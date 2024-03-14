@@ -1,0 +1,402 @@
+[
+  {
+    "nomeBeneficio": "Borsa di studio",
+    "codBeneficio": "BS",
+    "tipologiePagamenti": [
+      {
+        "nomeTipologiaPagamento": "Pagamento prima rata",
+        "categoria": [
+          {
+            "nomeCategoria": "Acconto prima rata",
+            "cod_categoria": "PR",
+            "daPagare": [
+              {
+                "Key": "A0",
+                "Value": "Emissione"
+              },
+              {
+                "Key": "A1",
+                "Value": "Prima Riemissione"
+              },
+              {
+                "Key": "A2",
+                "Value": "Seconda Riemissione"
+              }
+            ]
+          },
+          {
+            "nomeCategoria": "Prima rata",
+            "cod_categoria": "PR",
+            "daPagare": [
+              {
+                "Key": "P0",
+                "Value": "Emissione"
+              },
+              {
+                "Key": "P1",
+                "Value": "Prima Riemissione"
+              },
+              {
+                "Key": "P2",
+                "Value": "Seconda Riemissione"
+              }
+            ]
+          },
+          {
+            "nomeCategoria": "Integrazione prima rata",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "I0",
+                "Value": "Emissione"
+              },
+              {
+                "Key": "I1",
+                "Value": "Prima Riemissione"
+              },
+              {
+                "Key": "I2",
+                "Value": "Seconda Riemissione"
+              }
+            ]
+          },
+          {
+            "nomeCategoria": "Integrazione prima rata modifica Status Sede",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "I6",
+                "Value": "Emissione"
+              },
+              {
+                "Key": "I7",
+                "Value": "Prima Riemissione"
+              },
+              {
+                "Key": "I8",
+                "Value": "Seconda Riemissione"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "nomeTipologiaPagamento": "Pagamento Saldo",
+        "categoria": [
+          {
+            "nomeCategoria": "Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "S0",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "S1",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "S2",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          },
+          {
+            "nomeCategoria": "Integrazione Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "I9",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "IA",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "IB",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "nomeBeneficio": "Tassa regionale",
+    "codBeneficio": "TR",
+    "tipologiePagamenti": [
+      {
+        "nomeTipologiaPagamento": "Pagamento Tassa regionale",
+        "categoria": [
+          {
+            "nomeCategoria": "Tassa regionale",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "T0",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "T1",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "T2",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "nomeBeneficio": "Premio di laurea",
+    "codBeneficio": "PL",
+    "tipologiePagamenti": [
+      {
+        "nomeTipologiaPagamento": "Pagamento Saldo",
+        "categoria": [
+          {
+            "nomeCategoria": "Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "S0",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "S1",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "S2",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          },
+          {
+            "nomeCategoria": "Integrazione Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "I9",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "IA",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "IB",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "nomeBeneficio": "Contributo integrativo",
+    "codBeneficio": "CI",
+    "tipologiePagamenti": [
+      {
+        "nomeTipologiaPagamento": "Pagamento Saldo",
+        "categoria": [
+          {
+            "nomeCategoria": "Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "S0",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "S1",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "S2",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          },
+          {
+            "nomeCategoria": "Integrazione Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "I9",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "IA",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "IB",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "nomeBeneficio": "Buono libro",
+    "codBeneficio": "BL",
+    "tipologiePagamenti": [
+      {
+        "nomeTipologiaPagamento": "Pagamento Saldo",
+        "categoria": [
+          {
+            "nomeCategoria": "Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "S0",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "S1",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "S2",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          },
+          {
+            "nomeCategoria": "Integrazione Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "I9",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "IA",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "IB",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "nomeBeneficio": "Contributo alloggio",
+    "codBeneficio": "CA",
+    "tipologiePagamenti": [
+      {
+        "nomeTipologiaPagamento": "Prima rata",
+        "categoria": [
+          {
+            "nomeCategoria": "Pagamento prima rata",
+            "cod_categoria": "PR",
+            "daPagare": [
+              {
+                "Key": "P0",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "P1",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "P2",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "nomeTipologiaPagamento": "Pagamento Saldo",
+        "categoria": [
+          {
+            "nomeCategoria": "Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "S0",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "S1",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "S2",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          },
+          {
+            "nomeCategoria": "Integrazione Saldo",
+            "cod_categoria": "SA",
+            "daPagare": [
+              {
+                "Key": "I9",
+                "Value": "Emissione"
+
+              },
+              {
+                "Key": "IA",
+                "Value": "Prima Riemissione"
+
+              },
+              {
+                "Key": "IB",
+                "Value": "Seconda Riemissione"
+
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
