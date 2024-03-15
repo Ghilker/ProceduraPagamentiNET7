@@ -19,6 +19,7 @@ namespace ProcedureNet7.Storni
         List<Studente> studenti = new List<Studente>();
         List<Studente> studentiDaBloccare = new List<Studente>();
         List<Studente> studentiRimossi = new List<Studente>();
+        List<string> codFiscaliConErrori = new List<string>();
         public override void RunProcedure(ArgsProceduraStorni args)
         {
             _mainForm.inProcedure = true;
@@ -92,6 +93,10 @@ namespace ProcedureNet7.Storni
                         }
                         studentiDaBloccare.Add(studente);
                     }
+                    else
+                    {
+                        codFiscaliConErrori.Add(codFiscale);
+                    }
                 }
             }
 
@@ -147,6 +152,10 @@ namespace ProcedureNet7.Storni
                         string annoAccademico = reader["Anno_accademico"].ToString();
                         studente.SetStudenteAA(annoAccademico);
                     }
+                    else
+                    {
+                        codFiscaliConErrori.Add(codFiscale);
+                    }
                 }
             }
 
@@ -185,9 +194,30 @@ namespace ProcedureNet7.Storni
 
             _mainForm.inProcedure = false;
             _progress.Report((100, $"Fine lavorazione"));
+            Thread.Sleep(10);
             _progress.Report((100, $"Lavorati {studenti.Count} studenti"));
+            Thread.Sleep(10);
             _progress.Report((100, $"Di cui {studentiDaBloccare.Count} bloccati per IBAN"));
+            Thread.Sleep(10);
+            foreach (Studente studente in studentiDaBloccare)
+            {
+                _progress.Report((100, $"CF bloccato: {studente.codFiscale}"));
+                Thread.Sleep(10);
+            }
             _progress.Report((100, $"Rimossi {studentiRimossi.Count} per mancanza di dati/pagamento non inserito"));
+            Thread.Sleep(10);
+            foreach (Studente studente in studentiRimossi)
+            {
+                _progress.Report((100, $"CF rimosso: {studente.codFiscale}"));
+                Thread.Sleep(10);
+            }
+            _progress.Report((100, $"Rilevati {codFiscaliConErrori.Count} cod fiscale con errori"));
+            Thread.Sleep(10);
+            foreach (string studente in codFiscaliConErrori)
+            {
+                _progress.Report((100, $"CF errore: {studente}"));
+                Thread.Sleep(10);
+            }
             string test = "";
         }
 
@@ -214,8 +244,8 @@ namespace ProcedureNet7.Storni
                 DECLARE @utente varchar(20);
 
                 SET @Cod_tipologia_blocco = 'BSS';
-                SET @anno_accademico = @annoAcademico;
-                SET @utente = @utenteValue;
+                SET @anno_accademico = '{annoAccademico}';
+                SET @utente = '{utente}';
 
                 INSERT INTO Motivazioni_blocco_pagamenti
                     (Anno_accademico, Num_domanda, Cod_tipologia_blocco, Blocco_pagamento_attivo,
@@ -251,8 +281,6 @@ namespace ProcedureNet7.Storni
             ";
 
             using SqlCommand command = new(sql, conn);
-            _ = command.Parameters.AddWithValue("@annoAcademico", annoAccademico);
-            _ = command.Parameters.AddWithValue("@utenteValue", utente);
             _ = command.ExecuteNonQuery();
         }
 
