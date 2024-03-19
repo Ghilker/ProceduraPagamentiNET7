@@ -251,12 +251,20 @@ namespace ProcedureNet7
                                                 ,SUM(Imp_pagato) as Imp_pagato
                                                 FROM
                                                     pagamenti
-                                                WHERE Anno_accademico = @annoAccademico and ritirato_azienda = 0 AND cod_tipo_pagam in (
+                                                WHERE Anno_accademico = @annoAccademico and ritirato_azienda = 0 AND (
+                                                                    cod_tipo_pagam in (
+                                                                        SELECT DISTINCT Cod_tipo_pagam_new
+                                                                        FROM Decod_pagam_new inner join 
+                                                                            Tipologie_pagam_test on Decod_pagam_new.Cod_tipo_pagam_new = Tipologie_pagam_test.Cod_tipo_pagam 
+                                                                        WHERE Cod_beneficio = '{tipoBeneficio}'
+                                                                    ) OR
+                                                                    cod_tipo_pagam in (
                                                                         SELECT Cod_tipo_pagam_old 
                                                                         FROM Decod_pagam_new inner join 
                                                                             Tipologie_pagam_test on Decod_pagam_new.Cod_tipo_pagam_new = Tipologie_pagam_test.Cod_tipo_pagam 
                                                                         WHERE Cod_beneficio = '{tipoBeneficio}'
                                                                     )
+                                                                )
 									            GROUP BY Anno_accademico, Num_domanda
                                             )
 
@@ -292,6 +300,7 @@ namespace ProcedureNet7
                                                     AND cod_tipo_pagam in (
                                                             SELECT Cod_tipo_pagam_old FROM Decod_pagam_new WHERE Cod_tipo_pagam_new = '{codTipoPagamento}'
                                                         )
+                                                    OR cod_tipo_pagam = '{codTipoPagamento}'
                                                     )
 	                                            AND StatisticheTotali.num_domanda NOT IN(
                                                     SELECT
@@ -389,19 +398,19 @@ namespace ProcedureNet7
 
 
                     Studente studente = new Studente(
-                            reader["num_domanda"].ToString(),
-                            reader["cod_fiscale"].ToString().ToUpper(),
-                            reader["Cognome"].ToString(),
-                            reader["Nome"].ToString(),
+                            Utilities.RemoveAllSpaces(reader["num_domanda"].ToString()),
+                            Utilities.RemoveAllSpaces(reader["cod_fiscale"].ToString().ToUpper()),
+                            reader["Cognome"].ToString().Trim(),
+                            reader["Nome"].ToString().Trim(),
                             (DateTime)reader["Data_nascita"],
                             reader["sesso"].ToString(),
                             studenteCodEnte,
                             disabile == 1 ? true : false,
-                            double.TryParse(reader["imp_beneficio"].ToString(), out double importoBeneficio) ? importoBeneficio : 0,
+                            double.TryParse(Utilities.RemoveAllSpaces(reader["imp_beneficio"].ToString()), out double importoBeneficio) ? importoBeneficio : 0,
                             annoCorso,
-                            int.TryParse(reader["cod_corso"].ToString(), out int codCorso) ? codCorso : 0,
-                            reader["EsitoPA"].ToString() == "2" ? true : false,
-                            double.TryParse(reader["Imp_pagato"].ToString(), out double importoPagato) ? importoPagato : 0,
+                            int.TryParse(Utilities.RemoveAllSpaces(reader["cod_corso"].ToString()), out int codCorso) ? codCorso : 0,
+                            Utilities.RemoveAllSpaces(reader["EsitoPA"].ToString()) == "2" ? true : false,
+                            double.TryParse(Utilities.RemoveAllSpaces(reader["Imp_pagato"].ToString()), out double importoPagato) ? importoPagato : 0,
                             superamentoEsami == 1 ? true : false,
                             superamentoEsamiTassaRegionale == 1 ? true : false
                         );
@@ -421,7 +430,7 @@ namespace ProcedureNet7
                             FROM
                                 Pagamenti
                                 INNER JOIN Domanda ON Pagamenti.anno_accademico = Domanda.anno_accademico AND Pagamenti.num_domanda = Domanda.Num_domanda
-	                            INNER JOIN Decod_pagam_new ON Pagamenti.Cod_tipo_pagam = Decod_pagam_new.Cod_tipo_pagam_old
+	                            INNER JOIN Decod_pagam_new ON Pagamenti.Cod_tipo_pagam = Decod_pagam_new.Cod_tipo_pagam_old OR Pagamenti.Cod_tipo_pagam = Decod_pagam_new.Cod_tipo_pagam_new
 
                             WHERE
                                 Domanda.Anno_accademico = '{selectedAA}'
@@ -433,7 +442,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -640,7 +649,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -669,7 +678,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -702,7 +711,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -735,7 +744,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -1343,7 +1352,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -1372,7 +1381,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -1403,7 +1412,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -1421,7 +1430,7 @@ namespace ProcedureNet7
         void PopulateStudentDetrazioni(SqlConnection conn)
         {
             string dataQuery = $@"
-                    SELECT Domanda.Cod_fiscale, Reversali.*, (SELECT cod_tipo_pagam_new FROM Decod_pagam_new where Cod_tipo_pagam_old = Reversali.Cod_tipo_pagam) AS cod_tipo_pagam_new
+                    SELECT Domanda.Cod_fiscale, Reversali.*, (SELECT cod_tipo_pagam_new FROM Decod_pagam_new where Cod_tipo_pagam_old = Reversali.Cod_tipo_pagam OR Cod_tipo_pagam_new = Reversali.Cod_tipo_pagam) AS cod_tipo_pagam_new
                     FROM Domanda 
                     INNER JOIN #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale 
                     INNER JOIN Reversali ON Domanda.num_domanda = Reversali.num_domanda AND Domanda.Anno_accademico = Reversali.Anno_accademico
@@ -1434,7 +1443,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -1485,7 +1494,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
 
                     if (studente == null || reader["Cod_Stanza"].ToString() == "XXX")
@@ -1535,13 +1544,13 @@ namespace ProcedureNet7
                     {
 
                         AssegnazioneDataCheck result = studente.AddAssegnazione(
-                                 reader["cod_pensionato"].ToString(),
-                                 reader["cod_stanza"].ToString(),
-                                 DateTime.Parse(reader["data_decorrenza"].ToString()),
-                                 DateTime.TryParse(reader["data_fine_assegnazione"].ToString(), out DateTime date) ? date : new DateTime(2024, 07, 31),
-                                 reader["Cod_fine_assegnazione"].ToString(),
-                                 reader["tipo_stanza"].ToString(),
-                                 double.TryParse(reader["importo_mensile"].ToString(), out double importoMensile) ? importoMensile : 0,
+                                 reader["cod_pensionato"].ToString().Trim(),
+                                 reader["cod_stanza"].ToString().Trim(),
+                                 DateTime.Parse(reader["data_decorrenza"].ToString().Trim()),
+                                 DateTime.TryParse(reader["data_fine_assegnazione"].ToString().Trim(), out DateTime date) ? date : new DateTime(2024, 07, 31),
+                                 reader["Cod_fine_assegnazione"].ToString().Trim(),
+                                 reader["tipo_stanza"].ToString().Trim(),
+                                 double.TryParse(reader["importo_mensile"].ToString().Trim(), out double importoMensile) ? importoMensile : 0,
                                  new DateTime(2023, 10, 01),
                                  new DateTime(2024, 07, 31),
                                  studenteFuoriCorso || studenteDisabileFuoriCorso
@@ -1759,7 +1768,7 @@ namespace ProcedureNet7
                 while (reader.Read())
                 {
                     string impegnoToSet = "";
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                    string codFiscale = Utilities.RemoveAllSpaces(reader["Cod_fiscale"].ToString().ToUpper());
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
@@ -1861,9 +1870,8 @@ namespace ProcedureNet7
         {
             DataTable studentsData = new DataTable();
             string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam_test WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
-            string pagamentoDescrizione = "";
             SqlCommand cmd = new SqlCommand(sqlTipoPagam, conn);
-            pagamentoDescrizione = (string)cmd.ExecuteScalar();
+            string pagamentoDescrizione = (string)cmd.ExecuteScalar();
 
             string annoAccedemicoFileName = selectedAA.Substring(2, 2) + selectedAA.Substring(6, 2);
 
@@ -1884,10 +1892,9 @@ namespace ProcedureNet7
 
             foreach (string codEnte in sediStudi)
             {
-                string nomeCodEnte = "";
                 string sqlCodEnte = $"SELECT descrizione FROM Enti_di_gestione WHERE cod_ente = '{codEnte}'";
                 SqlCommand cmdSede = new SqlCommand(sqlCodEnte, conn);
-                nomeCodEnte = (string)cmdSede.ExecuteScalar();
+                string nomeCodEnte = (string)cmdSede.ExecuteScalar();
 
 
                 string nomePA = categoriaPagam == "PR" ? "ACCONTO PA" : "SALDO COSTO DEL SERVIZIO";
@@ -1929,9 +1936,8 @@ namespace ProcedureNet7
         {
             DataTable studentsData = new DataTable();
             string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam_test WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
-            string pagamentoDescrizione = "";
             SqlCommand cmd = new SqlCommand(sqlTipoPagam, conn);
-            pagamentoDescrizione = (string)cmd.ExecuteScalar();
+            string pagamentoDescrizione = (string)cmd.ExecuteScalar();
 
             string annoAccedemicoFileName = selectedAA.Substring(2, 2) + selectedAA.Substring(6, 2);
 

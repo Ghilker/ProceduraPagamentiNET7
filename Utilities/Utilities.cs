@@ -360,7 +360,15 @@ namespace ProcedureNet7
             }
             return path;
         }
+
+        public static string RemoveAllSpaces(string strimToTrim)
+        {
+            return strimToTrim.Replace(" ", "");
+        }
     }
+
+
+
     public class ProgressUpdater
     {
         private IProgress<(int, string)> _progress;
