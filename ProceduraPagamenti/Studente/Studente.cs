@@ -150,6 +150,13 @@ namespace ProcedureNet7
             detrazioni.Add(detrazione);
         }
 
+        public void RemoveAllAssegnazioni()
+        {
+            assegnazioni = null;
+            importoAccontoPA = 0;
+            importoSaldoPA = 0;
+        }
+
         public void SetInformations(
             long telefono,
             string email,

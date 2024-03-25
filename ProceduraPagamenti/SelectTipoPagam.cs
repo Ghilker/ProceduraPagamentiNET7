@@ -220,7 +220,14 @@ namespace ProcedureNet7
         {
             List<Beneficio> returnList = new List<Beneficio>();
 
-            string sql = "SELECT * FROM Tipologie_pagam_test";
+            string sql = @"
+                    SELECT     
+	                    Tipologie_benefici.Cod_beneficio, Tipologie_benefici.Descrizione, Tipologie_pagam.*
+                    FROM 
+	                    Tipologie_pagam 
+	                    INNER JOIN Tipologie_benefici ON Tipologie_benefici.Cod_beneficio = Left(Tipologie_pagam.cod_tipo_pagam, 2)
+                    WHERE        
+	                    (Tipologie_pagam.visibile IS NOT NULL)";
             SqlCommand cmd = new SqlCommand(sql, conn);
 
             using (SqlDataReader reader = cmd.ExecuteReader())
@@ -231,13 +238,13 @@ namespace ProcedureNet7
                     {
                         continue;
                     }
-                    string codBeneficio = reader["cod_beneficio"].ToString();
+                    string codBeneficio = reader["Cod_beneficio"].ToString().Substring(0, 2);
                     Beneficio beneficio = returnList.Find(b => b.codBeneficio == codBeneficio);
                     if (beneficio == null)
                     {
                         beneficio = new Beneficio
                         {
-                            nomeBeneficio = reader["descr_interno_tipo_beneficio"].ToString(),
+                            nomeBeneficio = reader["Descrizione"].ToString(),
                             codBeneficio = codBeneficio,
                             tipologiePagamenti = new List<TipologiaPagamento>()
                         };
@@ -272,7 +279,7 @@ namespace ProcedureNet7
 
                     DaPagareItem daPagareItem = new DaPagareItem
                     {
-                        Key = reader["cod_interno_pagam"].ToString(),
+                        Key = reader["cod_tipo_pagam"].ToString().Substring(2, 2),
                         Value = reader["descr_interno_tipo_emissione"].ToString()
                     };
 

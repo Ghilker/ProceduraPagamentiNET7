@@ -27,6 +27,8 @@ namespace ProcedureNet7
 
         public string _tipoProcedura { get; set; }
 
+        public bool _filtroManuale { get; set; }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             List<string> errorMessages = new List<string>();

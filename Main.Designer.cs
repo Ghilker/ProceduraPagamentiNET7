@@ -49,6 +49,7 @@
             openFileDialog = new OpenFileDialog();
             openFileDialogSecondary = new OpenFileDialog();
             panelProceduraPagamenti = new Panel();
+            proceduraPagamentiFiltroCheck = new CheckBox();
             label30 = new Label();
             pagamentiTipoProceduraCombo = new ComboBox();
             label26 = new Label();
@@ -256,6 +257,7 @@
             // 
             // panelProceduraPagamenti
             // 
+            panelProceduraPagamenti.Controls.Add(proceduraPagamentiFiltroCheck);
             panelProceduraPagamenti.Controls.Add(label30);
             panelProceduraPagamenti.Controls.Add(pagamentiTipoProceduraCombo);
             panelProceduraPagamenti.Controls.Add(label26);
@@ -272,6 +274,16 @@
             panelProceduraPagamenti.Name = "panelProceduraPagamenti";
             panelProceduraPagamenti.Size = new Size(658, 181);
             panelProceduraPagamenti.TabIndex = 24;
+            // 
+            // proceduraPagamentiFiltroCheck
+            // 
+            proceduraPagamentiFiltroCheck.AutoSize = true;
+            proceduraPagamentiFiltroCheck.Location = new Point(9, 119);
+            proceduraPagamentiFiltroCheck.Name = "proceduraPagamentiFiltroCheck";
+            proceduraPagamentiFiltroCheck.Size = new Size(102, 19);
+            proceduraPagamentiFiltroCheck.TabIndex = 25;
+            proceduraPagamentiFiltroCheck.Text = "Filtro Manuale";
+            proceduraPagamentiFiltroCheck.UseVisualStyleBackColor = true;
             // 
             // label30
             // 
@@ -489,9 +501,9 @@
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(680, 527);
+            Controls.Add(panelProceduraPagamenti);
             Controls.Add(panelStorni);
             Controls.Add(panelProceduraFlussoDiRitorno);
-            Controls.Add(panelProceduraPagamenti);
             Controls.Add(DatabaseInformations);
             Controls.Add(progressReport);
             Controls.Add(StartProcedureBtn);
@@ -558,6 +570,7 @@
         private Button storniFileBtn;
         private Label label31;
         private TextBox storniSelectedEseFinanziarioTxt;
+        private CheckBox proceduraPagamentiFiltroCheck;
     }
 }
 

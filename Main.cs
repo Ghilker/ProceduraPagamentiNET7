@@ -127,8 +127,9 @@ namespace ProcedureNet7
                             _numeroMandato = pagamentiNuovoMandatoTxt.Text,
                             _tipoProcedura = pagamentiSelectedTipoProcedura,
                             _vecchioMandato = pagamentiOldMandatoTxt.Text,
+                            _filtroManuale = proceduraPagamentiFiltroCheck.Checked,
                         };
-                        argsValidation.Validate(argsPagamenti);
+                        //argsValidation.Validate(argsPagamenti);
                         using (ProceduraPagamenti pagamenti = new ProceduraPagamenti(progress, this, CONNECTION_STRING))
                         {
                             pagamenti.RunProcedure(argsPagamenti);

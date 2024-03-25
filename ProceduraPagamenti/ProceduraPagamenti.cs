@@ -1,4 +1,6 @@
-﻿using System.Data;
+﻿using ProceduraPagamentiNET7.ProceduraPagamenti;
+using ProcedureNet7.Storni;
+using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
 using System.Text;
@@ -24,12 +26,20 @@ namespace ProcedureNet7
         string codTipoPagamento;
         string selectedImpegno;
         string categoriaPagam;
+        bool isIntegrazione = false;
+        bool isRiemissione = false;
+
+        bool usingFiltroManuale = false;
 
         List<Studente> listaStudentiDaPagare = new List<Studente>();
         Dictionary<Studente, List<string>> studentiConErroriPA = new Dictionary<Studente, List<string>>();
         List<Studente> listaStudentiDaNonPagare = new List<Studente>();
 
         List<string> impegniList = new List<string>();
+
+        Dictionary<string, string> dictQueryWhere;
+        string stringQueryWhere;
+        bool usingStringWhere = false;
 
         public ProceduraPagamenti(IProgress<(int, string)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
 
@@ -45,6 +55,9 @@ namespace ProcedureNet7
             selectedVecchioMandato = args._vecchioMandato;
             categoriaPagam = "";
             selectedCodEnte = "00";
+
+            usingFiltroManuale = args._filtroManuale;
+
             using SqlConnection conn = new(CONNECTION_STRING);
             conn.Open();
 
@@ -173,6 +186,44 @@ namespace ProcedureNet7
                 return;
             }
 
+            if (usingFiltroManuale)
+            {
+                _mainForm.Invoke((MethodInvoker)delegate
+                {
+                    using (FiltroManuale selectFiltroManuale = new FiltroManuale(conn, dbTableName))
+                    {
+                        selectFiltroManuale.StartPosition = FormStartPosition.CenterParent;
+                        DialogResult result = selectFiltroManuale.ShowDialog(_mainForm);
+
+                        if (result == DialogResult.OK)
+                        {
+                            TipoFiltro tipoFiltro = selectFiltroManuale.TipoFiltro;
+                            switch (tipoFiltro)
+                            {
+                                case TipoFiltro.filtroQuery:
+                                    usingStringWhere = true;
+                                    break;
+                                case TipoFiltro.filtroGuidato:
+                                    usingStringWhere = false;
+                                    break;
+                            }
+                            dictQueryWhere = selectFiltroManuale.DictWhereItems;
+                            stringQueryWhere = selectFiltroManuale.StringQueryWhere;
+                        }
+                        else if (result == DialogResult.Cancel)
+                        {
+                            exitProcedureEarly = true;
+                        }
+                    }
+                });
+            }
+
+            if (exitProcedureEarly)
+            {
+                _mainForm.inProcedure = false;
+                return;
+            }
+
             if (!string.IsNullOrWhiteSpace(selectedVecchioMandato))
             {
                 ClearMovimentiContabili(conn);
@@ -228,7 +279,7 @@ namespace ProcedureNet7
                                             imp_pagato DECIMAL(8,2),
                                             liquidabile CHAR(1),
                                             note VARCHAR(MAX),
-                                            togliere_loreto CHAR(1),
+                                            togliere_loreto VARCHAR(4),
                                             togliere_PEC CHAR(1)
                                         );");
             }
@@ -255,14 +306,14 @@ namespace ProcedureNet7
                                                                     cod_tipo_pagam in (
                                                                         SELECT DISTINCT Cod_tipo_pagam_new
                                                                         FROM Decod_pagam_new inner join 
-                                                                            Tipologie_pagam_test on Decod_pagam_new.Cod_tipo_pagam_new = Tipologie_pagam_test.Cod_tipo_pagam 
-                                                                        WHERE Cod_beneficio = '{tipoBeneficio}'
+                                                                            Tipologie_pagam on Decod_pagam_new.Cod_tipo_pagam_new = Tipologie_pagam.Cod_tipo_pagam 
+                                                                        WHERE LEFT(Cod_tipo_pagam,2) = '{tipoBeneficio}' AND visibile = 1
                                                                     ) OR
                                                                     cod_tipo_pagam in (
                                                                         SELECT Cod_tipo_pagam_old 
                                                                         FROM Decod_pagam_new inner join 
-                                                                            Tipologie_pagam_test on Decod_pagam_new.Cod_tipo_pagam_new = Tipologie_pagam_test.Cod_tipo_pagam 
-                                                                        WHERE Cod_beneficio = '{tipoBeneficio}'
+                                                                            Tipologie_pagam on Decod_pagam_new.Cod_tipo_pagam_new = Tipologie_pagam.Cod_tipo_pagam 
+                                                                        WHERE LEFT(Cod_tipo_pagam,2) = '{tipoBeneficio}' AND visibile = 1
                                                                     )
                                                                 )
 									            GROUP BY Anno_accademico, Num_domanda
@@ -302,14 +353,6 @@ namespace ProcedureNet7
                                                         )
                                                     OR cod_tipo_pagam = '{codTipoPagamento}'
                                                     )
-	                                            AND StatisticheTotali.num_domanda NOT IN(
-                                                    SELECT
-                                                        num_domanda
-                                                    FROM
-                                                        pagamenti
-                                                    WHERE anno_accademico=@annoAccademico 
-                                                    AND cod_tipo_pagam = '{codTipoPagamento}'
-                                                    )
                                             ");
 
             string sqlQuery = queryBuilder.ToString();
@@ -346,15 +389,83 @@ namespace ProcedureNet7
         }
         void GenerateStudentListToPay(SqlConnection conn)
         {
-            _progress.Report((20, "Generazione studenti"));
-
-            int totalRows = 0;
-            using (SqlCommand countCommand = new SqlCommand($"SELECT COUNT(*) FROM {dbTableName} WHERE anno_accademico = '{selectedAA}' AND cod_beneficio = '{tipoBeneficio}' AND liquidabile = '1' AND Togliere_loreto = '0' AND Togliere_PEC = '0'", conn))
+            string dataQuery = $"SELECT * FROM {dbTableName}";
+            if (usingFiltroManuale)
             {
-                totalRows = (int)countCommand.ExecuteScalar();
+                if (usingStringWhere)
+                {
+                    if (!stringQueryWhere.TrimStart().StartsWith("WHERE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        stringQueryWhere = "WHERE " + stringQueryWhere;
+                    }
+                    dataQuery = dataQuery + $@" {stringQueryWhere}";
+                }
+                else
+                {
+                    StringBuilder conditionalBuilder = new StringBuilder();
+                    if (dictQueryWhere["Sesso"] != "''")
+                    {
+                        conditionalBuilder.Append($" sesso in ({dictQueryWhere["Sesso"]}) AND ");
+                    }
+                    if (dictQueryWhere["StatusSede"] != "''")
+                    {
+                        conditionalBuilder.Append($" status_sede in ({dictQueryWhere["StatusSede"]}) AND ");
+                    }
+                    if (dictQueryWhere["Cittadinanza"] != "''")
+                    {
+                        conditionalBuilder.Append($" cod_cittadinanza in ({dictQueryWhere["Cittadinanza"]}) AND ");
+                    }
+                    if (dictQueryWhere["CodEnte"] != "''")
+                    {
+                        conditionalBuilder.Append($" cod_ente in ({dictQueryWhere["CodEnte"]}) AND ");
+                    }
+                    if (dictQueryWhere["EsitoPA"] != "''")
+                    {
+                        conditionalBuilder.Append($" esitoPA in ({dictQueryWhere["EsitoPA"]}) AND ");
+                    }
+                    if (dictQueryWhere["AnnoCorso"] != "''")
+                    {
+                        conditionalBuilder.Append($" anno_corso in ({dictQueryWhere["AnnoCorso"]}) AND ");
+                    }
+                    if (dictQueryWhere["Disabile"] != "''")
+                    {
+                        conditionalBuilder.Append($" disabile in ({dictQueryWhere["Disabile"]}) AND ");
+                    }
+                    if (dictQueryWhere["TipoCorso"] != "''")
+                    {
+                        conditionalBuilder.Append($" cod_corso in ({dictQueryWhere["TipoCorso"]}) AND ");
+                    }
+                    if (dictQueryWhere["SedeStudi"] != "''")
+                    {
+                        conditionalBuilder.Append($" sede_studi in ({dictQueryWhere["SedeStudi"]}) AND ");
+                    }
+                    if (dictQueryWhere["TogliereLoreto"] != "''")
+                    {
+                        conditionalBuilder.Append($" togliere_loreto IN ({dictQueryWhere["TogliereLoreto"]}) AND ");
+                    }
+
+                    if (conditionalBuilder.Length > 0)
+                    {
+                        conditionalBuilder.Length -= " AND ".Length;
+                    }
+
+                    string whereString = conditionalBuilder.ToString();
+                    dataQuery += $" WHERE anno_accademico = '{selectedAA}' AND cod_beneficio = '{tipoBeneficio}' AND liquidabile = '1' AND Togliere_PEC = '0' AND " + whereString;
+
+                    if (conditionalBuilder.Length <= 0)
+                    {
+                        _progress.Report((100, "Errore nella costruzione della query - Selezionare almeno un parametro se si usa il filtro manuale"));
+                        _mainForm.inProcedure = false;
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                dataQuery += $@" WHERE anno_accademico = '{selectedAA}' AND cod_beneficio = '{tipoBeneficio}' AND liquidabile = '1' AND Togliere_loreto = '0' AND Togliere_PEC = '0'";
             }
 
-            string dataQuery = $@"SELECT * FROM {dbTableName} WHERE anno_accademico = '{selectedAA}' AND cod_beneficio = '{tipoBeneficio}' AND liquidabile = '1' AND Togliere_loreto = '0' AND Togliere_PEC = '0'";
+            _progress.Report((20, "Generazione studenti"));
 
             SqlCommand readData = new(dataQuery, conn)
             {
@@ -430,6 +541,7 @@ namespace ProcedureNet7
                             FROM
                                 Pagamenti
                                 INNER JOIN Domanda ON Pagamenti.anno_accademico = Domanda.anno_accademico AND Pagamenti.num_domanda = Domanda.Num_domanda
+                                INNER JOIN #CFestrazione cf ON Domanda.cod_fiscale = cf.Cod_fiscale
 	                            INNER JOIN Decod_pagam_new ON Pagamenti.Cod_tipo_pagam = Decod_pagam_new.Cod_tipo_pagam_old OR Pagamenti.Cod_tipo_pagam = Decod_pagam_new.Cod_tipo_pagam_new
 
                             WHERE
@@ -485,9 +597,14 @@ namespace ProcedureNet7
             string lastValue = codTipoPagamento.Substring(3);
             string firstPart = codTipoPagamento.Substring(0, 3);
             string integrazioneValue = codTipoPagamento.Substring(2, 1);
+            if (integrazioneValue == "I")
+            {
+                isIntegrazione = true;
+            }
             if (lastValue != "0" && lastValue != "9" && lastValue != "6")
             {
                 ControlloRiemissioni(firstPart, lastValue);
+                isRiemissione = true;
             }
             else if (integrazioneValue == "I")
             {
@@ -732,9 +849,9 @@ namespace ProcedureNet7
                                 AND tipo_bando = 'lz' 
                                 AND TIPO_LUOGO = 'DOL'
                                 AND DATA_FINE_VALIDITA IS NULL
-                                AND INDIRIZZO = ''
+                                AND (INDIRIZZO = '' OR INDIRIZZO = 'ROMA' OR INDIRIZZO = 'CASSINO' OR INDIRIZZO = 'FROSINONE')
                                 AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vResidenza where ANNO_ACCADEMICO = 20232024 AND provincia_residenza = 'ee')
-                                AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vDomicilio where ANNO_ACCADEMICO = 20232024 AND (Indirizzo_domicilio = '' or prov = 'EE'))
+                                AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vDomicilio where ANNO_ACCADEMICO = 20232024 AND (Indirizzo_domicilio = '' or Indirizzo_domicilio = 'ROMA' or Indirizzo_domicilio = 'CASSINO' or Indirizzo_domicilio = 'FROSINONE'  or prov = 'EE'))
 	                            AND Indirizzo_PEC IS NULL
                             ";
             SqlCommand nonPecCmd = new(sqlStudentiPecKiller, conn);
@@ -843,7 +960,10 @@ namespace ProcedureNet7
                 if (tipoBeneficio == "BS")
                 {
                     PopulateStudentDetrazioni(conn);
-                    PopulateStudentiAssegnazioni(conn);
+                    if (!isIntegrazione)
+                    {
+                        PopulateStudentiAssegnazioni(conn);
+                    }
                 }
 
                 PopulateStudentiImpegni(conn);
@@ -1150,7 +1270,7 @@ namespace ProcedureNet7
             string secondHalfAA = selectedAA.Substring(6, 2);
             string baseFolderPath = Utilities.EnsureDirectory(Path.Combine(selectedSaveFolder, currentMonthName + currentYear + "_" + firstHalfAA + secondHalfAA));
 
-            string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam_test WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
+            string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
             SqlCommand cmd = new SqlCommand(sqlTipoPagam, conn);
             string pagamentoDescrizione = (string)cmd.ExecuteScalar();
             string beneficioFolderPath = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, pagamentoDescrizione));
@@ -1161,8 +1281,20 @@ namespace ProcedureNet7
             foreach (string impegno in impegnoList)
             {
                 _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno}"));
-                string currentFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}"));
+                string sqlImpegno = $"SELECT Descr FROM Impegni WHERE anno_accademico = '{selectedAA}' AND num_impegno = '{impegno}' AND categoria_pagamento = '{categoriaPagam}'";
+                SqlCommand cmdImpegno = new SqlCommand(sqlImpegno, conn);
+                string impegnoDescrizione = (string)cmdImpegno.ExecuteScalar();
+                string currentFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
                 ProcessImpegno(conn, impegno, currentFolder);
+            }
+
+            var studentiSenzaImpegno = listaStudentiDaPagare
+                .Where(s => string.IsNullOrWhiteSpace(s.numeroImpegno))
+                .ToList();
+            if (studentiSenzaImpegno.Any())
+            {
+                DataTable studentiSenzaImpegnoTable = GenerateDataTableFromList(studentiSenzaImpegno);
+                Utilities.WriteDataTableToTextFile(studentiSenzaImpegnoTable, beneficioFolderPath, "Studenti Senza Impegno");
             }
 
             _progress.Report((60, $"UPDATE:Lavorazione studenti - Generazione files - Completato"));
@@ -1178,6 +1310,7 @@ namespace ProcedureNet7
                 GenerateOutputFilesPA(conn, currentFolder, groupedStudents, impegno);
             }
         }
+
         private void GenerateOutputFilesPA(SqlConnection conn, string currentFolder, List<Studente> studentsWithSameImpegno, string impegno)
         {
             _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Senza detrazioni"));
@@ -1314,22 +1447,22 @@ namespace ProcedureNet7
                 double totaleParzialePA = 0;
                 foreach (Assegnazione assegnazione in studente.assegnazioni)
                 {
+                    double roundedCostoServizioPA = 0;
                     costoPA = Math.Round(assegnazione.costoTotale, 2);
                     accontoPA = Math.Round(studente.importoAccontoPA, 2);
                     costoServizioPA += costoPA;
-                    costoServizioPA = Math.Round(costoServizioPA, 2);
-                    returnDataTable.Rows.Add(" ", costoPA, costoServizioPA, assegnazione.codPensionato, assegnazione.codTipoStanza, assegnazione.dataDecorrenza, assegnazione.dataFineAssegnazione, (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days);
+                    roundedCostoServizioPA = Math.Round(costoServizioPA, 2);
+                    returnDataTable.Rows.Add(" ", costoPA, roundedCostoServizioPA, assegnazione.codPensionato, assegnazione.codTipoStanza, assegnazione.dataDecorrenza, assegnazione.dataFineAssegnazione, (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days);
                 }
                 costoServizioPA = Math.Round(costoServizioPA, 2);
                 returnDataTable.Rows.Add(" ");
                 returnDataTable.Rows.Add(" ", studente.cognome, studente.nome);
                 returnDataTable.Rows.Add(" ", "Importo borsa totale", studente.importoBeneficio);
-                returnDataTable.Rows.Add(" ", "Prima rata", studente.importoBeneficio / 2);
                 returnDataTable.Rows.Add(" ", "Costo servizio PA", costoServizioPA);
                 returnDataTable.Rows.Add(" ", "Acconto PA", studente.importoAccontoPA);
-                returnDataTable.Rows.Add(" ", "Saldo PA", costoServizioPA - studente.importoAccontoPA);
+                returnDataTable.Rows.Add(" ", "Saldo PA", Math.Round(costoServizioPA - studente.importoAccontoPA, 2));
                 returnDataTable.Rows.Add(" ");
-                returnDataTable.Rows.Add(" ", "Saldo", $"Lordo = {studente.importoBeneficio}", $"Ritenuta = {costoServizioPA - accontoPA}", $"Netto = {studente.importoBeneficio - (costoServizioPA - accontoPA)}");
+                returnDataTable.Rows.Add(" ", "Saldo", $"Lordo = {Math.Round(studente.importoDaPagareLordo)}", $"Ritenuta = {Math.Round(costoServizioPA - accontoPA)}", $"Netto = {Math.Round(studente.importoDaPagareLordo - (costoServizioPA - accontoPA))}");
                 returnDataTable.Rows.Add(" ");
                 returnDataTable.Rows.Add(" ");
                 progressivo++;
@@ -1430,7 +1563,7 @@ namespace ProcedureNet7
         void PopulateStudentDetrazioni(SqlConnection conn)
         {
             string dataQuery = $@"
-                    SELECT Domanda.Cod_fiscale, Reversali.*, (SELECT cod_tipo_pagam_new FROM Decod_pagam_new where Cod_tipo_pagam_old = Reversali.Cod_tipo_pagam OR Cod_tipo_pagam_new = Reversali.Cod_tipo_pagam) AS cod_tipo_pagam_new
+                    SELECT Domanda.Cod_fiscale, Reversali.*, (SELECT DISTINCT cod_tipo_pagam_new FROM Decod_pagam_new where Cod_tipo_pagam_old = Reversali.Cod_tipo_pagam OR Cod_tipo_pagam_new = Reversali.Cod_tipo_pagam) AS cod_tipo_pagam_new
                     FROM Domanda 
                     INNER JOIN #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale 
                     INNER JOIN Reversali ON Domanda.num_domanda = Reversali.num_domanda AND Domanda.Anno_accademico = Reversali.Anno_accademico
@@ -1728,7 +1861,7 @@ namespace ProcedureNet7
                 {
                     foreach (Detrazione detrazione in studente.detrazioni)
                     {
-                        if (!detrazione.daContabilizzare)
+                        if (!detrazione.daContabilizzare && detrazione.codReversale == "01" && tipoBeneficio == "BS")
                         {
                             continue;
                         }
@@ -1746,6 +1879,11 @@ namespace ProcedureNet7
                 }
 
                 studente.SetImportoDaPagare(importoDaPagare);
+                if (isRiemissione)
+                {
+                    studente.SetImportoDaPagareLordo(importoDaPagare);
+                    studente.RemoveAllAssegnazioni();
+                }
             }
 
             listaStudentiDaPagare.RemoveAll(studentiDaRimuovereDalPagamento.Contains);
@@ -1866,10 +2004,26 @@ namespace ProcedureNet7
             }
             return studentsData;
         }
+        private DataTable GenerateDataTableFromList(List<Studente> studentiSenzaImpegno)
+        {
+            DataTable table = new DataTable();
+            table.Columns.Add("Codice Fiscale", typeof(string));
+            table.Columns.Add("Num Domanda", typeof(string));
+            foreach (var student in studentiSenzaImpegno)
+            {
+                DataRow row = table.NewRow();
+                row["Codice Fiscale"] = student.codFiscale;
+                row["Num Domanda"] = student.numDomanda;
+                table.Rows.Add(row);
+            }
+
+            return table;
+        }
+
         private DataTable GenerareExcelDataTableConDetrazioni(SqlConnection conn, List<Studente> studentiDaGenerare, List<string> sediStudi, string impegno)
         {
             DataTable studentsData = new DataTable();
-            string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam_test WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
+            string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
             SqlCommand cmd = new SqlCommand(sqlTipoPagam, conn);
             string pagamentoDescrizione = (string)cmd.ExecuteScalar();
 
@@ -1935,7 +2089,7 @@ namespace ProcedureNet7
         private DataTable GenerareExcelDataTableNoDetrazioni(SqlConnection conn, List<Studente> studentiDaGenerare, string impegno)
         {
             DataTable studentsData = new DataTable();
-            string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam_test WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
+            string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
             SqlCommand cmd = new SqlCommand(sqlTipoPagam, conn);
             string pagamentoDescrizione = (string)cmd.ExecuteScalar();
 

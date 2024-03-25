@@ -320,27 +320,174 @@ namespace ProcedureNet7
             return newDataGridView;
         }
 
-        public static void CreateDropDownMenu(ref Button buttonToUse, ref ContextMenuStrip contextMenuStrip, Dictionary<string, string> dictionaryToUse, bool allActive = false)
+        public static void CreateDropDownMenu(ref Button buttonToUse, ref ContextMenuStrip contextMenuStrip, Dictionary<string, string> dictionaryToUse, bool allActive = false, int visibleItemCount = 30, bool clean = false)
         {
             contextMenuStrip = new ContextMenuStrip();
+            Button localButtonToUse = buttonToUse;
+            // List to hold all menu items
+            List<ToolStripMenuItem> allMenuItems = new List<ToolStripMenuItem>();
+            List<string> selectedItems = new List<string>();
             foreach (KeyValuePair<string, string> item in dictionaryToUse)
             {
-                ToolStripMenuItem menuItem = new($"{item.Key} - {item.Value}")
+                ToolStripMenuItem menuItem = null;
+                if (clean)
                 {
-                    CheckOnClick = true,
-                    Checked = allActive
+                    menuItem = new ToolStripMenuItem($"{item.Value}")
+                    {
+                        CheckOnClick = true,
+                        Checked = allActive,
+                        Font = new Font("Segoe UI", 10, FontStyle.Regular),
+                        Tag = item.Key
+                    };
+                }
+                else
+                {
+                    menuItem = new ToolStripMenuItem($"{item.Key} - {item.Value}")
+                    {
+                        CheckOnClick = true,
+                        Checked = allActive,
+                        Font = new Font("Segoe UI", 10, FontStyle.Regular),
+                        Tag = item.Key
+                    };
+                }
+
+                menuItem.Click += (sender, e) =>
+                {
+                    ToolStripMenuItem clickedItem = sender as ToolStripMenuItem;
+                    if (clickedItem != null)
+                    {
+                        // Check if the item is being selected or deselected
+                        if (clickedItem.Checked)
+                        {
+                            // Add the item's key to the list of selected items
+                            selectedItems.Add(clickedItem.Tag.ToString());
+                        }
+                        else
+                        {
+                            // Remove the item's key from the list of selected items
+                            selectedItems.Remove(clickedItem.Tag.ToString());
+                        }
+
+                        // Update the button's text with all selected item keys, joined by commas
+                        localButtonToUse.Text = string.Join(", ", selectedItems);
+
+                        if (selectedItems.Count > 0)
+                        {
+                            AdjustFontSizeToFit(localButtonToUse, localButtonToUse.Text);
+                        }
+                        else
+                        {
+                            // Reset font size to default if no items are selected
+                            localButtonToUse.Font = new Font(localButtonToUse.Font.FontFamily, 10, FontStyle.Regular);
+                        }
+                    }
                 };
-                _ = contextMenuStrip.Items.Add(menuItem);
+
+                allMenuItems.Add(menuItem);
             }
 
+            int scrollPosition = 0; // Track the current scroll position
+
             ContextMenuStrip localMenuStrip = contextMenuStrip;
-            Button localButtonToUse = buttonToUse;
-            // Use a Button click event to show the menu
+
+            void InitialPopulation()
+            {
+                localMenuStrip.Items.Clear();
+                for (int i = 0; i < Math.Min(visibleItemCount, allMenuItems.Count); i++)
+                {
+                    localMenuStrip.Items.Add(allMenuItems[i]);
+                }
+            }
+
+            void AdjustFontSizeToFit(Button button, string text)
+            {
+                using (Graphics g = button.CreateGraphics())
+                {
+                    float fontSize = button.Font.Size;
+                    SizeF stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
+
+                    // Try increasing font size until the text size exceeds the button's dimensions
+                    while (true)
+                    {
+                        SizeF newSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize + 0.2f));
+
+                        // Check if increasing makes the text too large for the button's width or height
+                        if (newSize.Width > button.Width - 10 || newSize.Height > button.Height - 10) // 10 is a buffer to avoid text touching the button edges
+                        {
+                            break; // Stop if the next size would exceed the button's dimensions
+                        }
+                        else
+                        {
+                            fontSize += 0.2f; // Increase font size by small increments
+                            stringSize = newSize;
+                        }
+                    }
+
+                    // Decrease font size if the text size exceeds the button's width or height
+                    while ((stringSize.Width > button.Width - 10 || stringSize.Height > button.Height - 10) && fontSize > 1)
+                    {
+                        fontSize -= 0.2f; // Decrease font size by small increments
+                        stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
+                    }
+
+                    // Apply the calculated font size to the button
+                    button.Font = new Font(button.Font.FontFamily, fontSize, button.Font.Style);
+                }
+            }
+
+
+
+            void UpdateVisibleItems(int newScrollPosition, int delta)
+            {
+                if (delta > 0) // Scrolling down
+                {
+                    for (int i = 0; i < delta; i++)
+                    {
+                        if (localMenuStrip.Items.Count >= visibleItemCount)
+                        {
+                            localMenuStrip.Items.RemoveAt(0);
+                        }
+                        if (newScrollPosition + visibleItemCount - 1 + i < allMenuItems.Count)
+                        {
+                            localMenuStrip.Items.Add(allMenuItems[newScrollPosition + visibleItemCount - 1 + i]);
+                        }
+                    }
+                }
+                else if (delta < 0) // Scrolling up
+                {
+                    for (int i = delta; i < 0; i++)
+                    {
+                        if (localMenuStrip.Items.Count >= visibleItemCount)
+                        {
+                            localMenuStrip.Items.RemoveAt(localMenuStrip.Items.Count - 1);
+                        }
+                        if (newScrollPosition - i < allMenuItems.Count)
+                        {
+                            localMenuStrip.Items.Insert(0, allMenuItems[newScrollPosition - i]);
+                        }
+                    }
+                }
+            }
+
             buttonToUse.Click += (sender, e) =>
             {
+                InitialPopulation(); // Populate the initial set of items
                 localMenuStrip.Show(localButtonToUse, new Point(0, localButtonToUse.Height));
             };
+
+            contextMenuStrip.MouseWheel += (sender, e) =>
+            {
+                int previousScrollPosition = scrollPosition;
+                scrollPosition -= Math.Sign(e.Delta) * 3; // Smoother scroll with smaller step
+                scrollPosition = Math.Max(0, Math.Min(scrollPosition, allMenuItems.Count - visibleItemCount));
+
+                int delta = scrollPosition - previousScrollPosition;
+
+                UpdateVisibleItems(scrollPosition, delta); // Update visible items based on scroll
+            };
         }
+
+
 
         public static void RemoveDropDownMenu(ref Button buttonToUse, ref ContextMenuStrip contextMenuStrip)
         {
