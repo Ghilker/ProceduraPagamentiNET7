@@ -41,6 +41,8 @@ namespace ProcedureNet7
         string stringQueryWhere;
         bool usingStringWhere = false;
 
+        bool isTR = false;
+
         public ProceduraPagamenti(IProgress<(int, string)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
 
         public override void RunProcedure(ArgsPagamenti args)
@@ -55,7 +57,6 @@ namespace ProcedureNet7
             selectedVecchioMandato = args._vecchioMandato;
             categoriaPagam = "";
             selectedCodEnte = "00";
-
             usingFiltroManuale = args._filtroManuale;
 
             using SqlConnection conn = new(CONNECTION_STRING);
@@ -78,6 +79,11 @@ namespace ProcedureNet7
                     {
                         selectedTipoPagamento = selectTipoPagam.SelectedCodPagamento;
                         tipoBeneficio = selectTipoPagam.SelectedTipoBeneficio;
+                        if (tipoBeneficio == "TR")
+                        {
+                            tipoBeneficio = "BS";
+                            isTR = true;
+                        }
                         categoriaPagam = selectTipoPagam.SelectedCategoriaBeneficio;
                     }
                     else if (result == DialogResult.Cancel)
@@ -92,7 +98,6 @@ namespace ProcedureNet7
                 _mainForm.inProcedure = false;
                 return;
             }
-
             codTipoPagamento = tipoBeneficio + selectedTipoPagamento;
 
             if (string.IsNullOrWhiteSpace(selectedTipoPagamento) || string.IsNullOrWhiteSpace(tipoBeneficio))
@@ -102,7 +107,8 @@ namespace ProcedureNet7
             }
             _mainForm.Invoke((MethodInvoker)delegate
             {
-                using (SelectPagamentoSettings selectPagamentoSettings = new SelectPagamentoSettings(conn, selectedAA, tipoBeneficio, categoriaPagam))
+                string currentTipoBeneficio = isTR ? "TR" : tipoBeneficio;
+                using (SelectPagamentoSettings selectPagamentoSettings = new SelectPagamentoSettings(conn, selectedAA, currentTipoBeneficio, categoriaPagam))
                 {
                     selectPagamentoSettings.StartPosition = FormStartPosition.CenterParent;
                     DialogResult dialogResult = selectPagamentoSettings.ShowDialog(_mainForm);
@@ -398,7 +404,7 @@ namespace ProcedureNet7
                     {
                         stringQueryWhere = "WHERE " + stringQueryWhere;
                     }
-                    dataQuery = dataQuery + $@" {stringQueryWhere}";
+                    dataQuery = dataQuery + $@" {stringQueryWhere} AND anno_accademico = '{selectedAA}' AND cod_beneficio = '{tipoBeneficio}' AND liquidabile = '1' AND Togliere_PEC = '0'";
                 }
                 else
                 {
@@ -845,13 +851,13 @@ namespace ProcedureNet7
                             SELECT LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE, Indirizzo_PEC 
                             FROM LUOGO_REPERIBILITA_STUDENTE
                             LEFT OUTER JOIN vProfilo ON LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE = vProfilo.Cod_Fiscale 
-                            WHERE ANNO_ACCADEMICO = 20232024 
+                            WHERE ANNO_ACCADEMICO = {selectedAA} 
                                 AND tipo_bando = 'lz' 
                                 AND TIPO_LUOGO = 'DOL'
                                 AND DATA_FINE_VALIDITA IS NULL
                                 AND (INDIRIZZO = '' OR INDIRIZZO = 'ROMA' OR INDIRIZZO = 'CASSINO' OR INDIRIZZO = 'FROSINONE')
-                                AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vResidenza where ANNO_ACCADEMICO = 20232024 AND provincia_residenza = 'ee')
-                                AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vDomicilio where ANNO_ACCADEMICO = 20232024 AND (Indirizzo_domicilio = '' or Indirizzo_domicilio = 'ROMA' or Indirizzo_domicilio = 'CASSINO' or Indirizzo_domicilio = 'FROSINONE'  or prov = 'EE'))
+                                AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vResidenza where ANNO_ACCADEMICO = '{selectedAA}' AND provincia_residenza = 'ee')
+                                AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vDomicilio where ANNO_ACCADEMICO = '{selectedAA}' AND (Indirizzo_domicilio = '' or Indirizzo_domicilio = 'ROMA' or Indirizzo_domicilio = 'CASSINO' or Indirizzo_domicilio = 'FROSINONE'  or prov = 'EE'))
 	                            AND Indirizzo_PEC IS NULL
                             ";
             SqlCommand nonPecCmd = new(sqlStudentiPecKiller, conn);
@@ -947,9 +953,10 @@ namespace ProcedureNet7
                 SqlCommand insertCmd = new(insertQuery, conn);
                 insertCmd.ExecuteNonQuery();
             }
-
-            FilterPagamenti(conn);
-
+            if (!isTR)
+            {
+                FilterPagamenti(conn);
+            }
             CheckLiquefazione(conn);
 
             if (listaStudentiDaPagare.Count > 0)
@@ -957,7 +964,7 @@ namespace ProcedureNet7
                 PopulateStudentLuogoNascita(conn);
                 PopulateStudentResidenza(conn);
                 PopulateStudentInformation(conn);
-                if (tipoBeneficio == "BS")
+                if (tipoBeneficio == "BS" && !isTR)
                 {
                     PopulateStudentDetrazioni(conn);
                     if (!isIntegrazione)
@@ -985,279 +992,359 @@ namespace ProcedureNet7
 
         private void InsertIntoMovimentazioni(SqlConnection conn)
         {
-            _progress.Report((80, $"Lavorazione studenti - Inserimento in movimenti contabili"));
-            Dictionary<int, Studente> codMovimentiPerStudente = new Dictionary<int, Studente>();
-
-            int lastCodiceMovimento = 0;
-            string sqlCodMovimento = $"SELECT TOP(1) CODICE_MOVIMENTO FROM MOVIMENTI_CONTABILI_GENERALI ORDER BY CODICE_MOVIMENTO DESC";
-            SqlCommand cmdCM = new SqlCommand(sqlCodMovimento, conn);
-            object result = cmdCM.ExecuteScalar();
-            if (result != null)
+            try
             {
-                lastCodiceMovimento = Convert.ToInt32(result);
-            }
+                _progress.Report((80, $"Lavorazione studenti - Inserimento in movimenti contabili"));
+                Dictionary<int, Studente> codMovimentiPerStudente = new Dictionary<int, Studente>();
 
-            int nextCodiceMovimento = lastCodiceMovimento + 1;
-
-            const int batchSize = 1000;
-            string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_GENERALI (ID_CAUSALE_MOVIMENTO_GENERALE, IMPORTO_MOVIMENTO, UTENTE_VALIDAZIONE, DATA_VALIDITA_MOVIMENTO_GENERALE, NOTE_VALIDAZIONE_MOVIMENTO, COD_MANDATO) VALUES ";
-            string note = "Inserimento tramite elaborazione file pagamenti";
-            int numberOfBatches = (int)Math.Ceiling((double)listaStudentiDaPagare.Count / batchSize);
-
-            StringBuilder finalQueryBuilder = new StringBuilder();
-            _progress.Report((80, $"Lavorazione studenti - Movimenti contabili generali - batch n°0"));
-            for (int batchNumber = 0; batchNumber < numberOfBatches; batchNumber++)
-            {
-                StringBuilder queryBuilder = new StringBuilder();
-                queryBuilder.Append(baseSqlInsert);
-
-                var batch = listaStudentiDaPagare.Skip(batchNumber * batchSize).Take(batchSize);
-
-                List<string> valuesList = new List<string>();
-
-                foreach (Studente studente in batch)
+                int lastCodiceMovimento = 0;
+                string sqlCodMovimento = $"SELECT TOP(1) CODICE_MOVIMENTO FROM MOVIMENTI_CONTABILI_GENERALI ORDER BY CODICE_MOVIMENTO DESC";
+                SqlCommand cmdCM = new SqlCommand(sqlCodMovimento, conn);
+                object result = cmdCM.ExecuteScalar();
+                if (result != null)
                 {
-                    string studenteValues = string.Format("('{0}', {1}, '{2}', '{3}', '{4}', '{5}')",
-                        codTipoPagamento,
-                        studente.importoDaPagare.ToString(CultureInfo.InvariantCulture),
-                        "sa",
-                        DateTime.Now.ToString("dd/MM/yyyy"),
-                        note,
-                        selectedNumeroMandato);
-
-                    valuesList.Add(studenteValues);
-                    codMovimentiPerStudente.Add(nextCodiceMovimento, studente);
-                    nextCodiceMovimento++;
+                    lastCodiceMovimento = Convert.ToInt32(result);
                 }
 
-                queryBuilder.Append(string.Join(",", valuesList));
-                queryBuilder.Append("; ");
+                int nextCodiceMovimento = lastCodiceMovimento + 1;
 
-                finalQueryBuilder.Append(queryBuilder.ToString());
-                _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili generali - batch n°{batchNumber}"));
+                const int batchSize = 1000;
+                string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_GENERALI (ID_CAUSALE_MOVIMENTO_GENERALE, IMPORTO_MOVIMENTO, UTENTE_VALIDAZIONE, DATA_VALIDITA_MOVIMENTO_GENERALE, NOTE_VALIDAZIONE_MOVIMENTO, COD_MANDATO) VALUES ";
+                string note = "Inserimento tramite elaborazione file pagamenti";
+                int numberOfBatches = (int)Math.Ceiling((double)listaStudentiDaPagare.Count / batchSize);
+
+                StringBuilder finalQueryBuilder = new StringBuilder();
+                _progress.Report((80, $"Lavorazione studenti - Movimenti contabili generali - batch n°0"));
+                for (int batchNumber = 0; batchNumber < numberOfBatches; batchNumber++)
+                {
+                    StringBuilder queryBuilder = new StringBuilder();
+                    queryBuilder.Append(baseSqlInsert);
+
+                    var batch = listaStudentiDaPagare.Skip(batchNumber * batchSize).Take(batchSize);
+
+                    List<string> valuesList = new List<string>();
+
+                    foreach (Studente studente in batch)
+                    {
+                        string studenteValues = string.Format("('{0}', {1}, '{2}', '{3}', '{4}', '{5}')",
+                            codTipoPagamento,
+                            studente.importoDaPagare.ToString(CultureInfo.InvariantCulture),
+                            "sa",
+                            DateTime.Now.ToString("dd/MM/yyyy"),
+                            note,
+                            studente.mandatoProvvisorio);
+
+                        valuesList.Add(studenteValues);
+                        codMovimentiPerStudente.Add(nextCodiceMovimento, studente);
+                        nextCodiceMovimento++;
+                    }
+
+                    queryBuilder.Append(string.Join(",", valuesList));
+                    queryBuilder.Append("; ");
+
+                    finalQueryBuilder.Append(queryBuilder.ToString());
+                    _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili generali - batch n°{batchNumber}"));
+                }
+                string finalQuery = finalQueryBuilder.ToString();
+                try
+                {
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _progress.Report((100, ex.Message));
+                    throw;
+                }
+
+                InsertIntoStatiDelMovimentoContabile(conn, codMovimentiPerStudente);
+                InsertIntoMovimentiContabiliElementariPagamenti(conn, codMovimentiPerStudente);
+                InsertIntoMovimentiContabiliElementariDetrazioni(conn, codMovimentiPerStudente);
+                InsertIntoMovimentiContabiliElementariAssegnazioni(conn, codMovimentiPerStudente);
             }
-            string finalQuery = finalQueryBuilder.ToString();
-            using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+            catch (Exception ex)
             {
-                cmd.ExecuteNonQuery();
+                _progress.Report((100, ex.Message));
+                throw;
             }
-
-            InsertIntoStatiDelMovimentoContabile(conn, codMovimentiPerStudente);
-            InsertIntoMovimentiContabiliElementariPagamenti(conn, codMovimentiPerStudente);
-            InsertIntoMovimentiContabiliElementariDetrazioni(conn, codMovimentiPerStudente);
-            InsertIntoMovimentiContabiliElementariAssegnazioni(conn, codMovimentiPerStudente);
         }
         private void InsertIntoStatiDelMovimentoContabile(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente)
         {
-            const int batchSize = 1000;
-            string baseSqlInsert = "INSERT INTO STATI_DEL_MOVIMENTO_CONTABILE (ID_STATO, CODICE_MOVIMENTO, DATA_ASSUNZIONE_DELLO_STATO, UTENTE_STATO) VALUES ";
-            StringBuilder finalQueryBuilder = new StringBuilder();
-
-            List<string> batchStatements = new List<string>();
-            int currentBatchSize = 0;
-            _progress.Report((80, $"Lavorazione studenti - Stati del movimento contabile"));
-            foreach (var entry in codMovimentiPerStudente)
+            try
             {
-                int codMovimento = entry.Key;
-                string insertStatement = $"(2, '{codMovimento}', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa')";
+                const int batchSize = 1000;
+                string baseSqlInsert = "INSERT INTO STATI_DEL_MOVIMENTO_CONTABILE (ID_STATO, CODICE_MOVIMENTO, DATA_ASSUNZIONE_DELLO_STATO, UTENTE_STATO) VALUES ";
+                StringBuilder finalQueryBuilder = new StringBuilder();
 
-                batchStatements.Add(insertStatement);
-                currentBatchSize++;
-
-                if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                List<string> batchStatements = new List<string>();
+                int currentBatchSize = 0;
+                _progress.Report((80, $"Lavorazione studenti - Stati del movimento contabile"));
+                foreach (var entry in codMovimentiPerStudente)
                 {
-                    finalQueryBuilder.Append(baseSqlInsert);
-                    finalQueryBuilder.Append(string.Join(",", batchStatements));
-                    finalQueryBuilder.Append("; ");
+                    int codMovimento = entry.Key;
+                    string insertStatement = $"(2, '{codMovimento}', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa')";
 
-                    batchStatements.Clear();
-                    currentBatchSize = 0;
+                    batchStatements.Add(insertStatement);
+                    currentBatchSize++;
+
+                    if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                    {
+                        finalQueryBuilder.Append(baseSqlInsert);
+                        finalQueryBuilder.Append(string.Join(",", batchStatements));
+                        finalQueryBuilder.Append("; ");
+
+                        batchStatements.Clear();
+                        currentBatchSize = 0;
+                    }
                 }
+
+                string finalQuery = finalQueryBuilder.ToString();
+
+                if (string.IsNullOrWhiteSpace(finalQuery))
+                {
+                    return;
+                }
+                try
+                {
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _progress.Report((100, ex.Message));
+                    throw;
+                }
+
+                _progress.Report((80, $"UPDATE:Lavorazione studenti - Stati del movimento contabile - completo"));
             }
-            _progress.Report((80, $"UPDATE:Lavorazione studenti - Stati del movimento contabile - completo"));
-
-            string finalQuery = finalQueryBuilder.ToString();
-
-            if (string.IsNullOrWhiteSpace(finalQuery))
+            catch (Exception ex)
             {
-                return;
-            }
-            using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
-            {
-
-                cmd.ExecuteNonQuery();
+                _progress.Report((100, ex.Message));
+                throw;
             }
         }
         private void InsertIntoMovimentiContabiliElementariPagamenti(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente)
         {
-            string codMovimentoElementare = "00";
-            string sqlCodMovimento = $"SELECT DISTINCT Cod_mov_contabile_elem FROM Decod_pagam_new where Cod_tipo_pagam_new = '{codTipoPagamento}'";
-            SqlCommand cmdCM = new SqlCommand(sqlCodMovimento, conn);
-            object result = cmdCM.ExecuteScalar();
-            if (result != null)
+            try
             {
-                codMovimentoElementare = result.ToString();
-            }
-
-
-            const int batchSize = 1000; // Maximum number of rows per INSERT statement
-            string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_ELEMENTARI (CODICE_FISCALE, ANNO_ACCADEMICO, ID_CAUSALE, CODICE_MOVIMENTO, IMPORTO, SEGNO, ANNO_ESERCIZIO_FINANZIARIO, STATO,DATA_INSERIMENTO, UTENTE_MOVIMENTO, NOTE_MOVIMENTO_ELEMENTARE, NUMERO_REVERSALE)  VALUES ";
-            StringBuilder finalQueryBuilder = new StringBuilder();
-
-            List<string> batchStatements = new List<string>();
-            int currentBatchSize = 0;
-            _progress.Report((80, $"Lavorazione studenti - Movimenti contabili elementari"));
-            foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
-            {
-                int codMovimento = entry.Key;
-                string importoDaPagare = entry.Value.importoDaPagare.ToString(CultureInfo.InvariantCulture);
-                int segno = 1;
-
-                // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
-                string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '{codMovimentoElementare}', '{codMovimento}', '{importoDaPagare}', '{segno}', '{DateTime.Now.ToString("yyyy")}','2', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa', '', '')";
-
-                batchStatements.Add(insertStatement);
-                currentBatchSize++;
-
-                // Execute batch when reaching batchSize or end of dictionary
-                if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                string codMovimentoElementare = "00";
+                string sqlCodMovimento = $"SELECT DISTINCT Cod_mov_contabile_elem FROM Decod_pagam_new where Cod_tipo_pagam_new = '{codTipoPagamento}'";
+                SqlCommand cmdCM = new SqlCommand(sqlCodMovimento, conn);
+                object result = cmdCM.ExecuteScalar();
+                if (result != null)
                 {
-                    finalQueryBuilder.Append(baseSqlInsert);
-                    finalQueryBuilder.Append(string.Join(",", batchStatements));
-                    finalQueryBuilder.Append("; "); // End the SQL statement with a semicolon and a space for separation
-
-                    batchStatements.Clear(); // Clear the batch for the next round
-                    currentBatchSize = 0; // Reset the batch size counter
+                    codMovimentoElementare = result.ToString();
                 }
-            }
-            _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili elementari - completo"));
 
-            string finalQuery = finalQueryBuilder.ToString();
-            if (string.IsNullOrWhiteSpace(finalQuery))
-            {
-                return;
-            }
-            // Execute all accumulated SQL statements at once
-            using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
-            {
 
-                cmd.ExecuteNonQuery(); // Execute the query
+                const int batchSize = 1000; // Maximum number of rows per INSERT statement
+                string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_ELEMENTARI (CODICE_FISCALE, ANNO_ACCADEMICO, ID_CAUSALE, CODICE_MOVIMENTO, IMPORTO, SEGNO, ANNO_ESERCIZIO_FINANZIARIO, STATO,DATA_INSERIMENTO, UTENTE_MOVIMENTO, NOTE_MOVIMENTO_ELEMENTARE, NUMERO_REVERSALE)  VALUES ";
+                StringBuilder finalQueryBuilder = new StringBuilder();
+
+                List<string> batchStatements = new List<string>();
+                int currentBatchSize = 0;
+                _progress.Report((80, $"Lavorazione studenti - Movimenti contabili elementari"));
+                foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
+                {
+                    int codMovimento = entry.Key;
+                    string importoDaPagare = entry.Value.importoDaPagare.ToString(CultureInfo.InvariantCulture);
+                    int segno = 1;
+
+                    // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
+                    string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '{codMovimentoElementare}', '{codMovimento}', '{importoDaPagare}', '{segno}', '{DateTime.Now.ToString("yyyy")}','2', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa', '', '')";
+
+                    batchStatements.Add(insertStatement);
+                    currentBatchSize++;
+
+                    // Execute batch when reaching batchSize or end of dictionary
+                    if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                    {
+                        finalQueryBuilder.Append(baseSqlInsert);
+                        finalQueryBuilder.Append(string.Join(",", batchStatements));
+                        finalQueryBuilder.Append("; "); // End the SQL statement with a semicolon and a space for separation
+
+                        batchStatements.Clear(); // Clear the batch for the next round
+                        currentBatchSize = 0; // Reset the batch size counter
+                    }
+                }
+
+                string finalQuery = finalQueryBuilder.ToString();
+                if (string.IsNullOrWhiteSpace(finalQuery))
+                {
+                    return;
+                }
+                try
+                {
+                    // Execute all accumulated SQL statements at once
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    {
+                        cmd.ExecuteNonQuery(); // Execute the query
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _progress.Report((100, ex.Message));
+                    throw;
+                }
+
+                _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili elementari - completo"));
+            }
+            catch (Exception ex)
+            {
+                _progress.Report((100, ex.Message));
+                throw;
             }
         }
         private void InsertIntoMovimentiContabiliElementariDetrazioni(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente)
         {
-            const int batchSize = 1000; // Maximum number of rows per INSERT statement
-            string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_ELEMENTARI (CODICE_FISCALE, ANNO_ACCADEMICO, ID_CAUSALE, CODICE_MOVIMENTO, IMPORTO, SEGNO, ANNO_ESERCIZIO_FINANZIARIO, STATO,DATA_INSERIMENTO, UTENTE_MOVIMENTO, NOTE_MOVIMENTO_ELEMENTARE, NUMERO_REVERSALE)  VALUES ";
-            StringBuilder finalQueryBuilder = new StringBuilder();
-
-            List<string> batchStatements = new List<string>();
-            int currentBatchSize = 0;
-
-            foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
+            try
             {
+                const int batchSize = 1000; // Maximum number of rows per INSERT statement
+                string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_ELEMENTARI (CODICE_FISCALE, ANNO_ACCADEMICO, ID_CAUSALE, CODICE_MOVIMENTO, IMPORTO, SEGNO, ANNO_ESERCIZIO_FINANZIARIO, STATO,DATA_INSERIMENTO, UTENTE_MOVIMENTO, NOTE_MOVIMENTO_ELEMENTARE, NUMERO_REVERSALE)  VALUES ";
+                StringBuilder finalQueryBuilder = new StringBuilder();
 
-                if (entry.Value.detrazioni == null)
-                {
-                    continue;
-                }
+                List<string> batchStatements = new List<string>();
+                int currentBatchSize = 0;
 
-                foreach (Detrazione detrazione in entry.Value.detrazioni)
+                foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
                 {
-                    if (!detrazione.daContabilizzare)
+
+                    if (entry.Value.detrazioni == null)
                     {
                         continue;
                     }
 
-                    int codMovimento = entry.Key;
-                    string importoDaDetrarre = detrazione.importo.ToString(CultureInfo.InvariantCulture);
-                    int segno = 0;
-
-                    // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
-                    string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '01', '{codMovimento}', '{importoDaDetrarre}', '{segno}', '{DateTime.Now.ToString("yyyy")}','2', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa', '', '')";
-
-                    batchStatements.Add(insertStatement);
-                    currentBatchSize++;
-
-                    // Execute batch when reaching batchSize or end of dictionary
-                    if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                    foreach (Detrazione detrazione in entry.Value.detrazioni)
                     {
-                        finalQueryBuilder.Append(baseSqlInsert);
-                        finalQueryBuilder.Append(string.Join(",", batchStatements));
-                        finalQueryBuilder.Append("; "); // End the SQL statement with a semicolon and a space for separation
+                        if (!detrazione.daContabilizzare)
+                        {
+                            continue;
+                        }
 
-                        batchStatements.Clear(); // Clear the batch for the next round
-                        currentBatchSize = 0; // Reset the batch size counter
+                        int codMovimento = entry.Key;
+                        string importoDaDetrarre = detrazione.importo.ToString(CultureInfo.InvariantCulture);
+                        int segno = 0;
+
+                        // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
+                        string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '01', '{codMovimento}', '{importoDaDetrarre}', '{segno}', '{DateTime.Now.ToString("yyyy")}','2', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa', '', '')";
+
+                        batchStatements.Add(insertStatement);
+                        currentBatchSize++;
+
+                        // Execute batch when reaching batchSize or end of dictionary
+                        if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                        {
+                            finalQueryBuilder.Append(baseSqlInsert);
+                            finalQueryBuilder.Append(string.Join(",", batchStatements));
+                            finalQueryBuilder.Append("; "); // End the SQL statement with a semicolon and a space for separation
+
+                            batchStatements.Clear(); // Clear the batch for the next round
+                            currentBatchSize = 0; // Reset the batch size counter
+                        }
                     }
                 }
-            }
 
-            string finalQuery = finalQueryBuilder.ToString();
-            if (string.IsNullOrWhiteSpace(finalQuery))
-            {
-                return;
+                string finalQuery = finalQueryBuilder.ToString();
+                if (string.IsNullOrWhiteSpace(finalQuery))
+                {
+                    return;
+                }
+                // Execute all accumulated SQL statements at once
+                try
+                {
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _progress.Report((100, ex.Message));
+                    throw;
+                }
             }
-            // Execute all accumulated SQL statements at once
-            using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+            catch (Exception ex)
             {
-                cmd.ExecuteNonQuery();
+                _progress.Report((100, ex.Message));
+                throw;
             }
         }
         private void InsertIntoMovimentiContabiliElementariAssegnazioni(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente)
         {
-            const int batchSize = 1000; // Maximum number of rows per INSERT statement
-            string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_ELEMENTARI (CODICE_FISCALE, ANNO_ACCADEMICO, ID_CAUSALE, CODICE_MOVIMENTO, IMPORTO, SEGNO, ANNO_ESERCIZIO_FINANZIARIO, STATO,DATA_INSERIMENTO, UTENTE_MOVIMENTO, NOTE_MOVIMENTO_ELEMENTARE, NUMERO_REVERSALE)  VALUES ";
-            StringBuilder finalQueryBuilder = new StringBuilder();
-
-            List<string> batchStatements = new List<string>();
-            int currentBatchSize = 0;
-
-            foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
+            try
             {
+                const int batchSize = 1000; // Maximum number of rows per INSERT statement
+                string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_ELEMENTARI (CODICE_FISCALE, ANNO_ACCADEMICO, ID_CAUSALE, CODICE_MOVIMENTO, IMPORTO, SEGNO, ANNO_ESERCIZIO_FINANZIARIO, STATO,DATA_INSERIMENTO, UTENTE_MOVIMENTO, NOTE_MOVIMENTO_ELEMENTARE, NUMERO_REVERSALE)  VALUES ";
+                StringBuilder finalQueryBuilder = new StringBuilder();
 
-                if (entry.Value.assegnazioni == null)
-                {
-                    continue;
-                }
+                List<string> batchStatements = new List<string>();
+                int currentBatchSize = 0;
 
-                foreach (Assegnazione assegnazione in entry.Value.assegnazioni)
+                foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
                 {
-                    if (assegnazione.costoTotale <= 0)
+
+                    if (entry.Value.assegnazioni == null)
                     {
                         continue;
                     }
 
-                    int codMovimento = entry.Key;
-                    string costoPostoAlloggio = assegnazione.costoTotale.ToString(CultureInfo.InvariantCulture);
-                    int segno = 0;
-
-                    // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
-                    string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '02', '{codMovimento}', '{costoPostoAlloggio}', '{segno}', '{DateTime.Now.ToString("yyyy")}','2', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa', '', '')";
-
-                    batchStatements.Add(insertStatement);
-                    currentBatchSize++;
-
-                    // Execute batch when reaching batchSize or end of dictionary
-                    if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                    foreach (Assegnazione assegnazione in entry.Value.assegnazioni)
                     {
-                        finalQueryBuilder.Append(baseSqlInsert);
-                        finalQueryBuilder.Append(string.Join(",", batchStatements));
-                        finalQueryBuilder.Append("; "); // End the SQL statement with a semicolon and a space for separation
+                        if (assegnazione.costoTotale <= 0)
+                        {
+                            continue;
+                        }
 
-                        batchStatements.Clear(); // Clear the batch for the next round
-                        currentBatchSize = 0; // Reset the batch size counter
+                        int codMovimento = entry.Key;
+                        string costoPostoAlloggio = assegnazione.costoTotale.ToString(CultureInfo.InvariantCulture);
+                        int segno = 0;
+
+                        // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
+                        string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '02', '{codMovimento}', '{costoPostoAlloggio}', '{segno}', '{DateTime.Now.ToString("yyyy")}','2', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa', '', '')";
+
+                        batchStatements.Add(insertStatement);
+                        currentBatchSize++;
+
+                        // Execute batch when reaching batchSize or end of dictionary
+                        if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                        {
+                            finalQueryBuilder.Append(baseSqlInsert);
+                            finalQueryBuilder.Append(string.Join(",", batchStatements));
+                            finalQueryBuilder.Append("; "); // End the SQL statement with a semicolon and a space for separation
+
+                            batchStatements.Clear(); // Clear the batch for the next round
+                            currentBatchSize = 0; // Reset the batch size counter
+                        }
                     }
                 }
-            }
 
-            string finalQuery = finalQueryBuilder.ToString();
-            if (string.IsNullOrWhiteSpace(finalQuery))
-            {
-                return;
+                string finalQuery = finalQueryBuilder.ToString();
+                if (string.IsNullOrWhiteSpace(finalQuery))
+                {
+                    return;
+                }
+                try
+                {
+                    // Execute all accumulated SQL statements at once
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _progress.Report((100, ex.Message));
+                    throw;
+                }
             }
-            // Execute all accumulated SQL statements at once
-            using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+            catch (Exception ex)
             {
-                cmd.ExecuteNonQuery();
+                _progress.Report((100, ex.Message));
+                throw;
             }
         }
 
@@ -1270,7 +1357,10 @@ namespace ProcedureNet7
             string secondHalfAA = selectedAA.Substring(6, 2);
             string baseFolderPath = Utilities.EnsureDirectory(Path.Combine(selectedSaveFolder, currentMonthName + currentYear + "_" + firstHalfAA + secondHalfAA));
 
-            string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
+            string currentBeneficio = isTR ? "TR" : tipoBeneficio;
+            string currentCodTipoPagamento = currentBeneficio + selectedTipoPagamento;
+
+            string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{currentCodTipoPagamento}'";
             SqlCommand cmd = new SqlCommand(sqlTipoPagam, conn);
             string pagamentoDescrizione = (string)cmd.ExecuteScalar();
             string beneficioFolderPath = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, pagamentoDescrizione));
@@ -1291,6 +1381,7 @@ namespace ProcedureNet7
             var studentiSenzaImpegno = listaStudentiDaPagare
                 .Where(s => string.IsNullOrWhiteSpace(s.numeroImpegno))
                 .ToList();
+
             if (studentiSenzaImpegno.Any())
             {
                 DataTable studentiSenzaImpegnoTable = GenerateDataTableFromList(studentiSenzaImpegno);
@@ -1314,50 +1405,64 @@ namespace ProcedureNet7
         private void GenerateOutputFilesPA(SqlConnection conn, string currentFolder, List<Studente> studentsWithSameImpegno, string impegno)
         {
             _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Senza detrazioni"));
-            string newFolderPath = Utilities.EnsureDirectory(Path.Combine(currentFolder, "CON DETRAZIONE"));
-
             var studentsWithPA = studentsWithSameImpegno
-                .Where(s => s.assegnazioni != null || (s.detrazioni != null && s.detrazioni.Any(d => d.codReversale == "01")))
+                .Where(s => s.assegnazioni != null || (s.detrazioni != null && s.detrazioni.Any(d => d.codReversale == "01" && d.daContabilizzare)))
                 .ToList();
             var studentsWithoutPA = studentsWithSameImpegno
-                .Where(s => s.assegnazioni == null && !(s.detrazioni != null && s.detrazioni.Any(d => d.codReversale == "01")))
+                .Where(s => s.assegnazioni == null && !(s.detrazioni != null && s.detrazioni.Any(d => d.codReversale == "01" && d.daContabilizzare)))
                 .ToList();
 
-            if (tipoStudente == "2")
+            if (studentsWithoutPA.Count > 0)
             {
-                ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: true, "SenzaDetrazioni");
-                DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(conn, studentsWithoutPA.Where(s => s.annoCorso == 1).ToList(), impegno);
-                DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(conn, studentsWithoutPA.Where(s => s.annoCorso != 1).ToList(), impegno);
-                Utilities.ExportDataTableToExcel(dataTableMatricole, currentFolder, false, dataTableMatricole.Rows[0][0].ToString() + "-Matricole");
-                Utilities.ExportDataTableToExcel(dataTableASuccessivi, currentFolder, false, dataTableASuccessivi.Rows[0][0].ToString() + "-AnniSuccessivi");
-            }
-            else if (tipoStudente == "0")
-            {
-                ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: false, "SenzaDetrazioni");
-            }
-            else if (tipoStudente == "1")
-            {
-                ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: false, processAnniSuccessivi: true, "SenzaDetrazioni");
-            }
-            ProcessStudentsByCodEnte(conn, selectedCodEnte, studentsWithPA, newFolderPath, impegno);
 
-            GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
-
+                if (tipoStudente == "2")
+                {
+                    ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
+                    DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(conn, studentsWithoutPA.Where(s => s.annoCorso == 1).ToList(), impegno);
+                    DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(conn, studentsWithoutPA.Where(s => s.annoCorso != 1).ToList(), impegno);
+                    if (dataTableMatricole != null)
+                    {
+                        Utilities.ExportDataTableToExcel(dataTableMatricole, currentFolder, false, "Matricole");
+                    }
+                    if (dataTableASuccessivi != null)
+                    {
+                        Utilities.ExportDataTableToExcel(dataTableASuccessivi, currentFolder, false, "AnniSuccessivi");
+                    }
+                }
+                else if (tipoStudente == "0")
+                {
+                    ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: false, "SenzaDetrazioni", "00", impegno);
+                }
+                else if (tipoStudente == "1")
+                {
+                    ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: false, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
+                }
+            }
+            if (studentsWithPA.Count > 0)
+            {
+                string newFolderPath = Utilities.EnsureDirectory(Path.Combine(currentFolder, "CON DETRAZIONE"));
+                ProcessStudentsByCodEnte(conn, selectedCodEnte, studentsWithPA, newFolderPath, impegno);
+                GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
+            }
         }
 
-        private void ProcessStudentsByAnnoCorso(List<Studente> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio)
+        private void ProcessStudentsByAnnoCorso(List<Studente> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio, string codEnteFlusso, string impegnoFlusso)
         {
             if (processMatricole)
             {
-                ProcessAndWriteStudents(students.Where(s => s.annoCorso == 1).ToList(), folderPath, $"{nomeFileInizio}-Matricole");
+                ProcessAndWriteStudents(students.Where(s => s.annoCorso == 1).ToList(), folderPath, $"{nomeFileInizio}_Matricole", codEnteFlusso, impegnoFlusso);
             }
             if (processAnniSuccessivi)
             {
-                ProcessAndWriteStudents(students.Where(s => s.annoCorso != 1).ToList(), folderPath, $"{nomeFileInizio}-AnniSuccessivi");
+                ProcessAndWriteStudents(students.Where(s => s.annoCorso != 1).ToList(), folderPath, $"{nomeFileInizio}_AnniSuccessivi", codEnteFlusso, impegnoFlusso);
             }
         }
         private void ProcessStudentsByCodEnte(SqlConnection conn, string selectedCodEnte, List<Studente> studentsWithPA, string newFolderPath, string impegno)
         {
+            if (studentsWithPA.Count <= 0)
+            {
+                return;
+            }
             bool allCodEnte = selectedCodEnte == "00";
             var codEnteList = allCodEnte ? studentsWithPA.Select(s => s.codEnte).Distinct() : new List<string> { selectedCodEnte };
 
@@ -1377,33 +1482,36 @@ namespace ProcedureNet7
 
                 if (tipoStudente == "2")
                 {
-                    ProcessStudentsByAnnoCorso(studentsInCodEnte, specificFolderPath, processMatricole: true, processAnniSuccessivi: true, "ConDetrazioni-" + nomeCodEnte);
+                    ProcessStudentsByAnnoCorso(studentsInCodEnte, specificFolderPath, processMatricole: true, processAnniSuccessivi: true, "Con Detrazioni_" + nomeCodEnte, codEnte, impegno);
                 }
                 else
                 {
                     bool processMatricole = tipoStudente == "0";
-                    ProcessStudentsByAnnoCorso(studentsInCodEnte, specificFolderPath, processMatricole: processMatricole, processAnniSuccessivi: !processMatricole, "ConDetrazioni-" + nomeCodEnte);
+                    ProcessStudentsByAnnoCorso(studentsInCodEnte, specificFolderPath, processMatricole: processMatricole, processAnniSuccessivi: !processMatricole, "Con Detrazioni_" + nomeCodEnte, codEnte, impegno);
                 }
             }
             List<string> sediStudi = codEnteList.ToList();
             DataTable dataTableMatricole = GenerareExcelDataTableConDetrazioni(conn, studentsWithPA.Where(s => s.annoCorso == 1).ToList(), sediStudi, impegno);
             DataTable dataTableASuccessivi = GenerareExcelDataTableConDetrazioni(conn, studentsWithPA.Where(s => s.annoCorso != 1).ToList(), sediStudi, impegno);
-            if (dataTableMatricole.Rows.Count > 0)
+            if (dataTableMatricole != null)
             {
-                Utilities.ExportDataTableToExcel(dataTableMatricole, newFolderPath, false, dataTableMatricole.Rows[0][0].ToString() + "-Matricole");
+                Utilities.ExportDataTableToExcel(dataTableMatricole, newFolderPath, false, "Matricole");
             }
-            if (dataTableASuccessivi.Rows.Count > 0)
+            if (dataTableASuccessivi != null)
             {
-                Utilities.ExportDataTableToExcel(dataTableASuccessivi, newFolderPath, false, dataTableASuccessivi.Rows[0][0].ToString() + "-AnniSuccessivi");
+                Utilities.ExportDataTableToExcel(dataTableASuccessivi, newFolderPath, false, "AnniSuccessivi");
             }
 
         }
-        private void ProcessAndWriteStudents(List<Studente> students, string folderPath, string fileName)
+        private void ProcessAndWriteStudents(List<Studente> students, string folderPath, string fileName, string codEnteFlusso, string impegnoFlusso)
         {
             if (students.Any())
             {
-                DataTable dataTableFlusso = GenerareFlussoDataTable(students);
-                Utilities.WriteDataTableToTextFile(dataTableFlusso, folderPath, $"flusso-{fileName}");
+                DataTable dataTableFlusso = GenerareFlussoDataTable(students, codEnteFlusso);
+                if (dataTableFlusso != null)
+                {
+                    Utilities.WriteDataTableToTextFile(dataTableFlusso, folderPath, $"flusso_{fileName}_impegnoFlusso");
+                }
             }
         }
 
@@ -1791,10 +1899,10 @@ namespace ProcedureNet7
                 }
                 studente.SetImportoSaldoPA(Math.Round(importoPA, 2));
 
-                double importiPagati = studente.importoPagato;
+                double importiPagati = isTR ? 0 : studente.importoPagato;
 
 
-                if (categoriaPagam == "PR" && tipoBeneficio == "BS")
+                if (categoriaPagam == "PR" && tipoBeneficio == "BS" && !isTR)
                 {
                     string currentYear = selectedAA.Substring(0, 4);
                     DateTime percentDate = new DateTime(int.Parse(currentYear), 11, 10);
@@ -1813,7 +1921,7 @@ namespace ProcedureNet7
                         importoDaPagare = importoMassimo * 0.5;
                     }
                 }
-                else if (tipoBeneficio == "BS")
+                else if (tipoBeneficio == "BS" && !isTR)
                 {
                     importoDaPagare = importoMassimo;
                     if (studente.annoCorso == 1)
@@ -1830,7 +1938,7 @@ namespace ProcedureNet7
                         }
                     }
                 }
-                else if (tipoBeneficio == "TR")
+                else if (isTR)
                 {
                     importoDaPagare = 140;
 
@@ -1848,7 +1956,7 @@ namespace ProcedureNet7
                         studentiDaRimuovereDalPagamento.Add(studente);
                     }
 
-                    if (!studente.superamentoEsami && !studente.superamentoEsamiTassaRegionale)
+                    if (!studente.superamentoEsami && !studente.superamentoEsamiTassaRegionale && studente.annoCorso == 1)
                     {
                         importoDaPagare = 0;
                         listaStudentiDaNonPagare.Add(studente);
@@ -1873,7 +1981,7 @@ namespace ProcedureNet7
                 importoDaPagare = Math.Max(importoDaPagare - (importiPagati + importoPA + importoReversali), 0);
                 importoDaPagare = Math.Round(importoDaPagare, 2);
 
-                if (importoDaPagare == 0)
+                if (importoDaPagare == 0 && !studentiDaRimuovereDalPagamento.Contains(studente))
                 {
                     studentiDaRimuovereDalPagamento.Add(studente);
                 }
@@ -1891,6 +1999,15 @@ namespace ProcedureNet7
         }
         void PopulateStudentiImpegni(SqlConnection conn)
         {
+            if (isTR)
+            {
+                foreach (Studente studente in listaStudentiDaPagare)
+                {
+                    studente.SetImpegno("3120");
+                }
+                _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato"));
+                return;
+            }
             string dataQuery = $@"
                     SELECT Cod_fiscale, num_impegno_primaRata, num_impegno_saldo
                     FROM Specifiche_impegni
@@ -1926,8 +2043,12 @@ namespace ProcedureNet7
             _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato"));
         }
 
-        private DataTable GenerareFlussoDataTable(List<Studente> studentiDaGenerare)
+        private DataTable GenerareFlussoDataTable(List<Studente> studentiDaGenerare, string codEnteFlusso)
         {
+            if (!studentiDaGenerare.Any())
+            {
+                return null;
+            }
             DataTable studentsData = new DataTable();
             studentsData.Columns.Add("Incrementale", typeof(int));
             studentsData.Columns.Add("Cod_fiscale", typeof(string));
@@ -1964,6 +2085,14 @@ namespace ProcedureNet7
 
             foreach (Studente studente in studentiDaGenerare)
             {
+                DateTime.TryParse(selectedDataRiferimento, out DateTime dataTabella);
+                string dataCreazioneTabella = dataTabella.ToString("ddMMyy");
+
+                string annoAccademicoBreve = selectedAA.Substring(2, 2) + selectedAA.Substring(6, 2);
+
+                string mandatoProvvisorio = $"{codTipoPagamento}_{dataCreazioneTabella}_{annoAccademicoBreve}_{codEnteFlusso}_{studente.numeroImpegno}";
+                studente.SetMandatoProvvisorio(mandatoProvvisorio);
+
                 int straniero = studente.residenza.provincia == "EE" ? 0 : 1;
                 string indirizzoResidenza = straniero == 0 ? studente.residenza.indirizzo.Replace("//", "-") : studente.residenza.indirizzo;
                 string capResidenza = straniero == 0 ? "00000" : studente.residenza.CAP;
@@ -2022,6 +2151,10 @@ namespace ProcedureNet7
 
         private DataTable GenerareExcelDataTableConDetrazioni(SqlConnection conn, List<Studente> studentiDaGenerare, List<string> sediStudi, string impegno)
         {
+            if (!studentiDaGenerare.Any())
+            {
+                return null;
+            }
             DataTable studentsData = new DataTable();
             string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
             SqlCommand cmd = new SqlCommand(sqlTipoPagam, conn);
@@ -2088,6 +2221,10 @@ namespace ProcedureNet7
         }
         private DataTable GenerareExcelDataTableNoDetrazioni(SqlConnection conn, List<Studente> studentiDaGenerare, string impegno)
         {
+            if (!studentiDaGenerare.Any())
+            {
+                return null;
+            }
             DataTable studentsData = new DataTable();
             string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
             SqlCommand cmd = new SqlCommand(sqlTipoPagam, conn);

@@ -37,6 +37,7 @@ namespace ProcedureNet7
         public string IBAN { get; private set; }
         public string swift { get; private set; }
         public List<Pagamento> pagamentiEffettuati { get; private set; }
+        public string mandatoProvvisorio { get; private set; }
 
         public Studente(
             string numDomanda,
@@ -188,6 +189,11 @@ namespace ProcedureNet7
         public void SetImportoSaldoPA(double amount)
         {
             this.importoSaldoPA = amount;
+        }
+
+        public void SetMandatoProvvisorio(string mandatoProvvisorio)
+        {
+            this.mandatoProvvisorio = mandatoProvvisorio;
         }
     }
 }

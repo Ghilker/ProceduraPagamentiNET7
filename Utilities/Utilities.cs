@@ -12,7 +12,7 @@ namespace ProcedureNet7
 {
     internal static class Utilities
     {
-        public static DataTable ReadExcelToDataTable(string filePath)
+        public static DataTable ReadExcelToDataTable(string filePath, bool firstRowAsData = false)
         {
             DataTable dataTable = new DataTable();
             Excel.Application excelApp = null;
@@ -36,25 +36,40 @@ namespace ProcedureNet7
                 int rowsCount = range.Rows.Count;
 
                 Dictionary<string, int> columnNames = new Dictionary<string, int>();
+
+                // Adjust start row based on whether the first row is treated as data
+                int startRow = firstRowAsData ? 1 : 2;
+
+                // Process column names
                 for (int col = 1; col <= columnsCount; col++)
                 {
-                    string originalColumnName = data[1, col]?.ToString() ?? $"Column{col}";
-                    string sanitizedColumnName = SanitizeColumnName(originalColumnName);
-
-                    if (columnNames.ContainsKey(sanitizedColumnName))
+                    string columnName;
+                    if (firstRowAsData)
                     {
-                        columnNames[sanitizedColumnName]++;
-                        sanitizedColumnName += $"_{columnNames[sanitizedColumnName]}";
+                        // Use default column names if the first row is treated as data
+                        columnName = $"Column{col}";
                     }
                     else
                     {
-                        columnNames[sanitizedColumnName] = 0;
-                    }
+                        // Use the first row for column names if not treated as data
+                        string originalColumnName = data[1, col]?.ToString() ?? $"Column{col}";
+                        columnName = SanitizeColumnName(originalColumnName);
 
-                    dataTable.Columns.Add(sanitizedColumnName);
+                        if (columnNames.ContainsKey(columnName))
+                        {
+                            columnNames[columnName]++;
+                            columnName += $"_{columnNames[columnName]}";
+                        }
+                        else
+                        {
+                            columnNames[columnName] = 0;
+                        }
+                    }
+                    dataTable.Columns.Add(columnName);
                 }
 
-                for (int row = 2; row <= rowsCount; row++)
+                // Process data rows
+                for (int row = startRow; row <= rowsCount; row++)
                 {
                     var dataRow = dataTable.NewRow();
                     for (int col = 1; col <= columnsCount; col++)
@@ -163,71 +178,68 @@ namespace ProcedureNet7
 
         public static void ExportDataTableToExcel(DataTable dataTable, string folderPath, bool includeHeaders = true, string fileName = "")
         {
-            if (dataTable == null || dataTable.Rows.Count == 0)
-            {
-                return;
-            }
+            if (dataTable == null || dataTable.Rows.Count == 0 || string.IsNullOrWhiteSpace(folderPath))
+                throw new ArgumentException("Invalid input parameters.");
 
-            Excel.Application excelApp = null;
+            fileName = GenerateFileName(fileName);
+            string fullPath = Path.Combine(folderPath, fileName);
+            Directory.CreateDirectory(folderPath); // Ensure the directory exists
+
+            Excel.Application excelApp = new Excel.Application();
             Excel.Workbooks workbooks = null;
             Excel._Workbook workbook = null;
             Excel._Worksheet worksheet = null;
+
             try
             {
-                excelApp = new Excel.Application();
                 workbooks = excelApp.Workbooks;
                 workbook = workbooks.Add();
-                worksheet = (Excel._Worksheet)workbook.ActiveSheet;
+                worksheet = workbook.ActiveSheet;
 
-                int rowCount = dataTable.Rows.Count;
-                int columnCount = dataTable.Columns.Count;
-
-                // Adjust the array size based on whether headers are included
-                int arrayRows = includeHeaders ? rowCount + 1 : rowCount;
-                object[,] values = new object[arrayRows, columnCount];
-
-                int rowIndex = 0;
-
-                // Include headers if requested
+                // Optionally, add column headers
                 if (includeHeaders)
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        values[rowIndex, i] = dataTable.Columns[i].ColumnName;
-                    }
-                    rowIndex = 1; // Start data entry from the second row
-                }
+                    AddHeaders(worksheet, dataTable);
 
-                // Rows
-                for (int i = 0; i < rowCount; i++)
-                {
-                    for (int j = 0; j < columnCount; j++)
-                    {
-                        values[i + rowIndex, j] = dataTable.Rows[i][j]; // Adjust index based on header inclusion
-                    }
-                }
+                // Add data rows
+                AddData(worksheet, dataTable, includeHeaders);
 
-                // Set the range value to the array
-                Excel.Range startCell = (Excel.Range)worksheet.Cells[includeHeaders ? 1 : 2, 1]; // Adjust starting cell based on header inclusion
-                Excel.Range endCell = (Excel.Range)worksheet.Cells[rowCount + (includeHeaders ? 1 : 0), columnCount]; // Adjust end cell based on header inclusion
-                Excel.Range writeRange = worksheet.Range[startCell, endCell];
-                writeRange.Value2 = values;
-
-                // Generate a unique file name and save the file
-                if (string.IsNullOrWhiteSpace(fileName))
-                {
-                    fileName = "Export_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".xlsx";
-                }
-                string excelFilePath = Path.Combine(folderPath, fileName);
-                if (!Directory.Exists(folderPath))
-                {
-                    Directory.CreateDirectory(folderPath);
-                }
-                workbook.SaveAs(excelFilePath);
+                // Save the Excel file
+                workbook.SaveAs(fullPath);
+            }
+            catch (Exception ex)
+            {
+                throw;
             }
             finally
             {
-                // Release COM objects
+                CleanUp(worksheet, workbook, workbooks, excelApp);
+            }
+        }
+
+        private static string GenerateFileName(string fileName)
+        {
+            return !string.IsNullOrWhiteSpace(fileName) ? $"{fileName}.xlsx" : $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+        }
+
+        private static void AddHeaders(Excel._Worksheet worksheet, DataTable dataTable)
+        {
+            for (int i = 0; i < dataTable.Columns.Count; i++)
+                worksheet.Cells[1, i + 1] = dataTable.Columns[i].ColumnName;
+        }
+
+        private static void AddData(Excel._Worksheet worksheet, DataTable dataTable, bool includeHeaders)
+        {
+            int rowOffset = includeHeaders ? 2 : 1;
+            for (int i = 0; i < dataTable.Rows.Count; i++)
+                for (int j = 0; j < dataTable.Columns.Count; j++)
+                    worksheet.Cells[i + rowOffset, j + 1] = dataTable.Rows[i][j];
+        }
+
+        private static void CleanUp(Excel._Worksheet worksheet, Excel._Workbook workbook, Excel.Workbooks workbooks, Excel.Application excelApp)
+        {
+            // Clean up resources
+            try
+            {
                 if (worksheet != null) Marshal.ReleaseComObject(worksheet);
                 if (workbook != null)
                 {
@@ -235,6 +247,13 @@ namespace ProcedureNet7
                     Marshal.ReleaseComObject(workbook);
                 }
                 if (workbooks != null) Marshal.ReleaseComObject(workbooks);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+            finally
+            {
                 if (excelApp != null)
                 {
                     excelApp.Quit();
@@ -486,8 +505,6 @@ namespace ProcedureNet7
                 UpdateVisibleItems(scrollPosition, delta); // Update visible items based on scroll
             };
         }
-
-
 
         public static void RemoveDropDownMenu(ref Button buttonToUse, ref ContextMenuStrip contextMenuStrip)
         {
