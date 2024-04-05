@@ -992,6 +992,7 @@ namespace ProcedureNet7
 
         private void InsertIntoMovimentazioni(SqlConnection conn)
         {
+            SqlTransaction sqlTransaction = conn.BeginTransaction();
             try
             {
                 _progress.Report((80, $"Lavorazione studenti - Inserimento in movimenti contabili"));
@@ -1048,29 +1049,30 @@ namespace ProcedureNet7
                 string finalQuery = finalQueryBuilder.ToString();
                 try
                 {
-                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn, sqlTransaction))
                     {
                         cmd.ExecuteNonQuery();
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    _progress.Report((100, ex.Message));
                     throw;
                 }
 
-                InsertIntoStatiDelMovimentoContabile(conn, codMovimentiPerStudente);
-                InsertIntoMovimentiContabiliElementariPagamenti(conn, codMovimentiPerStudente);
-                InsertIntoMovimentiContabiliElementariDetrazioni(conn, codMovimentiPerStudente);
-                InsertIntoMovimentiContabiliElementariAssegnazioni(conn, codMovimentiPerStudente);
+                InsertIntoStatiDelMovimentoContabile(conn, codMovimentiPerStudente, sqlTransaction);
+                InsertIntoMovimentiContabiliElementariPagamenti(conn, codMovimentiPerStudente, sqlTransaction);
+                InsertIntoMovimentiContabiliElementariDetrazioni(conn, codMovimentiPerStudente, sqlTransaction);
+                InsertIntoMovimentiContabiliElementariAssegnazioni(conn, codMovimentiPerStudente, sqlTransaction);
+
+                sqlTransaction.Commit();
             }
             catch (Exception ex)
             {
                 _progress.Report((100, ex.Message));
-                throw;
+                sqlTransaction.Rollback();
             }
         }
-        private void InsertIntoStatiDelMovimentoContabile(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente)
+        private void InsertIntoStatiDelMovimentoContabile(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -1104,30 +1106,28 @@ namespace ProcedureNet7
 
                 if (string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    return;
+                    throw new Exception("Query finale senza contenuti.");
                 }
                 try
                 {
-                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn, sqlTransaction))
                     {
                         cmd.ExecuteNonQuery();
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    _progress.Report((100, ex.Message));
                     throw;
                 }
 
                 _progress.Report((80, $"UPDATE:Lavorazione studenti - Stati del movimento contabile - completo"));
             }
-            catch (Exception ex)
+            catch
             {
-                _progress.Report((100, ex.Message));
                 throw;
             }
         }
-        private void InsertIntoMovimentiContabiliElementariPagamenti(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente)
+        private void InsertIntoMovimentiContabiliElementariPagamenti(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -1175,31 +1175,29 @@ namespace ProcedureNet7
                 string finalQuery = finalQueryBuilder.ToString();
                 if (string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    return;
+                    throw new Exception("Query finale senza contenuti.");
                 }
                 try
                 {
                     // Execute all accumulated SQL statements at once
-                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn, sqlTransaction))
                     {
                         cmd.ExecuteNonQuery(); // Execute the query
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    _progress.Report((100, ex.Message));
                     throw;
                 }
 
                 _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili elementari - completo"));
             }
-            catch (Exception ex)
+            catch
             {
-                _progress.Report((100, ex.Message));
                 throw;
             }
         }
-        private void InsertIntoMovimentiContabiliElementariDetrazioni(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente)
+        private void InsertIntoMovimentiContabiliElementariDetrazioni(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -1251,29 +1249,27 @@ namespace ProcedureNet7
                 string finalQuery = finalQueryBuilder.ToString();
                 if (string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    return;
+                    throw new Exception("Query finale senza contenuti.");
                 }
                 // Execute all accumulated SQL statements at once
                 try
                 {
-                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn, sqlTransaction))
                     {
                         cmd.ExecuteNonQuery();
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    _progress.Report((100, ex.Message));
                     throw;
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                _progress.Report((100, ex.Message));
                 throw;
             }
         }
-        private void InsertIntoMovimentiContabiliElementariAssegnazioni(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente)
+        private void InsertIntoMovimentiContabiliElementariAssegnazioni(SqlConnection conn, Dictionary<int, Studente> codMovimentiPerStudente, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -1325,25 +1321,23 @@ namespace ProcedureNet7
                 string finalQuery = finalQueryBuilder.ToString();
                 if (string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    return;
+                    throw new Exception("Query finale senza contenuti.");
                 }
                 try
                 {
                     // Execute all accumulated SQL statements at once
-                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn))
+                    using (SqlCommand cmd = new SqlCommand(finalQuery, conn, sqlTransaction))
                     {
                         cmd.ExecuteNonQuery();
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    _progress.Report((100, ex.Message));
                     throw;
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                _progress.Report((100, ex.Message));
                 throw;
             }
         }
