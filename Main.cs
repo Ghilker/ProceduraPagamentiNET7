@@ -136,10 +136,14 @@ namespace ProcedureNet7
                         }
                         break;
                     case ProcedureType.ProceduraFlussoDiRitorno:
+
+                        bool useFlussoNome = proceduraFlussoRitornoNomeFileCheck.Checked;
+                        string nomeFile = Path.GetFileNameWithoutExtension(selectedFilePath);
+
                         ArgsProceduraFlussoDiRitorno argsFlusso = new ArgsProceduraFlussoDiRitorno
                         {
                             _selectedFileFlusso = selectedFilePath,
-                            _selectedImpegnoProvv = proceduraFlussoRitornoNumMandatoTxt.Text,
+                            _selectedImpegnoProvv = useFlussoNome ? nomeFile : proceduraFlussoRitornoNumMandatoTxt.Text,
                             _selectedTipoBando = proceduraFlussoRitornoTipoBandoTxt.Text
                         };
                         argsValidation.Validate(argsFlusso);

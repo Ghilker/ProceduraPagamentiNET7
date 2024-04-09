@@ -63,6 +63,7 @@
             pagamentiSalvataggiolbl = new Label();
             pagamentiSalvataggioBTN = new Button();
             panelProceduraFlussoDiRitorno = new Panel();
+            proceduraFlussoRitornoNomeFileCheck = new CheckBox();
             label29 = new Label();
             proceduraFlussoRitornoTipoBandoTxt = new TextBox();
             label28 = new Label();
@@ -388,6 +389,7 @@
             // 
             // panelProceduraFlussoDiRitorno
             // 
+            panelProceduraFlussoDiRitorno.Controls.Add(proceduraFlussoRitornoNomeFileCheck);
             panelProceduraFlussoDiRitorno.Controls.Add(label29);
             panelProceduraFlussoDiRitorno.Controls.Add(proceduraFlussoRitornoTipoBandoTxt);
             panelProceduraFlussoDiRitorno.Controls.Add(label28);
@@ -398,6 +400,16 @@
             panelProceduraFlussoDiRitorno.Name = "panelProceduraFlussoDiRitorno";
             panelProceduraFlussoDiRitorno.Size = new Size(658, 182);
             panelProceduraFlussoDiRitorno.TabIndex = 26;
+            // 
+            // proceduraFlussoRitornoNomeFileCheck
+            // 
+            proceduraFlussoRitornoNomeFileCheck.AutoSize = true;
+            proceduraFlussoRitornoNomeFileCheck.Location = new Point(22, 96);
+            proceduraFlussoRitornoNomeFileCheck.Name = "proceduraFlussoRitornoNomeFileCheck";
+            proceduraFlussoRitornoNomeFileCheck.Size = new Size(193, 19);
+            proceduraFlussoRitornoNomeFileCheck.TabIndex = 6;
+            proceduraFlussoRitornoNomeFileCheck.Text = "Numero mandato nel nome file";
+            proceduraFlussoRitornoNomeFileCheck.UseVisualStyleBackColor = true;
             // 
             // label29
             // 
@@ -501,9 +513,9 @@
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(680, 527);
+            Controls.Add(panelProceduraFlussoDiRitorno);
             Controls.Add(panelProceduraPagamenti);
             Controls.Add(panelStorni);
-            Controls.Add(panelProceduraFlussoDiRitorno);
             Controls.Add(DatabaseInformations);
             Controls.Add(progressReport);
             Controls.Add(StartProcedureBtn);
@@ -571,6 +583,7 @@
         private Label label31;
         private TextBox storniSelectedEseFinanziarioTxt;
         private CheckBox proceduraPagamentiFiltroCheck;
+        private CheckBox proceduraFlussoRitornoNomeFileCheck;
     }
 }
 

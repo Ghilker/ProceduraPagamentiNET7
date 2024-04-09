@@ -992,37 +992,76 @@ namespace ProcedureNet7
 
         private void InsertIntoMovimentazioni(SqlConnection conn)
         {
+            List<Studente> studentiSenzaImpegno = new List<Studente>();
+            foreach (Studente studente in listaStudentiDaPagare)
+            {
+                if (string.IsNullOrWhiteSpace(studente.numeroImpegno))
+                {
+                    studentiSenzaImpegno.Add(studente);
+                }
+            }
+
+            listaStudentiDaPagare.RemoveAll(studentiSenzaImpegno.Contains);
+
+            if (listaStudentiDaPagare.Count == 0)
+            {
+                _progress.Report((100, "Nessuno studente con impegno inserito"));
+                throw new Exception("Nessuno studente con impegno inserito");
+            }
+
             SqlTransaction sqlTransaction = conn.BeginTransaction();
             try
             {
+                int lastCodiceMovimento = 0;
+                int nextCodiceMovimento = 0;
                 _progress.Report((80, $"Lavorazione studenti - Inserimento in movimenti contabili"));
                 Dictionary<int, Studente> codMovimentiPerStudente = new Dictionary<int, Studente>();
-
-                int lastCodiceMovimento = 0;
-                string sqlCodMovimento = $"SELECT TOP(1) CODICE_MOVIMENTO FROM MOVIMENTI_CONTABILI_GENERALI ORDER BY CODICE_MOVIMENTO DESC";
-                SqlCommand cmdCM = new SqlCommand(sqlCodMovimento, conn);
-                object result = cmdCM.ExecuteScalar();
-                if (result != null)
-                {
-                    lastCodiceMovimento = Convert.ToInt32(result);
-                }
-
-                int nextCodiceMovimento = lastCodiceMovimento + 1;
-
-                const int batchSize = 1000;
                 string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_GENERALI (ID_CAUSALE_MOVIMENTO_GENERALE, IMPORTO_MOVIMENTO, UTENTE_VALIDAZIONE, DATA_VALIDITA_MOVIMENTO_GENERALE, NOTE_VALIDAZIONE_MOVIMENTO, COD_MANDATO) VALUES ";
                 string note = "Inserimento tramite elaborazione file pagamenti";
-                int numberOfBatches = (int)Math.Ceiling((double)listaStudentiDaPagare.Count / batchSize);
+
+                if (listaStudentiDaPagare.Any())
+                {
+                    Studente firstStudent = listaStudentiDaPagare.First();
+                    string firstStudentValues = string.Format("('{0}', {1}, '{2}', '{3}', '{4}', '{5}')",
+                            codTipoPagamento,
+                            firstStudent.importoDaPagare.ToString(CultureInfo.InvariantCulture),
+                            "sa",
+                            DateTime.Now.ToString("dd/MM/yyyy"),
+                            note,
+                            firstStudent.mandatoProvvisorio);
+                    string initialInsertQuery = $"{baseSqlInsert} {firstStudentValues};";
+                    using (SqlCommand cmd = new SqlCommand(initialInsertQuery, conn, sqlTransaction))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    string sqlCodMovimento = "SELECT TOP(1) CODICE_MOVIMENTO FROM MOVIMENTI_CONTABILI_GENERALI ORDER BY CODICE_MOVIMENTO DESC";
+                    using (SqlCommand cmdCM = new SqlCommand(sqlCodMovimento, conn, sqlTransaction))
+                    {
+                        object result = cmdCM.ExecuteScalar();
+                        if (result != null)
+                        {
+                            lastCodiceMovimento = Convert.ToInt32(result);
+                            codMovimentiPerStudente.Add(lastCodiceMovimento, firstStudent);
+                        }
+                    }
+                }
+                else
+                {
+                    throw new Exception("Lista studenti da pagare è vuota a questo punto");
+                }
+
+                const int batchSize = 1000;
+                int numberOfBatches = (int)Math.Ceiling((double)(listaStudentiDaPagare.Count - 1) / batchSize);
 
                 StringBuilder finalQueryBuilder = new StringBuilder();
                 _progress.Report((80, $"Lavorazione studenti - Movimenti contabili generali - batch n°0"));
                 for (int batchNumber = 0; batchNumber < numberOfBatches; batchNumber++)
                 {
+                    nextCodiceMovimento = lastCodiceMovimento + 1;
                     StringBuilder queryBuilder = new StringBuilder();
                     queryBuilder.Append(baseSqlInsert);
 
-                    var batch = listaStudentiDaPagare.Skip(batchNumber * batchSize).Take(batchSize);
-
+                    var batch = listaStudentiDaPagare.Skip(1 + batchNumber * batchSize).Take(batchSize);
                     List<string> valuesList = new List<string>();
 
                     foreach (Studente studente in batch)
@@ -1106,7 +1145,7 @@ namespace ProcedureNet7
 
                 if (string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    throw new Exception("Query finale senza contenuti.");
+                    throw new Exception("STATI_DEL_MOVIMENTO_CONTABILE senza contenuti.");
                 }
                 try
                 {
@@ -1133,7 +1172,7 @@ namespace ProcedureNet7
             {
                 string codMovimentoElementare = "00";
                 string sqlCodMovimento = $"SELECT DISTINCT Cod_mov_contabile_elem FROM Decod_pagam_new where Cod_tipo_pagam_new = '{codTipoPagamento}'";
-                SqlCommand cmdCM = new SqlCommand(sqlCodMovimento, conn);
+                SqlCommand cmdCM = new SqlCommand(sqlCodMovimento, conn, sqlTransaction);
                 object result = cmdCM.ExecuteScalar();
                 if (result != null)
                 {
@@ -1175,7 +1214,7 @@ namespace ProcedureNet7
                 string finalQuery = finalQueryBuilder.ToString();
                 if (string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    throw new Exception("Query finale senza contenuti.");
+                    throw new Exception("MOVIMENTI_CONTABILI_ELEMENTARI senza contenuti.");
                 }
                 try
                 {
@@ -1249,7 +1288,7 @@ namespace ProcedureNet7
                 string finalQuery = finalQueryBuilder.ToString();
                 if (string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    throw new Exception("Query finale senza contenuti.");
+                    return;
                 }
                 // Execute all accumulated SQL statements at once
                 try
@@ -1321,7 +1360,7 @@ namespace ProcedureNet7
                 string finalQuery = finalQueryBuilder.ToString();
                 if (string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    throw new Exception("Query finale senza contenuti.");
+                    return;
                 }
                 try
                 {
@@ -1371,17 +1410,6 @@ namespace ProcedureNet7
                 string currentFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
                 ProcessImpegno(conn, impegno, currentFolder);
             }
-
-            var studentiSenzaImpegno = listaStudentiDaPagare
-                .Where(s => string.IsNullOrWhiteSpace(s.numeroImpegno))
-                .ToList();
-
-            if (studentiSenzaImpegno.Any())
-            {
-                DataTable studentiSenzaImpegnoTable = GenerateDataTableFromList(studentiSenzaImpegno);
-                Utilities.WriteDataTableToTextFile(studentiSenzaImpegnoTable, beneficioFolderPath, "Studenti Senza Impegno");
-            }
-
             _progress.Report((60, $"UPDATE:Lavorazione studenti - Generazione files - Completato"));
         }
         private void ProcessImpegno(SqlConnection conn, string impegno, string currentFolder)
@@ -1504,7 +1532,7 @@ namespace ProcedureNet7
                 DataTable dataTableFlusso = GenerareFlussoDataTable(students, codEnteFlusso);
                 if (dataTableFlusso != null)
                 {
-                    Utilities.WriteDataTableToTextFile(dataTableFlusso, folderPath, $"flusso_{fileName}_impegnoFlusso");
+                    Utilities.WriteDataTableToTextFile(dataTableFlusso, folderPath, $"flusso_{fileName}_{impegnoFlusso}");
                 }
             }
         }
@@ -2002,6 +2030,16 @@ namespace ProcedureNet7
                 _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato"));
                 return;
             }
+
+            if (tipoBeneficio == "CI")
+            {
+                foreach (Studente studente in listaStudentiDaPagare)
+                {
+                    studente.SetImpegno("1229");
+                }
+                _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato"));
+                return;
+            }
             string dataQuery = $@"
                     SELECT Cod_fiscale, num_impegno_primaRata, num_impegno_saldo
                     FROM Specifiche_impegni
@@ -2012,6 +2050,7 @@ namespace ProcedureNet7
 
             SqlCommand readData = new(dataQuery, conn);
             _progress.Report((45, $"Lavorazione studenti - inserimento impegni"));
+            List<Studente> studentiSenzaImpegno = new List<Studente>();
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -2030,10 +2069,23 @@ namespace ProcedureNet7
                             impegnoToSet = reader["num_impegno_saldo"].ToString();
                         }
 
+                        if (string.IsNullOrWhiteSpace(impegnoToSet))
+                        {
+                            studentiSenzaImpegno.Add(studente);
+                            continue;
+                        }
+
                         studente.SetImpegno(impegnoToSet);
                     }
                 }
             }
+            if (studentiSenzaImpegno.Any())
+            {
+                DataTable studentiSenzaImpegnoTable = GenerateDataTableFromList(studentiSenzaImpegno);
+                Utilities.WriteDataTableToTextFile(studentiSenzaImpegnoTable, selectedSaveFolder, "Studenti Senza Impegno");
+            }
+            listaStudentiDaPagare.RemoveAll(studentiSenzaImpegno.Contains);
+
             _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato"));
         }
 

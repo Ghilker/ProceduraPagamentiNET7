@@ -28,6 +28,7 @@ namespace ProcedureNet7.Storni
             selectedStorniFile = args._selectedFile;
             using SqlConnection conn = new(CONNECTION_STRING);
             conn.Open();
+            SqlTransaction sqlTransaction = conn.BeginTransaction();
             DataTable dataTable = Utilities.ReadExcelToDataTable(selectedStorniFile);
 
             foreach (DataRow row in dataTable.Rows)
