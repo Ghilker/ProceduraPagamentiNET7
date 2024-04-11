@@ -20,7 +20,7 @@ namespace ProcedureNet7
         List<StudenteRitorno> studenteRitornoList = new List<StudenteRitorno>();
         List<StudenteRitorno> studentiScartati = new List<StudenteRitorno>();
 
-        public ProceduraFlussoDiRitorno(IProgress<(int, string)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
+        public ProceduraFlussoDiRitorno(IProgress<(int, string, LogLevel)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
 
         public override void RunProcedure(ArgsProceduraFlussoDiRitorno args)
         {
@@ -31,38 +31,38 @@ namespace ProcedureNet7
             {
 
                 _mainForm.inProcedure = true;
-                _progress.Report((0, $"Inizio lavorazione"));
+                _progress.Report((0, $"Inizio lavorazione", LogLevel.INFO));
                 selectedFileFlusso = args._selectedFileFlusso;
                 selectedOldMandato = args._selectedImpegnoProvv;
                 selectedTipoBando = args._selectedTipoBando;
-                _progress.Report((10, $"Creazione lista studenti"));
+                _progress.Report((10, $"Creazione lista studenti", LogLevel.INFO));
                 CreateStudentiList();
-                _progress.Report((20, $"Selezione codice movimento generale"));
+                _progress.Report((20, $"Selezione codice movimento generale", LogLevel.INFO));
                 SetCodMovimentoGenerale(conn, sqlTransaction);
-                _progress.Report((30, $"Aggiornamento tabella movimento elementare"));
+                _progress.Report((30, $"Aggiornamento tabella movimento elementare", LogLevel.INFO));
                 UpdateMovimentoElementari(conn, sqlTransaction);
-                _progress.Report((40, $"Aggiornamento tabella stati movimento contabile"));
+                _progress.Report((40, $"Aggiornamento tabella stati movimento contabile", LogLevel.INFO));
                 UpdateStatiMovimentoContabile(conn, sqlTransaction);
 
-                _progress.Report((55, $"Inserimento in pagamenti"));
+                _progress.Report((55, $"Inserimento in pagamenti", LogLevel.INFO));
                 InsertIntoPagamenti(conn, sqlTransaction);
-                _progress.Report((66, $"Inserimento in reversali"));
+                _progress.Report((66, $"Inserimento in reversali", LogLevel.INFO));
                 InsertIntoReversali(conn, sqlTransaction);
-                _progress.Report((77, $"Aggiornamento mandati"));
+                _progress.Report((77, $"Aggiornamento mandati", LogLevel.INFO));
                 UpdateMandato(conn, sqlTransaction);
-                _progress.Report((88, $"Annullamento pagamenti scartati"));
+                _progress.Report((88, $"Annullamento pagamenti scartati", LogLevel.INFO));
                 Scartati(conn, sqlTransaction);
 
                 _mainForm.inProcedure = false;
-                _progress.Report((100, $"Fine lavorazione"));
-                _progress.Report((100, $"Totale studenti lavorati: {studenteRitornoList.Count}"));
-                _progress.Report((100, $"Di cui scartati: {studentiScartati.Count}"));
+                _progress.Report((100, $"Fine lavorazione", LogLevel.INFO));
+                _progress.Report((100, $"Totale studenti lavorati: {studenteRitornoList.Count}", LogLevel.INFO));
+                _progress.Report((100, $"Di cui scartati: {studentiScartati.Count}", LogLevel.INFO));
 
                 sqlTransaction.Commit();
             }
             catch (Exception ex)
             {
-                _progress.Report((100, ex.Message));
+                _progress.Report((100, ex.Message, LogLevel.ERROR));
                 sqlTransaction.Rollback();
             }
         }

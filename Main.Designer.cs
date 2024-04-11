@@ -41,7 +41,6 @@
             label3 = new Label();
             label4 = new Label();
             memorizeConnectionCheckBox = new CheckBox();
-            progressReport = new TextBox();
             chooseProcedure = new ComboBox();
             DatabaseInformations = new Panel();
             label27 = new Label();
@@ -75,6 +74,7 @@
             storniSelectedEseFinanziarioTxt = new TextBox();
             storniFilelbl = new Label();
             storniFileBtn = new Button();
+            progressReport = new RichTextBox();
             DatabaseInformations.SuspendLayout();
             panelProceduraPagamenti.SuspendLayout();
             panelProceduraFlussoDiRitorno.SuspendLayout();
@@ -183,17 +183,6 @@
             memorizeConnectionCheckBox.TabIndex = 13;
             memorizeConnectionCheckBox.Text = "Memorize connection";
             memorizeConnectionCheckBox.UseVisualStyleBackColor = true;
-            // 
-            // progressReport
-            // 
-            progressReport.Location = new Point(10, 227);
-            progressReport.Margin = new Padding(4, 3, 4, 3);
-            progressReport.Multiline = true;
-            progressReport.Name = "progressReport";
-            progressReport.ReadOnly = true;
-            progressReport.ScrollBars = ScrollBars.Both;
-            progressReport.Size = new Size(487, 175);
-            progressReport.TabIndex = 14;
             // 
             // chooseProcedure
             // 
@@ -508,16 +497,26 @@
             storniFileBtn.UseVisualStyleBackColor = true;
             storniFileBtn.Click += storniFileBtn_Click;
             // 
+            // progressReport
+            // 
+            progressReport.BackColor = SystemColors.Menu;
+            progressReport.Location = new Point(10, 227);
+            progressReport.Name = "progressReport";
+            progressReport.ScrollBars = RichTextBoxScrollBars.ForcedVertical;
+            progressReport.Size = new Size(647, 186);
+            progressReport.TabIndex = 28;
+            progressReport.Text = "";
+            // 
             // MainUI
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(680, 527);
+            Controls.Add(progressReport);
             Controls.Add(panelProceduraFlussoDiRitorno);
             Controls.Add(panelProceduraPagamenti);
             Controls.Add(panelStorni);
             Controls.Add(DatabaseInformations);
-            Controls.Add(progressReport);
             Controls.Add(StartProcedureBtn);
             Controls.Add(progressBar);
             Controls.Add(chooseProcedure);
@@ -533,7 +532,6 @@
             panelStorni.ResumeLayout(false);
             panelStorni.PerformLayout();
             ResumeLayout(false);
-            PerformLayout();
         }
 
         #endregion
@@ -550,7 +548,6 @@
         private Label label3;
         private Label label4;
         private CheckBox memorizeConnectionCheckBox;
-        private TextBox progressReport;
         private ComboBox chooseProcedure;
         private Panel DatabaseInformations;
         private OpenFileDialog openFileDialog;
@@ -584,6 +581,7 @@
         private TextBox storniSelectedEseFinanziarioTxt;
         private CheckBox proceduraPagamentiFiltroCheck;
         private CheckBox proceduraFlussoRitornoNomeFileCheck;
+        private RichTextBox progressReport;
     }
 }
 

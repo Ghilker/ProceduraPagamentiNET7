@@ -9,10 +9,10 @@ namespace ProcedureNet7
     internal abstract class BaseProcedure<TArgs> : IDisposable
     {
         protected string? CONNECTION_STRING;
-        protected IProgress<(int, string)> _progress;
+        protected IProgress<(int, string, LogLevel)> _progress;
         protected MainUI _mainForm;
 
-        protected BaseProcedure(IProgress<(int, string)> progress, MainUI mainUI, string connection_string)
+        protected BaseProcedure(IProgress<(int, string, LogLevel)> progress, MainUI mainUI, string connection_string)
         {
             _progress = progress;
             _mainForm = mainUI;

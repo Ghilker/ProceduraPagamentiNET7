@@ -43,7 +43,7 @@ namespace ProcedureNet7
 
         bool isTR = false;
 
-        public ProceduraPagamenti(IProgress<(int, string)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
+        public ProceduraPagamenti(IProgress<(int, string, LogLevel)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
 
         public override void RunProcedure(ArgsPagamenti args)
         {
@@ -187,7 +187,7 @@ namespace ProcedureNet7
 
             if (selectedTipoProcedura == "2" || (selectedTipoProcedura == "1" && !dbTableExists))
             {
-                _progress.Report((100, "Fine lavorazione"));
+                _progress.Report((100, "Fine lavorazione", LogLevel.INFO));
                 _mainForm.inProcedure = false;
                 return;
             }
@@ -238,14 +238,15 @@ namespace ProcedureNet7
             GenerateStudentListToPay(conn);
 
             ProcessStudentList();
-            _progress.Report((100, $"Lavorazione studenti - Fine lavorazione"));
+            _progress.Report((100, $"Lavorazione studenti - Fine lavorazione", LogLevel.INFO));
             _mainForm.inProcedure = false;
 
         }
         void CreateDBTable(SqlConnection conn)
         {
-            _progress.Report((1, $"Creazione Tabella: {dbTableName}"));
-            ProgressUpdater progressUpdater = new ProgressUpdater(_progress, 1);
+            _progress.Report((1, $"Creazione Tabella: {dbTableName}", LogLevel.INFO));
+            _progress.Report((1, $"Creazione Tabella in corso", LogLevel.INFO));
+            ProgressUpdater progressUpdater = new ProgressUpdater(_progress, 1, LogLevel.INFO);
             progressUpdater.StartUpdating();
             StringBuilder queryBuilder = new StringBuilder();
 
@@ -369,26 +370,26 @@ namespace ProcedureNet7
             };
             cmd.ExecuteNonQuery();
             progressUpdater.StopUpdating();
-            _progress.Report((1, "Fine creazione tabella d'appoggio"));
+            _progress.Report((1, "Fine creazione tabella d'appoggio", LogLevel.INFO));
         }
         void ClearMovimentiContabili(SqlConnection conn)
         {
-            _progress.Report((10, "Pulizia da movimenti contabili elementari del vecchio codice mandato"));
+            _progress.Report((10, "Pulizia da movimenti contabili elementari del vecchio codice mandato", LogLevel.INFO));
             string deleteSQL = $@"          DELETE FROM [MOVIMENTI_CONTABILI_ELEMENTARI] WHERE codice_movimento in 
                                             (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
             SqlCommand deleteCmd = new(deleteSQL, conn);
             deleteCmd.ExecuteNonQuery();
-            _progress.Report((10, "Set in movimenti contabili elementari dello stato a 0 dove era in elaborazione"));
+            _progress.Report((10, "Set in movimenti contabili elementari dello stato a 0 dove era in elaborazione", LogLevel.INFO));
             string updateSQL = $@"          UPDATE [MOVIMENTI_CONTABILI_ELEMENTARI] SET stato = 0, codice_movimento = null WHERE stato = 2 AND codice_movimento in 
                                             (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
             SqlCommand updateCmd = new(updateSQL, conn);
             updateCmd.ExecuteNonQuery();
-            _progress.Report((10, "Pulizia da stati del movimento contabile del vecchio codice mandato"));
+            _progress.Report((10, "Pulizia da stati del movimento contabile del vecchio codice mandato", LogLevel.INFO));
             string deleteStatiSQL = $@"     DELETE FROM [STATI_DEL_MOVIMENTO_CONTABILE] WHERE codice_movimento in 
                                             (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
             SqlCommand deleteStatiCmd = new(deleteStatiSQL, conn);
             deleteStatiCmd.ExecuteNonQuery();
-            _progress.Report((10, "Pulizia da movimenti contabili generali del vecchio codice mandato"));
+            _progress.Report((10, "Pulizia da movimenti contabili generali del vecchio codice mandato", LogLevel.INFO));
             string deleteGeneraliSQL = $@"  DELETE FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%')";
             SqlCommand deleteGeneraliCmd = new(deleteGeneraliSQL, conn);
             deleteGeneraliCmd.ExecuteNonQuery();
@@ -460,7 +461,7 @@ namespace ProcedureNet7
 
                     if (conditionalBuilder.Length <= 0)
                     {
-                        _progress.Report((100, "Errore nella costruzione della query - Selezionare almeno un parametro se si usa il filtro manuale"));
+                        _progress.Report((100, "Errore nella costruzione della query - Selezionare almeno un parametro se si usa il filtro manuale", LogLevel.INFO));
                         _mainForm.inProcedure = false;
                         return;
                     }
@@ -471,7 +472,7 @@ namespace ProcedureNet7
                 dataQuery += $@" WHERE anno_accademico = '{selectedAA}' AND cod_beneficio = '{tipoBeneficio}' AND liquidabile = '1' AND Togliere_loreto = '0' AND Togliere_PEC = '0'";
             }
 
-            _progress.Report((20, "Generazione studenti"));
+            _progress.Report((20, "Generazione studenti", LogLevel.INFO));
 
             SqlCommand readData = new(dataQuery, conn)
             {
@@ -535,7 +536,7 @@ namespace ProcedureNet7
                     listaStudentiDaPagare.Add(studente);
                 }
             }
-            _progress.Report((20, $"UPDATE:Generazione studenti - Completato"));
+            _progress.Report((20, $"UPDATE:Generazione studenti - Completato", LogLevel.INFO));
         }
         private void FilterPagamenti(SqlConnection conn)
         {
@@ -555,7 +556,7 @@ namespace ProcedureNet7
                                     ";
 
             SqlCommand readData = new(sqlPagam, conn);
-            _progress.Report((11, $"Lavorazione studenti - inserimento pagamenti"));
+            _progress.Report((11, $"Lavorazione studenti - inserimento pagamenti", LogLevel.INFO));
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -766,8 +767,8 @@ namespace ProcedureNet7
                                     )";
 
             SqlCommand readData = new(sqlKiller, conn);
-            _progress.Report((12, $"Lavorazione studenti - controllo eliminabili"));
-            List<Studente> listaStudentiDaEliminare = new List<Studente>();
+            _progress.Report((12, $"Lavorazione studenti - controllo eliminabili", LogLevel.INFO));
+            List<Studente> listaStudentiDaEliminareBlocchi = new List<Studente>();
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -776,11 +777,11 @@ namespace ProcedureNet7
                     Studente studente = listaStudentiDaPagare.FirstOrDefault(s => s.codFiscale == codFiscale);
                     if (studente != null)
                     {
-                        if (listaStudentiDaEliminare.Contains(studente))
+                        if (listaStudentiDaEliminareBlocchi.Contains(studente))
                         {
                             continue;
                         }
-                        listaStudentiDaEliminare.Add(studente);
+                        listaStudentiDaEliminareBlocchi.Add(studente);
                     }
                 }
             }
@@ -795,7 +796,7 @@ namespace ProcedureNet7
                             IBAN = ''
                      ";
             SqlCommand IBANDATA = new(sqlStudentiSenzaIBAN, conn);
-            _progress.Report((12, $"Lavorazione studenti - controllo IBAN"));
+            _progress.Report((12, $"Lavorazione studenti - controllo IBAN", LogLevel.INFO));
             List<Studente> listaStudentiDaEliminareIBAN = new List<Studente>();
             using (SqlDataReader reader = IBANDATA.ExecuteReader())
             {
@@ -828,7 +829,7 @@ namespace ProcedureNet7
                             
                      ";
             SqlCommand nonVincitori = new(sqlStudentiNonVincitori, conn);
-            _progress.Report((12, $"Lavorazione studenti - controllo Vincitori"));
+            _progress.Report((12, $"Lavorazione studenti - controllo Vincitori", LogLevel.INFO));
             List<Studente> listaStudentiDaEliminareNonVincitori = new List<Studente>();
             using (SqlDataReader reader = nonVincitori.ExecuteReader())
             {
@@ -861,7 +862,7 @@ namespace ProcedureNet7
 	                            AND Indirizzo_PEC IS NULL
                             ";
             SqlCommand nonPecCmd = new(sqlStudentiPecKiller, conn);
-            _progress.Report((12, $"Lavorazione studenti - controllo PEC"));
+            _progress.Report((12, $"Lavorazione studenti - controllo PEC", LogLevel.INFO));
             List<Studente> listaStudentiDaEliminarePEC = new List<Studente>();
             using (SqlDataReader reader = nonPecCmd.ExecuteReader())
             {
@@ -881,9 +882,9 @@ namespace ProcedureNet7
             }
 
 
-            if (listaStudentiDaEliminare.Count > 0)
+            if (listaStudentiDaEliminareBlocchi.Count > 0)
             {
-                List<string> codFiscaliDaEliminare = listaStudentiDaEliminare.Select(studente => studente.codFiscale).ToList();
+                List<string> codFiscaliDaEliminare = listaStudentiDaEliminareBlocchi.Select(studente => studente.codFiscale).ToList();
                 string sqlUpdate = $"UPDATE {dbTableName} SET togliere_loreto = 1, note = 'Studente con blocchi al momento della generazione del flusso' where cod_fiscale in ({string.Join(", ", codFiscaliDaEliminare.Select(cf => $"'{cf}'"))}) ";
                 using (SqlCommand cmd = new SqlCommand(sqlUpdate, conn))
                 {
@@ -920,13 +921,17 @@ namespace ProcedureNet7
                     cmd.ExecuteNonQuery(); // Execute the query
                 }
             }
+            _progress.Report((12, $"Numero studenti da eliminare per blocchi presenti in domanda = {listaStudentiDaEliminareBlocchi.Count}", LogLevel.DEBUG));
+            _progress.Report((12, $"Numero studenti da eliminare per IBAN mancante = {listaStudentiDaEliminareIBAN.Count}", LogLevel.DEBUG));
+            _progress.Report((12, $"Numero studenti da eliminare perché non più vincitori = {listaStudentiDaEliminareNonVincitori.Count}", LogLevel.DEBUG));
+            _progress.Report((12, $"Numero studenti da eliminare per PEC mancante = {listaStudentiDaEliminarePEC.Count}", LogLevel.DEBUG));
 
-            listaStudentiDaPagare.RemoveAll(listaStudentiDaEliminare.Contains);
+            listaStudentiDaPagare.RemoveAll(listaStudentiDaEliminareBlocchi.Contains);
             listaStudentiDaPagare.RemoveAll(listaStudentiDaEliminareIBAN.Contains);
             listaStudentiDaPagare.RemoveAll(listaStudentiDaEliminareNonVincitori.Contains);
             listaStudentiDaPagare.RemoveAll(listaStudentiDaEliminarePEC.Contains);
 
-            _progress.Report((12, $"Lavorazione studenti - controllo eliminabili - completato"));
+            _progress.Report((12, $"Lavorazione studenti - controllo eliminabili - completato", LogLevel.INFO));
         }
 
         void ProcessStudentList()
@@ -935,7 +940,7 @@ namespace ProcedureNet7
             {
                 return;
             }
-            _progress.Report((30, $"Lavorazione studenti"));
+            _progress.Report((30, $"Lavorazione studenti", LogLevel.INFO));
             List<string> codFiscali = listaStudentiDaPagare.Select(studente => studente.codFiscale).ToList();
 
             using SqlConnection conn = new(CONNECTION_STRING);
@@ -945,7 +950,7 @@ namespace ProcedureNet7
             SqlCommand createCmd = new(createTempTable, conn);
             createCmd.ExecuteNonQuery();
 
-            _progress.Report((30, $"Lavorazione studenti - creazione tabella codici fiscali"));
+            _progress.Report((30, $"Lavorazione studenti - creazione tabella codici fiscali", LogLevel.INFO));
             for (int i = 0; i < codFiscali.Count; i += 1000)
             {
                 var batch = codFiscali.Skip(i).Take(1000);
@@ -957,8 +962,11 @@ namespace ProcedureNet7
             {
                 FilterPagamenti(conn);
             }
+            _progress.Report((30, $"Numero studenti prima della pulizia = {listaStudentiDaPagare.Count}", LogLevel.DEBUG));
+
             CheckLiquefazione(conn);
 
+            _progress.Report((30, $"Numero studenti dopo la pulizia = {listaStudentiDaPagare.Count}", LogLevel.DEBUG));
             if (listaStudentiDaPagare.Count > 0)
             {
                 PopulateStudentLuogoNascita(conn);
@@ -1005,7 +1013,7 @@ namespace ProcedureNet7
 
             if (listaStudentiDaPagare.Count == 0)
             {
-                _progress.Report((100, "Nessuno studente con impegno inserito"));
+                _progress.Report((100, "Nessuno studente con impegno inserito", LogLevel.INFO));
                 throw new Exception("Nessuno studente con impegno inserito");
             }
 
@@ -1014,7 +1022,7 @@ namespace ProcedureNet7
             {
                 int lastCodiceMovimento = 0;
                 int nextCodiceMovimento = 0;
-                _progress.Report((80, $"Lavorazione studenti - Inserimento in movimenti contabili"));
+                _progress.Report((80, $"Lavorazione studenti - Inserimento in movimenti contabili", LogLevel.INFO));
                 Dictionary<int, Studente> codMovimentiPerStudente = new Dictionary<int, Studente>();
                 string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_GENERALI (ID_CAUSALE_MOVIMENTO_GENERALE, IMPORTO_MOVIMENTO, UTENTE_VALIDAZIONE, DATA_VALIDITA_MOVIMENTO_GENERALE, NOTE_VALIDAZIONE_MOVIMENTO, COD_MANDATO) VALUES ";
                 string note = "Inserimento tramite elaborazione file pagamenti";
@@ -1054,7 +1062,7 @@ namespace ProcedureNet7
                 int numberOfBatches = (int)Math.Ceiling((double)(listaStudentiDaPagare.Count - 1) / batchSize);
 
                 StringBuilder finalQueryBuilder = new StringBuilder();
-                _progress.Report((80, $"Lavorazione studenti - Movimenti contabili generali - batch n°0"));
+                _progress.Report((80, $"Lavorazione studenti - Movimenti contabili generali - batch n°0", LogLevel.INFO));
                 for (int batchNumber = 0; batchNumber < numberOfBatches; batchNumber++)
                 {
                     nextCodiceMovimento = lastCodiceMovimento + 1;
@@ -1083,7 +1091,7 @@ namespace ProcedureNet7
                     queryBuilder.Append("; ");
 
                     finalQueryBuilder.Append(queryBuilder.ToString());
-                    _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili generali - batch n°{batchNumber}"));
+                    _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili generali - batch n°{batchNumber}", LogLevel.INFO));
                 }
                 string finalQuery = finalQueryBuilder.ToString();
                 try
@@ -1107,7 +1115,7 @@ namespace ProcedureNet7
             }
             catch (Exception ex)
             {
-                _progress.Report((100, ex.Message));
+                _progress.Report((100, ex.Message, LogLevel.ERROR));
                 sqlTransaction.Rollback();
             }
         }
@@ -1121,7 +1129,7 @@ namespace ProcedureNet7
 
                 List<string> batchStatements = new List<string>();
                 int currentBatchSize = 0;
-                _progress.Report((80, $"Lavorazione studenti - Stati del movimento contabile"));
+                _progress.Report((80, $"Lavorazione studenti - Stati del movimento contabile", LogLevel.INFO));
                 foreach (var entry in codMovimentiPerStudente)
                 {
                     int codMovimento = entry.Key;
@@ -1159,7 +1167,7 @@ namespace ProcedureNet7
                     throw;
                 }
 
-                _progress.Report((80, $"UPDATE:Lavorazione studenti - Stati del movimento contabile - completo"));
+                _progress.Report((80, $"UPDATE:Lavorazione studenti - Stati del movimento contabile - completo", LogLevel.INFO));
             }
             catch
             {
@@ -1186,15 +1194,15 @@ namespace ProcedureNet7
 
                 List<string> batchStatements = new List<string>();
                 int currentBatchSize = 0;
-                _progress.Report((80, $"Lavorazione studenti - Movimenti contabili elementari"));
+                _progress.Report((80, $"Lavorazione studenti - Movimenti contabili elementari", LogLevel.INFO));
                 foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
                 {
                     int codMovimento = entry.Key;
-                    string importoDaPagare = entry.Value.importoDaPagare.ToString(CultureInfo.InvariantCulture);
+                    string importoLordo = entry.Value.importoDaPagareLordo.ToString(CultureInfo.InvariantCulture);
                     int segno = 1;
 
                     // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
-                    string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '{codMovimentoElementare}', '{codMovimento}', '{importoDaPagare}', '{segno}', '{DateTime.Now.ToString("yyyy")}','2', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa', '', '')";
+                    string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '{codMovimentoElementare}', '{codMovimento}', '{importoLordo}', '{segno}', '{DateTime.Now.ToString("yyyy")}','2', '{DateTime.Now.ToString("dd/MM/yyyy")}', 'sa', '', '')";
 
                     batchStatements.Add(insertStatement);
                     currentBatchSize++;
@@ -1229,7 +1237,7 @@ namespace ProcedureNet7
                     throw;
                 }
 
-                _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili elementari - completo"));
+                _progress.Report((80, $"UPDATE:Lavorazione studenti - Movimenti contabili elementari - completo", LogLevel.INFO));
             }
             catch
             {
@@ -1240,6 +1248,7 @@ namespace ProcedureNet7
         {
             try
             {
+                _progress.Report((80, $"Lavorazione studenti - Movimenti contabili elementari - Detrazioni", LogLevel.INFO));
                 const int batchSize = 1000; // Maximum number of rows per INSERT statement
                 string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_ELEMENTARI (CODICE_FISCALE, ANNO_ACCADEMICO, ID_CAUSALE, CODICE_MOVIMENTO, IMPORTO, SEGNO, ANNO_ESERCIZIO_FINANZIARIO, STATO,DATA_INSERIMENTO, UTENTE_MOVIMENTO, NOTE_MOVIMENTO_ELEMENTARE, NUMERO_REVERSALE)  VALUES ";
                 StringBuilder finalQueryBuilder = new StringBuilder();
@@ -1261,7 +1270,7 @@ namespace ProcedureNet7
                         {
                             continue;
                         }
-
+                        _progress.Report((80, $"Inserito CF: {entry.Value.codFiscale}", LogLevel.INFO));
                         int codMovimento = entry.Key;
                         string importoDaDetrarre = detrazione.importo.ToString(CultureInfo.InvariantCulture);
                         int segno = 0;
@@ -1273,7 +1282,7 @@ namespace ProcedureNet7
                         currentBatchSize++;
 
                         // Execute batch when reaching batchSize or end of dictionary
-                        if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                        if (currentBatchSize == batchSize || (codMovimento == codMovimentiPerStudente.Keys.Last() && detrazione == entry.Value.detrazioni.Last()))
                         {
                             finalQueryBuilder.Append(baseSqlInsert);
                             finalQueryBuilder.Append(string.Join(",", batchStatements));
@@ -1285,22 +1294,21 @@ namespace ProcedureNet7
                     }
                 }
 
-                string finalQuery = finalQueryBuilder.ToString();
-                if (string.IsNullOrWhiteSpace(finalQuery))
+                // Execute any remaining statements that didn't fill a complete batch
+                if (batchStatements.Count > 0)
                 {
-                    return;
+                    finalQueryBuilder.Append(baseSqlInsert);
+                    finalQueryBuilder.Append(string.Join(",", batchStatements));
+                    finalQueryBuilder.Append("; ");
                 }
-                // Execute all accumulated SQL statements at once
-                try
+
+                string finalQuery = finalQueryBuilder.ToString();
+                if (!string.IsNullOrWhiteSpace(finalQuery))
                 {
                     using (SqlCommand cmd = new SqlCommand(finalQuery, conn, sqlTransaction))
                     {
                         cmd.ExecuteNonQuery();
                     }
-                }
-                catch
-                {
-                    throw;
                 }
             }
             catch
@@ -1312,6 +1320,7 @@ namespace ProcedureNet7
         {
             try
             {
+                _progress.Report((80, $"Lavorazione studenti - Movimenti contabili elementari - Assegnazioni", LogLevel.INFO));
                 const int batchSize = 1000; // Maximum number of rows per INSERT statement
                 string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_ELEMENTARI (CODICE_FISCALE, ANNO_ACCADEMICO, ID_CAUSALE, CODICE_MOVIMENTO, IMPORTO, SEGNO, ANNO_ESERCIZIO_FINANZIARIO, STATO,DATA_INSERIMENTO, UTENTE_MOVIMENTO, NOTE_MOVIMENTO_ELEMENTARE, NUMERO_REVERSALE)  VALUES ";
                 StringBuilder finalQueryBuilder = new StringBuilder();
@@ -1345,7 +1354,7 @@ namespace ProcedureNet7
                         currentBatchSize++;
 
                         // Execute batch when reaching batchSize or end of dictionary
-                        if (currentBatchSize == batchSize || codMovimento == codMovimentiPerStudente.Keys.Last())
+                        if (currentBatchSize == batchSize || (codMovimento == codMovimentiPerStudente.Keys.Last() && assegnazione == entry.Value.assegnazioni.Last()))
                         {
                             finalQueryBuilder.Append(baseSqlInsert);
                             finalQueryBuilder.Append(string.Join(",", batchStatements));
@@ -1357,22 +1366,21 @@ namespace ProcedureNet7
                     }
                 }
 
-                string finalQuery = finalQueryBuilder.ToString();
-                if (string.IsNullOrWhiteSpace(finalQuery))
+                // Execute any remaining statements that didn't fill a complete batch
+                if (batchStatements.Count > 0)
                 {
-                    return;
+                    finalQueryBuilder.Append(baseSqlInsert);
+                    finalQueryBuilder.Append(string.Join(",", batchStatements));
+                    finalQueryBuilder.Append("; ");
                 }
-                try
+
+                string finalQuery = finalQueryBuilder.ToString();
+                if (!string.IsNullOrWhiteSpace(finalQuery))
                 {
-                    // Execute all accumulated SQL statements at once
                     using (SqlCommand cmd = new SqlCommand(finalQuery, conn, sqlTransaction))
                     {
                         cmd.ExecuteNonQuery();
                     }
-                }
-                catch
-                {
-                    throw;
                 }
             }
             catch
@@ -1383,7 +1391,7 @@ namespace ProcedureNet7
 
         private void GenerateOutputFiles(SqlConnection conn)
         {
-            _progress.Report((60, $"Lavorazione studenti - Generazione files"));
+            _progress.Report((60, $"Lavorazione studenti - Generazione files", LogLevel.INFO));
             string currentMonthName = DateTime.Now.ToString("MMMM").ToUpper();
             string currentYear = DateTime.Now.ToString("yyyy");
             string firstHalfAA = selectedAA.Substring(2, 2);
@@ -1403,14 +1411,14 @@ namespace ProcedureNet7
 
             foreach (string impegno in impegnoList)
             {
-                _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno}"));
+                _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno}", LogLevel.INFO));
                 string sqlImpegno = $"SELECT Descr FROM Impegni WHERE anno_accademico = '{selectedAA}' AND num_impegno = '{impegno}' AND categoria_pagamento = '{categoriaPagam}'";
                 SqlCommand cmdImpegno = new SqlCommand(sqlImpegno, conn);
                 string impegnoDescrizione = (string)cmdImpegno.ExecuteScalar();
                 string currentFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
                 ProcessImpegno(conn, impegno, currentFolder);
             }
-            _progress.Report((60, $"UPDATE:Lavorazione studenti - Generazione files - Completato"));
+            _progress.Report((60, $"UPDATE:Lavorazione studenti - Generazione files - Completato", LogLevel.INFO));
         }
         private void ProcessImpegno(SqlConnection conn, string impegno, string currentFolder)
         {
@@ -1426,7 +1434,7 @@ namespace ProcedureNet7
 
         private void GenerateOutputFilesPA(SqlConnection conn, string currentFolder, List<Studente> studentsWithSameImpegno, string impegno)
         {
-            _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Senza detrazioni"));
+            _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Senza detrazioni", LogLevel.INFO));
             var studentsWithPA = studentsWithSameImpegno
                 .Where(s => s.assegnazioni != null || (s.detrazioni != null && s.detrazioni.Any(d => d.codReversale == "01" && d.daContabilizzare)))
                 .ToList();
@@ -1499,7 +1507,7 @@ namespace ProcedureNet7
                 SqlCommand cmdSede = new SqlCommand(sqlCodEnte, conn);
                 nomeCodEnte = (string)cmdSede.ExecuteScalar();
                 nomeCodEnte = Utilities.SanitizeColumnName(nomeCodEnte);
-                _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}"));
+                _progress.Report((60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}", LogLevel.INFO));
                 string specificFolderPath = Utilities.EnsureDirectory(Path.Combine(newFolderPath, $"{nomeCodEnte}"));
 
                 if (tipoStudente == "2")
@@ -1548,7 +1556,7 @@ namespace ProcedureNet7
         }
         private DataTable GenerareGiuliaDataTable(List<Studente> studentsWithPA, string impegno)
         {
-            _progress.Report((60, $"Lavorazione studenti - impegno n°{impegno} - Generazione Dettaglio PA"));
+            _progress.Report((60, $"Lavorazione studenti - impegno n°{impegno} - Generazione Dettaglio PA", LogLevel.INFO));
             int progressivo = 1;
             DataTable returnDataTable = new DataTable();
 
@@ -1610,7 +1618,7 @@ namespace ProcedureNet7
                 INNER JOIN #CFEstrazione cfe ON Studente.Cod_fiscale = cfe.Cod_fiscale";
 
             SqlCommand readData = new(dataQuery, conn);
-            _progress.Report((30, $"Lavorazione studenti - inserimento in luogo nascita"));
+            _progress.Report((30, $"Lavorazione studenti - inserimento in luogo nascita", LogLevel.INFO));
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -1627,7 +1635,7 @@ namespace ProcedureNet7
                     }
                 }
             }
-            _progress.Report((30, $"UPDATE:Lavorazione studenti - inserimento in luogo nascita - completato"));
+            _progress.Report((30, $"UPDATE:Lavorazione studenti - inserimento in luogo nascita - completato", LogLevel.INFO));
         }
         void PopulateStudentResidenza(SqlConnection conn)
         {
@@ -1639,7 +1647,7 @@ namespace ProcedureNet7
 
             SqlCommand readData = new(dataQuery, conn);
             readData.Parameters.AddWithValue("@AnnoAccademico", selectedAA);
-            _progress.Report((35, $"Lavorazione studenti - inserimento in residenza"));
+            _progress.Report((35, $"Lavorazione studenti - inserimento in residenza", LogLevel.INFO));
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -1658,7 +1666,7 @@ namespace ProcedureNet7
                     }
                 }
             }
-            _progress.Report((35, $"UPDATE:Lavorazione studenti - inserimento in residenza - completato"));
+            _progress.Report((35, $"UPDATE:Lavorazione studenti - inserimento in residenza - completato", LogLevel.INFO));
         }
         void PopulateStudentInformation(SqlConnection conn)
         {
@@ -1670,7 +1678,7 @@ namespace ProcedureNet7
                     ";
 
             SqlCommand readData = new(dataQuery, conn);
-            _progress.Report((40, $"Lavorazione studenti - inserimento in informazioni"));
+            _progress.Report((40, $"Lavorazione studenti - inserimento in informazioni", LogLevel.INFO));
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -1688,7 +1696,7 @@ namespace ProcedureNet7
                     }
                 }
             }
-            _progress.Report((40, $"UPDATE:Lavorazione studenti - inserimento in informazioni - completato"));
+            _progress.Report((40, $"UPDATE:Lavorazione studenti - inserimento in informazioni - completato", LogLevel.INFO));
         }
         void PopulateStudentDetrazioni(SqlConnection conn)
         {
@@ -1701,7 +1709,7 @@ namespace ProcedureNet7
                     ";
 
             SqlCommand readData = new(dataQuery, conn);
-            _progress.Report((45, $"Lavorazione studenti - inserimento in detrazioni"));
+            _progress.Report((45, $"Lavorazione studenti - inserimento in detrazioni", LogLevel.INFO));
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -1720,7 +1728,7 @@ namespace ProcedureNet7
                     }
                 }
             }
-            _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento in detrazioni - completato"));
+            _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento in detrazioni - completato", LogLevel.INFO));
         }
         void PopulateStudentiAssegnazioni(SqlConnection conn)
         {
@@ -1750,7 +1758,7 @@ namespace ProcedureNet7
                     ";
 
             SqlCommand readData = new(dataQuery, conn);
-            _progress.Report((50, $"Lavorazione studenti - inserimento in assegnazioni"));
+            _progress.Report((50, $"Lavorazione studenti - inserimento in assegnazioni", LogLevel.INFO));
             HashSet<string> processedFiscalCodes = new HashSet<string>();
 
             using (SqlDataReader reader = readData.ExecuteReader())
@@ -1879,11 +1887,11 @@ namespace ProcedureNet7
                     studente.assegnazioni.RemoveAt(0);
                 }
             }
-            _progress.Report((50, $"UPDATE:Lavorazione studenti - inserimento in assegnazioni - completato"));
+            _progress.Report((50, $"UPDATE:Lavorazione studenti - inserimento in assegnazioni - completato", LogLevel.INFO));
         }
         void PopulateImportoDaPagare(SqlConnection conn)
         {
-            _progress.Report((55, $"Lavorazione studenti - Calcolo importi"));
+            _progress.Report((55, $"Lavorazione studenti - Calcolo importi", LogLevel.INFO));
             List<Studente> studentiDaRimuovereDalPagamento = new List<Studente>();
             foreach (Studente studente in listaStudentiDaPagare)
             {
@@ -2017,7 +2025,7 @@ namespace ProcedureNet7
             }
 
             listaStudentiDaPagare.RemoveAll(studentiDaRimuovereDalPagamento.Contains);
-            _progress.Report((55, $"UPDATE:Lavorazione studenti - Calcolo importi - Completato"));
+            _progress.Report((55, $"UPDATE:Lavorazione studenti - Calcolo importi - Completato", LogLevel.INFO));
         }
         void PopulateStudentiImpegni(SqlConnection conn)
         {
@@ -2027,19 +2035,10 @@ namespace ProcedureNet7
                 {
                     studente.SetImpegno("3120");
                 }
-                _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato"));
+                _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato", LogLevel.INFO));
                 return;
             }
 
-            if (tipoBeneficio == "CI")
-            {
-                foreach (Studente studente in listaStudentiDaPagare)
-                {
-                    studente.SetImpegno("1229");
-                }
-                _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato"));
-                return;
-            }
             string dataQuery = $@"
                     SELECT Cod_fiscale, num_impegno_primaRata, num_impegno_saldo
                     FROM Specifiche_impegni
@@ -2049,7 +2048,7 @@ namespace ProcedureNet7
                     ";
 
             SqlCommand readData = new(dataQuery, conn);
-            _progress.Report((45, $"Lavorazione studenti - inserimento impegni"));
+            _progress.Report((45, $"Lavorazione studenti - inserimento impegni", LogLevel.INFO));
             List<Studente> studentiSenzaImpegno = new List<Studente>();
             using (SqlDataReader reader = readData.ExecuteReader())
             {
@@ -2081,12 +2080,13 @@ namespace ProcedureNet7
             }
             if (studentiSenzaImpegno.Any())
             {
+                _progress.Report((45, $"Trovati {studentiSenzaImpegno.Count} studenti senza impegno", LogLevel.WARN));
                 DataTable studentiSenzaImpegnoTable = GenerateDataTableFromList(studentiSenzaImpegno);
                 Utilities.WriteDataTableToTextFile(studentiSenzaImpegnoTable, selectedSaveFolder, "Studenti Senza Impegno");
             }
             listaStudentiDaPagare.RemoveAll(studentiSenzaImpegno.Contains);
 
-            _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato"));
+            _progress.Report((45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato", LogLevel.INFO));
         }
 
         private DataTable GenerareFlussoDataTable(List<Studente> studentiDaGenerare, string codEnteFlusso)

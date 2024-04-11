@@ -17,7 +17,7 @@ namespace ProcedureNet7
 
         public bool inProcedure = false;
 
-
+        private Logger logger;
         public MainUI()
         {
             inProcedure = false;
@@ -25,25 +25,19 @@ namespace ProcedureNet7
             AddProcedures();
             DisableAllPanels();
             LoadCredentialsDropdown();
-            //LoadCredentialsAndUpdateUI();
+
+            logger = new Logger(this, progressBar, progressReport, LogLevel.DEBUG);
 
             backgroundWorker.WorkerReportsProgress = true;
             backgroundWorker.DoWork += BackgroundWorker_DoWork;
             backgroundWorker.ProgressChanged += BackgroundWorker_ProgressChanged;
             backgroundWorker.RunWorkerCompleted += BackgroundWorker_RunWorkerCompleted;
 
+            this.FormClosing += Main_FormClosing;
         }
-
-        private void LoadCredentialsAndUpdateUI()
+        private void Main_FormClosing(object? sender, FormClosingEventArgs e)
         {
-            Dictionary<string, Hashtable> credentials = SaveCredentials.LoadCredentialsFromFile();
-            if (credentials != null)
-            {
-                serverIP.Text = credentials["serverIP"]?.ToString();
-                databaseName.Text = credentials["databaseName"]?.ToString();
-                userID.Text = credentials["userID"]?.ToString();
-                password.Text = credentials["password"]?.ToString();
-            }
+            logger?.Stop();
         }
 
         private void AddProcedures()
@@ -88,9 +82,9 @@ namespace ProcedureNet7
 
         private void BackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            Progress<(int, string)> progress = new Progress<(int, string)>(report =>
+            Progress<(int, string, LogLevel)> progress = new Progress<(int, string, LogLevel)>(report =>
             {
-                QueueProgress(report.Item1, report.Item2); // Enqueue progress reports instead of directly updating UI
+                ReportProgress(report.Item1, report.Item2, report.Item3); // Enqueue progress reports instead of directly updating UI
             });
 
             ProcedureType selectedProcedure = ProcedureType.ProceduraPagamenti;
@@ -168,7 +162,7 @@ namespace ProcedureNet7
             }
             catch (ValidationException ex)
             {
-                ReportProgress(100, "Errore compilazione procedura: " + ex.Message);
+                ReportProgress(100, "Errore compilazione procedura: " + ex.Message, LogLevel.WARN);
                 inProcedure = false;
             }
         }
@@ -189,87 +183,9 @@ namespace ProcedureNet7
             //ReportProgress(100, "Fine lavorazione");
         }
 
-        private void ReportProgress(int progress, string message)
+        private void ReportProgress(int progress, string message, LogLevel logLevel = LogLevel.INFO)
         {
-            if (InvokeRequired) // This ensures you're on the UI thread
-            {
-                Invoke(new Action(() => ReportProgress(progress, message)));
-            }
-            else
-            {
-                progressBar.Value = progress;
-                string timestamp = DateTime.Now.ToString("HH:mm:ss:fff");
-
-                if (message.StartsWith("UPDATE:"))
-                {
-                    // Replace the last line if the message starts with the specific code
-                    string[] lines = progressReport.Text.Split(new string[] { Environment.NewLine }, StringSplitOptions.None);
-
-                    if (lines.Length > 0)
-                    {
-                        lines[lines.Length - 1] = $"{timestamp} - {message.Substring("UPDATE:".Length)}"; // Update the last line
-                        progressReport.Text = string.Join(Environment.NewLine, lines);
-                    }
-                }
-                else
-                {
-                    if (!progressReport.Text.EndsWith(Environment.NewLine))
-                    {
-                        progressReport.AppendText(Environment.NewLine);
-                    }
-                    // Append the timestamp and the message in a new line
-                    progressReport.AppendText($"{timestamp} - {message}{Environment.NewLine}");
-                }
-
-                // Ensure the caret is at the end of the text
-                progressReport.SelectionStart = progressReport.Text.Length;
-                progressReport.SelectionLength = 0;
-
-                // Scroll to the caret to make sure the last line is visible
-                progressReport.ScrollToCaret();
-            }
-        }
-
-        private ConcurrentQueue<(int, string)> progressQueue = new ConcurrentQueue<(int, string)>();
-        private volatile bool isProcessingQueue = false;
-
-        // Method for queuing progress reports
-        private void QueueProgress(int progress, string message)
-        {
-            progressQueue.Enqueue((progress, message));
-            ProcessQueueIfNeeded();
-        }
-
-        // Ensure the queue is processed if not already happening
-        private void ProcessQueueIfNeeded()
-        {
-            if (this.InvokeRequired)
-            {
-                this.Invoke(new Action(ProcessQueueIfNeeded));
-                return;
-            }
-
-            if (!isProcessingQueue)
-            {
-                isProcessingQueue = true;
-                Task.Run(() => ProcessQueueItems());
-            }
-        }
-
-        // Continuously process queue items and update UI
-        private void ProcessQueueItems()
-        {
-            while (!progressQueue.IsEmpty)
-            {
-                if (progressQueue.TryDequeue(out var report))
-                {
-                    this.Invoke(new Action(() =>
-                    {
-                        ReportProgress(report.Item1, report.Item2); // Update UI
-                    }));
-                }
-            }
-            isProcessingQueue = false;
+            logger.Log(message, progress, logLevel);
         }
 
         private void StartProcedureBtn_Click(object sender, EventArgs e)
@@ -335,7 +251,7 @@ namespace ProcedureNet7
             catch (Exception ex)
             {
                 inProcedure = false;
-                _ = MessageBox.Show($"Error: {ex.Message}");
+                ReportProgress(0, $"Error: {ex.Message}", LogLevel.ERROR);
             }
         }
 

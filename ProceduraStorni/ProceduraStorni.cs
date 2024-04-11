@@ -11,98 +11,100 @@ namespace ProcedureNet7.Storni
 {
     internal class ProceduraStorni : BaseProcedure<ArgsProceduraStorni>
     {
-        public ProceduraStorni(IProgress<(int, string)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
+        public ProceduraStorni(IProgress<(int, string, LogLevel)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
 
         string selectedStorniFile;
         string esercizioFinanziario;
-
+        SqlTransaction sqlTransaction;
         List<Studente> studenti = new List<Studente>();
         List<Studente> studentiDaBloccare = new List<Studente>();
         List<Studente> studentiRimossi = new List<Studente>();
         List<string> codFiscaliConErrori = new List<string>();
         public override void RunProcedure(ArgsProceduraStorni args)
         {
-            _mainForm.inProcedure = true;
-
-            esercizioFinanziario = args._esercizioFinanziario;
-            selectedStorniFile = args._selectedFile;
-            using SqlConnection conn = new(CONNECTION_STRING);
-            conn.Open();
-            SqlTransaction sqlTransaction = conn.BeginTransaction();
-            DataTable dataTable = Utilities.ReadExcelToDataTable(selectedStorniFile);
-
-            foreach (DataRow row in dataTable.Rows)
+            try
             {
-                string codFiscale = row["CODICE FISCALE"].ToString();
-                string IBAN = IBANHunter(row["MOTIVO STORNO"].ToString());
-                string numMandato = row["mandato"].ToString();
-                string impegnoRentroito = row["IMPEGNO dI provenienza"].ToString();
+                _mainForm.inProcedure = true;
 
-                if (string.IsNullOrEmpty(codFiscale) || string.IsNullOrEmpty(numMandato) || string.IsNullOrEmpty(IBAN) || string.IsNullOrEmpty(impegnoRentroito))
+                esercizioFinanziario = args._esercizioFinanziario;
+                selectedStorniFile = args._selectedFile;
+                using SqlConnection conn = new(CONNECTION_STRING);
+                conn.Open();
+                sqlTransaction = conn.BeginTransaction();
+                DataTable dataTable = Utilities.ReadExcelToDataTable(selectedStorniFile);
+
+                foreach (DataRow row in dataTable.Rows)
                 {
-                    continue;
+                    string codFiscale = row["CODICE FISCALE"].ToString();
+                    string IBAN = IBANHunter(row["MOTIVO STORNO"].ToString());
+                    string numMandato = row["mandato"].ToString();
+                    string impegnoRentroito = row["IMPEGNO dI provenienza"].ToString();
+
+                    if (string.IsNullOrEmpty(codFiscale) || string.IsNullOrEmpty(numMandato) || string.IsNullOrEmpty(IBAN) || string.IsNullOrEmpty(impegnoRentroito))
+                    {
+                        continue;
+                    }
+
+                    Studente studente = new Studente(codFiscale, IBAN, numMandato, impegnoRentroito);
+                    studenti.Add(studente);
                 }
 
-                Studente studente = new Studente(codFiscale, IBAN, numMandato, impegnoRentroito);
-                studenti.Add(studente);
-            }
+                _progress.Report((30, $"Lavorazione studenti", LogLevel.INFO));
+                List<string> codFiscali = studenti.Select(studente => studente.codFiscale).ToList();
 
-            _progress.Report((30, $"Lavorazione studenti"));
-            List<string> codFiscali = studenti.Select(studente => studente.codFiscale).ToList();
+                string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
+                SqlCommand createCmd = new(createTempTable, conn, sqlTransaction);
+                createCmd.ExecuteNonQuery();
 
-            string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
-            SqlCommand createCmd = new(createTempTable, conn);
-            createCmd.ExecuteNonQuery();
+                _progress.Report((30, $"Lavorazione studenti - creazione tabella codici fiscali", LogLevel.INFO));
+                for (int i = 0; i < codFiscali.Count; i += 1000)
+                {
+                    var batch = codFiscali.Skip(i).Take(1000);
+                    var insertQuery = "INSERT INTO #CFEstrazione (Cod_fiscale) VALUES " + string.Join(", ", batch.Select(cf => $"('{cf}')"));
+                    SqlCommand insertCmd = new(insertQuery, conn, sqlTransaction);
+                    insertCmd.ExecuteNonQuery();
+                }
 
-            _progress.Report((30, $"Lavorazione studenti - creazione tabella codici fiscali"));
-            for (int i = 0; i < codFiscali.Count; i += 1000)
-            {
-                var batch = codFiscali.Skip(i).Take(1000);
-                var insertQuery = "INSERT INTO #CFEstrazione (Cod_fiscale) VALUES " + string.Join(", ", batch.Select(cf => $"('{cf}')"));
-                SqlCommand insertCmd = new(insertQuery, conn);
-                insertCmd.ExecuteNonQuery();
-            }
-
-            string queryCheckIBAN = $@"
+                string queryCheckIBAN = $@"
                         SELECT vMODALITA_PAGAMENTO.Cod_fiscale, IBAN 
                         FROM vMODALITA_PAGAMENTO INNER JOIN
                             #CFEstrazione AS CF ON vMODALITA_PAGAMENTO.cod_fiscale = CF.cod_fiscale
                         WHERE Data_fine_validita IS NULL
                     ";
 
-            SqlCommand readData = new(queryCheckIBAN, conn);
-            _progress.Report((12, $"Lavorazione studenti - controllo eliminabili"));
-            using (SqlDataReader reader = readData.ExecuteReader())
-            {
-                while (reader.Read())
+                SqlCommand readData = new(queryCheckIBAN, conn, sqlTransaction);
+                _progress.Report((12, $"Lavorazione studenti - controllo eliminabili", LogLevel.INFO));
+                using (SqlDataReader reader = readData.ExecuteReader())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
-                    Studente studente = studenti.FirstOrDefault(s => s.codFiscale == codFiscale);
-                    if (studente != null)
+                    while (reader.Read())
                     {
-
-                        string IBAN = reader["IBAN"].ToString();
-
-                        if (studente.IBAN != IBAN)
+                        string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                        Studente studente = studenti.FirstOrDefault(s => s.codFiscale == codFiscale);
+                        if (studente != null)
                         {
-                            continue;
-                        }
 
-                        if (studentiDaBloccare.Contains(studente))
-                        {
-                            continue;
+                            string IBAN = reader["IBAN"].ToString();
+
+                            if (studente.IBAN != IBAN)
+                            {
+                                continue;
+                            }
+
+                            if (studentiDaBloccare.Contains(studente))
+                            {
+                                continue;
+                            }
+                            studentiDaBloccare.Add(studente);
                         }
-                        studentiDaBloccare.Add(studente);
-                    }
-                    else
-                    {
-                        codFiscaliConErrori.Add(codFiscale);
+                        else
+                        {
+                            codFiscaliConErrori.Add(codFiscale);
+                        }
                     }
                 }
-            }
 
 
-            string sqlMappingTable = $@"
+                string sqlMappingTable = $@"
                         CREATE TABLE #MappingTable
                         (
                             CodFiscale CHAR(16),
@@ -110,29 +112,30 @@ namespace ProcedureNet7.Storni
                             impReintroito VARCHAR(10)
                         )";
 
-            SqlCommand mappingTableCmd = new(sqlMappingTable, conn);
-            mappingTableCmd.ExecuteNonQuery();
+                SqlCommand mappingTableCmd = new(sqlMappingTable, conn, sqlTransaction);
+                mappingTableCmd.ExecuteNonQuery();
 
-            using (SqlCommand cmd = new SqlCommand())
-            {
-                cmd.Connection = conn;
-                cmd.CommandType = CommandType.Text;
-
-                foreach (Studente studente in studenti)
+                using (SqlCommand cmd = new SqlCommand())
                 {
-                    cmd.CommandText = "INSERT INTO #MappingTable (CodFiscale, NumMandato, impReintroito) VALUES (@CodFiscale, @NumMandato, @impReintroito)";
+                    cmd.Connection = conn;
+                    cmd.CommandType = CommandType.Text;
+                    cmd.Transaction = sqlTransaction;
 
-                    cmd.Parameters.Clear();
+                    foreach (Studente studente in studenti)
+                    {
+                        cmd.CommandText = "INSERT INTO #MappingTable (CodFiscale, NumMandato, impReintroito) VALUES (@CodFiscale, @NumMandato, @impReintroito)";
 
-                    cmd.Parameters.AddWithValue("@CodFiscale", studente.codFiscale);
-                    cmd.Parameters.AddWithValue("@NumMandato", studente.mandatoPagamento);
-                    cmd.Parameters.AddWithValue("@impReintroito", studente.impegnoReintroito);
+                        cmd.Parameters.Clear();
 
-                    cmd.ExecuteNonQuery();
+                        cmd.Parameters.AddWithValue("@CodFiscale", studente.codFiscale);
+                        cmd.Parameters.AddWithValue("@NumMandato", studente.mandatoPagamento);
+                        cmd.Parameters.AddWithValue("@impReintroito", studente.impegnoReintroito);
+
+                        cmd.ExecuteNonQuery();
+                    }
                 }
-            }
 
-            string queryAddStudenteAA = $@" 
+                string queryAddStudenteAA = $@" 
                     SELECT Pagamenti.Anno_accademico, Domanda.cod_fiscale
                     FROM Pagamenti INNER JOIN
                     Domanda ON Pagamenti.anno_accademico = Domanda.anno_accademico AND Pagamenti.num_domanda = Domanda.num_domanda INNER JOIN
@@ -140,42 +143,42 @@ namespace ProcedureNet7.Storni
                     WHERE pagamenti.ese_finanziario = '{esercizioFinanziario}'
                     ";
 
-            SqlCommand studenteAA = new(queryAddStudenteAA, conn);
-            _progress.Report((12, $"Lavorazione studenti - aggiunta anno accademico"));
-            using (SqlDataReader reader = studenteAA.ExecuteReader())
-            {
-                while (reader.Read())
+                SqlCommand studenteAA = new(queryAddStudenteAA, conn, sqlTransaction);
+                _progress.Report((12, $"Lavorazione studenti - aggiunta anno accademico", LogLevel.INFO));
+                using (SqlDataReader reader = studenteAA.ExecuteReader())
                 {
-                    string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
-                    Studente studente = studenti.FirstOrDefault(s => s.codFiscale == codFiscale);
-                    if (studente != null)
+                    while (reader.Read())
                     {
-                        string annoAccademico = reader["Anno_accademico"].ToString();
-                        studente.SetStudenteAA(annoAccademico);
-                    }
-                    else
-                    {
-                        codFiscaliConErrori.Add(codFiscale);
+                        string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
+                        Studente studente = studenti.FirstOrDefault(s => s.codFiscale == codFiscale);
+                        if (studente != null)
+                        {
+                            string annoAccademico = reader["Anno_accademico"].ToString();
+                            studente.SetStudenteAA(annoAccademico);
+                        }
+                        else
+                        {
+                            codFiscaliConErrori.Add(codFiscale);
+                        }
                     }
                 }
-            }
 
 
-            foreach (Studente studente in studenti)
-            {
-                if (
-                    string.IsNullOrWhiteSpace(studente.studenteAA) ||
-                    string.IsNullOrWhiteSpace(studente.mandatoPagamento) ||
-                    string.IsNullOrWhiteSpace(studente.impegnoReintroito)
-                )
+                foreach (Studente studente in studenti)
                 {
-                    studentiRimossi.Add(studente);
+                    if (
+                        string.IsNullOrWhiteSpace(studente.studenteAA) ||
+                        string.IsNullOrWhiteSpace(studente.mandatoPagamento) ||
+                        string.IsNullOrWhiteSpace(studente.impegnoReintroito)
+                    )
+                    {
+                        studentiRimossi.Add(studente);
+                    }
                 }
-            }
 
-            studenti.RemoveAll(studentiRimossi.Contains);
+                studenti.RemoveAll(studentiRimossi.Contains);
 
-            string sqlUpdatePagam = $@"
+                string sqlUpdatePagam = $@"
                     UPDATE Pagamenti
                     SET Ritirato_azienda = '1',
                         data_reintroito = '{DateTime.Now.ToString("dd/MM/yyyy")}',
@@ -188,58 +191,75 @@ namespace ProcedureNet7.Storni
                     WHERE pagamenti.ese_finanziario = '{esercizioFinanziario}'
                     ";
 
-            SqlCommand updatepagamCmd = new(sqlUpdatePagam, conn);
-            updatepagamCmd.ExecuteNonQuery();
+                SqlCommand updatepagamCmd = new(sqlUpdatePagam, conn, sqlTransaction);
+                updatepagamCmd.ExecuteNonQuery();
 
-            AddBlocks(conn);
+                AddBlocks(conn);
 
-            _mainForm.inProcedure = false;
-            _progress.Report((100, $"Fine lavorazione"));
-            Thread.Sleep(10);
-            _progress.Report((100, $"Lavorati {studenti.Count} studenti"));
-            Thread.Sleep(10);
-            _progress.Report((100, $"Di cui {studentiDaBloccare.Count} bloccati per IBAN"));
-            Thread.Sleep(10);
-            foreach (Studente studente in studentiDaBloccare)
-            {
-                _progress.Report((100, $"CF bloccato: {studente.codFiscale}"));
+                _mainForm.inProcedure = false;
+                sqlTransaction.Commit();
+                _progress.Report((100, $"Fine lavorazione", LogLevel.INFO));
                 Thread.Sleep(10);
-            }
-            _progress.Report((100, $"Rimossi {studentiRimossi.Count} per mancanza di dati/pagamento non inserito"));
-            Thread.Sleep(10);
-            foreach (Studente studente in studentiRimossi)
-            {
-                _progress.Report((100, $"CF rimosso: {studente.codFiscale}"));
+                _progress.Report((100, $"Lavorati {studenti.Count} studenti", LogLevel.INFO));
                 Thread.Sleep(10);
-            }
-            _progress.Report((100, $"Rilevati {codFiscaliConErrori.Count} cod fiscale con errori"));
-            Thread.Sleep(10);
-            foreach (string studente in codFiscaliConErrori)
-            {
-                _progress.Report((100, $"CF errore: {studente}"));
+                _progress.Report((100, $"Di cui {studentiDaBloccare.Count} bloccati per IBAN", LogLevel.INFO));
                 Thread.Sleep(10);
+                foreach (Studente studente in studentiDaBloccare)
+                {
+                    _progress.Report((100, $"CF bloccato: {studente.codFiscale}", LogLevel.INFO));
+                    Thread.Sleep(10);
+                }
+                _progress.Report((100, $"Rimossi {studentiRimossi.Count} per mancanza di dati/pagamento non inserito", LogLevel.INFO));
+                Thread.Sleep(10);
+                foreach (Studente studente in studentiRimossi)
+                {
+                    _progress.Report((100, $"CF rimosso: {studente.codFiscale}", LogLevel.INFO));
+                    Thread.Sleep(10);
+                }
+                _progress.Report((100, $"Rilevati {codFiscaliConErrori.Count} cod fiscale con errori", LogLevel.INFO));
+                Thread.Sleep(10);
+                foreach (string studente in codFiscaliConErrori)
+                {
+                    _progress.Report((100, $"CF errore: {studente}", LogLevel.INFO));
+                    Thread.Sleep(10);
+                }
+                string test = "";
             }
-            string test = "";
+            catch (Exception ex)
+            {
+                _progress.Report((100, $"Errore: {ex.Message}", LogLevel.ERROR));
+                sqlTransaction.Rollback();
+                _mainForm.inProcedure = false;
+            }
         }
 
         private void AddBlocks(SqlConnection conn)
         {
-            var groupedByAnnoAccademico = studentiDaBloccare.GroupBy(s => s.studenteAA);
-
-            foreach (var group in groupedByAnnoAccademico)
+            try
             {
-                List<string> codFiscaleMainList = group.Select(s => s.codFiscale).ToList();
-                AddBlock(conn, codFiscaleMainList, group.Key);
+                var groupedByAnnoAccademico = studentiDaBloccare.GroupBy(s => s.studenteAA);
+
+                foreach (var group in groupedByAnnoAccademico)
+                {
+                    List<string> codFiscaleMainList = group.Select(s => s.codFiscale).ToList();
+                    AddBlock(conn, codFiscaleMainList, group.Key);
+                }
+            }
+            catch
+            {
+                throw;
             }
         }
 
         private void AddBlock(SqlConnection conn, List<string> codFiscaleMainList, string annoAccademico)
         {
-            string utente = "IBANStorni";
+            try
+            {
+                string utente = "IBANStorni";
 
-            string codFiscaleList = string.Join(",", codFiscaleMainList.ConvertAll(c => $"'{c}'"));
+                string codFiscaleList = string.Join(",", codFiscaleMainList.ConvertAll(c => $"'{c}'"));
 
-            string sql = $@"
+                string sql = $@"
                 DECLARE @Cod_tipologia_blocco char(3);
                 DECLARE @anno_accademico char(8);
                 DECLARE @utente varchar(20);
@@ -281,8 +301,13 @@ namespace ProcedureNet7.Storni
                                 AND Blocco_pagamento_attivo = 1)
             ";
 
-            using SqlCommand command = new(sql, conn);
-            _ = command.ExecuteNonQuery();
+                using SqlCommand command = new(sql, conn, sqlTransaction);
+                _ = command.ExecuteNonQuery();
+            }
+            catch
+            {
+                throw;
+            }
         }
 
         public static string IBANHunter(string text)
