@@ -535,16 +535,14 @@ namespace ProcedureNet7
 
     public class ProgressUpdater
     {
-        private IProgress<(int, string, LogLevel)> _progress;
         private int _updateCount = 0;
         private int maxDashes = 40;
         private bool _inProcedure = false;
         private int _currentProgress;
         private LogLevel _logLevel;
 
-        public ProgressUpdater(IProgress<(int, string, LogLevel)> progress, int currentProgress, LogLevel logLevel)
+        public ProgressUpdater(int currentProgress, LogLevel logLevel)
         {
-            _progress = progress;
             _inProcedure = true;
             _currentProgress = currentProgress;
             _logLevel = logLevel;
@@ -559,7 +557,7 @@ namespace ProcedureNet7
         public void StopUpdating()
         {
             _inProcedure = false;
-            _progress.Report((_currentProgress, "UPDATE:" + new String('-', maxDashes), _logLevel));
+            Logger.Log(_currentProgress, "UPDATE:" + new String('-', maxDashes), _logLevel);
         }
 
         private void UpdateProgress()
@@ -572,7 +570,7 @@ namespace ProcedureNet7
                     Thread.Sleep(250);
                     if (!_inProcedure) { break; }
                     string updateMessage = new String('-', _updateCount + 1);
-                    _progress.Report((_currentProgress, $"UPDATE:{updateMessage}", _logLevel));
+                    Logger.Log(_currentProgress, $"UPDATE:{updateMessage}", _logLevel);
                     _updateCount++;
                 }
                 _updateCount = 0;

@@ -9,6 +9,7 @@ public class Logger
 
     private LogLevel logLevelThreshold = LogLevel.INFO; // Default log level threshold
 
+    private static Logger instance;
     private AutoResetEvent logSignal = new AutoResetEvent(false);
     private Thread logThread;
     private bool isRunning = true;
@@ -19,7 +20,7 @@ public class Logger
     private ConcurrentQueue<(int sequence, LogLevel level, string message)> logQueue = new ConcurrentQueue<(int sequence, LogLevel level, string message)>();
     private int logSequence = 0;
 
-    public Logger(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold)
+    private Logger(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold)
     {
         this.mainForm = mainForm;
         this.progressBar = progressBar;
@@ -36,6 +37,40 @@ public class Logger
         };
         logThread.Start();
     }
+    public static Logger GetInstance(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold = LogLevel.INFO)
+    {
+        if (instance == null)
+        {
+            instance = new Logger(mainForm, progressBar, logTextBox, logLevelThreshold);
+        }
+        return instance;
+    }
+
+    // Static method to log messages
+    public static void Log(int? progress, string message, LogLevel level = LogLevel.INFO)
+    {
+        instance?.LogInstance(message, progress, level);
+    }
+
+    public static void LogDebug(int? progress, string message)
+    {
+        Log(progress, message, LogLevel.DEBUG);
+    }
+
+    public static void LogInfo(int? progress, string message)
+    {
+        Log(progress, message, LogLevel.INFO);
+    }
+
+    public static void LogWarning(int? progress, string message)
+    {
+        Log(progress, message, LogLevel.WARN);
+    }
+
+    public static void LogError(int? progress, string message)
+    {
+        Log(progress, message, LogLevel.ERROR);
+    }
 
     private void LoggingThreadMethod()
     {
@@ -45,7 +80,7 @@ public class Logger
         }
     }
 
-    public void Log(string message, int? progress = null, LogLevel level = LogLevel.INFO)
+    public void LogInstance(string message, int? progress = null, LogLevel level = LogLevel.INFO)
     {
         if (level < logLevelThreshold)
         {
@@ -144,6 +179,10 @@ public class Logger
         }
     }
 
+    public void ClearLogs()
+    {
+        logTextBox.Clear();
+    }
 
     private Color GetColorForLogLevel(LogLevel level)
     {

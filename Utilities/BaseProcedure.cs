@@ -9,12 +9,10 @@ namespace ProcedureNet7
     internal abstract class BaseProcedure<TArgs> : IDisposable
     {
         protected string? CONNECTION_STRING;
-        protected IProgress<(int, string, LogLevel)> _progress;
         protected MainUI _mainForm;
 
-        protected BaseProcedure(IProgress<(int, string, LogLevel)> progress, MainUI mainUI, string connection_string)
+        protected BaseProcedure(MainUI mainUI, string connection_string)
         {
-            _progress = progress;
             _mainForm = mainUI;
             CONNECTION_STRING = connection_string;
         }
@@ -40,7 +38,6 @@ namespace ProcedureNet7
                 if (disposing)
                 {
                     CONNECTION_STRING = string.Empty;
-                    _progress = null;
                     _mainForm = null;
                 }
                 disposed = true;

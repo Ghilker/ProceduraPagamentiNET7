@@ -26,7 +26,8 @@ namespace ProcedureNet7
             DisableAllPanels();
             LoadCredentialsDropdown();
 
-            logger = new Logger(this, progressBar, progressReport, LogLevel.DEBUG);
+            logger = Logger.GetInstance(this, progressBar, progressReport, LogLevel.DEBUG);
+            logger.ClearLogs();
 
             backgroundWorker.WorkerReportsProgress = true;
             backgroundWorker.DoWork += BackgroundWorker_DoWork;
@@ -59,6 +60,7 @@ namespace ProcedureNet7
 
         private void ToggleProcedurePanels(ProcedureType selectedProcedure)
         {
+            logger.ClearLogs();
             panelProceduraPagamenti.Visible = false;
             panelProceduraFlussoDiRitorno.Visible = false;
             panelStorni.Visible = false;
@@ -82,11 +84,6 @@ namespace ProcedureNet7
 
         private void BackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            Progress<(int, string, LogLevel)> progress = new Progress<(int, string, LogLevel)>(report =>
-            {
-                ReportProgress(report.Item1, report.Item2, report.Item3); // Enqueue progress reports instead of directly updating UI
-            });
-
             ProcedureType selectedProcedure = ProcedureType.ProceduraPagamenti;
             _ = Invoke(new MethodInvoker(() =>
             {
@@ -124,7 +121,7 @@ namespace ProcedureNet7
                             _filtroManuale = proceduraPagamentiFiltroCheck.Checked,
                         };
                         argsValidation.Validate(argsPagamenti);
-                        using (ProceduraPagamenti pagamenti = new ProceduraPagamenti(progress, this, CONNECTION_STRING))
+                        using (ProceduraPagamenti pagamenti = new ProceduraPagamenti(this, CONNECTION_STRING))
                         {
                             pagamenti.RunProcedure(argsPagamenti);
                         }
@@ -141,7 +138,7 @@ namespace ProcedureNet7
                             _selectedTipoBando = proceduraFlussoRitornoTipoBandoTxt.Text
                         };
                         argsValidation.Validate(argsFlusso);
-                        using (ProceduraFlussoDiRitorno flusso = new ProceduraFlussoDiRitorno(progress, this, CONNECTION_STRING))
+                        using (ProceduraFlussoDiRitorno flusso = new ProceduraFlussoDiRitorno(this, CONNECTION_STRING))
                         {
                             flusso.RunProcedure(argsFlusso);
                         }
@@ -153,7 +150,7 @@ namespace ProcedureNet7
                             _esercizioFinanziario = storniSelectedEseFinanziarioTxt.Text
                         };
                         argsValidation.Validate(argsStorni);
-                        using (ProceduraStorni storni = new ProceduraStorni(progress, this, CONNECTION_STRING))
+                        using (ProceduraStorni storni = new ProceduraStorni(this, CONNECTION_STRING))
                         {
                             storni.RunProcedure(argsStorni);
                         }
@@ -162,7 +159,7 @@ namespace ProcedureNet7
             }
             catch (ValidationException ex)
             {
-                ReportProgress(100, "Errore compilazione procedura: " + ex.Message, LogLevel.WARN);
+                Logger.Log(100, "Errore compilazione procedura: " + ex.Message, LogLevel.WARN);
                 inProcedure = false;
             }
         }
@@ -181,11 +178,6 @@ namespace ProcedureNet7
         private void BackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             //ReportProgress(100, "Fine lavorazione");
-        }
-
-        private void ReportProgress(int progress, string message, LogLevel logLevel = LogLevel.INFO)
-        {
-            logger.Log(message, progress, logLevel);
         }
 
         private void StartProcedureBtn_Click(object sender, EventArgs e)
@@ -251,7 +243,7 @@ namespace ProcedureNet7
             catch (Exception ex)
             {
                 inProcedure = false;
-                ReportProgress(0, $"Error: {ex.Message}", LogLevel.ERROR);
+                Logger.LogError(0, $"Error: {ex.Message}");
             }
         }
 

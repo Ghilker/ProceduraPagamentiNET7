@@ -11,7 +11,7 @@ namespace ProcedureNet7.Storni
 {
     internal class ProceduraStorni : BaseProcedure<ArgsProceduraStorni>
     {
-        public ProceduraStorni(IProgress<(int, string, LogLevel)> progress, MainUI mainUI, string connection_string) : base(progress, mainUI, connection_string) { }
+        public ProceduraStorni(MainUI mainUI, string connection_string) : base(mainUI, connection_string) { }
 
         string selectedStorniFile;
         string esercizioFinanziario;
@@ -49,14 +49,14 @@ namespace ProcedureNet7.Storni
                     studenti.Add(studente);
                 }
 
-                _progress.Report((30, $"Lavorazione studenti", LogLevel.INFO));
+                Logger.LogInfo(30, $"Lavorazione studenti");
                 List<string> codFiscali = studenti.Select(studente => studente.codFiscale).ToList();
 
                 string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
                 SqlCommand createCmd = new(createTempTable, conn, sqlTransaction);
                 createCmd.ExecuteNonQuery();
 
-                _progress.Report((30, $"Lavorazione studenti - creazione tabella codici fiscali", LogLevel.INFO));
+                Logger.LogInfo(30, $"Lavorazione studenti - creazione tabella codici fiscali");
                 for (int i = 0; i < codFiscali.Count; i += 1000)
                 {
                     var batch = codFiscali.Skip(i).Take(1000);
@@ -73,7 +73,7 @@ namespace ProcedureNet7.Storni
                     ";
 
                 SqlCommand readData = new(queryCheckIBAN, conn, sqlTransaction);
-                _progress.Report((12, $"Lavorazione studenti - controllo eliminabili", LogLevel.INFO));
+                Logger.LogInfo(12, $"Lavorazione studenti - controllo eliminabili");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
                     while (reader.Read())
@@ -144,7 +144,7 @@ namespace ProcedureNet7.Storni
                     ";
 
                 SqlCommand studenteAA = new(queryAddStudenteAA, conn, sqlTransaction);
-                _progress.Report((12, $"Lavorazione studenti - aggiunta anno accademico", LogLevel.INFO));
+                Logger.LogInfo(12, $"Lavorazione studenti - aggiunta anno accademico");
                 using (SqlDataReader reader = studenteAA.ExecuteReader())
                 {
                     while (reader.Read())
@@ -198,36 +198,36 @@ namespace ProcedureNet7.Storni
 
                 _mainForm.inProcedure = false;
                 sqlTransaction.Commit();
-                _progress.Report((100, $"Fine lavorazione", LogLevel.INFO));
+                Logger.LogInfo(100, $"Fine lavorazione");
                 Thread.Sleep(10);
-                _progress.Report((100, $"Lavorati {studenti.Count} studenti", LogLevel.INFO));
+                Logger.LogInfo(100, $"Lavorati {studenti.Count} studenti");
                 Thread.Sleep(10);
-                _progress.Report((100, $"Di cui {studentiDaBloccare.Count} bloccati per IBAN", LogLevel.INFO));
+                Logger.LogInfo(100, $"Di cui {studentiDaBloccare.Count} bloccati per IBAN");
                 Thread.Sleep(10);
                 foreach (Studente studente in studentiDaBloccare)
                 {
-                    _progress.Report((100, $"CF bloccato: {studente.codFiscale}", LogLevel.INFO));
+                    Logger.LogInfo(100, $"CF bloccato: {studente.codFiscale}");
                     Thread.Sleep(10);
                 }
-                _progress.Report((100, $"Rimossi {studentiRimossi.Count} per mancanza di dati/pagamento non inserito", LogLevel.INFO));
+                Logger.LogInfo(100, $"Rimossi {studentiRimossi.Count} per mancanza di dati/pagamento non inserito");
                 Thread.Sleep(10);
                 foreach (Studente studente in studentiRimossi)
                 {
-                    _progress.Report((100, $"CF rimosso: {studente.codFiscale}", LogLevel.INFO));
+                    Logger.LogInfo(100, $"CF rimosso: {studente.codFiscale}");
                     Thread.Sleep(10);
                 }
-                _progress.Report((100, $"Rilevati {codFiscaliConErrori.Count} cod fiscale con errori", LogLevel.INFO));
+                Logger.LogInfo(100, $"Rilevati {codFiscaliConErrori.Count} cod fiscale con errori");
                 Thread.Sleep(10);
                 foreach (string studente in codFiscaliConErrori)
                 {
-                    _progress.Report((100, $"CF errore: {studente}", LogLevel.INFO));
+                    Logger.LogInfo(100, $"CF errore: {studente}");
                     Thread.Sleep(10);
                 }
                 string test = "";
             }
             catch (Exception ex)
             {
-                _progress.Report((100, $"Errore: {ex.Message}", LogLevel.ERROR));
+                Logger.LogError(100, $"Errore: {ex.Message}");
                 sqlTransaction.Rollback();
                 _mainForm.inProcedure = false;
             }
