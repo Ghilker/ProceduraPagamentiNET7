@@ -22,7 +22,6 @@ namespace ProcedureNet7
 
         public string _vecchioMandato { get; set; }
 
-        [Required(ErrorMessage = "Indicare il numero del mandato")]
         public string _numeroMandato { get; set; }
 
         public string _tipoProcedura { get; set; }
@@ -32,15 +31,6 @@ namespace ProcedureNet7
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             List<string> errorMessages = new List<string>();
-            if (string.IsNullOrWhiteSpace(_numeroMandato))
-            {
-                errorMessages.Add("Indicare il numero di mandato");
-            }
-            else if (!string.IsNullOrWhiteSpace(_vecchioMandato) && string.IsNullOrWhiteSpace(_numeroMandato))
-            {
-                errorMessages.Add("Indicare il nuovo numero di mandato per modificare il precedente");
-            }
-
             if (string.IsNullOrWhiteSpace(_tipoProcedura))
             {
                 errorMessages.Add("Indicare il tipo di procedura da eseguire");

@@ -109,7 +109,8 @@ namespace ProcedureNet7.Storni
                         (
                             CodFiscale CHAR(16),
                             NumMandato VARCHAR(10),
-                            impReintroito VARCHAR(10)
+                            impReintroito VARCHAR(10),
+                            IBAN_Storno VARCHAR(50)
                         )";
 
                 SqlCommand mappingTableCmd = new(sqlMappingTable, conn, sqlTransaction);
@@ -123,13 +124,14 @@ namespace ProcedureNet7.Storni
 
                     foreach (Studente studente in studenti)
                     {
-                        cmd.CommandText = "INSERT INTO #MappingTable (CodFiscale, NumMandato, impReintroito) VALUES (@CodFiscale, @NumMandato, @impReintroito)";
+                        cmd.CommandText = "INSERT INTO #MappingTable (CodFiscale, NumMandato, impReintroito, IBAN_Storno) VALUES (@CodFiscale, @NumMandato, @impReintroito, @IbanStorno)";
 
                         cmd.Parameters.Clear();
 
                         cmd.Parameters.AddWithValue("@CodFiscale", studente.codFiscale);
                         cmd.Parameters.AddWithValue("@NumMandato", studente.mandatoPagamento);
                         cmd.Parameters.AddWithValue("@impReintroito", studente.impegnoReintroito);
+                        cmd.Parameters.AddWithValue("@IbanStorno", studente.IBAN);
 
                         cmd.ExecuteNonQuery();
                     }
@@ -184,7 +186,8 @@ namespace ProcedureNet7.Storni
                         data_reintroito = '{DateTime.Now.ToString("dd/MM/yyyy")}',
                         utente_reintroito = 'Area 4',
                         impegno_reintroito = MT.impReintroito,
-                        causale_reintroito = 'Transazione non possibile'
+                        causale_reintroito = 'Transazione non possibile',
+                        IBAN_Storno = MT.IBAN_Storno
                     FROM Pagamenti INNER JOIN 
                     Domanda ON Pagamenti.anno_accademico = Domanda.anno_accademico AND Pagamenti.num_domanda = Domanda.num_domanda INNER JOIN
                     #MappingTable AS MT ON Domanda.cod_fiscale = MT.CodFiscale AND Pagamenti.cod_mandato = MT.NumMandato

@@ -245,7 +245,7 @@ namespace ProcedureNet7
         void CreateDBTable(SqlConnection conn)
         {
             Logger.LogInfo(1, $"Creazione Tabella: {dbTableName}");
-            Logger.LogInfo(1, $"Creazione Tabella in corso");
+            Logger.LogInfo(1, $"-");
             ProgressUpdater progressUpdater = new ProgressUpdater(1, LogLevel.INFO);
             progressUpdater.StartUpdating();
             StringBuilder queryBuilder = new StringBuilder();
@@ -1477,13 +1477,20 @@ namespace ProcedureNet7
 
         private void ProcessStudentsByAnnoCorso(List<Studente> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio, string codEnteFlusso, string impegnoFlusso)
         {
-            if (processMatricole)
+            if (processMatricole && processAnniSuccessivi)
             {
-                ProcessAndWriteStudents(students.Where(s => s.annoCorso == 1).ToList(), folderPath, $"{nomeFileInizio}_Matricole", codEnteFlusso, impegnoFlusso);
+                ProcessAndWriteStudents(students, folderPath, $"{nomeFileInizio}", codEnteFlusso, impegnoFlusso);
             }
-            if (processAnniSuccessivi)
+            else
             {
-                ProcessAndWriteStudents(students.Where(s => s.annoCorso != 1).ToList(), folderPath, $"{nomeFileInizio}_AnniSuccessivi", codEnteFlusso, impegnoFlusso);
+                if (processMatricole)
+                {
+                    ProcessAndWriteStudents(students.Where(s => s.annoCorso == 1).ToList(), folderPath, $"{nomeFileInizio}_Matricole", codEnteFlusso, impegnoFlusso);
+                }
+                if (processAnniSuccessivi)
+                {
+                    ProcessAndWriteStudents(students.Where(s => s.annoCorso != 1).ToList(), folderPath, $"{nomeFileInizio}_AnniSuccessivi", codEnteFlusso, impegnoFlusso);
+                }
             }
         }
         private void ProcessStudentsByCodEnte(SqlConnection conn, string selectedCodEnte, List<Studente> studentsWithPA, string newFolderPath, string impegno)
@@ -1722,7 +1729,8 @@ namespace ProcedureNet7
                                 double.TryParse(reader["importo"].ToString(), out double importo) ? importo : 0,
                                 reader["Note"].ToString(),
                                 reader["cod_tipo_pagam"].ToString(),
-                                reader["cod_tipo_pagam_new"].ToString()
+                                reader["cod_tipo_pagam_new"].ToString(),
+                                false
                             );
                     }
                 }
@@ -1820,6 +1828,10 @@ namespace ProcedureNet7
                             {
                                 continue;
                             }
+                        }
+                        else if (studente.detrazioni == null && isRiemissione)
+                        {
+                            continue;
                         }
 
                         if (studente.annoCorso > 0)
@@ -2021,7 +2033,7 @@ namespace ProcedureNet7
                 {
                     foreach (Detrazione detrazione in studente.detrazioni)
                     {
-                        if (!detrazione.daContabilizzare && detrazione.codReversale == "01" && tipoBeneficio == "BS")
+                        if (detrazione.codReversale == "01" && tipoBeneficio == "BS")
                         {
                             continue;
                         }
@@ -2158,7 +2170,11 @@ namespace ProcedureNet7
 
                 string annoAccademicoBreve = selectedAA.Substring(2, 2) + selectedAA.Substring(6, 2);
 
-                string mandatoProvvisorio = $"{codTipoPagamento}_{dataCreazioneTabella}_{annoAccademicoBreve}_{codEnteFlusso}_{studente.numeroImpegno}";
+                string mandatoProvvisorio = selectedNumeroMandato;
+                if (string.IsNullOrWhiteSpace(selectedNumeroMandato))
+                {
+                    mandatoProvvisorio = $"{codTipoPagamento}_{dataCreazioneTabella}_{annoAccademicoBreve}_{studente.numeroImpegno}_{codEnteFlusso}";
+                }
                 studente.SetMandatoProvvisorio(mandatoProvvisorio);
 
                 int straniero = studente.residenza.provincia == "EE" ? 0 : 1;

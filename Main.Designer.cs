@@ -75,10 +75,14 @@
             storniFilelbl = new Label();
             storniFileBtn = new Button();
             progressReport = new RichTextBox();
+            panelProceduraControlloIBAN = new Panel();
+            controlloIbanAATxt = new TextBox();
+            label5 = new Label();
             DatabaseInformations.SuspendLayout();
             panelProceduraPagamenti.SuspendLayout();
             panelProceduraFlussoDiRitorno.SuspendLayout();
             panelStorni.SuspendLayout();
+            panelProceduraControlloIBAN.SuspendLayout();
             SuspendLayout();
             // 
             // StartProcedureBtn
@@ -298,9 +302,9 @@
             label26.AutoSize = true;
             label26.Location = new Point(347, 71);
             label26.Name = "label26";
-            label26.Size = new Size(102, 15);
+            label26.Size = new Size(164, 15);
             label26.TabIndex = 12;
-            label26.Text = "Numero mandato";
+            label26.Text = "Numero mandato (opzionale)";
             // 
             // pagamentiNuovoMandatoTxt
             // 
@@ -507,19 +511,45 @@
             progressReport.TabIndex = 28;
             progressReport.Text = "";
             // 
+            // panelProceduraControlloIBAN
+            // 
+            panelProceduraControlloIBAN.Controls.Add(label5);
+            panelProceduraControlloIBAN.Controls.Add(controlloIbanAATxt);
+            panelProceduraControlloIBAN.Location = new Point(10, 6);
+            panelProceduraControlloIBAN.Name = "panelProceduraControlloIBAN";
+            panelProceduraControlloIBAN.Size = new Size(658, 182);
+            panelProceduraControlloIBAN.TabIndex = 26;
+            // 
+            // controlloIbanAATxt
+            // 
+            controlloIbanAATxt.Location = new Point(36, 16);
+            controlloIbanAATxt.Name = "controlloIbanAATxt";
+            controlloIbanAATxt.Size = new Size(100, 23);
+            controlloIbanAATxt.TabIndex = 0;
+            // 
+            // label5
+            // 
+            label5.AutoSize = true;
+            label5.Location = new Point(148, 24);
+            label5.Name = "label5";
+            label5.Size = new Size(152, 15);
+            label5.TabIndex = 1;
+            label5.Text = "Indicare l'anno accademico";
+            // 
             // MainUI
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(680, 527);
-            Controls.Add(progressReport);
-            Controls.Add(panelProceduraFlussoDiRitorno);
+            Controls.Add(panelProceduraControlloIBAN);
             Controls.Add(panelProceduraPagamenti);
+            Controls.Add(panelProceduraFlussoDiRitorno);
             Controls.Add(panelStorni);
             Controls.Add(DatabaseInformations);
             Controls.Add(StartProcedureBtn);
             Controls.Add(progressBar);
             Controls.Add(chooseProcedure);
+            Controls.Add(progressReport);
             Margin = new Padding(4, 3, 4, 3);
             Name = "MainUI";
             Text = "MainUI";
@@ -531,6 +561,8 @@
             panelProceduraFlussoDiRitorno.PerformLayout();
             panelStorni.ResumeLayout(false);
             panelStorni.PerformLayout();
+            panelProceduraControlloIBAN.ResumeLayout(false);
+            panelProceduraControlloIBAN.PerformLayout();
             ResumeLayout(false);
         }
 
@@ -582,6 +614,9 @@
         private CheckBox proceduraPagamentiFiltroCheck;
         private CheckBox proceduraFlussoRitornoNomeFileCheck;
         private RichTextBox progressReport;
+        private Panel panelProceduraControlloIBAN;
+        private Label label5;
+        private TextBox controlloIbanAATxt;
     }
 }
 

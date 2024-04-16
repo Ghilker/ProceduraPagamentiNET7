@@ -56,6 +56,7 @@ namespace ProcedureNet7
             panelProceduraPagamenti.Visible = false;
             panelProceduraFlussoDiRitorno.Visible = false;
             panelStorni.Visible = false;
+            panelProceduraControlloIBAN.Visible = false;
         }
 
         private void ToggleProcedurePanels(ProcedureType selectedProcedure)
@@ -64,6 +65,7 @@ namespace ProcedureNet7
             panelProceduraPagamenti.Visible = false;
             panelProceduraFlussoDiRitorno.Visible = false;
             panelStorni.Visible = false;
+            panelProceduraControlloIBAN.Visible = false;
             selectedFolderPath = null;
             selectedFilePath = null;
             selectedFilePathSecondary = null;
@@ -78,6 +80,9 @@ namespace ProcedureNet7
                     break;
                 case ProcedureType.ProceduraStorni:
                     panelStorni.Visible = true;
+                    break;
+                case ProcedureType.ProceduraControlloIBAN:
+                    panelProceduraControlloIBAN.Visible = true;
                     break;
             }
         }
@@ -153,6 +158,17 @@ namespace ProcedureNet7
                         using (ProceduraStorni storni = new ProceduraStorni(this, CONNECTION_STRING))
                         {
                             storni.RunProcedure(argsStorni);
+                        }
+                        break;
+                    case ProcedureType.ProceduraControlloIBAN:
+                        ArgsProceduraControlloIBAN argsIBAN = new ArgsProceduraControlloIBAN
+                        {
+                            _annoAccademico = controlloIbanAATxt.Text
+                        };
+                        argsValidation.Validate(argsIBAN);
+                        using (ProceduraControlloIBAN controlloIBAN = new ProceduraControlloIBAN(this, CONNECTION_STRING))
+                        {
+                            controlloIBAN.RunProcedure(argsIBAN);
                         }
                         break;
                 }
@@ -302,6 +318,7 @@ namespace ProcedureNet7
     {
         ProceduraPagamenti,
         ProceduraFlussoDiRitorno,
-        ProceduraStorni
+        ProceduraStorni,
+        ProceduraControlloIBAN
     }
 }

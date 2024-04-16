@@ -25,5 +25,10 @@ namespace ProcedureNet7
             this.daContabilizzare = daContabilizzare;
         }
 
+        public void DisableContabilizzare()
+        {
+            daContabilizzare = false;
+        }
+
     }
 }
