@@ -15,16 +15,17 @@ namespace ProcedureNet7
 {
     public partial class SelectTipoPagam : Form
     {
-        string jsonPath = "ProcedureNet7.ProceduraPagamenti.JSON.PagamentiBenefici.json";
-        List<Beneficio> beneficioList;
-        List<Beneficio> test;
-        List<TipologiaPagamento> tipologiaPagamentoList;
-        List<CategoriaPagamento> categoriaList;
-        List<DaPagareItem> daPagareList;
+        List<Beneficio> beneficioList = new List<Beneficio>();
+        List<TipologiaPagamento> tipologiaPagamentoList = new List<TipologiaPagamento>();
+        List<CategoriaPagamento> categoriaList = new List<CategoriaPagamento>();
+        List<DaPagareItem> daPagareList = new List<DaPagareItem>();
+        SqlTransaction? sqlTransaction = null;
 
-        public SelectTipoPagam(SqlConnection conn)
+        public SelectTipoPagam(SqlConnection conn, SqlTransaction sqlTransaction)
         {
             InitializeComponent();
+
+            this.sqlTransaction = sqlTransaction;
 
             beneficioList = GenerateBeneficiList(conn);
 
@@ -45,15 +46,24 @@ namespace ProcedureNet7
         }
         private void PopulateTipoPagamComboBox(string selectedBeneficio)
         {
-            Beneficio selected = null;
+            Beneficio? nullableBeneficio = null;
+
             foreach (Beneficio beneficio in beneficioList)
             {
                 if (beneficio.codBeneficio == selectedBeneficio)
                 {
-                    selected = beneficio;
+                    nullableBeneficio = beneficio;
                     break;
                 }
             }
+
+            if (nullableBeneficio == null)
+            {
+                Logger.LogError(null, "Beneficio selezionato è nullo");
+                return;
+            }
+
+            Beneficio selected = nullableBeneficio;
             Dictionary<string, string> tipoPagamenti = new Dictionary<string, string>();
             foreach (TipologiaPagamento tipoPagamento in selected.tipologiePagamenti)
             {
@@ -65,14 +75,25 @@ namespace ProcedureNet7
 
         private void PopulateCatPagamentoComboBox(string selectedTipoPagam)
         {
-            TipologiaPagamento selected = null;
+            TipologiaPagamento? nullableTipologiaPagam = null;
+
             foreach (TipologiaPagamento tipoPagam in tipologiaPagamentoList)
             {
                 if (tipoPagam.nomeTipologiaPagamento == selectedTipoPagam)
                 {
-                    selected = tipoPagam; break;
+                    nullableTipologiaPagam = tipoPagam;
+                    break;
                 }
             }
+
+            if (nullableTipologiaPagam == null)
+            {
+                Logger.LogError(null, "La tipologia di pagamento selezionata è nulla");
+                return;
+            }
+
+            TipologiaPagamento selected = nullableTipologiaPagam;
+
             Dictionary<string, string> categoriaPagamenti = new Dictionary<string, string>();
             foreach (CategoriaPagamento categoria in selected.categoria)
             {
@@ -84,14 +105,25 @@ namespace ProcedureNet7
 
         private void PopulateEffettuarePagamentoComboBox(string selectedCategoria)
         {
-            CategoriaPagamento selected = null;
+            CategoriaPagamento? nullableCategoraPagam = null;
+
             foreach (CategoriaPagamento cat in categoriaList)
             {
                 if (cat.nomeCategoria == selectedCategoria)
                 {
-                    selected = cat; break;
+                    nullableCategoraPagam = cat;
+                    break;
                 }
             }
+
+            if (nullableCategoraPagam == null)
+            {
+                Logger.LogError(null, "La categoria di pagamento selezionata è nulla");
+                return;
+            }
+
+            CategoriaPagamento selected = nullableCategoraPagam;
+
             Dictionary<string, string> effettuarePagamenti = new Dictionary<string, string>();
             foreach (DaPagareItem daPagare in selected.daPagare)
             {
@@ -99,27 +131,6 @@ namespace ProcedureNet7
             }
             daPagareList = selected.daPagare;
             CreatePagamentiComboBox(ref promptEffettuarePagamCombo, effettuarePagamenti);
-        }
-
-        private static List<Beneficio> DeserializeJsonResource(string resourcePath)
-        {
-            // Get the current assembly
-            Assembly assembly = Assembly.GetExecutingAssembly();
-
-            // Read the resource stream for the embedded JSON file
-            using (Stream stream = assembly.GetManifestResourceStream(resourcePath))
-            {
-                if (stream == null)
-                {
-                    throw new InvalidOperationException("Could not find embedded resource");
-                }
-
-                using (StreamReader reader = new StreamReader(stream))
-                {
-                    string jsonString = reader.ReadToEnd();
-                    return JsonSerializer.Deserialize<List<Beneficio>>(jsonString);
-                }
-            }
         }
 
         public static void CreatePagamentiComboBox(ref ComboBox comboBox, Dictionary<string, string> toInsert, bool inverted = false)
@@ -228,31 +239,31 @@ namespace ProcedureNet7
 	                    INNER JOIN Tipologie_benefici ON Tipologie_benefici.Cod_beneficio = Left(Tipologie_pagam.cod_tipo_pagam, 2)
                     WHERE        
 	                    (Tipologie_pagam.visibile IS NOT NULL)";
-            SqlCommand cmd = new SqlCommand(sql, conn);
+            SqlCommand cmd = new SqlCommand(sql, conn, sqlTransaction);
 
             using (SqlDataReader reader = cmd.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    if (reader["categoria_pagamento"].ToString() == "00")
+                    if (Utilities.SafeGetString(reader, "categoria_pagamento") == "00")
                     {
                         continue;
                     }
-                    string codBeneficio = reader["Cod_beneficio"].ToString().Substring(0, 2);
-                    Beneficio beneficio = returnList.Find(b => b.codBeneficio == codBeneficio);
+                    string codBeneficio = Utilities.SafeGetString(reader, "Cod_beneficio").Substring(0, 2);
+                    Beneficio? beneficio = returnList.Find(b => b.codBeneficio == codBeneficio);
                     if (beneficio == null)
                     {
                         beneficio = new Beneficio
                         {
-                            nomeBeneficio = reader["Descrizione"].ToString(),
+                            nomeBeneficio = Utilities.SafeGetString(reader, "Descrizione"),
                             codBeneficio = codBeneficio,
                             tipologiePagamenti = new List<TipologiaPagamento>()
                         };
                         returnList.Add(beneficio);
                     }
 
-                    string nomeTipologiaPagam = reader["descr_interno_tipo_pagamento"].ToString();
-                    TipologiaPagamento tipologiaPagamento = beneficio.tipologiePagamenti.Find(t => t.nomeTipologiaPagamento == nomeTipologiaPagam);
+                    string nomeTipologiaPagam = Utilities.SafeGetString(reader, "descr_interno_tipo_pagamento");
+                    TipologiaPagamento? tipologiaPagamento = beneficio.tipologiePagamenti.Find(t => t.nomeTipologiaPagamento == nomeTipologiaPagam);
                     if (tipologiaPagamento == null)
                     {
                         tipologiaPagamento = new TipologiaPagamento
@@ -263,15 +274,15 @@ namespace ProcedureNet7
                         beneficio.tipologiePagamenti.Add(tipologiaPagamento);
                     }
 
-                    string nomCategoria = reader["descr_interno_cat_pagamento"].ToString();
-                    CategoriaPagamento categoriaPagamento = tipologiaPagamento.categoria.Find(c => c.nomeCategoria == nomCategoria);
+                    string nomCategoria = Utilities.SafeGetString(reader, "descr_interno_cat_pagamento");
+                    CategoriaPagamento? categoriaPagamento = tipologiaPagamento.categoria.Find(c => c.nomeCategoria == nomCategoria);
 
                     if (categoriaPagamento == null)
                     {
                         categoriaPagamento = new CategoriaPagamento
                         {
                             nomeCategoria = nomCategoria,
-                            cod_categoria = reader["categoria_pagamento"].ToString(),
+                            cod_categoria = Utilities.SafeGetString(reader, "categoria_pagamento"),
                             daPagare = new List<DaPagareItem>()
                         };
                         tipologiaPagamento.categoria.Add(categoriaPagamento);
@@ -279,8 +290,8 @@ namespace ProcedureNet7
 
                     DaPagareItem daPagareItem = new DaPagareItem
                     {
-                        Key = reader["cod_tipo_pagam"].ToString().Substring(2, 2),
-                        Value = reader["descr_interno_tipo_emissione"].ToString()
+                        Key = Utilities.SafeGetString(reader, "cod_tipo_pagam").Substring(2, 2),
+                        Value = Utilities.SafeGetString(reader, "descr_interno_tipo_emissione")
                     };
 
                     categoriaPagamento.daPagare.Add(daPagareItem);
@@ -297,12 +308,24 @@ namespace ProcedureNet7
         public string nomeBeneficio { get; set; }
         public string codBeneficio { get; set; }
         public List<TipologiaPagamento> tipologiePagamenti { get; set; }
+
+        public Beneficio()
+        {
+            nomeBeneficio = string.Empty;
+            codBeneficio = string.Empty;
+            tipologiePagamenti = new List<TipologiaPagamento>();
+        }
     }
 
     public class TipologiaPagamento
     {
         public string nomeTipologiaPagamento { get; set; }
         public List<CategoriaPagamento> categoria { get; set; }
+        public TipologiaPagamento()
+        {
+            nomeTipologiaPagamento = string.Empty;
+            categoria = new List<CategoriaPagamento>();
+        }
     }
 
     public class CategoriaPagamento
@@ -310,12 +333,24 @@ namespace ProcedureNet7
         public string nomeCategoria { get; set; }
         public List<DaPagareItem> daPagare { get; set; }
         public string cod_categoria { get; set; }
+        public CategoriaPagamento()
+        {
+            nomeCategoria = string.Empty;
+            daPagare = new List<DaPagareItem>();
+            cod_categoria = string.Empty;
+        }
     }
 
     public class DaPagareItem
     {
         public string Key { get; set; }
         public string Value { get; set; }
+
+        public DaPagareItem()
+        {
+            Key = string.Empty;
+            Value = string.Empty;
+        }
     }
 
 }

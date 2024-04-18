@@ -13,9 +13,9 @@ namespace ProcedureNet7
 {
     internal class ProceduraFlussoDiRitorno : BaseProcedure<ArgsProceduraFlussoDiRitorno>
     {
-        string selectedFileFlusso;
-        string selectedOldMandato;
-        string selectedTipoBando;
+        string selectedFileFlusso = "";
+        string selectedOldMandato = "";
+        string selectedTipoBando = "";
 
         List<StudenteRitorno> studenteRitornoList = new List<StudenteRitorno>();
         List<StudenteRitorno> studentiScartati = new List<StudenteRitorno>();
@@ -116,11 +116,11 @@ namespace ProcedureNet7
                 {
                     while (reader.Read())
                     {
-                        string codFiscale = reader["CODICE_FISCALE"].ToString().ToUpper();
-                        StudenteRitorno studente = studenteRitornoList.FirstOrDefault(s => s.codFiscale == codFiscale);
+                        string codFiscale = Utilities.SafeGetString(reader, "CODICE_FISCALE").ToUpper();
+                        StudenteRitorno? studente = studenteRitornoList.FirstOrDefault(s => s.codFiscale == codFiscale);
                         if (studente != null)
                         {
-                            string codMovimento = reader["CODICE_MOVIMENTO"].ToString();
+                            string codMovimento = Utilities.SafeGetString(reader, "CODICE_MOVIMENTO");
                             studente.SetCodMovimentoGenerale(codMovimento);
                         }
                     }
@@ -509,6 +509,7 @@ namespace ProcedureNet7
             this.dataPagamento = dataPagamento;
             this.numReversale = numReversale;
             this.pagamentoScartato = pagamentoScartato;
+            codMovimentoGenerale = "";
         }
 
         public void SetCodMovimentoGenerale(string codMovimentoGenerale)

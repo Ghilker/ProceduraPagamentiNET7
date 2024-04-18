@@ -22,11 +22,13 @@ namespace ProcedureNet7
         List<string> codEnteList = new List<string>();
         List<string> tipoStudentiList = new List<string>();
         List<string> impegniList = new List<string>();
-        public SelectPagamentoSettings(SqlConnection conn, string selectedAA, string selectedBeneficio, string catPagamento)
+        SqlTransaction sqlTransaction = null;
+        public SelectPagamentoSettings(SqlConnection conn, SqlTransaction sqlTransaction, string selectedAA, string selectedBeneficio, string catPagamento)
         {
             this.selectedAA = selectedAA;
             this.selectedBeneficio = selectedBeneficio;
             this.catPagamento = catPagamento;
+            this.sqlTransaction = sqlTransaction;
             InitializeComponent();
             Dictionary<string, string> tipoStudenteData = new Dictionary<string, string>()
             {
@@ -41,7 +43,7 @@ namespace ProcedureNet7
 
         List<string> GenerateCodEnteComboBox(ref ComboBox comboBox, SqlConnection conn)
         {
-            SqlCommand readData = new($"SELECT * FROM Enti_di_gestione WHERE cod_ente <> '00'", conn);
+            SqlCommand readData = new($"SELECT * FROM Enti_di_gestione WHERE cod_ente <> '00'", conn, sqlTransaction);
 
             Dictionary<string, string> codEntiDict = new Dictionary<string, string>
             {
@@ -52,7 +54,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    codEntiDict.Add(reader["cod_ente"].ToString(), reader["descrizione"].ToString());
+                    codEntiDict.Add(Utilities.SafeGetString(reader, "cod_ente"), Utilities.SafeGetString(reader, "descrizione"));
                 }
             }
             return CreatePagamentiComboBox(ref comboBox, codEntiDict);
@@ -60,7 +62,7 @@ namespace ProcedureNet7
 
         List<string> GenerateImpegnoComboBox(ref ComboBox comboBox, SqlConnection conn)
         {
-            SqlCommand readData = new($"SELECT * FROM impegni WHERE Cod_beneficio = '{selectedBeneficio}' and anno_accademico = '{selectedAA}' and categoria_pagamento = '{catPagamento}'", conn);
+            SqlCommand readData = new($"SELECT * FROM impegni WHERE Cod_beneficio = '{selectedBeneficio}' and anno_accademico = '{selectedAA}' and categoria_pagamento = '{catPagamento}'", conn, sqlTransaction);
 
             Dictionary<string, string> impegni = new Dictionary<string, string>
             {
@@ -71,7 +73,7 @@ namespace ProcedureNet7
             {
                 while (reader.Read())
                 {
-                    impegni.Add(reader["num_impegno"].ToString(), reader["descr"].ToString());
+                    impegni.Add(Utilities.SafeGetString(reader, "num_impegno"), Utilities.SafeGetString(reader, "descr"));
                 }
             }
             return CreatePagamentiComboBox(ref comboBox, impegni);

@@ -15,5 +15,12 @@ namespace ProcedureNet7
         public string _selectedImpegnoProvv { get; set; }
         [Required(ErrorMessage = "Indicare il tipo di bando")]
         public string _selectedTipoBando { get; set; }
+
+        public ArgsProceduraFlussoDiRitorno()
+        {
+            _selectedFileFlusso = "";
+            _selectedImpegnoProvv = "";
+            _selectedTipoBando = "";
+        }
     }
 }

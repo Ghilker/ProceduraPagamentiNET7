@@ -18,6 +18,14 @@ namespace ProcedureNet7
         public double costoMensile { get; private set; }
         public AssegnazioneDataCheck statoCorrettezzaAssegnazione { get; private set; }
 
+        public Assegnazione()
+        {
+            codPensionato = string.Empty;
+            codStanza = string.Empty;
+            codFineAssegnazione = string.Empty;
+            codTipoStanza = string.Empty;
+        }
+
         public AssegnazioneDataCheck SetAssegnazione(
                 string codPensionato,
                 string codStanza,

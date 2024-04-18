@@ -18,6 +18,7 @@ namespace ProceduraPagamentiNET7.ProceduraPagamenti
         private TipoFiltro selectedFiltro;
         private string queryWhereText;
         private SqlConnection conn;
+        SqlTransaction sqlTransaction = null;
         private string tableName;
 
         private ContextMenuStrip filtroSessoStrip;
@@ -103,10 +104,11 @@ namespace ProceduraPagamentiNET7.ProceduraPagamenti
             }
         }
 
-        public FiltroManuale(SqlConnection conn, string tableName)
+        public FiltroManuale(SqlConnection conn, SqlTransaction sqlTransaction, string tableName)
         {
             this.conn = conn;
             this.tableName = tableName;
+            this.sqlTransaction = sqlTransaction;
             InitializeComponent();
             CreateComboFiltro(ref selectTipoFiltroCombo, _TipoFiltro);
             filtroQueryPanel.Visible = false;
@@ -138,7 +140,7 @@ namespace ProceduraPagamentiNET7.ProceduraPagamenti
         private void CreateStrip(string query, ref Button button, ref ContextMenuStrip strip, bool cleanStrip = false)
         {
             var comboData = new Dictionary<string, string>();
-            using (SqlCommand command = new SqlCommand(query, conn))
+            using (SqlCommand command = new SqlCommand(query, conn, sqlTransaction))
             {
                 using (SqlDataReader reader = command.ExecuteReader())
                 {

@@ -29,7 +29,7 @@ namespace ProcedureNet7
 
             try
             {
-                _ = Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? throw new Exception($"Errore nella creazione della cartella di salvataggio, file path non corretto"));
 
                 string jsonCredentials = System.Text.Json.JsonSerializer.Serialize(allCredentials);
                 byte[] credentialsBytes = Encoding.UTF8.GetBytes(jsonCredentials);
@@ -54,7 +54,7 @@ namespace ProcedureNet7
             }
         }
 
-        public static Dictionary<string, Hashtable>? LoadCredentialsFromFile()
+        public static Dictionary<string, Hashtable> LoadCredentialsFromFile()
         {
             string folderPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string filePath = Path.Combine(folderPath, "Procedures", "connectionCredentials.bin");
@@ -64,9 +64,18 @@ namespace ProcedureNet7
                 if (File.Exists(filePath))
                 {
                     using FileStream fileStream = new(filePath, FileMode.Open);
+
+                    byte[]? nullableKey = LoadEncryptionKey();
+                    byte[]? nullableIV = LoadEncryptionIV();
+
+                    if (nullableKey == null || nullableIV == null)
+                    {
+                        throw new Exception("Errore nel caricamento dei file di salvataggio, è necessario ricreare le credenziali.");
+                    }
+
                     using Aes aes = Aes.Create();
-                    aes.Key = LoadEncryptionKey();
-                    aes.IV = LoadEncryptionIV();
+                    aes.Key = nullableKey;
+                    aes.IV = nullableIV;
 
                     using MemoryStream memoryStream = new();
                     using (CryptoStream cryptoStream = new(fileStream, aes.CreateDecryptor(), CryptoStreamMode.Read))
@@ -75,7 +84,7 @@ namespace ProcedureNet7
                     }
 
                     string jsonCredentials = Encoding.UTF8.GetString(memoryStream.ToArray());
-                    return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, Hashtable>>(jsonCredentials);
+                    return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, Hashtable>>(jsonCredentials) ?? throw new Exception("Errore nel caricamento dei file di salvataggio, è necessario ricreare le credenziali.");
                 }
                 else
                 {
@@ -84,7 +93,7 @@ namespace ProcedureNet7
             }
             catch (Exception ex)
             {
-                _ = MessageBox.Show($"Failed to load credentials. Error: {ex.Message}");
+                Logger.LogError(null, $"Failed to load credentials. Error: {ex.Message}");
                 return new Dictionary<string, Hashtable>();
             }
         }

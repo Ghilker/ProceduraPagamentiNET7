@@ -12,6 +12,13 @@ namespace ProcedureNet7
         public string nomeComune;
         public string provincia;
 
+        public LuogoNascita()
+        {
+            this.codComune = string.Empty;
+            this.nomeComune = string.Empty;
+            this.provincia = string.Empty;
+        }
+
         public LuogoNascita(
                 string codComune,
                 string nomeComune,

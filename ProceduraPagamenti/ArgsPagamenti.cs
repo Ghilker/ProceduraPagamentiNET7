@@ -28,6 +28,16 @@ namespace ProcedureNet7
 
         public bool _filtroManuale { get; set; }
 
+        public ArgsPagamenti()
+        {
+            _annoAccademico = string.Empty;
+            _selectedSaveFolder = string.Empty;
+            _dataRiferimento = string.Empty;
+            _vecchioMandato = string.Empty;
+            _numeroMandato = string.Empty;
+            _tipoProcedura = string.Empty;
+        }
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             List<string> errorMessages = new List<string>();

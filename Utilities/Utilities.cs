@@ -15,25 +15,55 @@ namespace ProcedureNet7
         public static DataTable ReadExcelToDataTable(string filePath, bool firstRowAsData = false)
         {
             DataTable dataTable = new DataTable();
-            Excel.Application excelApp = null;
-            Excel.Workbooks workbooks = null;
-            Excel.Workbook workbook = null;
-            Excel.Worksheet worksheet = null;
-            Excel.Range range = null;
+            Excel.Application? excelApp = null;
+            Excel.Workbooks? workbooks = null;
+            Excel.Workbook? workbook = null;
+            Excel.Worksheet? worksheet = null;
+            Excel.Range? range = null;
+
+            Logger.LogDebug(null, "Initializing Excel application.");
 
             try
             {
                 excelApp = new Excel.Application();
+                if (excelApp == null)
+                {
+                    Logger.LogError(null, "Excel application could not be started.");
+                    return new DataTable();
+                }
+
                 workbooks = excelApp.Workbooks;
                 workbook = workbooks.Open(filePath);
+                if (workbook == null)
+                {
+                    Logger.LogError(null, "Failed to open workbook.");
+                    return new DataTable();
+                }
+
                 worksheet = workbook.Sheets[1];
+                if (worksheet == null)
+                {
+                    Logger.LogError(null, "Failed to get the first worksheet.");
+                    return new DataTable();
+                }
+
                 range = worksheet.UsedRange;
+                if (range == null)
+                {
+                    Logger.LogError(null, "Failed to get used range of worksheet.");
+                    return new DataTable();
+                }
 
                 object[,] data = range.Value2;
-                if (data == null) return dataTable; // Return an empty dataTable if no data
+                if (data == null)
+                {
+                    Logger.LogWarning(null, "No data found in Excel range.");
+                    return new DataTable(); // Return an empty dataTable if no data
+                }
 
                 int columnsCount = range.Columns.Count;
                 int rowsCount = range.Rows.Count;
+                Logger.LogDebug(null, $"Preparing to process {columnsCount} columns and {rowsCount - (firstRowAsData ? 0 : 1)} rows.");
 
                 Dictionary<string, int> columnNames = new Dictionary<string, int>();
 
@@ -66,6 +96,7 @@ namespace ProcedureNet7
                         }
                     }
                     dataTable.Columns.Add(columnName);
+                    Logger.LogDebug(null, $"Column added: {columnName}");
                 }
 
                 // Process data rows
@@ -78,11 +109,12 @@ namespace ProcedureNet7
                     }
                     dataTable.Rows.Add(dataRow);
                 }
+                Logger.LogDebug(null, "Data rows processed successfully.");
             }
             catch (Exception ex)
             {
-                // Handle exceptions or log errors
-                throw;
+                Logger.LogError(null, $"An error occurred: {ex.Message}");
+                throw; // Re-throwing the exception after logging
             }
             finally
             {
@@ -104,10 +136,12 @@ namespace ProcedureNet7
                     excelApp.Quit();
                     Marshal.ReleaseComObject(excelApp);
                 }
+                Logger.LogDebug(null, "Excel resources cleaned up successfully.");
             }
 
             return dataTable;
         }
+
         public static string SanitizeColumnName(string columnName)
         {
             // Regular expression to remove any special characters but preserve spaces
@@ -185,36 +219,59 @@ namespace ProcedureNet7
             string fullPath = Path.Combine(folderPath, fileName);
             Directory.CreateDirectory(folderPath); // Ensure the directory exists
 
-            Excel.Application excelApp = new Excel.Application();
-            Excel.Workbooks workbooks = null;
-            Excel._Workbook workbook = null;
-            Excel._Worksheet worksheet = null;
+            Excel.Application? excelApp = new Excel.Application();
+            Excel.Workbooks? workbooks = null;
+            Excel._Workbook? workbook = null;
+            Excel._Worksheet? worksheet = null;
 
             try
             {
                 workbooks = excelApp.Workbooks;
                 workbook = workbooks.Add();
-                worksheet = workbook.ActiveSheet;
+                worksheet = (Excel._Worksheet)workbook.ActiveSheet!;
 
                 // Optionally, add column headers
-                if (includeHeaders)
+                if (includeHeaders && worksheet != null)
                     AddHeaders(worksheet, dataTable);
 
                 // Add data rows
-                AddData(worksheet, dataTable, includeHeaders);
+                if (worksheet != null)
+                    AddData(worksheet, dataTable, includeHeaders);
 
                 // Save the Excel file
                 workbook.SaveAs(fullPath);
             }
             catch (Exception ex)
             {
-                throw;
+                Logger.LogError(null, $"An error occurred while exporting data to Excel: {ex.Message}");
+                throw; // Re-throwing the exception after logging
             }
             finally
             {
                 CleanUp(worksheet, workbook, workbooks, excelApp);
             }
         }
+
+        private static void CleanUp(Excel._Worksheet? worksheet, Excel._Workbook? workbook, Excel.Workbooks? workbooks, Excel.Application? excelApp)
+        {
+            if (worksheet != null) Marshal.ReleaseComObject(worksheet);
+            if (workbook != null)
+            {
+                workbook.Close(false);
+                Marshal.ReleaseComObject(workbook);
+            }
+            if (workbooks != null)
+            {
+                workbooks.Close();
+                Marshal.ReleaseComObject(workbooks);
+            }
+            if (excelApp != null)
+            {
+                excelApp.Quit();
+                Marshal.ReleaseComObject(excelApp);
+            }
+        }
+
 
         private static string GenerateFileName(string fileName)
         {
@@ -235,33 +292,6 @@ namespace ProcedureNet7
                     worksheet.Cells[i + rowOffset, j + 1] = dataTable.Rows[i][j];
         }
 
-        private static void CleanUp(Excel._Worksheet worksheet, Excel._Workbook workbook, Excel.Workbooks workbooks, Excel.Application excelApp)
-        {
-            // Clean up resources
-            try
-            {
-                if (worksheet != null) Marshal.ReleaseComObject(worksheet);
-                if (workbook != null)
-                {
-                    workbook.Close(false);
-                    Marshal.ReleaseComObject(workbook);
-                }
-                if (workbooks != null) Marshal.ReleaseComObject(workbooks);
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
-            finally
-            {
-                if (excelApp != null)
-                {
-                    excelApp.Quit();
-                    Marshal.ReleaseComObject(excelApp);
-                }
-            }
-        }
-
         public static void WriteDataTableToTextFile(DataTable dataTable, string directoryPath, string fileName)
         {
             fileName = Path.ChangeExtension(fileName, ".txt");
@@ -278,8 +308,14 @@ namespace ProcedureNet7
                 // Fill the array with the cell values
                 for (int i = 0; i < dataTable.Columns.Count; i++)
                 {
+                    string? nullableRowContent = row[i].ToString();
+                    string rowContent = "";
+                    if (nullableRowContent != null)
+                    {
+                        rowContent = nullableRowContent;
+                    }
                     // Use .ToString() to ensure that even null values become empty strings
-                    array[i] = row[i].ToString();
+                    array[i] = rowContent;
                 }
 
                 // Join the array elements with a semicolon and append to the StringBuilder
@@ -293,7 +329,7 @@ namespace ProcedureNet7
         public static DataGridView CreateDataGridView(
             DataTable dataTable,
             MainUI mainForm,
-            Panel panelToAddTo = null,
+            Panel panelToAddTo,
             DataGridViewCellEventHandler? mouseClick_Handler = null,
             DataGridViewCellMouseEventHandler? columnHeaderMouseClick_Handler = null,
             string keyTag = "")
@@ -348,7 +384,7 @@ namespace ProcedureNet7
             List<string> selectedItems = new List<string>();
             foreach (KeyValuePair<string, string> item in dictionaryToUse)
             {
-                ToolStripMenuItem menuItem = null;
+                ToolStripMenuItem menuItem;
                 if (clean)
                 {
                     menuItem = new ToolStripMenuItem($"{item.Value}")
@@ -372,19 +408,34 @@ namespace ProcedureNet7
 
                 menuItem.Click += (sender, e) =>
                 {
-                    ToolStripMenuItem clickedItem = sender as ToolStripMenuItem;
-                    if (clickedItem != null)
+                    if (sender is ToolStripMenuItem clickedItem)
                     {
-                        // Check if the item is being selected or deselected
-                        if (clickedItem.Checked)
+                        string? nullTag = clickedItem.Tag.ToString();
+                        string tag = "";
+                        if (nullTag != null)
                         {
-                            // Add the item's key to the list of selected items
-                            selectedItems.Add(clickedItem.Tag.ToString());
+                            tag = nullTag;
                         }
                         else
                         {
-                            // Remove the item's key from the list of selected items
-                            selectedItems.Remove(clickedItem.Tag.ToString());
+                            Logger.LogWarning(null, $"Tag vuota nel CreateDropDownMenu del {menuItem}");
+                        }
+                        // Check if the item is being selected or deselected
+                        if (clickedItem.Checked)
+                        {
+                            if (!string.IsNullOrWhiteSpace(tag))
+                            {
+                                // Add the item's key to the list of selected items
+                                selectedItems.Add(tag);
+                            }
+                        }
+                        else
+                        {
+                            if (!string.IsNullOrWhiteSpace(tag) && selectedItems.Contains(tag))
+                            {
+                                // Remove the item's key from the list of selected items
+                                selectedItems.Remove(tag);
+                            }
                         }
 
                         // Update the button's text with all selected item keys, joined by commas
@@ -506,16 +557,6 @@ namespace ProcedureNet7
             };
         }
 
-        public static void RemoveDropDownMenu(ref Button buttonToUse, ref ContextMenuStrip contextMenuStrip)
-        {
-            if (buttonToUse != null && contextMenuStrip != null)
-            {
-                // Dispose of the context menu
-                contextMenuStrip.Dispose();
-                contextMenuStrip = null;
-            }
-        }
-
         public static string EnsureDirectory(string path)
         {
             if (!Directory.Exists(path))
@@ -529,6 +570,26 @@ namespace ProcedureNet7
         {
             return strimToTrim.Replace(" ", "");
         }
+
+        public static string SafeGetString(this IDataRecord record, string fieldName)
+        {
+            if (record[fieldName] is DBNull or null)
+                return string.Empty;
+
+            // At this point, record[fieldName] is neither DBNull nor null.
+            // You can now safely call ToString() on it.
+            return record[fieldName].ToString()!;
+        }
+        public static string SafeGetString(this IDataRecord record, int index)
+        {
+            if (record[index] is DBNull or null)
+                return string.Empty;
+
+            // At this point, record[fieldName] is neither DBNull nor null.
+            // You can now safely call ToString() on it.
+            return record[index].ToString()!;
+        }
+
     }
 
 

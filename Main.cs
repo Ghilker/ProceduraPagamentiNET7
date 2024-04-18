@@ -9,11 +9,11 @@ namespace ProcedureNet7
 {
     public partial class MainUI : Form
     {
-        private string? selectedFolderPath;
-        private string? selectedFilePath;
-        private string? selectedFilePathSecondary;
+        private string selectedFolderPath = string.Empty;
+        private string selectedFilePath = string.Empty;
+        private string selectedFilePathSecondary = string.Empty;
 
-        public string? CONNECTION_STRING;
+        public string CONNECTION_STRING = string.Empty;
 
         public bool inProcedure = false;
 
@@ -66,9 +66,9 @@ namespace ProcedureNet7
             panelProceduraFlussoDiRitorno.Visible = false;
             panelStorni.Visible = false;
             panelProceduraControlloIBAN.Visible = false;
-            selectedFolderPath = null;
-            selectedFilePath = null;
-            selectedFilePathSecondary = null;
+            selectedFolderPath = string.Empty;
+            selectedFilePath = string.Empty;
+            selectedFilePathSecondary = string.Empty;
 
             switch (selectedProcedure)
             {
@@ -87,7 +87,7 @@ namespace ProcedureNet7
             }
         }
 
-        private void BackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+        private void BackgroundWorker_DoWork(object? sender, DoWorkEventArgs e)
         {
             ProcedureType selectedProcedure = ProcedureType.ProceduraPagamenti;
             _ = Invoke(new MethodInvoker(() =>
@@ -180,7 +180,7 @@ namespace ProcedureNet7
             }
         }
 
-        private void BackgroundWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        private void BackgroundWorker_ProgressChanged(object? sender, ProgressChangedEventArgs e)
         {
             progressBar.Value = e.ProgressPercentage;
 
@@ -191,12 +191,12 @@ namespace ProcedureNet7
             }
         }
 
-        private void BackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void BackgroundWorker_RunWorkerCompleted(object? sender, RunWorkerCompletedEventArgs e)
         {
             //ReportProgress(100, "Fine lavorazione");
         }
 
-        private void StartProcedureBtn_Click(object sender, EventArgs e)
+        private void StartProcedureBtn_Click(object? sender, EventArgs e)
         {
             if (inProcedure)
             {
@@ -219,12 +219,13 @@ namespace ProcedureNet7
                 string.IsNullOrEmpty(userID.Text) &&
                 string.IsNullOrEmpty(password.Text))
             {
-                credentials = SaveCredentials.LoadCredentialsFromFile();
-                if (credentials == null)
+                Dictionary<string, Hashtable>? nullableCredentials = SaveCredentials.LoadCredentialsFromFile();
+                if (nullableCredentials == null)
                 {
-                    _ = MessageBox.Show("No saved credentials found. Please enter the connection details.");
+                    Logger.LogWarning(null, "No saved credentials found. Please enter the connection details.");
                     return;
                 }
+                credentials = nullableCredentials;
             }
             else
             {
@@ -275,13 +276,19 @@ namespace ProcedureNet7
             }
         }
 
-        private void credentialDropdownCombo_SelectedIndexChanged(object sender, EventArgs e)
+        private void credentialDropdownCombo_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            string selectedIdentifier = credentialDropdownCombo.SelectedItem.ToString();
-            var allCredentials = SaveCredentials.LoadCredentialsFromFile();
-            if (allCredentials != null && allCredentials.ContainsKey(selectedIdentifier))
+            string? nullableIdentifier = credentialDropdownCombo.SelectedItem.ToString();
+            if (nullableIdentifier == null)
             {
-                Hashtable credentials = allCredentials[selectedIdentifier];
+                Logger.LogDebug(null, "No credentials found");
+                return;
+            }
+            string selectedIdentifier = nullableIdentifier;
+            var allCredentials = SaveCredentials.LoadCredentialsFromFile();
+            if (allCredentials != null && allCredentials.TryGetValue(selectedIdentifier, out Hashtable? value))
+            {
+                Hashtable credentials = value;
                 // Now set your text fields based on `credentials` Hashtable
                 serverIP.Text = credentials["serverIP"]?.ToString();
                 databaseName.Text = credentials["databaseName"]?.ToString();
@@ -290,7 +297,7 @@ namespace ProcedureNet7
             }
         }
 
-        private void ChooseProcedure_SelectedIndexChanged(object sender, EventArgs e)
+        private void ChooseProcedure_SelectedIndexChanged(object? sender, EventArgs e)
         {
             if (chooseProcedure.SelectedIndex != -1)
             {
@@ -298,17 +305,17 @@ namespace ProcedureNet7
                 ToggleProcedurePanels(selectedProcedure);
             }
         }
-        private void proceduraFlussoRitornoFileBtn_Click(object sender, EventArgs e)
+        private void proceduraFlussoRitornoFileBtn_Click(object? sender, EventArgs e)
         {
             Utilities.ChooseFileAndSetPath(proceduraFlussoRitornoFileLbl, openFileDialog, ref selectedFilePath);
         }
 
-        private void pagamentiSalvataggioBTN_Click(object sender, EventArgs e)
+        private void pagamentiSalvataggioBTN_Click(object? sender, EventArgs e)
         {
             Utilities.ChooseFolder(pagamentiSalvataggiolbl, folderBrowserDialog, ref selectedFolderPath);
         }
 
-        private void storniFileBtn_Click(object sender, EventArgs e)
+        private void storniFileBtn_Click(object? sender, EventArgs e)
         {
             Utilities.ChooseFileAndSetPath(storniFilelbl, openFileDialog, ref selectedFilePath);
         }

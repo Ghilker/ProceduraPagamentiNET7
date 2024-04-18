@@ -72,6 +72,16 @@ namespace ProcedureNet7
             this.importoPagato = importoPagato;
             this.superamentoEsami = superamentoEsami;
             this.superamentoEsamiTassaRegionale = superamentoEsamiTassaRegionale;
+            numeroImpegno = string.Empty;
+            assegnazioni = new List<Assegnazione>();
+            detrazioni = new List<Detrazione>();
+            IBAN = string.Empty;
+            indirizzoEmail = string.Empty;
+            swift = string.Empty;
+            pagamentiEffettuati = new List<Pagamento>();
+            mandatoProvvisorio = string.Empty;
+            residenza = new Residenza();
+            luogoNascita = new LuogoNascita();
         }
 
         public AssegnazioneDataCheck AddAssegnazione(
@@ -153,7 +163,7 @@ namespace ProcedureNet7
 
         public void RemoveAllAssegnazioni()
         {
-            assegnazioni = null;
+            assegnazioni = new List<Assegnazione>();
             importoAccontoPA = 0;
             importoSaldoPA = 0;
         }

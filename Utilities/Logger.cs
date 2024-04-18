@@ -5,17 +5,15 @@ using System.Windows.Forms; // Required for working with WinForms UI components
 public enum LogLevel { DEBUG, INFO, WARN, ERROR }
 public class Logger
 {
-
-
-    private LogLevel logLevelThreshold = LogLevel.INFO; // Default log level threshold
-
-    private static Logger instance;
+    private LogLevel logLevelThreshold = LogLevel.INFO;
+    private static readonly object lockObject = new object();
+    private static Logger? instance;
     private AutoResetEvent logSignal = new AutoResetEvent(false);
     private Thread logThread;
     private bool isRunning = true;
     private Form mainForm;
     private ProgressBar progressBar;
-    private RichTextBox logTextBox; // Changed to RichTextBox for text color formatting
+    private RichTextBox logTextBox;
     private System.Timers.Timer uiUpdateTimer;
     private ConcurrentQueue<(int sequence, LogLevel level, string message)> logQueue = new ConcurrentQueue<(int sequence, LogLevel level, string message)>();
     private int logSequence = 0;
@@ -27,21 +25,24 @@ public class Logger
         this.logTextBox = logTextBox;
         this.logLevelThreshold = logLevelThreshold;
 
-        uiUpdateTimer = new System.Timers.Timer(100); // Adjusted for more efficient batch processing
+        uiUpdateTimer = new System.Timers.Timer(100);
         uiUpdateTimer.Elapsed += (sender, e) => FlushLogQueueToUI();
         uiUpdateTimer.Start();
 
-        logThread = new Thread(LoggingThreadMethod)
-        {
-            IsBackground = true
-        };
+        logThread = new Thread(LoggingThreadMethod) { IsBackground = true };
         logThread.Start();
     }
     public static Logger GetInstance(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold = LogLevel.INFO)
     {
         if (instance == null)
         {
-            instance = new Logger(mainForm, progressBar, logTextBox, logLevelThreshold);
+            lock (lockObject)
+            {
+                if (instance == null)
+                {
+                    instance = new Logger(mainForm, progressBar, logTextBox, logLevelThreshold);
+                }
+            }
         }
         return instance;
     }
@@ -74,52 +75,82 @@ public class Logger
 
     private void LoggingThreadMethod()
     {
-        while (isRunning || !logQueue.IsEmpty)
+        while (isRunning)
         {
-            logSignal.WaitOne(); // Wait for a signal to check the queue again
+            if (logSignal.WaitOne(1000) || !logQueue.IsEmpty)
+            {
+                FlushLogQueue();
+            }
         }
     }
 
     public void LogInstance(string message, int? progress = null, LogLevel level = LogLevel.INFO)
     {
-        if (level < logLevelThreshold)
-        {
-            return; // Skip logging messages below the threshold
-        }
+        if (level < logLevelThreshold) return;
 
         int currentSequence = Interlocked.Increment(ref logSequence);
         string timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
         string logEntry = $"{timestamp} - {message}";
         logQueue.Enqueue((currentSequence, level, logEntry));
-        logSignal.Set();
 
         if (progress.HasValue)
         {
-            mainForm.BeginInvoke((MethodInvoker)delegate
-            {
-                progressBar.Value = progress.Value;
-            });
+            mainForm.BeginInvoke((MethodInvoker)delegate { progressBar.Value = progress.Value; });
+        }
+
+        logSignal.Set();
+        AdjustTimerInterval();
+    }
+
+    private void AdjustTimerInterval()
+    {
+        int queueCount = logQueue.Count;
+        if (queueCount <= 100)
+        {
+            uiUpdateTimer.Interval = 100; // Fast interval for small or moderate queues
+        }
+        else
+        {
+            // As the queue size increases, the timer interval increases exponentially
+            uiUpdateTimer.Interval = 100 + (queueCount - 100) / 10;
         }
     }
 
     private void FlushLogQueueToUI()
     {
+        int batchCount = CalculateDynamicBatchSize(); // Increase dump size if queue is large
+
         if (!mainForm.IsDisposed)
         {
             mainForm.BeginInvoke((MethodInvoker)delegate
             {
-                try
+                for (int i = 0; i < batchCount && logQueue.TryDequeue(out var logEntry); i++)
                 {
-                    while (logQueue.TryDequeue(out var logEntry))
-                    {
-                        ProcessLogEntry(logEntry);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Log or handle the exception as needed
+                    ProcessLogEntry(logEntry);
                 }
             });
+        }
+    }
+    private int CalculateDynamicBatchSize()
+    {
+        int queueCount = logQueue.Count;
+        if (queueCount <= 100)
+        {
+            return 1; // No batching, process one at a time
+        }
+        else
+        {
+            // Increase batch size as the queue grows larger
+            // Example: for every additional 100 entries, increase batch size by 10
+            return 10 + (queueCount - 100) / 100 * 10;
+        }
+    }
+
+    private void FlushLogQueue()
+    {
+        while (logQueue.TryDequeue(out var logEntry))
+        {
+            ProcessLogEntry(logEntry);
         }
     }
 

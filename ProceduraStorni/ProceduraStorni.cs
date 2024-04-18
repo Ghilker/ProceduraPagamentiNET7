@@ -13,8 +13,8 @@ namespace ProcedureNet7.Storni
     {
         public ProceduraStorni(MainUI mainUI, string connection_string) : base(mainUI, connection_string) { }
 
-        string selectedStorniFile;
-        string esercizioFinanziario;
+        string selectedStorniFile = string.Empty;
+        string esercizioFinanziario = string.Empty;
         SqlTransaction sqlTransaction;
         List<Studente> studenti = new List<Studente>();
         List<Studente> studentiDaBloccare = new List<Studente>();
@@ -78,12 +78,12 @@ namespace ProcedureNet7.Storni
                 {
                     while (reader.Read())
                     {
-                        string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
-                        Studente studente = studenti.FirstOrDefault(s => s.codFiscale == codFiscale);
+                        string codFiscale = Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper();
+                        Studente? studente = studenti.FirstOrDefault(s => s.codFiscale == codFiscale);
                         if (studente != null)
                         {
 
-                            string IBAN = reader["IBAN"].ToString();
+                            string IBAN = Utilities.SafeGetString(reader, "IBAN");
 
                             if (studente.IBAN != IBAN)
                             {
@@ -151,11 +151,11 @@ namespace ProcedureNet7.Storni
                 {
                     while (reader.Read())
                     {
-                        string codFiscale = reader["Cod_fiscale"].ToString().ToUpper();
-                        Studente studente = studenti.FirstOrDefault(s => s.codFiscale == codFiscale);
+                        string codFiscale = Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper();
+                        Studente? studente = studenti.FirstOrDefault(s => s.codFiscale == codFiscale);
                         if (studente != null)
                         {
-                            string annoAccademico = reader["Anno_accademico"].ToString();
+                            string annoAccademico = Utilities.SafeGetString(reader, "Anno_accademico");
                             studente.SetStudenteAA(annoAccademico);
                         }
                         else
@@ -226,7 +226,6 @@ namespace ProcedureNet7.Storni
                     Logger.LogInfo(100, $"CF errore: {studente}");
                     Thread.Sleep(10);
                 }
-                string test = "";
             }
             catch (Exception ex)
             {

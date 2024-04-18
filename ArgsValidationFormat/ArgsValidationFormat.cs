@@ -10,23 +10,23 @@ namespace ProcedureNet7
 {
     public class ValidDateFormatAttribute : ValidationAttribute
     {
-        public override bool IsValid(object value)
+        public override bool IsValid(object? value)
         {
-            if (value == null || string.IsNullOrEmpty(value.ToString()))
+            if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
                 return false;
 
-            return Regex.IsMatch(value.ToString(), @"^\d{2}/\d{2}/\d{4}$");
+            return Regex.IsMatch(value.ToString()!, @"^\d{2}/\d{2}/\d{4}$");
         }
     }
 
     public class ValidAAFormatAttribute : ValidationAttribute
     {
-        public override bool IsValid(object value)
+        public override bool IsValid(object? value)
         {
-            if (value == null || string.IsNullOrEmpty(value.ToString()))
+            if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
                 return false;
 
-            if (!Regex.IsMatch(value.ToString(), @"^[0-9]{8}$"))
+            if (!Regex.IsMatch(value.ToString()!, @"^[0-9]{8}$"))
             {
                 return false;
             }

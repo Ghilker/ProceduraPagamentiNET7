@@ -19,6 +19,7 @@ namespace ProcedureNet7.Storni
             this.mandatoPagamento = mandatoPagamento;
             this.IBAN = IBAN;
             this.impegnoReintroito = impegnoReintroito;
+            studenteAA = string.Empty;
         }
 
         public void SetStudenteAA(string studenteAA)

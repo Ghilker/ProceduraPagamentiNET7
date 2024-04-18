@@ -13,8 +13,8 @@ namespace ProcedureNet7
 
         public ProceduraControlloIBAN(MainUI mainUI, string connection_string) : base(mainUI, connection_string) { }
 
-        string selectedAA;
-        SqlTransaction sqlTransaction;
+        string? selectedAA;
+        SqlTransaction? sqlTransaction;
         public override void RunProcedure(ArgsProceduraControlloIBAN args)
         {
             selectedAA = args._annoAccademico;
@@ -57,9 +57,9 @@ namespace ProcedureNet7
                 {
                     while (reader.Read())
                     {
-                        string codFiscale = reader["Cod_fiscale"].ToString().ToUpper().Trim();
-                        string IBAN_Storno = reader["iban_storno"].ToString().ToUpper().Trim();
-                        string IBAN_attuale = reader["IBAN"].ToString().ToUpper().Trim();
+                        string codFiscale = Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper().Trim();
+                        string IBAN_Storno = Utilities.SafeGetString(reader, "iban_storno").ToUpper().Trim();
+                        string IBAN_attuale = Utilities.SafeGetString(reader, "IBAN").ToUpper().Trim();
 
                         if (string.IsNullOrWhiteSpace(IBAN_attuale) || string.IsNullOrWhiteSpace(IBAN_Storno))
                         {
@@ -87,7 +87,7 @@ namespace ProcedureNet7
             try
             {
                 string blockCode = "BSS";
-                string annoAccademico = selectedAA;
+                string annoAccademico = selectedAA ?? string.Empty;
                 string utente = "Area4";
 
                 string codFiscaleList = string.Join(",", codFiscaleCol.ConvertAll(c => $"'{c}'"));
