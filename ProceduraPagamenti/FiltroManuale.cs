@@ -16,9 +16,9 @@ namespace ProceduraPagamentiNET7.ProceduraPagamenti
     public partial class FiltroManuale : Form
     {
         private TipoFiltro selectedFiltro;
-        private string queryWhereText;
+        private string queryWhereText = string.Empty;
         private SqlConnection conn;
-        SqlTransaction sqlTransaction = null;
+        SqlTransaction? sqlTransaction = null;
         private string tableName;
 
         private ContextMenuStrip filtroSessoStrip;
@@ -146,8 +146,8 @@ namespace ProceduraPagamentiNET7.ProceduraPagamenti
                 {
                     while (reader.Read())
                     {
-                        string key = reader[0].ToString();
-                        string value = reader[1].ToString();
+                        string key = Utilities.SafeGetString(reader, 0);
+                        string value = Utilities.SafeGetString(reader, 1);
                         comboData[key] = value;
                     }
                 }

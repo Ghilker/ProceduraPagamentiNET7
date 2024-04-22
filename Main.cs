@@ -38,7 +38,8 @@ namespace ProcedureNet7
         }
         private void Main_FormClosing(object? sender, FormClosingEventArgs e)
         {
-            logger?.Stop();
+            logger.Dispose();
+            backgroundWorker.Dispose();
         }
 
         private void AddProcedures()

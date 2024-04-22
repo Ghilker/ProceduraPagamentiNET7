@@ -2,20 +2,19 @@
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Windows.Forms; // Required for working with WinForms UI components
-public enum LogLevel { DEBUG, INFO, WARN, ERROR }
-public class Logger
+public class Logger : IDisposable
 {
-    private LogLevel logLevelThreshold = LogLevel.INFO;
-    private static readonly object lockObject = new object();
+    private readonly LogLevel logLevelThreshold = LogLevel.INFO;
+    private static readonly object lockObject = new();
     private static Logger? instance;
-    private AutoResetEvent logSignal = new AutoResetEvent(false);
-    private Thread logThread;
+    private readonly AutoResetEvent logSignal = new(false);
+    private readonly Thread logThread;
     private bool isRunning = true;
-    private Form mainForm;
-    private ProgressBar progressBar;
-    private RichTextBox logTextBox;
-    private System.Timers.Timer uiUpdateTimer;
-    private ConcurrentQueue<(int sequence, LogLevel level, string message)> logQueue = new ConcurrentQueue<(int sequence, LogLevel level, string message)>();
+    private readonly Form mainForm;
+    private readonly ProgressBar progressBar;
+    private readonly RichTextBox logTextBox;
+    private readonly System.Timers.Timer uiUpdateTimer;
+    private readonly ConcurrentQueue<(int sequence, LogLevel level, string message)> logQueue = new();
     private int logSequence = 0;
 
     private Logger(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold)
@@ -32,16 +31,19 @@ public class Logger
         logThread = new Thread(LoggingThreadMethod) { IsBackground = true };
         logThread.Start();
     }
+
+    public void Dispose()
+    {
+        Stop();
+    }
+
     public static Logger GetInstance(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold = LogLevel.INFO)
     {
         if (instance == null)
         {
             lock (lockObject)
             {
-                if (instance == null)
-                {
-                    instance = new Logger(mainForm, progressBar, logTextBox, logLevelThreshold);
-                }
+                instance ??= new Logger(mainForm, progressBar, logTextBox, logLevelThreshold);
             }
         }
         return instance;
@@ -175,7 +177,7 @@ public class Logger
             if (lines.Length > 0)
             {
                 int lastLineStartIndex = logTextBox.GetFirstCharIndexFromLine(lines.Length - 1);
-                int lastLineLength = lines[lines.Length - 1].Length;
+                int lastLineLength = lines[^1].Length;
 
                 // Select the last line and replace it with the updated message
                 logTextBox.Select(lastLineStartIndex, lastLineLength);
@@ -215,21 +217,16 @@ public class Logger
         logTextBox.Clear();
     }
 
-    private Color GetColorForLogLevel(LogLevel level)
+    private static Color GetColorForLogLevel(LogLevel level)
     {
-        switch (level)
+        return level switch
         {
-            case LogLevel.DEBUG:
-                return Color.DarkCyan;
-            case LogLevel.INFO:
-                return Color.Black;
-            case LogLevel.WARN:
-                return Color.Orange;
-            case LogLevel.ERROR:
-                return Color.Red;
-            default:
-                return Color.Black;
-        }
+            LogLevel.DEBUG => Color.DarkCyan,
+            LogLevel.INFO => Color.Black,
+            LogLevel.WARN => Color.Orange,
+            LogLevel.ERROR => Color.Red,
+            _ => Color.Black,
+        };
     }
 
     public void Stop()
@@ -243,3 +240,4 @@ public class Logger
         logSignal.Dispose();
     }
 }
+public enum LogLevel { DEBUG, INFO, WARN, ERROR }

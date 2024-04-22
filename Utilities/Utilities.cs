@@ -14,7 +14,7 @@ namespace ProcedureNet7
     {
         public static DataTable ReadExcelToDataTable(string filePath, bool firstRowAsData = false)
         {
-            DataTable dataTable = new DataTable();
+            DataTable dataTable = new();
             Excel.Application? excelApp = null;
             Excel.Workbooks? workbooks = null;
             Excel.Workbook? workbook = null;
@@ -65,7 +65,7 @@ namespace ProcedureNet7
                 int rowsCount = range.Rows.Count;
                 Logger.LogDebug(null, $"Preparing to process {columnsCount} columns and {rowsCount - (firstRowAsData ? 0 : 1)} rows.");
 
-                Dictionary<string, int> columnNames = new Dictionary<string, int>();
+                Dictionary<string, int> columnNames = new();
 
                 // Adjust start row based on whether the first row is treated as data
                 int startRow = firstRowAsData ? 1 : 2;
@@ -85,10 +85,10 @@ namespace ProcedureNet7
                         string originalColumnName = data[1, col]?.ToString() ?? $"Column{col}";
                         columnName = SanitizeColumnName(originalColumnName);
 
-                        if (columnNames.ContainsKey(columnName))
+                        if (columnNames.TryGetValue(columnName, out int value))
                         {
-                            columnNames[columnName]++;
-                            columnName += $"_{columnNames[columnName]}";
+                            columnNames[columnName] = ++value;
+                            columnName += $"_{value}";
                         }
                         else
                         {
@@ -167,7 +167,7 @@ namespace ProcedureNet7
 
         public static string GetCheckBoxSelectedCodes(ToolStripItemCollection items)
         {
-            List<string> selectedCodes = new List<string>();
+            List<string> selectedCodes = new();
             foreach (ToolStripMenuItem item in items)
             {
                 if (item.Checked)
@@ -219,7 +219,7 @@ namespace ProcedureNet7
             string fullPath = Path.Combine(folderPath, fileName);
             Directory.CreateDirectory(folderPath); // Ensure the directory exists
 
-            Excel.Application? excelApp = new Excel.Application();
+            Excel.Application? excelApp = new();
             Excel.Workbooks? workbooks = null;
             Excel._Workbook? workbook = null;
             Excel._Worksheet? worksheet = null;
@@ -297,7 +297,7 @@ namespace ProcedureNet7
             fileName = Path.ChangeExtension(fileName, ".txt");
             string filePath = Path.Combine(directoryPath, fileName);
 
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
 
             // Iterate through all rows in the DataTable
             foreach (DataRow row in dataTable.Rows)
@@ -380,8 +380,8 @@ namespace ProcedureNet7
             contextMenuStrip = new ContextMenuStrip();
             Button localButtonToUse = buttonToUse;
             // List to hold all menu items
-            List<ToolStripMenuItem> allMenuItems = new List<ToolStripMenuItem>();
-            List<string> selectedItems = new List<string>();
+            List<ToolStripMenuItem> allMenuItems = new();
+            List<string> selectedItems = new();
             foreach (KeyValuePair<string, string> item in dictionaryToUse)
             {
                 ToolStripMenuItem menuItem;
@@ -471,41 +471,37 @@ namespace ProcedureNet7
 
             void AdjustFontSizeToFit(Button button, string text)
             {
-                using (Graphics g = button.CreateGraphics())
+                using Graphics g = button.CreateGraphics();
+                float fontSize = button.Font.Size;
+                SizeF stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
+
+                // Try increasing font size until the text size exceeds the button's dimensions
+                while (true)
                 {
-                    float fontSize = button.Font.Size;
-                    SizeF stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
+                    SizeF newSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize + 0.2f));
 
-                    // Try increasing font size until the text size exceeds the button's dimensions
-                    while (true)
+                    // Check if increasing makes the text too large for the button's width or height
+                    if (newSize.Width > button.Width - 10 || newSize.Height > button.Height - 10) // 10 is a buffer to avoid text touching the button edges
                     {
-                        SizeF newSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize + 0.2f));
-
-                        // Check if increasing makes the text too large for the button's width or height
-                        if (newSize.Width > button.Width - 10 || newSize.Height > button.Height - 10) // 10 is a buffer to avoid text touching the button edges
-                        {
-                            break; // Stop if the next size would exceed the button's dimensions
-                        }
-                        else
-                        {
-                            fontSize += 0.2f; // Increase font size by small increments
-                            stringSize = newSize;
-                        }
+                        break; // Stop if the next size would exceed the button's dimensions
                     }
-
-                    // Decrease font size if the text size exceeds the button's width or height
-                    while ((stringSize.Width > button.Width - 10 || stringSize.Height > button.Height - 10) && fontSize > 1)
+                    else
                     {
-                        fontSize -= 0.2f; // Decrease font size by small increments
-                        stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
+                        fontSize += 0.2f; // Increase font size by small increments
+                        stringSize = newSize;
                     }
-
-                    // Apply the calculated font size to the button
-                    button.Font = new Font(button.Font.FontFamily, fontSize, button.Font.Style);
                 }
+
+                // Decrease font size if the text size exceeds the button's width or height
+                while ((stringSize.Width > button.Width - 10 || stringSize.Height > button.Height - 10) && fontSize > 1)
+                {
+                    fontSize -= 0.2f; // Decrease font size by small increments
+                    stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
+                }
+
+                // Apply the calculated font size to the button
+                button.Font = new Font(button.Font.FontFamily, fontSize, button.Font.Style);
             }
-
-
 
             void UpdateVisibleItems(int newScrollPosition, int delta)
             {
@@ -597,10 +593,10 @@ namespace ProcedureNet7
     public class ProgressUpdater
     {
         private int _updateCount = 0;
-        private int maxDashes = 40;
+        private readonly int maxDashes = 40;
         private bool _inProcedure = false;
-        private int _currentProgress;
-        private LogLevel _logLevel;
+        private readonly int _currentProgress;
+        private readonly LogLevel _logLevel;
 
         public ProgressUpdater(int currentProgress, LogLevel logLevel)
         {
@@ -630,7 +626,7 @@ namespace ProcedureNet7
                     if (!_inProcedure) { break; }
                     Thread.Sleep(250);
                     if (!_inProcedure) { break; }
-                    string updateMessage = new String('-', _updateCount + 1);
+                    string updateMessage = new('-', _updateCount + 1);
                     Logger.Log(_currentProgress, $"UPDATE:{updateMessage}", _logLevel);
                     _updateCount++;
                 }
