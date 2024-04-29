@@ -9,11 +9,13 @@ namespace ProcedureNet7
     internal class Pagamento
     {
         public string codTipoPagam { get; private set; }
+        public double importoPagamento { get; private set; }
         public bool ritiratoAzienda { get; private set; }
 
-        public Pagamento(string codTipoPagam, bool ritiratoAzienda)
+        public Pagamento(string codTipoPagam, double importoPagamento, bool ritiratoAzienda)
         {
             this.codTipoPagam = codTipoPagam;
+            this.importoPagamento = importoPagamento;
             this.ritiratoAzienda = ritiratoAzienda;
         }
     }

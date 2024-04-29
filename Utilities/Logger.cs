@@ -14,7 +14,7 @@ public class Logger : IDisposable
     private readonly ProgressBar progressBar;
     private readonly RichTextBox logTextBox;
     private readonly System.Timers.Timer uiUpdateTimer;
-    private readonly ConcurrentQueue<(int sequence, LogLevel level, string message)> logQueue = new();
+    private readonly ConcurrentQueue<(int sequence, LogLevel level, string message, Color? textColor)> logQueue = new();
     private int logSequence = 0;
 
     private Logger(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold)
@@ -50,9 +50,9 @@ public class Logger : IDisposable
     }
 
     // Static method to log messages
-    public static void Log(int? progress, string message, LogLevel level = LogLevel.INFO)
+    public static void Log(int? progress, string message, LogLevel level = LogLevel.INFO, Color? textColor = null)
     {
-        instance?.LogInstance(message, progress, level);
+        instance?.LogInstance(message, progress, level, textColor);
     }
 
     public static void LogDebug(int? progress, string message)
@@ -60,9 +60,9 @@ public class Logger : IDisposable
         Log(progress, message, LogLevel.DEBUG);
     }
 
-    public static void LogInfo(int? progress, string message)
+    public static void LogInfo(int? progress, string message, Color? textColor = null)
     {
-        Log(progress, message, LogLevel.INFO);
+        Log(progress, message, LogLevel.INFO, textColor);
     }
 
     public static void LogWarning(int? progress, string message)
@@ -86,14 +86,14 @@ public class Logger : IDisposable
         }
     }
 
-    public void LogInstance(string message, int? progress = null, LogLevel level = LogLevel.INFO)
+    public void LogInstance(string message, int? progress = null, LogLevel level = LogLevel.INFO, Color? textColor = null)
     {
         if (level < logLevelThreshold) return;
 
         int currentSequence = Interlocked.Increment(ref logSequence);
         string timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
         string logEntry = $"{timestamp} - {message}";
-        logQueue.Enqueue((currentSequence, level, logEntry));
+        logQueue.Enqueue((currentSequence, level, logEntry, textColor));
 
         if (progress.HasValue)
         {
@@ -156,7 +156,7 @@ public class Logger : IDisposable
         }
     }
 
-    private void ProcessLogEntry((int sequence, LogLevel level, string message) logEntry)
+    private void ProcessLogEntry((int sequence, LogLevel level, string message, Color? textColor) logEntry)
     {
         // Ensure any UI updates are done on the UI thread
         if (mainForm.InvokeRequired)
@@ -166,8 +166,15 @@ public class Logger : IDisposable
         }
 
         string messageText = logEntry.message;
-        Color textColor = GetColorForLogLevel(logEntry.level);
-
+        Color textColor;
+        if (logEntry.textColor != null)
+        {
+            textColor = (Color)logEntry.textColor;
+        }
+        else
+        {
+            textColor = GetColorForLogLevel(logEntry.level);
+        }
         if (messageText.Contains("UPDATE:"))
         {
             // For "UPDATE:", modify the last line without appending a new line

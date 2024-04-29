@@ -29,6 +29,7 @@ namespace ProcedureNet7
             riepilogoTipoStudente.Text = riepilogoArguments.tipoStudente;
             riepilogoNomeDiTabella.Text = riepilogoArguments.nomeTabella;
             riepilogoNumImpegno.Text = riepilogoArguments.numImpegno;
+            riepilogoRichiestoPA.Text = riepilogoArguments.richiestoPA;
         }
 
         private void promptRiepilogoOkBtn_Click(object sender, EventArgs e)
@@ -56,6 +57,8 @@ namespace ProcedureNet7
         public string nomeTabella { get; set; }
         public string dataRiferimento { get; set; }
         public string numImpegno { get; set; }
+
+        public string richiestoPA { get; set; }
 
         // Static variable that holds a single instance of the class
         private static RiepilogoArguments instance = null;

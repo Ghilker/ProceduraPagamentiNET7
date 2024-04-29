@@ -161,8 +161,6 @@ namespace ProcedureNet7
             {
                 return false; // Connection failed
             }
-
-
         }
 
         public static string GetCheckBoxSelectedCodes(ToolStripItemCollection items)
@@ -236,7 +234,7 @@ namespace ProcedureNet7
 
                 // Add data rows
                 if (worksheet != null)
-                    AddData(worksheet, dataTable, includeHeaders);
+                    AddDataInBulk(worksheet, dataTable, includeHeaders);
 
                 // Save the Excel file
                 workbook.SaveAs(fullPath);
@@ -284,12 +282,39 @@ namespace ProcedureNet7
                 worksheet.Cells[1, i + 1] = dataTable.Columns[i].ColumnName;
         }
 
-        private static void AddData(Excel._Worksheet worksheet, DataTable dataTable, bool includeHeaders)
+        private static void AddDataInBulk(Excel._Worksheet worksheet, DataTable dataTable, bool includeHeaders)
         {
-            int rowOffset = includeHeaders ? 2 : 1;
+            int columnsCount = dataTable.Columns.Count;
+            object[,] values = new object[dataTable.Rows.Count, columnsCount];
+
             for (int i = 0; i < dataTable.Rows.Count; i++)
-                for (int j = 0; j < dataTable.Columns.Count; j++)
-                    worksheet.Cells[i + rowOffset, j + 1] = dataTable.Rows[i][j];
+            {
+                for (int j = 0; j < columnsCount; j++)
+                {
+                    values[i, j] = dataTable.Rows[i][j];
+                }
+            }
+
+            int rowOffset = includeHeaders ? 2 : 1;
+            string excelRange = $"A{rowOffset}:" + GetExcelColumnName(columnsCount) + $"{rowOffset + dataTable.Rows.Count - 1}";
+            Excel.Range range = worksheet.Range[excelRange];
+            range.Value = values;
+        }
+
+        private static string GetExcelColumnName(int columnNumber)
+        {
+            int dividend = columnNumber;
+            string columnName = String.Empty;
+            int modulo;
+
+            while (dividend > 0)
+            {
+                modulo = (dividend - 1) % 26;
+                columnName = Convert.ToChar(65 + modulo).ToString() + columnName;
+                dividend = (dividend - modulo) / 26;
+            }
+
+            return columnName;
         }
 
         public static void WriteDataTableToTextFile(DataTable dataTable, string directoryPath, string fileName)

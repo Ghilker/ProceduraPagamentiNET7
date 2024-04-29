@@ -54,6 +54,8 @@
             label12 = new Label();
             riepilogoNumImpegno = new Label();
             label13 = new Label();
+            riepilogoRichiestoPA = new Label();
+            label14 = new Label();
             SuspendLayout();
             // 
             // promptRiepilogoOkBtn
@@ -292,12 +294,32 @@
             label13.TabIndex = 34;
             label13.Text = "Impegno selezionato";
             // 
+            // riepilogoRichiestoPA
+            // 
+            riepilogoRichiestoPA.AutoSize = true;
+            riepilogoRichiestoPA.Location = new Point(148, 191);
+            riepilogoRichiestoPA.Name = "riepilogoRichiestoPA";
+            riepilogoRichiestoPA.Size = new Size(32, 15);
+            riepilogoRichiestoPA.TabIndex = 37;
+            riepilogoRichiestoPA.Text = "_____";
+            // 
+            // label14
+            // 
+            label14.AutoSize = true;
+            label14.Location = new Point(12, 191);
+            label14.Name = "label14";
+            label14.Size = new Size(134, 15);
+            label14.TabIndex = 36;
+            label14.Text = "Richiesto PA selezionato";
+            // 
             // RiepilogoPagamenti
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(385, 285);
             ControlBox = false;
+            Controls.Add(riepilogoRichiestoPA);
+            Controls.Add(label14);
             Controls.Add(riepilogoNumImpegno);
             Controls.Add(label13);
             Controls.Add(riepilogoDataRiferimento);
@@ -358,5 +380,7 @@
         private Label label12;
         private Label riepilogoNumImpegno;
         private Label label13;
+        private Label riepilogoRichiestoPA;
+        private Label label14;
     }
 }

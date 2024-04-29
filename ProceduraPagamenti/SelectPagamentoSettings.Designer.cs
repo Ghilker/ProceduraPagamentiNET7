@@ -36,11 +36,13 @@
             promptImpegnoCombo = new ComboBox();
             label3 = new Label();
             promptCodEnteCombo = new ComboBox();
+            label4 = new Label();
+            promptRichiestoPACombo = new ComboBox();
             SuspendLayout();
             // 
             // promptTipoStudenteOkBtn
             // 
-            promptTipoStudenteOkBtn.Location = new Point(322, 144);
+            promptTipoStudenteOkBtn.Location = new Point(322, 197);
             promptTipoStudenteOkBtn.Name = "promptTipoStudenteOkBtn";
             promptTipoStudenteOkBtn.Size = new Size(75, 23);
             promptTipoStudenteOkBtn.TabIndex = 9;
@@ -50,7 +52,7 @@
             // 
             // promptTipoStudenteNokBtn
             // 
-            promptTipoStudenteNokBtn.Location = new Point(3, 144);
+            promptTipoStudenteNokBtn.Location = new Point(3, 197);
             promptTipoStudenteNokBtn.Name = "promptTipoStudenteNokBtn";
             promptTipoStudenteNokBtn.Size = new Size(75, 23);
             promptTipoStudenteNokBtn.TabIndex = 8;
@@ -112,12 +114,32 @@
             promptCodEnteCombo.Size = new Size(394, 23);
             promptCodEnteCombo.TabIndex = 12;
             // 
+            // label4
+            // 
+            label4.AutoSize = true;
+            label4.Location = new Point(3, 141);
+            label4.Name = "label4";
+            label4.Size = new Size(128, 15);
+            label4.TabIndex = 15;
+            label4.Text = "Indicare se richiesto PA";
+            // 
+            // promptRichiestoPACombo
+            // 
+            promptRichiestoPACombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            promptRichiestoPACombo.FormattingEnabled = true;
+            promptRichiestoPACombo.Location = new Point(3, 159);
+            promptRichiestoPACombo.Name = "promptRichiestoPACombo";
+            promptRichiestoPACombo.Size = new Size(394, 23);
+            promptRichiestoPACombo.TabIndex = 14;
+            // 
             // SelectPagamentoSettings
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(400, 176);
+            ClientSize = new Size(400, 224);
             ControlBox = false;
+            Controls.Add(label4);
+            Controls.Add(promptRichiestoPACombo);
             Controls.Add(label3);
             Controls.Add(promptCodEnteCombo);
             Controls.Add(label1);
@@ -142,5 +164,7 @@
         private ComboBox promptImpegnoCombo;
         private Label label3;
         private ComboBox promptCodEnteCombo;
+        private Label label4;
+        private ComboBox promptRichiestoPACombo;
     }
 }

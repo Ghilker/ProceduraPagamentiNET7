@@ -22,6 +22,7 @@ namespace ProcedureNet7
         List<string> codEnteList = new List<string>();
         List<string> tipoStudentiList = new List<string>();
         List<string> impegniList = new List<string>();
+        List<string> richiedentiList = new List<string>();
         SqlTransaction sqlTransaction = null;
         public SelectPagamentoSettings(SqlConnection conn, SqlTransaction sqlTransaction, string selectedAA, string selectedBeneficio, string catPagamento)
         {
@@ -36,9 +37,18 @@ namespace ProcedureNet7
                 { "0", "Matricole" },
                 { "1", "Anni successivi" }
             };
+
+            Dictionary<string, string> richiedentePAdict = new Dictionary<string, string>()
+            {
+                { "2", "Tutti gli studenti" },
+                { "0", "Solo non richiedenti PA" },
+                { "1", "Solo richiedenti PA" }
+            };
+
             codEnteList = GenerateCodEnteComboBox(ref promptCodEnteCombo, conn);
             tipoStudentiList = CreatePagamentiComboBox(ref promptTipoStudenteCombo, tipoStudenteData);
             impegniList = GenerateImpegnoComboBox(ref promptImpegnoCombo, conn);
+            richiedentiList = CreatePagamentiComboBox(ref promptRichiestoPACombo, richiedentePAdict);
         }
 
         List<string> GenerateCodEnteComboBox(ref ComboBox comboBox, SqlConnection conn)
@@ -136,6 +146,21 @@ namespace ProcedureNet7
                 RiepilogoArguments.Instance.enteDiGestione = pagamentiSelectedCodEnteRiepilogo;
 
                 return new InputReturn(pagamentiSelectedCodEnte, codEnteList);
+            }
+        }
+
+        public InputReturn InputRichiestaPA
+        {
+            get
+            {
+                dynamic pagamentiSelectedRichiestaObj = promptRichiestoPACombo.SelectedItem;
+                string pagamentiSelectedRichiesta = pagamentiSelectedRichiestaObj?.Value ?? "";
+
+                dynamic pagamentiSelectedRichiestaRiepilogoObj = promptRichiestoPACombo.SelectedItem;
+                string pagamentiSelectedRichiestaRiepilogo = pagamentiSelectedRichiestaRiepilogoObj?.Text ?? "";
+                RiepilogoArguments.Instance.richiestoPA = pagamentiSelectedRichiestaRiepilogo;
+
+                return new InputReturn(pagamentiSelectedRichiesta, richiedentiList);
             }
         }
 

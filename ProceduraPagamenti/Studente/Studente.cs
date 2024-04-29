@@ -52,7 +52,6 @@ namespace ProcedureNet7
             int annoCorso,
             int tipoCorso,
             bool vincitorePA,
-            double importoPagato,
             bool superamentoEsami,
             bool superamentoEsamiTassaRegionale
             )
@@ -69,7 +68,6 @@ namespace ProcedureNet7
             this.annoCorso = annoCorso;
             this.tipoCorso = tipoCorso;
             this.vincitorePA = vincitorePA;
-            this.importoPagato = importoPagato;
             this.superamentoEsami = superamentoEsami;
             this.superamentoEsamiTassaRegionale = superamentoEsamiTassaRegionale;
             numeroImpegno = string.Empty;
@@ -124,14 +122,14 @@ namespace ProcedureNet7
 
         }
 
-        public void AddPagamentoEffettuato(string codTipoPagam, bool ritiratoAzienda)
+        public void AddPagamentoEffettuato(string codTipoPagam, double importoPagamento, bool ritiratoAzienda)
         {
             if (pagamentiEffettuati == null)
             {
                 pagamentiEffettuati = new List<Pagamento>();
             }
 
-            pagamentiEffettuati.Add(new Pagamento(codTipoPagam, ritiratoAzienda));
+            pagamentiEffettuati.Add(new Pagamento(codTipoPagam, importoPagamento, ritiratoAzienda));
         }
 
         public void SetLuogoNascita(string codComune, string nomeComune, string provincia)
@@ -179,6 +177,11 @@ namespace ProcedureNet7
             this.indirizzoEmail = email;
             this.IBAN = iban;
             this.swift = swift;
+        }
+
+        public void SetImportiPagati(double amount)
+        {
+            this.importoPagato = amount;
         }
 
         public void SetImportoDaPagare(double amount)
