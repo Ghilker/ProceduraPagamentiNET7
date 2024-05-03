@@ -1,4 +1,4 @@
-﻿namespace ProceduraPagamentiNET7.ProceduraPagamenti
+﻿namespace ProcedureNet7
 {
     partial class FiltroManuale
     {

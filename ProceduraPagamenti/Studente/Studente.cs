@@ -29,6 +29,7 @@ namespace ProcedureNet7
         public double importoAccontoPA { get; private set; }
         public double importoSaldoPA { get; private set; }
         public string numDomanda { get; private set; }
+        public List<Reversale> reversali { get; private set; }
         public List<Detrazione> detrazioni { get; private set; }
         public long telefono { get; private set; }
         public string indirizzoEmail { get; private set; }
@@ -72,6 +73,7 @@ namespace ProcedureNet7
             this.superamentoEsamiTassaRegionale = superamentoEsamiTassaRegionale;
             numeroImpegno = string.Empty;
             assegnazioni = new List<Assegnazione>();
+            reversali = new List<Reversale>();
             detrazioni = new List<Detrazione>();
             IBAN = string.Empty;
             indirizzoEmail = string.Empty;
@@ -147,9 +149,21 @@ namespace ProcedureNet7
             this.numeroImpegno = impegno;
         }
 
-        public void AddDetrazione(string codReversale, double importo, string nota, string codTipoPagamOld, string codTipoPagamNew, bool daContabilizzare = false)
+        public void AddReversale(string codReversale, double importo, string nota, string codTipoPagamOld, string codTipoPagamNew)
         {
-            Detrazione detrazione = new Detrazione(codReversale, importo, nota, codTipoPagamOld, codTipoPagamNew, daContabilizzare);
+            Reversale reversale = new Reversale(codReversale, importo, nota, codTipoPagamOld, codTipoPagamNew);
+
+            if (reversali == null)
+            {
+                reversali = new List<Reversale>();
+            }
+
+            reversali.Add(reversale);
+        }
+
+        public void AddDetrazione(string codReversale, double importo, string nota, bool needUpdate = false)
+        {
+            Detrazione detrazione = new Detrazione(codReversale, importo, nota, needUpdate);
 
             if (detrazioni == null)
             {

@@ -1,5 +1,4 @@
-﻿using ProcedureNet7;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -11,7 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace ProceduraPagamentiNET7.ProceduraPagamenti
+namespace ProcedureNet7
 {
     public partial class FiltroManuale : Form
     {
