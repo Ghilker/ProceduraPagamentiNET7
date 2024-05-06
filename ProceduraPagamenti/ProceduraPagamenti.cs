@@ -1696,8 +1696,8 @@ namespace ProcedureNet7
             string secondHalfAA = selectedAA.Substring(6, 2);
             string baseFolderPath = Utilities.EnsureDirectory(Path.Combine(selectedSaveFolder, currentMonthName + currentYear + "_" + firstHalfAA + secondHalfAA));
 
-            string currentBeneficio = isTR ? "TR" : tipoBeneficio;
-            string currentCodTipoPagamento = currentBeneficio + selectedTipoPagamento;
+            //string currentBeneficio = isTR ? "TR" : tipoBeneficio;
+            string currentCodTipoPagamento = tipoBeneficio + selectedTipoPagamento;
 
             string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{currentCodTipoPagamento}'";
             SqlCommand cmd = new(sqlTipoPagam, conn, sqlTransaction);
@@ -2461,23 +2461,15 @@ namespace ProcedureNet7
         }
         void PopulateStudentiImpegni()
         {
-            if (isTR)
-            {
-                foreach (var pair in studentiDaPagare)
-                {
-                    Studente studente = pair.Value;
-                    studente.SetImpegno("3120");
-                }
-                Logger.LogInfo(45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato");
-                return;
-            }
+
+            string currentBeneficio = isTR ? "TR" : tipoBeneficio;
 
             string dataQuery = $@"
                     SELECT Specifiche_impegni.Cod_fiscale, num_impegno_primaRata, num_impegno_saldo
                     FROM Specifiche_impegni
                         INNER JOIN #CFEstrazione cfe ON Specifiche_impegni.Cod_fiscale = cfe.Cod_fiscale 
                     WHERE 
-                        Cod_beneficio = '{tipoBeneficio}' AND
+                        Cod_beneficio = '{currentBeneficio}' AND
                         Anno_accademico = '{selectedAA}'
                     ";
 
