@@ -107,26 +107,24 @@ public class Logger : IDisposable
     private void AdjustTimerInterval()
     {
         int queueCount = logQueue.Count;
-        if (queueCount <= 100)
-        {
-            uiUpdateTimer.Interval = 100; // Fast interval for small or moderate queues
-        }
-        else
-        {
-            // As the queue size increases, the timer interval increases exponentially
-            uiUpdateTimer.Interval = 100 + (queueCount - 100) / 10;
-        }
+        uiUpdateTimer.Interval = queueCount <= 100 ? 100 : 100 + (queueCount - 100) / 10;
     }
 
     private void FlushLogQueueToUI()
     {
-        int batchCount = CalculateDynamicBatchSize(); // Increase dump size if queue is large
-
         if (!mainForm.IsDisposed)
         {
             mainForm.BeginInvoke((MethodInvoker)delegate
             {
-                for (int i = 0; i < batchCount && logQueue.TryDequeue(out var logEntry); i++)
+                // Dequeue messages in a thread-safe manner and ensure they're processed sequentially
+                var sortedLogs = new SortedList<int, (int sequence, LogLevel level, string message, Color? textColor)>();
+
+                while (sortedLogs.Count < CalculateDynamicBatchSize() && logQueue.TryDequeue(out var logEntry))
+                {
+                    sortedLogs.Add(logEntry.sequence, logEntry);
+                }
+
+                foreach (var logEntry in sortedLogs.Values)
                 {
                     ProcessLogEntry(logEntry);
                 }
@@ -136,16 +134,7 @@ public class Logger : IDisposable
     private int CalculateDynamicBatchSize()
     {
         int queueCount = logQueue.Count;
-        if (queueCount <= 100)
-        {
-            return 1; // No batching, process one at a time
-        }
-        else
-        {
-            // Increase batch size as the queue grows larger
-            // Example: for every additional 100 entries, increase batch size by 10
-            return 10 + (queueCount - 100) / 100 * 10;
-        }
+        return queueCount <= 100 ? 1 : 10 + (queueCount - 100) / 100 * 10;
     }
 
     private void FlushLogQueue()
@@ -166,15 +155,8 @@ public class Logger : IDisposable
         }
 
         string messageText = logEntry.message;
-        Color textColor;
-        if (logEntry.textColor != null)
-        {
-            textColor = (Color)logEntry.textColor;
-        }
-        else
-        {
-            textColor = GetColorForLogLevel(logEntry.level);
-        }
+        Color textColor = logEntry.textColor ?? GetColorForLogLevel(logEntry.level);
+
         if (messageText.Contains("UPDATE:"))
         {
             // For "UPDATE:", modify the last line without appending a new line

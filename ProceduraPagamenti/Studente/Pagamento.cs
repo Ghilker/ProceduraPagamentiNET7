@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class Pagamento
+    public class Pagamento
     {
         public string codTipoPagam { get; private set; }
         public double importoPagamento { get; private set; }

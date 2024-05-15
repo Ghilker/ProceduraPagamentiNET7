@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class Studente
+    public class Studente
     {
         public string numeroImpegno { get; private set; }
         public string codFiscale { get; private set; }

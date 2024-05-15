@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class Assegnazione
+    public class Assegnazione
     {
         public string codPensionato { get; private set; }
         public string codStanza { get; private set; }
@@ -47,6 +47,8 @@ namespace ProcedureNet7
             this.codFineAssegnazione = codFineAssegnazione;
             this.codTipoStanza = codTipoStanza;
             this.costoMensile = costoMensile;
+
+            statoCorrettezzaAssegnazione = AssegnazioneDataCheck.Corretto;
 
             costoTotale = CalculateTotalDailyCost(dataDecorrenza, dataFineAssegnazione, costoMensile, minDate, maxDate, assegnazioni, fuoriCorso);
 

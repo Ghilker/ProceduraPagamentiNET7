@@ -108,7 +108,7 @@ namespace ProcedureNet7
                 string dataQuery = @$"
                     SELECT DISTINCT  CODICE_MOVIMENTO, CODICE_FISCALE
 	                FROM MOVIMENTI_CONTABILI_ELEMENTARI
-	                WHERE CODICE_MOVIMENTO IN (SELECT CODICE_MOVIMENTO FROM MOVIMENTI_CONTABILI_GENERALI WHERE cod_mandato='{selectedOldMandato}')
+	                WHERE CODICE_MOVIMENTO IN (SELECT CODICE_MOVIMENTO FROM MOVIMENTI_CONTABILI_GENERALI WHERE cod_mandato like '{selectedOldMandato}%')
                     ";
 
                 SqlCommand readData = new(dataQuery, conn, sqlTransaction);

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class Detrazione
+    public class Detrazione
     {
         public double importo { get; private set; }
         public string causale { get; private set; }

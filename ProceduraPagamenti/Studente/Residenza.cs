@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class Residenza
+    public class Residenza
     {
         public string indirizzo;
         public string codComune;
