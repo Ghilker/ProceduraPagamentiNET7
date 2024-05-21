@@ -41,10 +41,10 @@
             label3 = new Label();
             label4 = new Label();
             memorizeConnectionCheckBox = new CheckBox();
-            chooseProcedure = new ComboBox();
+            chooseProcedure = new ExtendedComboBox();
             DatabaseInformations = new Panel();
             label27 = new Label();
-            credentialDropdownCombo = new ComboBox();
+            credentialDropdownCombo = new ExtendedComboBox();
             openFileDialog = new OpenFileDialog();
             openFileDialogSecondary = new OpenFileDialog();
             panelProceduraPagamenti = new Panel();
@@ -580,7 +580,7 @@
         private Label label3;
         private Label label4;
         private CheckBox memorizeConnectionCheckBox;
-        private ComboBox chooseProcedure;
+        private ExtendedComboBox chooseProcedure;
         private Panel DatabaseInformations;
         private OpenFileDialog openFileDialog;
         private OpenFileDialog openFileDialogSecondary;
@@ -597,7 +597,7 @@
         private TextBox pagamentiOldMandatoTxt;
         private Label label30;
         private ComboBox pagamentiTipoProceduraCombo;
-        private ComboBox credentialDropdownCombo;
+        private ExtendedComboBox credentialDropdownCombo;
         private Label label27;
         private Panel panelProceduraFlussoDiRitorno;
         private Label proceduraFlussoRitornoFileLbl;

@@ -33,18 +33,18 @@ namespace ProcedureNet7
         {
             if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
             {
-                DataGridView dgv = sender as DataGridView;
+                DataGridView? dgv = sender as DataGridView;
                 if (dgv != null)
                 {
                     // Get the value of the clicked cell
                     string cellValue = dgv.Rows[e.RowIndex].Cells[e.ColumnIndex].Value.ToString();
 
                     // Regex to match a typical fiscal code format (adjust the pattern as necessary)
-                    string fiscalCodePattern = @"^[A-Z0-9]{16}$"; // Example pattern for a 16-character alphanumeric code
+                    string fiscalCodePattern = @"^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$";
                     if (Regex.IsMatch(cellValue, fiscalCodePattern))
                     {
                         // Confirm removal
-                        var confirmResult = MessageBox.Show($"Are you sure to delete the student with fiscal code: {cellValue}?",
+                        var confirmResult = MessageBox.Show($"Vuoi davvero cancellare dal pagamento lo studente con codice fiscale: {cellValue}?",
                                                             "Confirm Delete",
                                                             MessageBoxButtons.YesNo);
                         if (confirmResult == DialogResult.Yes)
@@ -61,6 +61,18 @@ namespace ProcedureNet7
                     }
                 }
             }
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            this.DialogResult = DialogResult.OK;
+            this.Close();
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            this.DialogResult = DialogResult.Cancel;
+            this.Close();
         }
     }
 }

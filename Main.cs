@@ -45,10 +45,26 @@ namespace ProcedureNet7
         private void AddProcedures()
         {
             chooseProcedure.Items.Clear();
-            foreach (object? procedure in Enum.GetValues(typeof(ProcedureType)))
+            int maxWidth = 0;
+            using (Graphics g = chooseProcedure.CreateGraphics())
             {
-                _ = chooseProcedure.Items.Add(procedure);
+                foreach (object? procedure in Enum.GetValues(typeof(ProcedureType)))
+                {
+                    string itemText = procedure.ToString();
+                    _ = chooseProcedure.Items.Add(itemText);
+
+                    int itemWidth = TextRenderer.MeasureText(g, itemText, chooseProcedure.Font).Width;
+
+                    // Update the maximum width if this item's width is greater
+                    if (itemWidth > maxWidth)
+                    {
+                        maxWidth = itemWidth;
+                    }
+                }
             }
+
+            chooseProcedure.DropDownWidth = maxWidth + SystemInformation.VerticalScrollBarWidth;
+
             PagamentiSettings.CreatePagamentiComboBox(ref pagamentiTipoProceduraCombo, PagamentiSettings.pagamentiTipoProcedura);
         }
 
@@ -93,7 +109,8 @@ namespace ProcedureNet7
             ProcedureType selectedProcedure = ProcedureType.ProceduraPagamenti;
             _ = Invoke(new MethodInvoker(() =>
             {
-                selectedProcedure = (ProcedureType)chooseProcedure.SelectedItem;
+                string selectedText = chooseProcedure.SelectedItem.ToString();
+                _ = Enum.TryParse(selectedText, out selectedProcedure);
             }));
 
             ArgsValidation argsValidation = new ArgsValidation();
@@ -267,13 +284,48 @@ namespace ProcedureNet7
 
         private void LoadCredentialsDropdown()
         {
+            credentialDropdownCombo.Items.Clear(); // Clear existing items
             var allCredentials = SaveCredentials.LoadCredentialsFromFile();
+            int maxWidth = 0; // Initialize a variable to keep track of the maximum width
+
             if (allCredentials != null)
             {
-                foreach (var entry in allCredentials.Keys)
+                using (Graphics g = credentialDropdownCombo.CreateGraphics())
                 {
-                    credentialDropdownCombo.Items.Add(entry); // Assuming `credentialsDropdown` is your dropdown control
+                    foreach (var entry in allCredentials)
+                    {
+                        if (entry.Value.ContainsKey("databaseName"))
+                        {
+                            string itemText = $"{entry.Key}: {entry.Value["databaseName"]}";
+                            credentialDropdownCombo.Items.Add(itemText);
+
+                            // Measure the width of the text
+                            int itemWidth = TextRenderer.MeasureText(g, itemText, credentialDropdownCombo.Font).Width;
+
+                            // Update the maximum width if this item's width is greater
+                            if (itemWidth > maxWidth)
+                            {
+                                maxWidth = itemWidth;
+                            }
+                        }
+                        else
+                        {
+                            Logger.LogDebug(null, $"Invalid credential format for key: {entry.Key}");
+                        }
+                    }
                 }
+            }
+            else
+            {
+                Logger.LogDebug(null, "No credentials loaded from file");
+            }
+
+            // Set the dropdown width, adding some padding
+            credentialDropdownCombo.DropDownWidth = maxWidth + SystemInformation.VerticalScrollBarWidth;
+
+            if (credentialDropdownCombo.Items.Count > 0)
+            {
+                credentialDropdownCombo.SelectedIndex = 0; // Optionally, select the first item by default
             }
         }
 
@@ -285,7 +337,14 @@ namespace ProcedureNet7
                 Logger.LogDebug(null, "No credentials found");
                 return;
             }
-            string selectedIdentifier = nullableIdentifier;
+            // Split the selected item to get the key part
+            string[] parts = nullableIdentifier.Split(':');
+            if (parts.Length < 2)
+            {
+                Logger.LogDebug(null, "Invalid credential format");
+                return;
+            }
+            string selectedIdentifier = parts[0].Trim();
             var allCredentials = SaveCredentials.LoadCredentialsFromFile();
             if (allCredentials != null && allCredentials.TryGetValue(selectedIdentifier, out Hashtable? value))
             {
@@ -302,10 +361,19 @@ namespace ProcedureNet7
         {
             if (chooseProcedure.SelectedIndex != -1)
             {
-                ProcedureType selectedProcedure = (ProcedureType)chooseProcedure.SelectedItem;
-                ToggleProcedurePanels(selectedProcedure);
+                string selectedText = chooseProcedure.SelectedItem.ToString();
+                if (Enum.TryParse<ProcedureType>(selectedText, out var selectedProcedure))
+                {
+                    ToggleProcedurePanels(selectedProcedure);
+                }
+                else
+                {
+                    // Handle the case where the selected item cannot be parsed to a ProcedureType
+                    MessageBox.Show("Invalid procedure selected.");
+                }
             }
         }
+
         private void proceduraFlussoRitornoFileBtn_Click(object? sender, EventArgs e)
         {
             Utilities.ChooseFileAndSetPath(proceduraFlussoRitornoFileLbl, openFileDialog, ref selectedFilePath);

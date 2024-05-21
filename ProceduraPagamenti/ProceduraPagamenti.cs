@@ -862,6 +862,7 @@ namespace ProcedureNet7
         private void ControlloIntegrazioni()
         {
             Logger.LogDebug(null, "Inizio del controllo delle integrazioni per gli studenti");
+            ControlloProvvedimenti();
             HashSet<string> studentiDaRimuovere = new();
             foreach (var pair in studentiDaPagare)
             {
@@ -942,6 +943,53 @@ namespace ProcedureNet7
             }
             Logger.LogInfo(null, $"Rimossi {studentiDaRimuovere.Count} studenti dalla lista di pagamento dopo il controllo delle integrazioni");
         }
+
+        private void ControlloProvvedimenti()
+        {
+            string sqlProvv = $@"
+                SELECT DISTINCT 
+                    Domanda.Cod_fiscale
+                FROM            
+                    Domanda INNER JOIN
+                    #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale INNER JOIN
+                    PROVVEDIMENTI ON Domanda.Num_domanda = PROVVEDIMENTI.Num_domanda AND Domanda.Anno_accademico = PROVVEDIMENTI.Anno_accademico
+                WHERE        
+                    (Domanda.Anno_accademico = {selectedAA}) AND 
+                    (PROVVEDIMENTI.tipo_provvedimento IN ('05', '13'))
+                ORDER BY Domanda.Cod_fiscale";
+
+            SqlCommand readData = new(sqlProvv, conn, sqlTransaction);
+            Logger.LogInfo(null, "Lavorazione studenti - controllo provvedimenti");
+            HashSet<string> listaStudentiDaMantenere = new();
+
+            using (SqlDataReader reader = readData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+                    listaStudentiDaMantenere.Add(codFiscale);
+                }
+            }
+
+            HashSet<string> studentiDaRimuovere = new();
+
+            // Find students to remove
+            foreach (var pair in studentiDaPagare)
+            {
+                if (!listaStudentiDaMantenere.Contains(pair.Key))
+                {
+                    studentiDaRimuovere.Add(pair.Key);
+                }
+            }
+
+            // Remove students not present in the query
+            foreach (string codFiscale in studentiDaRimuovere)
+            {
+                studentiDaPagare.Remove(codFiscale);
+            }
+        }
+
+
         private void ControlloRiemissioni(string firstPart, string lastValue)
         {
             Logger.LogDebug(null, "Inizio del controllo delle riemissioni per gli studenti"); // Start of method
@@ -1268,11 +1316,17 @@ namespace ProcedureNet7
 
                 PopulateImportoDaPagare();
                 List<Studente> studenti = studentiDaPagare.Values.ToList();
-
-                if (MessageBox.Show("Do you want to see an overview of the current student list?", "Overview", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                _ = _mainForm.Invoke((MethodInvoker)delegate
                 {
-                    ShowStudentOverview(studenti);
-                }
+                    if (MessageBox.Show(_mainForm, "Do you want to see an overview of the current student list?", "Overview", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                    {
+                        bool continueProcessing = ShowStudentOverview(studenti);
+                        if (!continueProcessing)
+                        {
+                            return; // Exit if user clicked Cancel
+                        }
+                    }
+                });
                 List<Studente> studentiafter = studentiDaPagare.Values.ToList();
                 if (studentiDaPagare.Count > 0)
                 {
@@ -1284,15 +1338,20 @@ namespace ProcedureNet7
             SqlCommand dropCmd = new(dropTempTable, conn, sqlTransaction);
             _ = dropCmd.ExecuteNonQuery();
         }
-        void ShowStudentOverview(List<Studente> studenti)
+        bool ShowStudentOverview(List<Studente> studenti)
         {
+            bool result = false;
             _ = _mainForm.Invoke((MethodInvoker)delegate
             {
                 using (var overviewForm = new StudentOverview(studenti, ref studentiDaPagare, _mainForm))
                 {
-                    overviewForm.ShowDialog();
+                    if (overviewForm.ShowDialog() == DialogResult.OK)
+                    {
+                        result = true;
+                    }
                 }
             });
+            return result;
         }
 
         private void InsertIntoMovimentazioni(List<Studente> studentiDaProcessare, string impegno)
@@ -2461,33 +2520,15 @@ namespace ProcedureNet7
             });
 
             Logger.LogInfo(55, $"UPDATE:Lavorazione studenti - Calcolo importi - Completato");
-            Logger.LogInfo(55, $"Lavorazione studenti - Creazione file pagamenti negativi");
-            DataTable table = new();
-            _ = table.Columns.Add("Codice Fiscale", typeof(string));
-            _ = table.Columns.Add("Num Domanda", typeof(string));
-            _ = table.Columns.Add("Importo beneficio", typeof(string));
-            _ = table.Columns.Add("Importo da pagare", typeof(string));
             foreach (var pair in studentiDaPagare)
             {
                 Studente studente = pair.Value;
 
                 if (studente.importoDaPagare > 0)
                 { continue; }
-
-                DataRow row = table.NewRow();
-                row["Codice Fiscale"] = studente.codFiscale;
-                row["Num Domanda"] = studente.numDomanda;
-                row["Importo beneficio"] = studente.importoBeneficio;
-                row["Importo da pagare"] = studente.importoDaPagare;
-                table.Rows.Add(row);
                 studentiDaRimuovereDalPagamento[studente.codFiscale] = true;
             }
 
-            if (table.Rows.Count > 0)
-            {
-                Utilities.ExportDataTableToExcel(table, selectedSaveFolder, fileName: "Studenti con pagamento in negativo");
-            }
-            Logger.LogInfo(55, $"UPDATE:Lavorazione studenti - Creazione file pagamenti negativi - Completato");
             // First, create a temporary table and insert the cod_fiscale values
             if (studentiDaRimuovereDalPagamento.Count > 0 && !string.IsNullOrWhiteSpace(selectedVecchioMandato))
             {
