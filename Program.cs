@@ -14,8 +14,8 @@ namespace ProcedureNet7
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            MainUI mainUI = new MainUI();
-            Application.Run(mainUI);
+            //MainUI mainUI = new MainUI(); Application.Run(mainUI);
+            MasterForm masterForm = new MasterForm(); Application.Run(masterForm);
         }
     }
 }

@@ -20,40 +20,37 @@ namespace ProcedureNet7
         List<StudenteRitorno> studenteRitornoList = new List<StudenteRitorno>();
         List<StudenteRitorno> studentiScartati = new List<StudenteRitorno>();
 
-        public ProceduraFlussoDiRitorno(MainUI mainUI, string connection_string) : base(mainUI, connection_string) { }
+        public ProceduraFlussoDiRitorno(MasterForm masterForm, SqlConnection mainConnection) : base(masterForm, mainConnection) { }
 
         public override void RunProcedure(ArgsProceduraFlussoDiRitorno args)
         {
-            using SqlConnection conn = new(CONNECTION_STRING);
-            conn.Open();
-            SqlTransaction sqlTransaction = conn.BeginTransaction();
+            SqlTransaction sqlTransaction = CONNECTION.BeginTransaction();
             try
             {
 
-                _mainForm.inProcedure = true;
+                _masterForm.inProcedure = true;
                 Logger.LogInfo(0, $"Inizio lavorazione");
                 selectedFileFlusso = args._selectedFileFlusso;
                 selectedOldMandato = args._selectedImpegnoProvv;
-                selectedTipoBando = args._selectedTipoBando;
                 Logger.LogInfo(10, $"Creazione lista studenti");
                 CreateStudentiList();
                 Logger.LogInfo(20, $"Selezione codice movimento generale");
-                SetCodMovimentoGenerale(conn, sqlTransaction);
+                SetCodMovimentoGenerale(CONNECTION, sqlTransaction);
                 Logger.LogInfo(30, $"Aggiornamento tabella movimento elementare");
-                UpdateMovimentoElementari(conn, sqlTransaction);
+                UpdateMovimentoElementari(CONNECTION, sqlTransaction);
                 Logger.LogInfo(40, $"Aggiornamento tabella stati movimento contabile");
-                UpdateStatiMovimentoContabile(conn, sqlTransaction);
+                UpdateStatiMovimentoContabile(CONNECTION, sqlTransaction);
 
                 Logger.LogInfo(55, $"Inserimento in pagamenti");
-                InsertIntoPagamenti(conn, sqlTransaction);
+                InsertIntoPagamenti(CONNECTION, sqlTransaction);
                 Logger.LogInfo(66, $"Inserimento in reversali");
-                InsertIntoReversali(conn, sqlTransaction);
+                InsertIntoReversali(CONNECTION, sqlTransaction);
                 Logger.LogInfo(77, $"Aggiornamento mandati");
-                UpdateMandato(conn, sqlTransaction);
+                UpdateMandato(CONNECTION, sqlTransaction);
                 Logger.LogInfo(88, $"Annullamento pagamenti scartati");
-                Scartati(conn, sqlTransaction);
+                Scartati(CONNECTION, sqlTransaction);
 
-                _mainForm.inProcedure = false;
+                _masterForm.inProcedure = false;
                 Logger.LogInfo(100, $"Fine lavorazione");
                 Logger.LogInfo(100, $"Totale studenti lavorati: {studenteRitornoList.Count}");
                 Logger.LogInfo(100, $"Di cui scartati: {studentiScartati.Count}");
@@ -64,7 +61,7 @@ namespace ProcedureNet7
             {
                 Logger.LogError(100, ex.Message);
                 sqlTransaction.Rollback();
-                _mainForm.inProcedure = false;
+                _masterForm.inProcedure = false;
             }
         }
 
@@ -101,7 +98,7 @@ namespace ProcedureNet7
                 throw;
             }
         }
-        void SetCodMovimentoGenerale(SqlConnection conn, SqlTransaction sqlTransaction)
+        void SetCodMovimentoGenerale(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -111,7 +108,7 @@ namespace ProcedureNet7
 	                WHERE CODICE_MOVIMENTO IN (SELECT CODICE_MOVIMENTO FROM MOVIMENTI_CONTABILI_GENERALI WHERE cod_mandato like '{selectedOldMandato}%')
                     ";
 
-                SqlCommand readData = new(dataQuery, conn, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
                     while (reader.Read())
@@ -131,7 +128,7 @@ namespace ProcedureNet7
                 throw;
             }
         }
-        private void UpdateMovimentoElementari(SqlConnection conn, SqlTransaction sqlTransaction)
+        private void UpdateMovimentoElementari(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -154,7 +151,7 @@ namespace ProcedureNet7
                     UPDATE MOVIMENTI_CONTABILI_ELEMENTARI SET stato='1'
                     WHERE codice_fiscale IN ({listaCF}) AND codice_movimento IN ({listaCodMov});
                     ";
-                SqlCommand updateAllCmd = new(sqlUpdateAll, conn, sqlTransaction);
+                SqlCommand updateAllCmd = new(sqlUpdateAll, CONNECTION, sqlTransaction);
                 updateAllCmd.ExecuteNonQuery();
 
                 string createTempTable = @"
@@ -164,11 +161,11 @@ namespace ProcedureNet7
                         NumReversale VARCHAR(20)
                     );
                     ";
-                SqlCommand createCmd = new(createTempTable, conn, sqlTransaction);
+                SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
                 createCmd.ExecuteNonQuery();
 
                 DataTable tempStudentMappingTable = NumReversaleToCodFiscale(studenteRitornoList);
-                BulkInsertIntoSqlTable(conn, tempStudentMappingTable, "#TempStudenteMappings", sqlTransaction);
+                BulkInsertIntoSqlTable(CONNECTION, tempStudentMappingTable, "#TempStudenteMappings", sqlTransaction);
 
                 string sqlUpdateReversali = $@"
                         UPDATE MOVIMENTI_CONTABILI_ELEMENTARI
@@ -178,12 +175,12 @@ namespace ProcedureNet7
                         WHERE MOVIMENTI_CONTABILI_ELEMENTARI.Codice_movimento IN ({listaCodMov}) AND MOVIMENTI_CONTABILI_ELEMENTARI.segno = '0';
                         ";
 
-                SqlCommand updateReversaliCmd = new(sqlUpdateReversali, conn, sqlTransaction);
+                SqlCommand updateReversaliCmd = new(sqlUpdateReversali, CONNECTION, sqlTransaction);
                 updateReversaliCmd.ExecuteNonQuery();
 
                 string dropTable = "DROP TABLE #TempStudenteMappings";
 
-                SqlCommand dropTableCmd = new(dropTable, conn, sqlTransaction);
+                SqlCommand dropTableCmd = new(dropTable, CONNECTION, sqlTransaction);
                 dropTableCmd.ExecuteNonQuery();
 
             }
@@ -192,7 +189,7 @@ namespace ProcedureNet7
                 throw;
             }
         }
-        private void UpdateStatiMovimentoContabile(SqlConnection conn, SqlTransaction sqlTransaction)
+        private void UpdateStatiMovimentoContabile(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -204,11 +201,11 @@ namespace ProcedureNet7
                             CodMovimentoGenerale VARCHAR(50)
                         );
                         ";
-                SqlCommand createCmd = new(createTempTable, conn, sqlTransaction);
+                SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
                 createCmd.ExecuteNonQuery();
 
                 DataTable tempMovimentoContabili = CodMovimentoToDateAndCf(studenteRitornoList);
-                BulkInsertIntoSqlTable(conn, tempMovimentoContabili, "#TempMovimentiContabili", sqlTransaction);
+                BulkInsertIntoSqlTable(CONNECTION, tempMovimentoContabili, "#TempMovimentiContabili", sqlTransaction);
 
                 string sqlInsertStati = $@"
                 INSERT INTO STATI_DEL_MOVIMENTO_CONTABILE (ID_STATO, CODICE_MOVIMENTO, DATA_ASSUNZIONE_DELLO_STATO, UTENTE_STATO, NOTE_STATO)
@@ -218,16 +215,16 @@ namespace ProcedureNet7
                 #TempMovimentiContabili as tm ON stm.codice_movimento = tm.CodMovimentoGenerale INNER JOIN
                 MOVIMENTI_CONTABILI_GENERALI AS mcg ON tm.CodMovimentoGenerale = mcg.CODICE_MOVIMENTO
 
-                WHERE mcg.cod_mandato = '{selectedOldMandato}';
+                WHERE mcg.cod_mandato like '{selectedOldMandato}%';
                 ";
 
-                using (SqlCommand cmd = new SqlCommand(sqlInsertStati, conn, sqlTransaction))
+                using (SqlCommand cmd = new SqlCommand(sqlInsertStati, CONNECTION, sqlTransaction))
                 {
                     cmd.ExecuteNonQuery();
                 }
                 string dropTable = "DROP TABLE #TempMovimentiContabili";
 
-                SqlCommand dropTableCmd = new(dropTable, conn, sqlTransaction);
+                SqlCommand dropTableCmd = new(dropTable, CONNECTION, sqlTransaction);
                 dropTableCmd.ExecuteNonQuery();
 
             }
@@ -236,7 +233,7 @@ namespace ProcedureNet7
                 throw;
             }
         }
-        private void InsertIntoPagamenti(SqlConnection conn, SqlTransaction sqlTransaction)
+        private void InsertIntoPagamenti(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -249,11 +246,11 @@ namespace ProcedureNet7
                             NumMandato VARCHAR(20)
                         );
                         ";
-                SqlCommand createCmd = new(createTempTable, conn, sqlTransaction);
+                SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
                 createCmd.ExecuteNonQuery();
 
                 DataTable pagamTable = PagamentiTable(studenteRitornoList);
-                BulkInsertIntoSqlTable(conn, pagamTable, "#TempPagamenti", sqlTransaction);
+                BulkInsertIntoSqlTable(CONNECTION, pagamTable, "#TempPagamenti", sqlTransaction);
 
                 string sqlInsertPagam = $@"
                         INSERT INTO PAGAMENTI (Cod_tipo_pagam, Anno_accademico, Cod_mandato, Data_emissione_mandato, Num_domanda, Imp_pagato, Data_validita, Ese_finanziario, Note, Non_riscosso, Ritirato_azienda, Utente)
@@ -264,13 +261,13 @@ namespace ProcedureNet7
                             FROM MOVIMENTI_CONTABILI_ELEMENTARI as mce INNER JOIN
                                 Domanda ON mce.ANNO_ACCADEMICO = Domanda.Anno_accademico AND mce.CODICE_FISCALE = Domanda.Cod_fiscale INNER JOIN
                                 #TempPagamenti ON Domanda.Cod_fiscale = #TempPagamenti.CodFiscale AND mce.CODICE_MOVIMENTO = #TempPagamenti.CodMovimentoGenerale
-                            WHERE segno='1' AND Domanda.Tipo_bando = '{selectedTipoBando}') 
+                            WHERE segno='1' AND Domanda.Tipo_bando = 'LZ') 
                             as mce ON mcg.codice_movimento = mce.codice_movimento INNER JOIN
                         #TempPagamenti as tmp ON mcg.codice_movimento = tmp.CodMovimentoGenerale
-                        WHERE mcg.cod_mandato = '{selectedOldMandato}'
+                        WHERE mcg.cod_mandato like '{selectedOldMandato}%'
                         ";
 
-                using (SqlCommand cmd = new SqlCommand(sqlInsertPagam, conn, sqlTransaction))
+                using (SqlCommand cmd = new SqlCommand(sqlInsertPagam, CONNECTION, sqlTransaction))
                 {
                     cmd.ExecuteNonQuery();
                 }
@@ -280,7 +277,7 @@ namespace ProcedureNet7
                 throw;
             }
         }
-        private void InsertIntoReversali(SqlConnection conn, SqlTransaction sqlTransaction)
+        private void InsertIntoReversali(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -293,11 +290,11 @@ namespace ProcedureNet7
                             NumMandato VARCHAR(20)
                         );
                         ";
-                SqlCommand createCmd = new(createTempTable, conn, sqlTransaction);
+                SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
                 createCmd.ExecuteNonQuery();
 
                 DataTable pagamTable = PagamentiTable(studenteRitornoList);
-                BulkInsertIntoSqlTable(conn, pagamTable, "#TempReversali", sqlTransaction);
+                BulkInsertIntoSqlTable(CONNECTION, pagamTable, "#TempReversali", sqlTransaction);
 
                 string sqlInsertPagam = $@"
                         INSERT INTO REVERSALI (
@@ -329,11 +326,11 @@ namespace ProcedureNet7
                             MOVIMENTI_CONTABILI_ELEMENTARI as mce ON mcg.codice_movimento = mce.codice_movimento INNER JOIN
                             domanda ON mce.anno_accademico = domanda.anno_accademico AND mce.codice_fiscale = domanda.cod_fiscale INNER JOIN
                             #TempReversali as tm ON mce.codice_movimento = tm.codMovimentoGenerale AND mce.codice_fiscale = tm.codFiscale
-                        WHERE mce.segno='0' AND Domanda.Tipo_bando = '{selectedTipoBando}' and mcg.cod_mandato = '{selectedOldMandato}'
+                        WHERE mce.segno='0' AND Domanda.Tipo_bando = 'LZ' and mcg.cod_mandato like '{selectedOldMandato}%'
 
                         ";
 
-                using (SqlCommand cmd = new SqlCommand(sqlInsertPagam, conn, sqlTransaction))
+                using (SqlCommand cmd = new SqlCommand(sqlInsertPagam, CONNECTION, sqlTransaction))
                 {
                     cmd.ExecuteNonQuery();
                 }
@@ -343,7 +340,7 @@ namespace ProcedureNet7
                 throw;
             }
         }
-        private void UpdateMandato(SqlConnection conn, SqlTransaction sqlTransaction)
+        private void UpdateMandato(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -354,11 +351,11 @@ namespace ProcedureNet7
                             CodMovimentoGenerale VARCHAR(50)
                         );
                         ";
-                SqlCommand createCmd = new(createTempTable, conn, sqlTransaction);
+                SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
                 createCmd.ExecuteNonQuery();
 
                 DataTable tempMovimentoContabili = NumMandatoUpdate(studenteRitornoList);
-                BulkInsertIntoSqlTable(conn, tempMovimentoContabili, "#TempMovimentiContabili", sqlTransaction);
+                BulkInsertIntoSqlTable(CONNECTION, tempMovimentoContabili, "#TempMovimentiContabili", sqlTransaction);
 
                 string sqlInsertStati = $@"
                 UPDATE MOVIMENTI_CONTABILI_GENERALI
@@ -367,16 +364,16 @@ namespace ProcedureNet7
                 FROM MOVIMENTI_CONTABILI_GENERALI INNER JOIN
                 #TempMovimentiContabili as tm ON MOVIMENTI_CONTABILI_GENERALI.codice_movimento = tm.codMovimentoGenerale
 
-                WHERE MOVIMENTI_CONTABILI_GENERALI.cod_mandato = '{selectedOldMandato}';
+                WHERE MOVIMENTI_CONTABILI_GENERALI.cod_mandato like '{selectedOldMandato}%';
                 ";
 
-                using (SqlCommand cmd = new SqlCommand(sqlInsertStati, conn, sqlTransaction))
+                using (SqlCommand cmd = new SqlCommand(sqlInsertStati, CONNECTION, sqlTransaction))
                 {
                     cmd.ExecuteNonQuery();
                 }
 
                 string dropTable = "DROP TABLE #TempMovimentiContabili";
-                SqlCommand dropTableCmd = new(dropTable, conn, sqlTransaction);
+                SqlCommand dropTableCmd = new(dropTable, CONNECTION, sqlTransaction);
                 dropTableCmd.ExecuteNonQuery();
             }
             catch
@@ -384,7 +381,7 @@ namespace ProcedureNet7
                 throw;
             }
         }
-        private void Scartati(SqlConnection conn, SqlTransaction sqlTransaction)
+        private void Scartati(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             try
             {
@@ -392,7 +389,7 @@ namespace ProcedureNet7
                 {
                     string sqlScartati = "SP_annulla_pagamento";
 
-                    using (SqlCommand cmd = new SqlCommand(sqlScartati, conn, sqlTransaction))
+                    using (SqlCommand cmd = new SqlCommand(sqlScartati, CONNECTION, sqlTransaction))
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
 
@@ -466,11 +463,11 @@ namespace ProcedureNet7
             return table;
         }
 
-        static void BulkInsertIntoSqlTable(SqlConnection conn, DataTable studentMappingsTable, string destinationTable, SqlTransaction sqlTransaction)
+        static void BulkInsertIntoSqlTable(SqlConnection CONNECTION, DataTable studentMappingsTable, string destinationTable, SqlTransaction sqlTransaction)
         {
             try
             {
-                using (SqlBulkCopy bulkCopy = new SqlBulkCopy(conn, SqlBulkCopyOptions.Default, sqlTransaction))
+                using (SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction))
                 {
                     bulkCopy.DestinationTableName = destinationTable;
                     bulkCopy.WriteToServer(studentMappingsTable);

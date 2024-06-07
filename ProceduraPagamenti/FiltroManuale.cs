@@ -20,16 +20,16 @@ namespace ProcedureNet7
         SqlTransaction? sqlTransaction = null;
         private string tableName;
 
-        private ContextMenuStrip filtroSessoStrip;
-        private ContextMenuStrip filtroDisabileStrip;
-        private ContextMenuStrip filtroStatusSedeStrip;
-        private ContextMenuStrip filtroCittadinanzaStrip;
-        private ContextMenuStrip filtroEnteStrip;
-        private ContextMenuStrip filtroEsitoPAStrip;
-        private ContextMenuStrip filtroAnnoCorsoStrip;
-        private ContextMenuStrip filtroTipoCorsoStrip;
-        private ContextMenuStrip filtroSedeStudiStrip;
-        private ContextMenuStrip filtroLoretoStrip;
+        private ContextMenuStrip? filtroSessoStrip;
+        private ContextMenuStrip? filtroDisabileStrip;
+        private ContextMenuStrip? filtroStatusSedeStrip;
+        private ContextMenuStrip? filtroCittadinanzaStrip;
+        private ContextMenuStrip? filtroEnteStrip;
+        private ContextMenuStrip? filtroEsitoPAStrip;
+        private ContextMenuStrip? filtroAnnoCorsoStrip;
+        private ContextMenuStrip? filtroTipoCorsoStrip;
+        private ContextMenuStrip? filtroSedeStudiStrip;
+        private ContextMenuStrip? filtroLoretoStrip;
 
         private Dictionary<TipoFiltro, string> _TipoFiltro = new Dictionary<TipoFiltro, string>()
         {
@@ -71,16 +71,16 @@ namespace ProcedureNet7
             {
                 Dictionary<string, string> returnDict = new Dictionary<string, string>()
                 {
-                    { "Sesso", Utilities.GetCheckBoxSelectedCodes(filtroSessoStrip.Items) },
-                    { "StatusSede", Utilities.GetCheckBoxSelectedCodes(filtroStatusSedeStrip.Items) },
-                    { "Cittadinanza", Utilities.GetCheckBoxSelectedCodes(filtroCittadinanzaStrip.Items) },
-                    { "CodEnte", Utilities.GetCheckBoxSelectedCodes(filtroEnteStrip.Items) },
-                    { "EsitoPA", Utilities.GetCheckBoxSelectedCodes(filtroEsitoPAStrip.Items) },
-                    { "AnnoCorso", Utilities.GetCheckBoxSelectedCodes(filtroAnnoCorsoStrip.Items) },
-                    { "Disabile", Utilities.GetCheckBoxSelectedCodes(filtroDisabileStrip.Items) },
-                    { "TipoCorso", Utilities.GetCheckBoxSelectedCodes(filtroTipoCorsoStrip.Items) },
-                    { "SedeStudi", Utilities.GetCheckBoxSelectedCodes(filtroSedeStudiStrip.Items) },
-                    { "TogliereLoreto", Utilities.GetCheckBoxSelectedCodes(filtroLoretoStrip.Items) }
+                    { "Sesso", Utilities.GetCheckBoxSelectedCodes(filtroSessoStrip?.Items) },
+                    { "StatusSede", Utilities.GetCheckBoxSelectedCodes(filtroStatusSedeStrip ?.Items) },
+                    { "Cittadinanza", Utilities.GetCheckBoxSelectedCodes(filtroCittadinanzaStrip ?.Items) },
+                    { "CodEnte", Utilities.GetCheckBoxSelectedCodes(filtroEnteStrip ?.Items) },
+                    { "EsitoPA", Utilities.GetCheckBoxSelectedCodes(filtroEsitoPAStrip ?.Items) },
+                    { "AnnoCorso", Utilities.GetCheckBoxSelectedCodes(filtroAnnoCorsoStrip ?.Items) },
+                    { "Disabile", Utilities.GetCheckBoxSelectedCodes(filtroDisabileStrip ?.Items) },
+                    { "TipoCorso", Utilities.GetCheckBoxSelectedCodes(filtroTipoCorsoStrip ?.Items) },
+                    { "SedeStudi", Utilities.GetCheckBoxSelectedCodes(filtroSedeStudiStrip ?.Items) },
+                    { "TogliereLoreto", Utilities.GetCheckBoxSelectedCodes(filtroLoretoStrip ?.Items) }
                 };
 
                 return returnDict;
@@ -136,7 +136,7 @@ namespace ProcedureNet7
             comboBox.ValueMember = "Value";
         }
 
-        private void CreateStrip(string query, ref Button button, ref ContextMenuStrip strip, bool cleanStrip = false)
+        private void CreateStrip(string query, ref Button button, ref ContextMenuStrip? strip, bool cleanStrip = false)
         {
             var comboData = new Dictionary<string, string>();
             using (SqlCommand command = new SqlCommand(query, conn, sqlTransaction))

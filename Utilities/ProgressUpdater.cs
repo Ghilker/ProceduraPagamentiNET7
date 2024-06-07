@@ -14,11 +14,6 @@ namespace ProcedureNet7
         private readonly int _currentProgress;
         private readonly LogLevel _logLevel;
 
-        public ProgressUpdater()
-        {
-
-        }
-
         public ProgressUpdater(int currentProgress, LogLevel logLevel)
         {
             _inProcedure = true;

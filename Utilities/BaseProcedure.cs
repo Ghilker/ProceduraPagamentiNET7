@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,14 +9,17 @@ namespace ProcedureNet7
 {
     internal abstract class BaseProcedure<TArgs> : IDisposable
     {
-        protected string? CONNECTION_STRING;
-        protected MainUI _mainForm;
+        protected SqlConnection? CONNECTION;
+        protected MasterForm? _masterForm;
 
-        protected BaseProcedure(MainUI mainUI, string connection_string)
+        protected BaseProcedure(MasterForm? _masterForm, SqlConnection? connection_string)
         {
-            _mainForm = mainUI;
-            CONNECTION_STRING = connection_string;
+            this._masterForm = _masterForm;
+            CONNECTION = connection_string;
         }
+
+        //protected MainUI _mainForm; protected string CONNECTION_STRING; protected BaseProcedure(MainUI _masterForm, string connection_string) { }
+
 
         public virtual void EscapePressed()
         {
@@ -37,8 +41,8 @@ namespace ProcedureNet7
             {
                 if (disposing)
                 {
-                    CONNECTION_STRING = string.Empty;
-                    _mainForm = null;
+                    CONNECTION = null;
+                    _masterForm = null;
                 }
                 disposed = true;
             }

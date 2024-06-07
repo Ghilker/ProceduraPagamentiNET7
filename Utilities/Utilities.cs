@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using ClosedXML.Excel;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
@@ -8,6 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Excel = Microsoft.Office.Interop.Excel;
+
 
 namespace ProcedureNet7
 {
@@ -150,22 +152,42 @@ namespace ProcedureNet7
         }
 
         // Method to check database connection
-        public static bool CanConnectToDatabase(string connectionString)
+        public static bool CanConnectToDatabase(string connectionString, out SqlConnection? outConnection)
         {
             try
             {
-                using SqlConnection connection = new(connectionString);
+                SqlConnection connection = new(connectionString);
                 connection.Open(); // Attempt to open the connection
+                outConnection = connection;
                 return true; // Connection successful
             }
             catch
             {
+                outConnection = null;
                 return false; // Connection failed
             }
         }
 
-        public static string GetCheckBoxSelectedCodes(ToolStripItemCollection items)
+        public static bool CanConnectToDatabase(SqlConnection connection)
         {
+            if (connection == null)
+            {
+                return false;
+            }
+            if (connection.State == System.Data.ConnectionState.Open)
+            {
+                return true;
+            }
+            return false;
+
+        }
+
+        public static string GetCheckBoxSelectedCodes(ToolStripItemCollection? items)
+        {
+            if (items == null)
+            {
+                return "''";
+            }
             List<string> selectedCodes = new();
             foreach (ToolStripMenuItem item in items)
             {
@@ -218,24 +240,32 @@ namespace ProcedureNet7
             string fullPath = Path.Combine(folderPath, fileName);
             Directory.CreateDirectory(folderPath); // Ensure the directory exists
 
-            Excel.Application? excelApp = new();
-            Excel.Workbooks? workbooks = null;
-            Excel._Workbook? workbook = null;
-            Excel._Worksheet? worksheet = null;
+            Excel.Application excelApp = new Excel.Application();
+            Excel.Workbook workbook = null;
+            Excel.Worksheet worksheet = null;
 
             try
             {
-                workbooks = excelApp.Workbooks;
-                workbook = workbooks.Add();
-                worksheet = (Excel._Worksheet)workbook.ActiveSheet!;
+                workbook = excelApp.Workbooks.Add();
+                worksheet = workbook.Sheets[1];
 
                 // Optionally, add column headers
-                if (includeHeaders && worksheet != null)
-                    AddHeaders(worksheet, dataTable);
+                if (includeHeaders)
+                {
+                    for (int col = 0; col < dataTable.Columns.Count; col++)
+                    {
+                        worksheet.Cells[1, col + 1] = dataTable.Columns[col].ColumnName;
+                    }
+                }
 
                 // Add data rows
-                if (worksheet != null)
-                    AddDataInBulk(worksheet, dataTable, includeHeaders);
+                for (int row = 0; row < dataTable.Rows.Count; row++)
+                {
+                    for (int col = 0; col < dataTable.Columns.Count; col++)
+                    {
+                        worksheet.Cells[row + (includeHeaders ? 2 : 1), col + 1] = dataTable.Rows[row][col];
+                    }
+                }
 
                 // Save the Excel file
                 workbook.SaveAs(fullPath);
@@ -247,8 +277,41 @@ namespace ProcedureNet7
             }
             finally
             {
-                CleanUp(worksheet, workbook, workbooks, excelApp);
+                // Clean up
+                if (workbook != null)
+                {
+                    workbook.Close();
+                    Marshal.ReleaseComObject(workbook);
+                }
+                if (excelApp != null)
+                {
+                    excelApp.Quit();
+                    Marshal.ReleaseComObject(excelApp);
+                }
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
             }
+        }
+
+        private static string GenerateFileName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                fileName = $"Export_{DateTime.Now:yyyyMMddHHmmss}.xlsx";
+            }
+            else if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                fileName += ".xlsx";
+            }
+            return fileName;
+        }
+
+        private static object GetXLCellValue(object value)
+        {
+            // Convert value to appropriate type for ClosedXML
+            if (value == null || value == DBNull.Value)
+                return string.Empty;
+            return value;
         }
 
         private static void CleanUp(Excel._Worksheet? worksheet, Excel._Workbook? workbook, Excel.Workbooks? workbooks, Excel.Application? excelApp)
@@ -271,11 +334,6 @@ namespace ProcedureNet7
             }
         }
 
-
-        private static string GenerateFileName(string fileName)
-        {
-            return !string.IsNullOrWhiteSpace(fileName) ? $"{fileName}.xlsx" : $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-        }
 
         private static void AddHeaders(Excel._Worksheet worksheet, DataTable dataTable)
         {
@@ -401,7 +459,7 @@ namespace ProcedureNet7
             return newDataGridView;
         }
 
-        public static void CreateDropDownMenu(ref Button buttonToUse, ref ContextMenuStrip contextMenuStrip, Dictionary<string, string> dictionaryToUse, bool allActive = false, int visibleItemCount = 30, bool clean = false)
+        public static void CreateDropDownMenu(ref Button buttonToUse, ref ContextMenuStrip? contextMenuStrip, Dictionary<string, string> dictionaryToUse, bool allActive = false, int visibleItemCount = 30, bool clean = false)
         {
             contextMenuStrip = new ContextMenuStrip();
             Button localButtonToUse = buttonToUse;

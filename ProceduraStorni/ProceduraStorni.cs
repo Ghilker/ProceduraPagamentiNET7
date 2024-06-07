@@ -11,7 +11,7 @@ namespace ProcedureNet7.Storni
 {
     internal class ProceduraStorni : BaseProcedure<ArgsProceduraStorni>
     {
-        public ProceduraStorni(MainUI mainUI, string connection_string) : base(mainUI, connection_string) { }
+        public ProceduraStorni(MasterForm masterForm, SqlConnection mainConnection) : base(masterForm, mainConnection) { }
 
         string selectedStorniFile = string.Empty;
         string esercizioFinanziario = string.Empty;
@@ -24,13 +24,11 @@ namespace ProcedureNet7.Storni
         {
             try
             {
-                _mainForm.inProcedure = true;
+                _masterForm.inProcedure = true;
 
                 esercizioFinanziario = args._esercizioFinanziario;
                 selectedStorniFile = args._selectedFile;
-                using SqlConnection conn = new(CONNECTION_STRING);
-                conn.Open();
-                sqlTransaction = conn.BeginTransaction();
+                sqlTransaction = CONNECTION.BeginTransaction();
                 DataTable dataTable = Utilities.ReadExcelToDataTable(selectedStorniFile);
 
                 foreach (DataRow row in dataTable.Rows)
@@ -53,7 +51,7 @@ namespace ProcedureNet7.Storni
                 List<string> codFiscali = studenti.Select(studente => studente.codFiscale).ToList();
 
                 string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
-                SqlCommand createCmd = new(createTempTable, conn, sqlTransaction);
+                SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
                 createCmd.ExecuteNonQuery();
 
                 Logger.LogInfo(30, $"Lavorazione studenti - creazione tabella codici fiscali");
@@ -61,7 +59,7 @@ namespace ProcedureNet7.Storni
                 {
                     var batch = codFiscali.Skip(i).Take(1000);
                     var insertQuery = "INSERT INTO #CFEstrazione (Cod_fiscale) VALUES " + string.Join(", ", batch.Select(cf => $"('{cf}')"));
-                    SqlCommand insertCmd = new(insertQuery, conn, sqlTransaction);
+                    SqlCommand insertCmd = new(insertQuery, CONNECTION, sqlTransaction);
                     insertCmd.ExecuteNonQuery();
                 }
 
@@ -72,7 +70,7 @@ namespace ProcedureNet7.Storni
                         WHERE Data_fine_validita IS NULL
                     ";
 
-                SqlCommand readData = new(queryCheckIBAN, conn, sqlTransaction);
+                SqlCommand readData = new(queryCheckIBAN, CONNECTION, sqlTransaction);
                 Logger.LogInfo(12, $"Lavorazione studenti - controllo eliminabili");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -113,12 +111,12 @@ namespace ProcedureNet7.Storni
                             IBAN_Storno VARCHAR(50)
                         )";
 
-                SqlCommand mappingTableCmd = new(sqlMappingTable, conn, sqlTransaction);
+                SqlCommand mappingTableCmd = new(sqlMappingTable, CONNECTION, sqlTransaction);
                 mappingTableCmd.ExecuteNonQuery();
 
                 using (SqlCommand cmd = new SqlCommand())
                 {
-                    cmd.Connection = conn;
+                    cmd.Connection = CONNECTION;
                     cmd.CommandType = CommandType.Text;
                     cmd.Transaction = sqlTransaction;
 
@@ -145,7 +143,7 @@ namespace ProcedureNet7.Storni
                     WHERE pagamenti.ese_finanziario = '{esercizioFinanziario}'
                     ";
 
-                SqlCommand studenteAA = new(queryAddStudenteAA, conn, sqlTransaction);
+                SqlCommand studenteAA = new(queryAddStudenteAA, CONNECTION, sqlTransaction);
                 Logger.LogInfo(12, $"Lavorazione studenti - aggiunta anno accademico");
                 using (SqlDataReader reader = studenteAA.ExecuteReader())
                 {
@@ -194,12 +192,12 @@ namespace ProcedureNet7.Storni
                     WHERE pagamenti.ese_finanziario = '{esercizioFinanziario}'
                     ";
 
-                SqlCommand updatepagamCmd = new(sqlUpdatePagam, conn, sqlTransaction);
+                SqlCommand updatepagamCmd = new(sqlUpdatePagam, CONNECTION, sqlTransaction);
                 updatepagamCmd.ExecuteNonQuery();
 
-                AddBlocks(conn);
+                AddBlocks(CONNECTION);
 
-                _mainForm.inProcedure = false;
+                _masterForm.inProcedure = false;
                 sqlTransaction.Commit();
                 Logger.LogInfo(100, $"Fine lavorazione");
                 Thread.Sleep(10);
@@ -231,11 +229,11 @@ namespace ProcedureNet7.Storni
             {
                 Logger.LogError(100, $"Errore: {ex.Message}");
                 sqlTransaction.Rollback();
-                _mainForm.inProcedure = false;
+                _masterForm.inProcedure = false;
             }
         }
 
-        private void AddBlocks(SqlConnection conn)
+        private void AddBlocks(SqlConnection CONNECTION)
         {
             try
             {
@@ -244,7 +242,7 @@ namespace ProcedureNet7.Storni
                 foreach (var group in groupedByAnnoAccademico)
                 {
                     List<string> codFiscaleMainList = group.Select(s => s.codFiscale).ToList();
-                    AddBlock(conn, codFiscaleMainList, group.Key);
+                    AddBlock(CONNECTION, codFiscaleMainList, group.Key);
                 }
             }
             catch
@@ -253,7 +251,7 @@ namespace ProcedureNet7.Storni
             }
         }
 
-        private void AddBlock(SqlConnection conn, List<string> codFiscaleMainList, string annoAccademico)
+        private void AddBlock(SqlConnection CONNECTION, List<string> codFiscaleMainList, string annoAccademico)
         {
             try
             {
@@ -287,8 +285,8 @@ namespace ProcedureNet7.Storni
 				                and Data_fine_validita is null)
 
 
-	            INSERT INTO [DatiGenerali_dom] ([Anno_accademico], [Num_domanda], [Status_domanda], [Tipo_studente], [Rifug_politico], [Tutelato], [Num_anni_conferma], [Straniero_povero], [Reddito_2_anni], [Residenza_est_da], [Firmata], [Straniero_fam_res_ita], [Fotocopia], [Firmata_genitore], [Cert_storico_ana], [Doc_consolare], [Doc_consolare_provv], [Permesso_sogg], [Permesso_sogg_provv], [Numero_componenti_nucleo_familiare], [SEQ], [Nubile_prole], [Fuori_termine], [Invalido], [Status_sede_stud], [Superamento_esami], [Superamento_esami_tassa_reg], [Appartenente_UE], [Selezionato_CEE], [Conferma_PA], [Matricola_studente], [Incompatibilita_con_bando], [Note_ufficio], [Domanda_sanata], [Data_validita], [Utente], [Conferma_reddito], [Pagamento_tassareg], [Blocco_pagamento], [Domanda_senza_documentazione], [Esame_complementare], [Esami_fondamentali], [Percorrenza_120_minuti], [Distanza_50KM_sede], [Iscrizione_FuoriTermine], [Autorizzazione_invio], [Nubile_prole_calcolata], [Possesso_altra_borsa], [Studente_detenuto], [esonero_pag_tassa_reg], [presentato_contratto], [presentato_doc_cred_rim], [tipo_doc_cred_rim], [n_sentenza_divsep], [anno_sentenza_divsep], [Id_Domanda], [Inserimento_PEC], [Rinuncia_in_corso], [Doppia_borsa], [Posto_alloggio_confort])
-	            SELECT distinct Domanda.Anno_accademico, Domanda.Num_domanda, vDATIGENERALI_dom.Status_domanda, vDATIGENERALI_dom.Tipo_studente, vDATIGENERALI_dom.Rifug_politico, vDATIGENERALI_dom.Tutelato, vDATIGENERALI_dom.Num_anni_conferma, vDATIGENERALI_dom.Straniero_povero, vDATIGENERALI_dom.Reddito_2_anni, vDATIGENERALI_dom.Residenza_est_da, vDATIGENERALI_dom.Firmata, vDATIGENERALI_dom.Straniero_fam_res_ita, vDATIGENERALI_dom.Fotocopia, vDATIGENERALI_dom.Firmata_genitore, vDATIGENERALI_dom.Cert_storico_ana, vDATIGENERALI_dom.Doc_consolare, vDATIGENERALI_dom.Doc_consolare_provv, vDATIGENERALI_dom.Permesso_sogg, vDATIGENERALI_dom.Permesso_sogg_provv, vDATIGENERALI_dom.Numero_componenti_nucleo_familiare, vDATIGENERALI_dom.SEQ, vDATIGENERALI_dom.Nubile_prole, vDATIGENERALI_dom.Fuori_termine, vDATIGENERALI_dom.Invalido, vDATIGENERALI_dom.Status_sede_stud, vDATIGENERALI_dom.Superamento_esami, vDATIGENERALI_dom.Superamento_esami_tassa_reg, vDATIGENERALI_dom.Appartenente_UE, vDATIGENERALI_dom.Selezionato_CEE, vDATIGENERALI_dom.Conferma_PA, vDATIGENERALI_dom.Matricola_studente, vDATIGENERALI_dom.Incompatibilita_con_bando, vDATIGENERALI_dom.Note_ufficio, vDATIGENERALI_dom.Domanda_sanata, CURRENT_TIMESTAMP, @utente, vDATIGENERALI_dom.Conferma_reddito, vDATIGENERALI_dom.Pagamento_tassareg, 1, vDATIGENERALI_dom.Domanda_senza_documentazione, vDATIGENERALI_dom.Esame_complementare, vDATIGENERALI_dom.Esami_fondamentali, vDATIGENERALI_dom.Percorrenza_120_minuti, vDATIGENERALI_dom.Distanza_50KM_sede, vDATIGENERALI_dom.Iscrizione_FuoriTermine, vDATIGENERALI_dom.Autorizzazione_invio, vDATIGENERALI_dom.Nubile_prole_calcolata, vDATIGENERALI_dom.Possesso_altra_borsa, vDATIGENERALI_dom.Studente_detenuto, vDATIGENERALI_dom.esonero_pag_tassa_reg, vDATIGENERALI_dom.presentato_contratto, vDATIGENERALI_dom.presentato_doc_cred_rim, vDATIGENERALI_dom.tipo_doc_cred_rim, vDATIGENERALI_dom.n_sentenza_divsep, vDATIGENERALI_dom.anno_sentenza_divsep, vDATIGENERALI_dom.Id_Domanda, vDATIGENERALI_dom.Inserimento_PEC, vDATIGENERALI_dom.Rinuncia_in_corso, vDATIGENERALI_dom.Doppia_borsa, vDATIGENERALI_dom.Posto_alloggio_confort 
+	            INSERT INTO [DatiGenerali_dom] ([Anno_accademico], [Num_domanda], [Status_domanda], [Tipo_studente], [Rifug_politico], [Tutelato], [Num_anni_conferma], [Straniero_povero], [Reddito_2_anni], [Residenza_est_da], [Firmata], [Straniero_fam_res_ita], [Fotocopia], [Firmata_genitore], [Cert_storico_ana], [Doc_consolare], [Doc_consolare_provv], [Permesso_sogg], [Permesso_sogg_provv], [Numero_componenti_nucleo_familiare], [SEQ], [Nubile_prole], [Fuori_termine], [Invalido], [Status_sede_stud], [Superamento_esami], [Superamento_esami_tassa_reg], [Appartenente_UE], [Selezionato_CEE], [Conferma_PA], [Matricola_studente], [Incompatibilita_con_bando], [Note_ufficio], [Domanda_sanata], [Data_validita], [Utente], [Conferma_reddito], [Pagamento_tassareg], [Blocco_pagamento], [Domanda_senza_documentazione], [Esame_complementare], [Esami_fondamentali], [Percorrenza_120_minuti], [Distanza_50KM_sede], [Iscrizione_FuoriTermine], [Autorizzazione_invio], [Nubile_prole_calcolata], [Possesso_altra_borsa], [Studente_detenuto], [esonero_pag_tassa_reg], [presentato_contratto], [presentato_doc_cred_rim], [tipo_doc_cred_rim], [n_sentenza_divsep], [anno_sentenza_divsep], [Id_Domanda], [Inserimento_PEC], [Rinuncia_in_corso], [Doppia_borsa], [Posto_alloggio_confort], [RichiestaMensa])
+	            SELECT distinct Domanda.Anno_accademico, Domanda.Num_domanda, vDATIGENERALI_dom.Status_domanda, vDATIGENERALI_dom.Tipo_studente, vDATIGENERALI_dom.Rifug_politico, vDATIGENERALI_dom.Tutelato, vDATIGENERALI_dom.Num_anni_conferma, vDATIGENERALI_dom.Straniero_povero, vDATIGENERALI_dom.Reddito_2_anni, vDATIGENERALI_dom.Residenza_est_da, vDATIGENERALI_dom.Firmata, vDATIGENERALI_dom.Straniero_fam_res_ita, vDATIGENERALI_dom.Fotocopia, vDATIGENERALI_dom.Firmata_genitore, vDATIGENERALI_dom.Cert_storico_ana, vDATIGENERALI_dom.Doc_consolare, vDATIGENERALI_dom.Doc_consolare_provv, vDATIGENERALI_dom.Permesso_sogg, vDATIGENERALI_dom.Permesso_sogg_provv, vDATIGENERALI_dom.Numero_componenti_nucleo_familiare, vDATIGENERALI_dom.SEQ, vDATIGENERALI_dom.Nubile_prole, vDATIGENERALI_dom.Fuori_termine, vDATIGENERALI_dom.Invalido, vDATIGENERALI_dom.Status_sede_stud, vDATIGENERALI_dom.Superamento_esami, vDATIGENERALI_dom.Superamento_esami_tassa_reg, vDATIGENERALI_dom.Appartenente_UE, vDATIGENERALI_dom.Selezionato_CEE, vDATIGENERALI_dom.Conferma_PA, vDATIGENERALI_dom.Matricola_studente, vDATIGENERALI_dom.Incompatibilita_con_bando, vDATIGENERALI_dom.Note_ufficio, vDATIGENERALI_dom.Domanda_sanata, CURRENT_TIMESTAMP, @utente, vDATIGENERALI_dom.Conferma_reddito, vDATIGENERALI_dom.Pagamento_tassareg, 1, vDATIGENERALI_dom.Domanda_senza_documentazione, vDATIGENERALI_dom.Esame_complementare, vDATIGENERALI_dom.Esami_fondamentali, vDATIGENERALI_dom.Percorrenza_120_minuti, vDATIGENERALI_dom.Distanza_50KM_sede, vDATIGENERALI_dom.Iscrizione_FuoriTermine, vDATIGENERALI_dom.Autorizzazione_invio, vDATIGENERALI_dom.Nubile_prole_calcolata, vDATIGENERALI_dom.Possesso_altra_borsa, vDATIGENERALI_dom.Studente_detenuto, vDATIGENERALI_dom.esonero_pag_tassa_reg, vDATIGENERALI_dom.presentato_contratto, vDATIGENERALI_dom.presentato_doc_cred_rim, vDATIGENERALI_dom.tipo_doc_cred_rim, vDATIGENERALI_dom.n_sentenza_divsep, vDATIGENERALI_dom.anno_sentenza_divsep, vDATIGENERALI_dom.Id_Domanda, vDATIGENERALI_dom.Inserimento_PEC, vDATIGENERALI_dom.Rinuncia_in_corso, vDATIGENERALI_dom.Doppia_borsa, vDATIGENERALI_dom.Posto_alloggio_confort, vDATIGENERALI_dom.RichiestaMensa 
 	            FROM 
 		            Domanda INNER JOIN vDATIGENERALI_dom ON Domanda.Anno_accademico = vDATIGENERALI_dom.Anno_accademico AND 
 		            Domanda.Num_domanda = vDATIGENERALI_dom.Num_domanda 
@@ -303,7 +301,7 @@ namespace ProcedureNet7.Storni
                                 AND Blocco_pagamento_attivo = 1)
             ";
 
-                using SqlCommand command = new(sql, conn, sqlTransaction);
+                using SqlCommand command = new(sql, CONNECTION, sqlTransaction);
                 _ = command.ExecuteNonQuery();
             }
             catch
