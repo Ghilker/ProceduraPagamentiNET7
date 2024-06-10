@@ -82,6 +82,7 @@ namespace ProcedureNet7
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure: connessione o transazione null");
                     _masterForm.inProcedure = false;
+                    sqlTransaction?.Rollback();
                     return;
                 }
 
@@ -90,6 +91,7 @@ namespace ProcedureNet7
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandleTipoPagamentoDialog");
                     _masterForm.inProcedure = false;
+                    sqlTransaction?.Rollback();
                     return;
                 }
 
@@ -98,6 +100,7 @@ namespace ProcedureNet7
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandlePagamentoSettingsDialog");
                     _masterForm.inProcedure = false;
+                    sqlTransaction?.Rollback();
                     return;
                 }
 
@@ -106,6 +109,7 @@ namespace ProcedureNet7
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandleTableNameSelectionDialog");
                     _masterForm.inProcedure = false;
+                    sqlTransaction?.Rollback();
                     return;
                 }
 
@@ -114,6 +118,7 @@ namespace ProcedureNet7
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandleRiepilogoPagamentiDialog");
                     _masterForm.inProcedure = false;
+                    sqlTransaction?.Rollback();
                     return;
                 }
 
@@ -122,6 +127,7 @@ namespace ProcedureNet7
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo CheckAndCreateDatabaseTable");
                     _masterForm.inProcedure = false;
+                    sqlTransaction?.Rollback();
                     return;
                 }
 
@@ -130,6 +136,7 @@ namespace ProcedureNet7
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandleFiltroManuale");
                     _masterForm.inProcedure = false;
+                    sqlTransaction?.Rollback();
                     return;
                 }
 
@@ -138,6 +145,7 @@ namespace ProcedureNet7
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo ClearMovimentiIfNeeded");
                     _masterForm.inProcedure = false;
+                    sqlTransaction?.Rollback();
                     return;
                 }
 
@@ -743,7 +751,7 @@ namespace ProcedureNet7
             List<string> codFiscali = studentiDaPagare.Keys.ToList();
 
             Logger.LogDebug(null, "Creazione tabella CF");
-            string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16) COLLATE Latin1_General_CI_AS);";
+            string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
             using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction))
             {
                 createCmd.ExecuteNonQuery();
@@ -2134,7 +2142,7 @@ namespace ProcedureNet7
             string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{currentCodTipoPagamento}'";
             SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction);
             string pagamentoDescrizione = (string)cmd.ExecuteScalar();
-            string beneficioFolderPath = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, pagamentoDescrizione));
+            string beneficioFolderPath = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, (selectedDataRiferimento + pagamentoDescrizione)));
 
             bool doAllImpegni = selectedImpegno == "0000";
             IEnumerable<string> impegnoList = doAllImpegni ? impegniList : new List<string> { selectedImpegno };
