@@ -61,6 +61,7 @@ namespace ProcedureNet7
             {
                 var procedures = new List<string>();
 
+#if PAGAMENTI || DEBUG
                 // Add ProcedurePagamenti
                 foreach (var value in Enum.GetValues(typeof(ProcedurePagamenti)))
                 {
@@ -68,7 +69,9 @@ namespace ProcedureNet7
                     var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
                     procedures.Add($"{attribute.Category} - {value}");
                 }
+#endif
 
+#if VARIE || DEBUG
                 // Add ProcedureVarie
                 foreach (var value in Enum.GetValues(typeof(ProcedureVarie)))
                 {
@@ -76,6 +79,7 @@ namespace ProcedureNet7
                     var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
                     procedures.Add($"{attribute.Category} - {value}");
                 }
+#endif
 
                 procedureSelect.DataSource = procedures;
             }
@@ -118,61 +122,60 @@ namespace ProcedureNet7
 
             _ = Invoke(new MethodInvoker(() =>
             {
-                switch (category)
+#if PAGAMENTI || DEBUG
+                if (category == "Pagamenti" && Enum.TryParse(procedureName, out ProcedurePagamenti selectedPagamentiProcedure))
                 {
-                    case "Pagamenti":
-                        if (Enum.TryParse(procedureName, out ProcedurePagamenti selectedPagamentiProcedure))
-                        {
-                            switch (selectedPagamentiProcedure)
-                            {
-                                case ProcedurePagamenti.ProceduraPagamenti:
-                                    FormProceduraPagamenti proceduraPagamenti = new FormProceduraPagamenti(this);
-                                    ShowFormInPanel(proceduraPagamenti);
-                                    break;
-                                case ProcedurePagamenti.ProceduraFlussoDiRitorno:
-                                    FormProceduraFlussi proceduraFlussi = new FormProceduraFlussi(this);
-                                    ShowFormInPanel(proceduraFlussi);
-                                    break;
-                                case ProcedurePagamenti.ProceduraStorni:
-                                    FormProceduraStorni proceduraStorni = new FormProceduraStorni(this);
-                                    ShowFormInPanel(proceduraStorni);
-                                    break;
-                                case ProcedurePagamenti.ProceduraRendiconto:
-                                    FormProceduraRendiconto proceduraRendiconto = new FormProceduraRendiconto(this);
-                                    ShowFormInPanel(proceduraRendiconto);
-                                    break;
-                            }
-                        }
-                        break;
-                    case "Varie":
-                        if (Enum.TryParse(procedureName, out ProcedureVarie selectedVarieProcedure))
-                        {
-                            switch (selectedVarieProcedure)
-                            {
-                                case ProcedureVarie.ProceduraBlocchi:
-                                    FormProceduraBlocchi proceduraBlocchi = new FormProceduraBlocchi(this);
-                                    ShowFormInPanel(proceduraBlocchi);
-                                    break;
-                                case ProcedureVarie.ProceduraTicket:
-                                    FormProceduraTicket proceduraTicket = new FormProceduraTicket(this);
-                                    ShowFormInPanel(proceduraTicket);
-                                    break;
-                                case ProcedureVarie.ProceduraAllegati:
-                                    FormProceduraAllegati proceduraAllegati = new FormProceduraAllegati(this);
-                                    ShowFormInPanel(proceduraAllegati);
-                                    break;
-                                case ProcedureVarie.SpecificheImpegni:
-                                    FormSpecificheImpegni specificheImpegni = new FormSpecificheImpegni(this);
-                                    ShowFormInPanel(specificheImpegni);
-                                    break;
-                                case ProcedureVarie.ProceduraAggiuntaProvvedimento:
-                                    FormAggiuntaProvvedimenti provvedimenti = new FormAggiuntaProvvedimenti(this);
-                                    ShowFormInPanel(provvedimenti);
-                                    break;
-                            }
-                        }
-                        break;
+                    switch (selectedPagamentiProcedure)
+                    {
+                        case ProcedurePagamenti.ProceduraPagamenti:
+                            FormProceduraPagamenti proceduraPagamenti = new FormProceduraPagamenti(this);
+                            ShowFormInPanel(proceduraPagamenti);
+                            break;
+                        case ProcedurePagamenti.ProceduraFlussoDiRitorno:
+                            FormProceduraFlussi proceduraFlussi = new FormProceduraFlussi(this);
+                            ShowFormInPanel(proceduraFlussi);
+                            break;
+                        case ProcedurePagamenti.ProceduraStorni:
+                            FormProceduraStorni proceduraStorni = new FormProceduraStorni(this);
+                            ShowFormInPanel(proceduraStorni);
+                            break;
+                        case ProcedurePagamenti.ProceduraRendiconto:
+                            FormProceduraRendiconto proceduraRendiconto = new FormProceduraRendiconto(this);
+                            ShowFormInPanel(proceduraRendiconto);
+                            break;
+                    }
                 }
+
+#endif
+#if VARIE || DEBUG
+                if (category == "Varie" && Enum.TryParse(procedureName, out ProcedureVarie selectedVarieProcedure))
+                {
+                    switch (selectedVarieProcedure)
+                    {
+                        case ProcedureVarie.ProceduraBlocchi:
+                            FormProceduraBlocchi proceduraBlocchi = new FormProceduraBlocchi(this);
+                            ShowFormInPanel(proceduraBlocchi);
+                            break;
+                        case ProcedureVarie.ProceduraTicket:
+                            FormProceduraTicket proceduraTicket = new FormProceduraTicket(this);
+                            ShowFormInPanel(proceduraTicket);
+                            break;
+                        case ProcedureVarie.ProceduraAllegati:
+                            FormProceduraAllegati proceduraAllegati = new FormProceduraAllegati(this);
+                            ShowFormInPanel(proceduraAllegati);
+                            break;
+                        case ProcedureVarie.SpecificheImpegni:
+                            FormSpecificheImpegni specificheImpegni = new FormSpecificheImpegni(this);
+                            ShowFormInPanel(specificheImpegni);
+                            break;
+                        case ProcedureVarie.ProceduraAggiuntaProvvedimento:
+                            FormAggiuntaProvvedimenti provvedimenti = new FormAggiuntaProvvedimenti(this);
+                            ShowFormInPanel(provvedimenti);
+                            break;
+                    }
+                }
+#endif
+
             }));
         }
 
