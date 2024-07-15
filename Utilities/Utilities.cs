@@ -231,7 +231,7 @@ namespace ProcedureNet7
             }
         }
 
-        public static void ExportDataTableToExcel(DataTable dataTable, string folderPath, bool includeHeaders = true, string fileName = "")
+        public static string ExportDataTableToExcel(DataTable dataTable, string folderPath, bool includeHeaders = true, string fileName = "")
         {
             if (dataTable == null || dataTable.Rows.Count == 0 || string.IsNullOrWhiteSpace(folderPath))
                 throw new ArgumentException("Invalid input parameters.");
@@ -240,35 +240,28 @@ namespace ProcedureNet7
             string fullPath = Path.Combine(folderPath, fileName);
             Directory.CreateDirectory(folderPath); // Ensure the directory exists
 
-            Excel.Application excelApp = new Excel.Application();
-            Excel.Workbook workbook = null;
-            Excel.Worksheet worksheet = null;
+            Excel.Application? excelApp = new();
+            Excel.Workbooks? workbooks = null;
+            Excel._Workbook? workbook = null;
+            Excel._Worksheet? worksheet = null;
 
             try
             {
-                workbook = excelApp.Workbooks.Add();
-                worksheet = workbook.Sheets[1];
+                workbooks = excelApp.Workbooks;
+                workbook = workbooks.Add();
+                worksheet = (Excel._Worksheet)workbook.ActiveSheet!;
 
                 // Optionally, add column headers
-                if (includeHeaders)
-                {
-                    for (int col = 0; col < dataTable.Columns.Count; col++)
-                    {
-                        worksheet.Cells[1, col + 1] = dataTable.Columns[col].ColumnName;
-                    }
-                }
+                if (includeHeaders && worksheet != null)
+                    AddHeaders(worksheet, dataTable);
 
                 // Add data rows
-                for (int row = 0; row < dataTable.Rows.Count; row++)
-                {
-                    for (int col = 0; col < dataTable.Columns.Count; col++)
-                    {
-                        worksheet.Cells[row + (includeHeaders ? 2 : 1), col + 1] = dataTable.Rows[row][col];
-                    }
-                }
+                if (worksheet != null)
+                    AddData(worksheet, dataTable, includeHeaders);
 
                 // Save the Excel file
                 workbook.SaveAs(fullPath);
+                return fullPath;
             }
             catch (Exception ex)
             {
@@ -277,41 +270,8 @@ namespace ProcedureNet7
             }
             finally
             {
-                // Clean up
-                if (workbook != null)
-                {
-                    workbook.Close();
-                    Marshal.ReleaseComObject(workbook);
-                }
-                if (excelApp != null)
-                {
-                    excelApp.Quit();
-                    Marshal.ReleaseComObject(excelApp);
-                }
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
+                CleanUp(worksheet, workbook, workbooks, excelApp);
             }
-        }
-
-        private static string GenerateFileName(string fileName)
-        {
-            if (string.IsNullOrWhiteSpace(fileName))
-            {
-                fileName = $"Export_{DateTime.Now:yyyyMMddHHmmss}.xlsx";
-            }
-            else if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
-            {
-                fileName += ".xlsx";
-            }
-            return fileName;
-        }
-
-        private static object GetXLCellValue(object value)
-        {
-            // Convert value to appropriate type for ClosedXML
-            if (value == null || value == DBNull.Value)
-                return string.Empty;
-            return value;
         }
 
         private static void CleanUp(Excel._Worksheet? worksheet, Excel._Workbook? workbook, Excel.Workbooks? workbooks, Excel.Application? excelApp)
@@ -334,11 +294,32 @@ namespace ProcedureNet7
             }
         }
 
+        private static string GenerateFileName(string fileName)
+        {
+            return !string.IsNullOrWhiteSpace(fileName) ? $"{fileName}.xlsx" : $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+        }
 
         private static void AddHeaders(Excel._Worksheet worksheet, DataTable dataTable)
         {
             for (int i = 0; i < dataTable.Columns.Count; i++)
                 worksheet.Cells[1, i + 1] = dataTable.Columns[i].ColumnName;
+        }
+
+        private static void AddData(Excel._Worksheet worksheet, DataTable dataTable, bool includeHeaders)
+        {
+            int rowOffset = includeHeaders ? 2 : 1;
+            int rowCount = dataTable.Rows.Count;
+            int columnCount = dataTable.Columns.Count;
+
+            object[,] values = new object[rowCount, columnCount];
+
+            for (int i = 0; i < rowCount; i++)
+                for (int j = 0; j < columnCount; j++)
+                    values[i, j] = dataTable.Rows[i][j];
+
+            Excel.Range range = worksheet.Cells[rowOffset, 1];
+            range = range.Resize[rowCount, columnCount];
+            range.Value = values; // Set the entire block of values in one shot
         }
 
         private static void AddDataInBulk(Excel._Worksheet worksheet, DataTable dataTable, bool includeHeaders)
@@ -693,4 +674,15 @@ namespace ProcedureNet7
             return dataTable;
         }
     }
+
+    public class ProcedureCategoryAttribute : Attribute
+    {
+        public string Category { get; }
+
+        public ProcedureCategoryAttribute(string category)
+        {
+            Category = category;
+        }
+    }
+
 }

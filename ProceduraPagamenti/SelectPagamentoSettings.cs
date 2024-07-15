@@ -42,6 +42,7 @@ namespace ProcedureNet7
             {
                 { "2", "Tutti gli studenti" },
                 { "0", "Solo non richiedenti PA" },
+                { "3", "Solo non richiedenti PA mai vincitori PA" },
                 { "1", "Solo richiedenti PA" }
             };
 

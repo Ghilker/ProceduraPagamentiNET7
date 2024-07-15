@@ -20,6 +20,7 @@ namespace ProcedureNet7
         public bool disabile { get; private set; }
         public double importoBeneficio { get; private set; }
         public bool vincitorePA { get; private set; }
+        public bool eraVincitorePA { get; private set; }
         public List<Assegnazione> assegnazioni { get; private set; }
         public int annoCorso { get; private set; }
         public int tipoCorso { get; private set; }
@@ -69,6 +70,7 @@ namespace ProcedureNet7
             this.annoCorso = annoCorso;
             this.tipoCorso = tipoCorso;
             this.vincitorePA = vincitorePA;
+            eraVincitorePA = false;
             this.superamentoEsami = superamentoEsami;
             this.superamentoEsamiTassaRegionale = superamentoEsamiTassaRegionale;
             numeroImpegno = string.Empty;
@@ -221,6 +223,11 @@ namespace ProcedureNet7
         public void SetMandatoProvvisorio(string mandatoProvvisorio)
         {
             this.mandatoProvvisorio = mandatoProvvisorio;
+        }
+
+        public void SetEraVincitorePA(bool eraVincitorePA)
+        {
+            this.eraVincitorePA = eraVincitorePA;
         }
     }
 }

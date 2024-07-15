@@ -18,7 +18,7 @@ namespace ProcedureNet7
             CONNECTION = connection_string;
         }
 
-        //protected MainUI _mainForm; protected string CONNECTION_STRING; protected BaseProcedure(MainUI _masterForm, string connection_string) { }
+        //protected MainUI _masterForm; protected string CONNECTION_STRING; protected BaseProcedure(MainUI _masterForm, string connection_string) { }
 
 
         public virtual void EscapePressed()

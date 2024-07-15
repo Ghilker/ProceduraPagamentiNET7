@@ -1,0 +1,30 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace ProcedureNet7
+{
+    public class ArgsProceduraBlocchi
+    {
+        [Required(ErrorMessage = "Selezionare il file con i dati")]
+        public string _blocksFilePath { get; set; }
+
+        [Required(ErrorMessage = "Inserire l'anno accademico")]
+        [ValidAAFormat(ErrorMessage = "L'anno accademico deve essere nel formato xxxxyyyy.")]
+        public string _blocksYear { get; set; }
+
+        [Required(ErrorMessage = "Inserire l'utente variazione")]
+        public string _blocksUsername { get; set; }
+
+        public ArgsProceduraBlocchi()
+        {
+            _blocksFilePath = string.Empty;
+            _blocksYear = string.Empty;
+            _blocksUsername = string.Empty;
+        }
+
+    }
+}

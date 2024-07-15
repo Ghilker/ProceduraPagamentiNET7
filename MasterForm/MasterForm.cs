@@ -6,6 +6,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -22,6 +23,8 @@ namespace ProcedureNet7
         Logger? logger;
 
         public bool inProcedure = false;
+
+
 
         public MasterForm()
         {
@@ -56,19 +59,25 @@ namespace ProcedureNet7
             int maxWidth = 0;
             using (Graphics g = procedureSelect.CreateGraphics())
             {
-                foreach (object? procedure in Enum.GetValues(typeof(ProcedureType)))
+                var procedures = new List<string>();
+
+                // Add ProcedurePagamenti
+                foreach (var value in Enum.GetValues(typeof(ProcedurePagamenti)))
                 {
-                    string itemText = procedure.ToString();
-                    _ = procedureSelect.Items.Add(itemText);
-
-                    int itemWidth = TextRenderer.MeasureText(g, itemText, procedureSelect.Font).Width;
-
-                    // Update the maximum width if this item's width is greater
-                    if (itemWidth > maxWidth)
-                    {
-                        maxWidth = itemWidth;
-                    }
+                    var fieldInfo = typeof(ProcedurePagamenti).GetField(value.ToString());
+                    var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
+                    procedures.Add($"{attribute.Category} - {value}");
                 }
+
+                // Add ProcedureVarie
+                foreach (var value in Enum.GetValues(typeof(ProcedureVarie)))
+                {
+                    var fieldInfo = typeof(ProcedureVarie).GetField(value.ToString());
+                    var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
+                    procedures.Add($"{attribute.Category} - {value}");
+                }
+
+                procedureSelect.DataSource = procedures;
             }
             procedureSelect.DropDownWidth = maxWidth + SystemInformation.VerticalScrollBarWidth;
         }
@@ -102,28 +111,69 @@ namespace ProcedureNet7
         private void ProcedureSelect_SelectedIndexChanged(object sender, EventArgs e)
         {
             ClearCurrentForm();
-            ProcedureType selectedProcedure = ProcedureType.ProceduraPagamenti;
+            string selectedText = procedureSelect.SelectedItem.ToString();
+            string[] parts = selectedText.Split(new[] { " - " }, StringSplitOptions.None);
+            string category = parts[0];
+            string procedureName = parts[1];
+
             _ = Invoke(new MethodInvoker(() =>
             {
-                string selectedText = procedureSelect.SelectedItem.ToString();
-                _ = Enum.TryParse(selectedText, out selectedProcedure);
+                switch (category)
+                {
+                    case "Pagamenti":
+                        if (Enum.TryParse(procedureName, out ProcedurePagamenti selectedPagamentiProcedure))
+                        {
+                            switch (selectedPagamentiProcedure)
+                            {
+                                case ProcedurePagamenti.ProceduraPagamenti:
+                                    FormProceduraPagamenti proceduraPagamenti = new FormProceduraPagamenti(this);
+                                    ShowFormInPanel(proceduraPagamenti);
+                                    break;
+                                case ProcedurePagamenti.ProceduraFlussoDiRitorno:
+                                    FormProceduraFlussi proceduraFlussi = new FormProceduraFlussi(this);
+                                    ShowFormInPanel(proceduraFlussi);
+                                    break;
+                                case ProcedurePagamenti.ProceduraStorni:
+                                    FormProceduraStorni proceduraStorni = new FormProceduraStorni(this);
+                                    ShowFormInPanel(proceduraStorni);
+                                    break;
+                                case ProcedurePagamenti.ProceduraRendiconto:
+                                    FormProceduraRendiconto proceduraRendiconto = new FormProceduraRendiconto(this);
+                                    ShowFormInPanel(proceduraRendiconto);
+                                    break;
+                            }
+                        }
+                        break;
+                    case "Varie":
+                        if (Enum.TryParse(procedureName, out ProcedureVarie selectedVarieProcedure))
+                        {
+                            switch (selectedVarieProcedure)
+                            {
+                                case ProcedureVarie.ProceduraBlocchi:
+                                    FormProceduraBlocchi proceduraBlocchi = new FormProceduraBlocchi(this);
+                                    ShowFormInPanel(proceduraBlocchi);
+                                    break;
+                                case ProcedureVarie.ProceduraTicket:
+                                    FormProceduraTicket proceduraTicket = new FormProceduraTicket(this);
+                                    ShowFormInPanel(proceduraTicket);
+                                    break;
+                                case ProcedureVarie.ProceduraAllegati:
+                                    FormProceduraAllegati proceduraAllegati = new FormProceduraAllegati(this);
+                                    ShowFormInPanel(proceduraAllegati);
+                                    break;
+                                case ProcedureVarie.SpecificheImpegni:
+                                    FormSpecificheImpegni specificheImpegni = new FormSpecificheImpegni(this);
+                                    ShowFormInPanel(specificheImpegni);
+                                    break;
+                                case ProcedureVarie.ProceduraAggiuntaProvvedimento:
+                                    FormAggiuntaProvvedimenti provvedimenti = new FormAggiuntaProvvedimenti(this);
+                                    ShowFormInPanel(provvedimenti);
+                                    break;
+                            }
+                        }
+                        break;
+                }
             }));
-
-            switch (selectedProcedure)
-            {
-                case ProcedureType.ProceduraPagamenti:
-                    FormProceduraPagamenti proceduraPagamenti = new FormProceduraPagamenti(this);
-                    ShowFormInPanel(proceduraPagamenti);
-                    break;
-                case ProcedureType.ProceduraFlussoDiRitorno:
-                    FormProceduraFlussi proceduraFlussi = new FormProceduraFlussi(this);
-                    ShowFormInPanel(proceduraFlussi);
-                    break;
-                case ProcedureType.ProceduraStorni:
-                    FormProceduraStorni proceduraStorni = new FormProceduraStorni(this);
-                    ShowFormInPanel(proceduraStorni);
-                    break;
-            }
         }
 
         private void BackgroundWorker_DoWork(object? sender, DoWorkEventArgs e)
@@ -165,11 +215,32 @@ namespace ProcedureNet7
         {
             return proceduresPanel;
         }
-        enum ProcedureType
+
+        public enum ProcedurePagamenti
         {
+            [ProcedureCategory("Pagamenti")]
             ProceduraPagamenti,
+            [ProcedureCategory("Pagamenti")]
             ProceduraFlussoDiRitorno,
-            ProceduraStorni
+            [ProcedureCategory("Pagamenti")]
+            ProceduraStorni,
+            [ProcedureCategory("Pagamenti")]
+            ProceduraRendiconto
         }
+
+        public enum ProcedureVarie
+        {
+            [ProcedureCategory("Varie")]
+            ProceduraBlocchi,
+            [ProcedureCategory("Varie")]
+            ProceduraTicket,
+            [ProcedureCategory("Varie")]
+            ProceduraAggiuntaProvvedimento,
+            [ProcedureCategory("Varie")]
+            ProceduraAllegati,
+            [ProcedureCategory("Varie")]
+            SpecificheImpegni
+        }
+
     }
 }

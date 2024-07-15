@@ -1,5 +1,4 @@
-﻿using ProcedureNet7.Storni;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
@@ -13,19 +12,15 @@ using System.Windows.Forms;
 
 namespace ProcedureNet7
 {
-    public partial class FormProceduraStorni : Form
+    public partial class FormProceduraRendiconto : Form
     {
+
         MasterForm? _masterForm;
-        string selectedFilePath = string.Empty;
-        public FormProceduraStorni(MasterForm masterForm)
+        string selectedFolderPath = string.Empty;
+        public FormProceduraRendiconto(MasterForm masterForm)
         {
             _masterForm = masterForm;
             InitializeComponent();
-        }
-
-        private void StorniFileBtn_Click(object sender, EventArgs e)
-        {
-            Utilities.ChooseFileAndSetPath(storniFilelbl, openFileDialog, ref selectedFilePath);
         }
 
         private void RunProcedureBtnClick(object sender, EventArgs e)
@@ -35,10 +30,10 @@ namespace ProcedureNet7
                 return;
             }
 
-            _masterForm.RunBackgroundWorker(RunFlussoRitorno);
+            _masterForm.RunBackgroundWorker(RunRendiconto);
         }
 
-        private void RunFlussoRitorno(SqlConnection mainConnection)
+        private void RunRendiconto(SqlConnection mainConnection)
         {
             try
             {
@@ -47,14 +42,16 @@ namespace ProcedureNet7
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
                 ArgsValidation argsValidation = new ArgsValidation();
-                ArgsProceduraStorni argsStorni = new ArgsProceduraStorni
+
+                ArgsProceduraRendiconto argsProceduraRendiconto = new()
                 {
-                    _selectedFile = selectedFilePath,
-                    _esercizioFinanziario = storniSelectedEseFinanziarioTxt.Text
+                    _selectedSaveFolder = selectedFolderPath,
+                    _annoAccademicoInizio = procedureAAstartText.Text,
+                    _annoAccademicoFine = procedureAAendText.Text
                 };
-                argsValidation.Validate(argsStorni);
-                using ProceduraStorni storni = new(_masterForm, mainConnection);
-                storni.RunProcedure(argsStorni);
+                argsValidation.Validate(argsProceduraRendiconto);
+                using ProceduraRendiconto rendiconto = new(_masterForm, mainConnection);
+                rendiconto.RunProcedure(argsProceduraRendiconto);
             }
             catch (ValidationException ex)
             {
@@ -64,6 +61,11 @@ namespace ProcedureNet7
             {
                 throw;
             }
+        }
+
+        private void ProcedureFolderSelectBtn_Click(object sender, EventArgs e)
+        {
+            Utilities.ChooseFolder(procedureFolderSelectLbl, folderBrowserDialog1, ref selectedFolderPath);
         }
     }
 }

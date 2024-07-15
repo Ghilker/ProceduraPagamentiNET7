@@ -49,6 +49,14 @@ namespace ProcedureNet7
                 UpdateMandato(CONNECTION, sqlTransaction);
                 Logger.LogInfo(88, $"Annullamento pagamenti scartati");
                 Scartati(CONNECTION, sqlTransaction);
+                _ = _masterForm.Invoke((MethodInvoker)delegate
+                {
+                    DialogResult result = MessageBox.Show(_masterForm, "continuare?", "cont", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (result == DialogResult.No)
+                    {
+                        throw new Exception("Chiuso dall'utente");
+                    }
+                });
 
                 _masterForm.inProcedure = false;
                 Logger.LogInfo(100, $"Fine lavorazione");
@@ -271,6 +279,11 @@ namespace ProcedureNet7
                 {
                     cmd.ExecuteNonQuery();
                 }
+
+                string dropTable = "DROP TABLE #TempPagamenti";
+
+                SqlCommand dropTableCmd = new(dropTable, CONNECTION, sqlTransaction);
+                dropTableCmd.ExecuteNonQuery();
             }
             catch
             {
@@ -334,6 +347,10 @@ namespace ProcedureNet7
                 {
                     cmd.ExecuteNonQuery();
                 }
+
+                string dropTable = "DROP TABLE #TempReversali";
+                SqlCommand dropTableCmd = new(dropTable, CONNECTION, sqlTransaction);
+                dropTableCmd.ExecuteNonQuery();
             }
             catch
             {
@@ -416,6 +433,11 @@ namespace ProcedureNet7
 
             foreach (var studente in studenteRitornoList)
             {
+                if (string.IsNullOrWhiteSpace(studente.codMovimentoGenerale))
+                {
+                    Logger.LogWarning(null, $"Studente {studente.codFiscale} ha il codice movimento vuoto/nullo!");
+                    continue;
+                }
                 dt.Rows.Add(studente.codFiscale, studente.dataPagamento, studente.codMovimentoGenerale);
             }
 
@@ -429,6 +451,11 @@ namespace ProcedureNet7
 
             foreach (var studente in studenteRitornoList)
             {
+                if (string.IsNullOrWhiteSpace(studente.codMovimentoGenerale))
+                {
+                    Logger.LogWarning(null, $"Studente {studente.codFiscale} ha il codice movimento vuoto/nullo!");
+                    continue;
+                }
                 table.Rows.Add(studente.codFiscale, studente.numReversale);
             }
 
@@ -444,6 +471,11 @@ namespace ProcedureNet7
 
             foreach (var studente in studenteRitornoList)
             {
+                if (string.IsNullOrWhiteSpace(studente.codMovimentoGenerale))
+                {
+                    Logger.LogWarning(null, $"Studente {studente.codFiscale} ha il codice movimento vuoto/nullo!");
+                    continue;
+                }
                 table.Rows.Add(studente.codFiscale, studente.dataPagamento, studente.codMovimentoGenerale, studente.numMandatoFlusso);
             }
 
@@ -457,6 +489,11 @@ namespace ProcedureNet7
 
             foreach (var studente in studenteRitornoList)
             {
+                if (string.IsNullOrWhiteSpace(studente.codMovimentoGenerale))
+                {
+                    Logger.LogWarning(null, $"Studente {studente.codFiscale} ha il codice movimento vuoto/nullo!");
+                    continue;
+                }
                 table.Rows.Add(studente.numMandatoFlusso, studente.codMovimentoGenerale);
             }
 

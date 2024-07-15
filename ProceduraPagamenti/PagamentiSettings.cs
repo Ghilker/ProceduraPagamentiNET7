@@ -27,7 +27,7 @@ namespace ProcedureNet7
                 }
                 else
                 {
-                    _ = comboBox.Items.Add(new { Text = item.Key + " - " + item.Value, Value = item.Key });
+                    _ = comboBox.Items.Add(new { Text = $"{item.Key} - {item.Value}", Value = item.Key });
                 }
             }
             comboBox.DisplayMember = "Text";
