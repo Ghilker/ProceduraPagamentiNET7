@@ -641,6 +641,29 @@ namespace ProcedureNet7
             // You can now safely call ToString() on it.
             return record[fieldName].ToString()!;
         }
+
+        public static int SafeGetInt(this IDataRecord record, string fieldName, int defaultValue = 0)
+        {
+            if (record[fieldName] is DBNull or null)
+                return defaultValue;
+
+            if (int.TryParse(record[fieldName].ToString(), out int result))
+                return result;
+
+            return defaultValue;
+        }
+
+        public static double SafeGetDouble(this IDataRecord record, string fieldName, double defaultValue = 0.0)
+        {
+            if (record[fieldName] is DBNull or null)
+                return defaultValue;
+
+            if (double.TryParse(record[fieldName].ToString(), out double result))
+                return result;
+
+            return defaultValue;
+        }
+
         public static string SafeGetString(this IDataRecord record, int index)
         {
             if (record[index] is DBNull or null)

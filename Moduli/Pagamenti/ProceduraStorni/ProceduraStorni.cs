@@ -197,6 +197,10 @@ namespace ProcedureNet7.Storni
 
                 AddBlocks(CONNECTION);
 
+                string dropTempTable = "DROP TABLE #CFEstrazione; DROP TABLE #MappingTable;";
+                SqlCommand dropCmd = new(dropTempTable, CONNECTION, sqlTransaction);
+                _ = dropCmd.ExecuteNonQuery();
+
                 _masterForm.inProcedure = false;
                 sqlTransaction.Commit();
                 Logger.LogInfo(100, $"Fine lavorazione");

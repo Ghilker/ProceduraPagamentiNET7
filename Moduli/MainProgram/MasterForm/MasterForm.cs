@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
@@ -76,6 +77,14 @@ namespace ProcedureNet7
                 foreach (var value in Enum.GetValues(typeof(ProcedureVarie)))
                 {
                     var fieldInfo = typeof(ProcedureVarie).GetField(value.ToString());
+                    var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
+                    procedures.Add($"{attribute.Category} - {value}");
+                }
+#endif
+#if VERIFICHE || DEBUG
+                foreach (var value in Enum.GetValues(typeof(ProcedureVerifiche)))
+                {
+                    var fieldInfo = typeof(ProcedureVerifiche).GetField(value.ToString());
                     var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
                     procedures.Add($"{attribute.Category} - {value}");
                 }
@@ -175,7 +184,18 @@ namespace ProcedureNet7
                     }
                 }
 #endif
-
+#if VERIFICHE || DEBUG
+                if (category == "Verifiche" && Enum.TryParse(procedureName, out ProcedureVerifiche selectedVerificheProcedure))
+                {
+                    switch (selectedVerificheProcedure)
+                    {
+                        case ProcedureVerifiche.ProceduraControlloPuntiBonus:
+                            FormControlloPuntiBonus controlloPuntiBonus = new FormControlloPuntiBonus(this);
+                            ShowFormInPanel(controlloPuntiBonus);
+                            break;
+                    }
+                }
+#endif
             }));
         }
 
@@ -243,6 +263,12 @@ namespace ProcedureNet7
             ProceduraAllegati,
             [ProcedureCategory("Varie")]
             SpecificheImpegni
+        }
+
+        public enum ProcedureVerifiche
+        {
+            [ProcedureCategory("Verifiche")]
+            ProceduraControlloPuntiBonus
         }
 
     }

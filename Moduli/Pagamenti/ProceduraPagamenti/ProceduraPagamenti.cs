@@ -1515,10 +1515,19 @@ namespace ProcedureNet7
             void PopulateStudentResidenza()
             {
                 string dataQuery = $@"
-                    SELECT vResidenza.* 
-                    FROM vResidenza 
-                        INNER JOIN #CFEstrazione cfe ON vResidenza.Cod_fiscale = cfe.Cod_fiscale 
-                    WHERE ANNO_ACCADEMICO = '{selectedAA}'";
+
+
+                        SELECT        LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO, LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE, LUOGO_REPERIBILITA_STUDENTE.INDIRIZZO, Comuni.Cod_comune, Comuni.Descrizione AS comune_residenza, 
+                                                 Comuni.Cod_provincia AS provincia_residenza, LUOGO_REPERIBILITA_STUDENTE.CAP
+                        FROM            LUOGO_REPERIBILITA_STUDENTE INNER JOIN
+                                                 Comuni ON LUOGO_REPERIBILITA_STUDENTE.COD_COMUNE = Comuni.Cod_comune
+                                        INNER JOIN #CFEstrazione cfe ON LUOGO_REPERIBILITA_STUDENTE.Cod_fiscale = cfe.Cod_fiscale 
+                        WHERE        (LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO = '{selectedAA}') AND (LUOGO_REPERIBILITA_STUDENTE.TIPO_LUOGO = 'RES') AND 
+                                                 (LUOGO_REPERIBILITA_STUDENTE.DATA_VALIDITA =
+                                                     (SELECT        MAX(DATA_VALIDITA) AS Expr1
+                                                       FROM            LUOGO_REPERIBILITA_STUDENTE AS rsd
+                                                       WHERE        (COD_FISCALE = luogo_reperibilita_studente.cod_fiscale) AND (ANNO_ACCADEMICO = luogo_reperibilita_studente.anno_accademico) AND (TIPO_LUOGO = 'RES')))
+                        ";
 
                 SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
                 Logger.LogInfo(35, $"Lavorazione studenti - inserimento in residenza");

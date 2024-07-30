@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Configurations>Debug;Release;PAGAMENTI;VARIE</Configurations>
+    <Configurations>Debug;Release;PAGAMENTI;VARIE;VERIFICHE</Configurations>
     <SignAssembly>False</SignAssembly>
     <UseWPF>False</UseWPF>
   </PropertyGroup>
@@ -14,6 +14,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
 	<AssemblyName>DebugProcedure</AssemblyName>
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VERIFICHE|AnyCPU'">
+    <DefineConstants>$(DefineConstants);VERIFICHE</DefineConstants>
+    <AssemblyName>DebugProcedure</AssemblyName>
     <Optimize>True</Optimize>
   </PropertyGroup>
 
