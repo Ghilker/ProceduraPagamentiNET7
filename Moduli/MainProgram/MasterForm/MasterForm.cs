@@ -1,4 +1,5 @@
 ﻿
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -25,10 +26,11 @@ namespace ProcedureNet7
 
         public bool inProcedure = false;
 
+        private string userTier;
 
-
-        public MasterForm()
+        public MasterForm(int userID, string userTier)
         {
+            this.userTier = userTier;
             InitializeComponent();
             Initialize();
             InitializeBackgroundWorker();
@@ -68,7 +70,10 @@ namespace ProcedureNet7
                 {
                     var fieldInfo = typeof(ProcedurePagamenti).GetField(value.ToString());
                     var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
-                    procedures.Add($"{attribute.Category} - {value}");
+                    if (IsTierAllowed(attribute.Tier))
+                    {
+                        procedures.Add($"{attribute.Category} - {value}");
+                    }
                 }
 #endif
 
@@ -78,7 +83,10 @@ namespace ProcedureNet7
                 {
                     var fieldInfo = typeof(ProcedureVarie).GetField(value.ToString());
                     var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
-                    procedures.Add($"{attribute.Category} - {value}");
+                    if (IsTierAllowed(attribute.Tier))
+                    {
+                        procedures.Add($"{attribute.Category} - {value}");
+                    }
                 }
 #endif
 #if VERIFICHE || DEBUG
@@ -86,13 +94,28 @@ namespace ProcedureNet7
                 {
                     var fieldInfo = typeof(ProcedureVerifiche).GetField(value.ToString());
                     var attribute = (ProcedureCategoryAttribute)fieldInfo.GetCustomAttribute(typeof(ProcedureCategoryAttribute));
-                    procedures.Add($"{attribute.Category} - {value}");
+                    if (IsTierAllowed(attribute.Tier))
+                    {
+                        procedures.Add($"{attribute.Category} - {value}");
+                    }
                 }
 #endif
 
                 procedureSelect.DataSource = procedures;
             }
             procedureSelect.DropDownWidth = maxWidth + SystemInformation.VerticalScrollBarWidth;
+        }
+
+        private bool IsTierAllowed(string procedureTier)
+        {
+            var tiers = new Dictionary<string, int>
+            {
+                { "Operatore", 1 },
+                { "Funzionario", 2 },
+                { "Programmatore", 3 }
+            };
+
+            return tiers[userTier] >= tiers[procedureTier];
         }
 
         private void ShowFormInPanel(Form form)
@@ -239,35 +262,41 @@ namespace ProcedureNet7
             return proceduresPanel;
         }
 
+        private void ChangeUserButton_Click(object sender, EventArgs e)
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(@"SOFTWARE\ProcedureNet7", false);
+            Application.Restart();
+        }
+
         public enum ProcedurePagamenti
         {
-            [ProcedureCategory("Pagamenti")]
+            [ProcedureCategory("Pagamenti", "Programmatore")]
             ProceduraPagamenti,
-            [ProcedureCategory("Pagamenti")]
+            [ProcedureCategory("Pagamenti", "Funzionario")]
             ProceduraFlussoDiRitorno,
-            [ProcedureCategory("Pagamenti")]
+            [ProcedureCategory("Pagamenti", "Funzionario")]
             ProceduraStorni,
-            [ProcedureCategory("Pagamenti")]
+            [ProcedureCategory("Pagamenti", "Funzionario")]
             ProceduraRendiconto
         }
 
         public enum ProcedureVarie
         {
-            [ProcedureCategory("Varie")]
+            [ProcedureCategory("Varie", "Funzionario")]
             ProceduraBlocchi,
-            [ProcedureCategory("Varie")]
+            [ProcedureCategory("Varie", "Programmatore")]
             ProceduraTicket,
-            [ProcedureCategory("Varie")]
+            [ProcedureCategory("Varie", "Programmatore")]
             ProceduraAggiuntaProvvedimento,
-            [ProcedureCategory("Varie")]
+            [ProcedureCategory("Varie", "Operatore")]
             ProceduraAllegati,
-            [ProcedureCategory("Varie")]
+            [ProcedureCategory("Varie", "Funzionario")]
             SpecificheImpegni
         }
 
         public enum ProcedureVerifiche
         {
-            [ProcedureCategory("Verifiche")]
+            [ProcedureCategory("Verifiche", "Programmatore")]
             ProceduraControlloPuntiBonus
         }
 

@@ -35,6 +35,7 @@
             procedureSelect = new ExtendedComboBox();
             backgroundWorker = new System.ComponentModel.BackgroundWorker();
             progressBar = new ProgressBar();
+            button1 = new Button();
             SuspendLayout();
             // 
             // proceduresPanel
@@ -67,7 +68,7 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Location = new Point(12, 371);
+            label1.Location = new Point(202, 368);
             label1.Name = "label1";
             label1.Size = new Size(135, 15);
             label1.TabIndex = 4;
@@ -77,9 +78,9 @@
             // 
             procedureSelect.DropDownStyle = ComboBoxStyle.DropDownList;
             procedureSelect.FormattingEnabled = true;
-            procedureSelect.Location = new Point(188, 368);
+            procedureSelect.Location = new Point(343, 368);
             procedureSelect.Name = "procedureSelect";
-            procedureSelect.Size = new Size(367, 23);
+            procedureSelect.Size = new Size(212, 23);
             procedureSelect.TabIndex = 3;
             procedureSelect.SelectedIndexChanged += ProcedureSelect_SelectedIndexChanged;
             // 
@@ -94,11 +95,22 @@
             progressBar.Size = new Size(543, 23);
             progressBar.TabIndex = 5;
             // 
+            // button1
+            // 
+            button1.Location = new Point(12, 368);
+            button1.Name = "button1";
+            button1.Size = new Size(184, 23);
+            button1.TabIndex = 6;
+            button1.Text = "Cambia utente";
+            button1.UseVisualStyleBackColor = true;
+            button1.Click += ChangeUserButton_Click;
+            // 
             // MasterForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(823, 677);
+            Controls.Add(button1);
             Controls.Add(progressBar);
             Controls.Add(label1);
             Controls.Add(procedureSelect);
@@ -120,5 +132,6 @@
         private ExtendedComboBox procedureSelect;
         private System.ComponentModel.BackgroundWorker backgroundWorker;
         private ProgressBar progressBar;
+        private Button button1;
     }
 }

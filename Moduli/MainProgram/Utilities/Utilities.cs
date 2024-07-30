@@ -698,14 +698,16 @@ namespace ProcedureNet7
         }
     }
 
-    public class ProcedureCategoryAttribute : Attribute
+    [AttributeUsage(AttributeTargets.Field, Inherited = false, AllowMultiple = false)]
+    sealed class ProcedureCategoryAttribute : Attribute
     {
         public string Category { get; }
+        public string Tier { get; }
 
-        public ProcedureCategoryAttribute(string category)
+        public ProcedureCategoryAttribute(string category, string tier)
         {
             Category = category;
+            Tier = tier;
         }
     }
-
 }

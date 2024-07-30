@@ -169,6 +169,7 @@ namespace ProcedureNet7
             ";
 
             SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+            readData.CommandTimeout = 90000000;
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -299,6 +300,7 @@ namespace ProcedureNet7
 
                 ";
             SqlCommand readDataStorico = new(storicoBonusQuery, CONNECTION, sqlTransaction);
+            readDataStorico.CommandTimeout = 900000;
             try
             {
                 using (SqlDataReader reader = readDataStorico.ExecuteReader())
@@ -402,6 +404,68 @@ namespace ProcedureNet7
             {
                 string test = "";
             }
+
+
+            DataTable altriStudenti = new DataTable();
+
+            altriStudenti.Columns.Add("Num_domanda");
+            altriStudenti.Columns.Add("Cod_fiscale");
+            altriStudenti.Columns.Add("Cod_tipologia_studi");
+            altriStudenti.Columns.Add("Anno_corso");
+            altriStudenti.Columns.Add("Numero_crediti");
+            altriStudenti.Columns.Add("Crediti_rimanenti");
+            altriStudenti.Columns.Add("Crediti_rimanenti_calcolati");
+            altriStudenti.Columns.Add("Crediti_utilizzati");
+            altriStudenti.Columns.Add("esitoBS");
+            altriStudenti.Columns.Add("Cod_avvenimento");
+            altriStudenti.Columns.Add("Anno_avvenimento");
+            altriStudenti.Columns.Add("Prima_immatricolaz");
+            altriStudenti.Columns.Add("Sede_istituzione_universitaria");
+            altriStudenti.Columns.Add("cred_DI");
+            altriStudenti.Columns.Add("annocorso_DI");
+            altriStudenti.Columns.Add("ripetenteDI");
+            altriStudenti.Columns.Add("Ateneo");
+            altriStudenti.Columns.Add("Crediti_riconosciuti_da_rinuncia");
+            altriStudenti.Columns.Add("AACreditiRiconosciuti");
+
+            foreach (StudenteControlliBonus dataStudente in studenti)
+            {
+                if (dataStudente.controlloManualeStudente)
+                {
+                    continue;
+                }
+                foreach (Avvenimento avvenimento in dataStudente.storicoAvvenimenti)
+                {
+                    altriStudenti.Rows.Add(
+                        dataStudente.numDomanda,
+                        dataStudente.codFiscale,
+                        dataStudente.codTipologiaStudi,
+                        dataStudente.annoCorso,
+                        dataStudente.numCrediti,
+                        dataStudente.creditiBonusRimanentiDaTabella,
+                        dataStudente.creditiRimanentiCalcolati,
+                        dataStudente.creditiBonusUsatiDaTabella,
+                        dataStudente.currentEsitoBS,
+                        avvenimento.codAvvenimento,
+                        avvenimento.annoAccademicoAvvenimento,
+                        avvenimento.AAPrimaImmatricolazione,
+                        avvenimento.sedeIstituzioneUniversitariaAvvenimento,
+                        avvenimento.creditiDI,
+                        avvenimento.annoCorsoDI,
+                        avvenimento.ripetenteDI,
+                        avvenimento.ateneoAvvenimento,
+                        avvenimento.creditiRiconosciutiAvvenimento,
+                        avvenimento.AACreditiRiconosciuti
+                        );
+                }
+            }
+            Utilities.ExportDataTableToExcel(altriStudenti, saveFolder);
+
+            if (studenti.Count > 0)
+            {
+                string test = "";
+            }
+
         }
 
 
