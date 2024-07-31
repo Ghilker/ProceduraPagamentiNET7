@@ -147,7 +147,7 @@ namespace ProcedureNet7
             {
                 key.SetValue(RegistryUsernameKey, username);
                 key.SetValue(RegistryPasswordHashKey, passwordHash);
-                key.SetValue(RegistryExpirationDateKey, DateTime.Now.AddDays(3).ToString("yyyy-MM-dd HH:mm:ss"));
+                key.SetValue(RegistryExpirationDateKey, DateTime.Now.AddDays(15).ToString("yyyy-MM-dd HH:mm:ss"));
                 key.SetValue(RegistryUserIDKey, userID);
                 key.SetValue(RegistryUserTierKey, userTier);
             }
@@ -155,8 +155,13 @@ namespace ProcedureNet7
 
         private static async Task<(bool, int, string)> ValidateUser(string username, string passwordHash)
         {
+            string apiKey = await RetrieveApiKey(username, passwordHash);
+            if (apiKey == null)
+            {
+                return (false, 0, "basic");
+            }
+
             string apiUrl = "https://procedurelavoro.altervista.org/validate_user.php";
-            string apiKey = "7d1d88eea6ce0f5534720c97ee7242e1d2e450f9f267a35742b1ff3ca75f56a5"; // Match this with the PHP script
 
             using (HttpClient client = new HttpClient())
             {
@@ -178,20 +183,58 @@ namespace ProcedureNet7
                     bool success = jsonResponse.status == "success";
                     int userID = success ? jsonResponse.userID : 0;
                     string userTier = success ? jsonResponse.tier : "basic";
+
+
                     return (success, userID, userTier);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    // Handle exception (logging, etc.)
                     return (false, 0, "basic");
                 }
             }
         }
 
+        private static async Task<string> RetrieveApiKey(string username, string passwordHash)
+        {
+            string apiUrl = "https://procedurelavoro.altervista.org/get_api_key.php";
+
+            using (HttpClient client = new HttpClient())
+            {
+                var values = new Dictionary<string, string>
+                {
+                    { "username", username },
+                    { "password_hash", passwordHash }
+                };
+
+                var content = new FormUrlEncodedContent(values);
+
+                try
+                {
+                    var response = await client.PostAsync(apiUrl, content);
+                    var responseString = await response.Content.ReadAsStringAsync();
+
+                    dynamic jsonResponse = JsonConvert.DeserializeObject(responseString);
+                    if (jsonResponse.status == "success")
+                    {
+                        return jsonResponse.apiKey;
+                    }
+                }
+                catch
+                {
+                    Application.Exit();
+                }
+            }
+
+            return null;
+        }
+
+
         private static async Task<bool> ValidateStoredUser(string username, string passwordHash)
         {
+            string apiKey = await RetrieveApiKey(username, passwordHash);
+            if (apiKey == null) return false;
+
             string apiUrl = "https://procedurelavoro.altervista.org/validate_user.php";
-            string apiKey = "7d1d88eea6ce0f5534720c97ee7242e1d2e450f9f267a35742b1ff3ca75f56a5"; // Match this with the PHP script
 
             using (HttpClient client = new HttpClient())
             {
@@ -219,6 +262,7 @@ namespace ProcedureNet7
                 }
             }
         }
+
 
         private static string ComputeHash(string input)
         {
@@ -253,5 +297,6 @@ namespace ProcedureNet7
                 return false;
             }
         }
+
     }
 }
