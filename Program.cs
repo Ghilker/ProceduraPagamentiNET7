@@ -20,7 +20,7 @@ namespace ProcedureNet7
         private const string RegistryUserTierKey = "UserTier";
 
         // Booleans to enable or disable checks
-        private static readonly bool DisableFileHashCheck = false;
+        private static readonly bool DisableFileCheck = false;
         private static readonly bool DisableUserCredentialCheck = false;
 
         // Track login attempts
@@ -40,16 +40,16 @@ namespace ProcedureNet7
             int userID = 0;
             string userTier = "Operatore";
 
-            if (!DisableFileHashCheck)
+            if (!DisableFileCheck)
             {
-                string storedHash = "e0SsYONkRspbYOs0vQZB5qNqHMcnw1EZfqwOc1JaUcRtdLPl";
-                string fileUrl = "https://raw.githubusercontent.com/Ghilker/Me/master/SaveTXT.txt";
-                isFileValid = Task.Run(() => VerifyFileHash(fileUrl, storedHash)).Result;
+                isFileValid = Task.Run(() => VerifyFileStatus()).Result;
             }
 
             if (!isFileValid)
             {
-                MessageBox.Show("An unkown error occurred. Closing.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("An unknown error occurred. Closing.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Application.Exit();
+                return;
             }
 
             if (!DisableUserCredentialCheck)
@@ -112,6 +112,32 @@ namespace ProcedureNet7
                 Application.Exit();
             }
         }
+
+        private static async Task<bool> VerifyFileStatus()
+        {
+            string apiUrl = "https://procedurelavoro.altervista.org/check_file_status.php";
+
+            using (HttpClient client = new HttpClient())
+            {
+                try
+                {
+                    var response = await client.GetStringAsync(apiUrl);
+                    dynamic jsonResponse = JsonConvert.DeserializeObject(response);
+
+                    if (jsonResponse.status == "success" && jsonResponse.isValid == 1)
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Exception: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+
+            return false;
+        }
+
 
         private static bool TryGetStoredCredentials(out string username, out string passwordHash, out int userID, out string userTier)
         {
