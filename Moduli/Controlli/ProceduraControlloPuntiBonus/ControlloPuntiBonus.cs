@@ -127,6 +127,7 @@ namespace ProcedureNet7
                 )
                 SELECT 
                     CTE_Merito.Num_domanda,
+                    Studente.Codice_studente,
                     Studente.Cod_fiscale,
                     CTE_Iscrizioni.Cod_tipologia_studi,
                     CTE_ValoriCalcolati.Anno_corso,
@@ -202,6 +203,7 @@ namespace ProcedureNet7
                         StudenteControlliBonus newStudente = new StudenteControlliBonus
                         {
                             codFiscale = codFiscale,
+                            codiceStudente = Utilities.SafeGetString(reader, "Codice_studente"),
                             numDomanda = Utilities.SafeGetString(reader, "Num_domanda"),
                             codTipologiaStudi = Utilities.SafeGetString(reader, "Cod_tipologia_studi"),
                             annoCorso = Utilities.SafeGetString(reader, "Anno_corso"),

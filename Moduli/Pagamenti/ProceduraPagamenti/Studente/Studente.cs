@@ -12,7 +12,7 @@ namespace ProcedureNet7
         public string codFiscale { get; private set; }
         public string cognome { get; private set; }
         public string nome { get; private set; }
-        public DateTime dataNascita { get; private set; }
+        public string dataNascita { get; private set; }
         public string sesso { get; private set; }
         public string codEnte { get; private set; }
         public Residenza residenza { get; private set; }
@@ -46,7 +46,7 @@ namespace ProcedureNet7
             string codFiscale,
             string cognome,
             string nome,
-            DateTime dataNascita,
+            string dataNascita,
             string sesso,
             string codEnte,
             bool disabile,

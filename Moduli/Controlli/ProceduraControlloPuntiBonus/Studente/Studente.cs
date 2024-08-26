@@ -9,6 +9,7 @@ namespace ProcedureNet7
     internal class StudenteControlliBonus
     {
         public string codFiscale { get; set; }
+        public string codiceStudente { get; set; }
         public string numDomanda { get; set; }
         public string codTipologiaStudi { get; set; }
         public string annoCorso { get; set; }

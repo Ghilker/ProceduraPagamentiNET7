@@ -727,7 +727,7 @@ namespace ProcedureNet7
                             Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "cod_fiscale").ToUpper()),
                             Utilities.SafeGetString(reader, "Cognome").Trim().ToUpper(),
                             Utilities.SafeGetString(reader, "Nome").Trim().ToUpper(),
-                            (DateTime)reader["Data_nascita"],
+                            ((DateTime)reader["Data_nascita"]).ToString("dd/MM/yyyy"),
                             Utilities.SafeGetString(reader, "sesso").Trim().ToUpper(),
                             studenteCodEnte,
                             disabile == 1,
@@ -1669,9 +1669,14 @@ namespace ProcedureNet7
             void PopulateStudentiAssegnazioni()
             {
                 string dateQuery = $@"
-                    SELECT min_data_PA, max_data_PA , detrazione_PA, detrazione_PA_fuori_corso
+                    SELECT 
+                        FORMAT(min_data_PA, 'dd/MM/yyyy') AS min_data_PA, 
+                        FORMAT(max_data_PA, 'dd/MM/yyyy') AS max_data_PA, 
+                        detrazione_PA, 
+                        detrazione_PA_fuori_corso
                     FROM DatiGenerali_con 
-                    WHERE Anno_accademico = '{selectedAA}'";
+                    WHERE Anno_accademico = '{selectedAA}'
+                ";
 
                 DateTime min_data_PA = new(1990, 01, 01);
                 DateTime max_data_PA = new(2999, 01, 01);
@@ -1715,8 +1720,8 @@ namespace ProcedureNet7
                         Assegnazione_PA.Cod_fiscale,
                         Assegnazione_PA.Cod_Pensionato, 
                         Assegnazione_PA.Cod_Stanza, 
-                        Assegnazione_PA.Data_Decorrenza, 
-                        Assegnazione_PA.Data_Fine_Assegnazione, 
+                        FORMAT(Assegnazione_PA.Data_Decorrenza, 'dd/MM/yyyy') AS Data_Decorrenza, 
+                        FORMAT(Assegnazione_PA.Data_Fine_Assegnazione, 'dd/MM/yyyy') AS Data_Fine_Assegnazione, 
                         Assegnazione_PA.Cod_Fine_Assegnazione,
                         Costo_Servizio.Tipo_stanza, 
                         Costo_Servizio.Importo as importo_mensile,
@@ -1991,7 +1996,7 @@ namespace ProcedureNet7
                 {
                     Studente studente = pair.Value;
 
-                    if (studente.codFiscale == "TSSMRC01S05H501J")
+                    if (studente.codFiscale == "KLNSRA00B64Z224M")
                     {
                         string test = "";
                     }
@@ -2106,7 +2111,7 @@ namespace ProcedureNet7
                             {
                                 if (reversale.codReversale == "01")
                                 {
-                                    importoPA += reversale.importo;
+                                    importoPA -= reversale.importo;
                                 }
 
                                 if (riemessaPrimaRata && reversale.codReversale == "01")
@@ -2137,7 +2142,8 @@ namespace ProcedureNet7
                             }
                         }
                     }
-                    studente.SetImportoSaldoPA(Math.Round(Math.Max(importoPA, 0), 2));
+                    importoPA = Math.Round(Math.Max(importoPA, 0), 2);
+                    studente.SetImportoSaldoPA(importoPA);
 
                     double importiPagati = isTR ? 0 : studente.importoPagato;
 
@@ -2220,7 +2226,7 @@ namespace ProcedureNet7
                     }
 
                     studente.SetImportoDaPagareLordo(Math.Round(importoDaPagare - importiPagati, 2));
-                    importoDaPagare = importoDaPagare - (importiPagati + importoPA + importoDetrazioni);
+                    importoDaPagare = importoDaPagare - (importiPagati + importoPA + importoDetrazioni + importoReversali);
                     importoDaPagare = Math.Round(importoDaPagare, 2);
                     importoTotale += importoDaPagare;
                     if ((importoDaPagare == 0 || Math.Abs(importoDaPagare) < 5) && !studentiDaRimuovereDallaTabella.ContainsKey(studente.codFiscale))
@@ -2474,7 +2480,7 @@ namespace ProcedureNet7
                 DataTable dataTable = GenerareGiuliaDataTable(studentsWithPA, impegno);
                 if (dataTable.Rows.Count > 0)
                 {
-                    Utilities.ExportDataTableToExcel(dataTable, newFolderPath, false, "Dettaglio PA");
+                    Utilities.ExportDataTableToExcel(dataTable, newFolderPath, true, "Dettaglio PA");
                 }
             }
             static DataTable GenerareGiuliaDataTable(List<Studente> studentsWithPA, string impegno)
@@ -2483,15 +2489,23 @@ namespace ProcedureNet7
                 int progressivo = 1;
                 DataTable returnDataTable = new();
 
-                _ = returnDataTable.Columns.Add("1");
-                _ = returnDataTable.Columns.Add("2");
-                _ = returnDataTable.Columns.Add("3");
-                _ = returnDataTable.Columns.Add("4");
-                _ = returnDataTable.Columns.Add("5");
-                _ = returnDataTable.Columns.Add("6");
-                _ = returnDataTable.Columns.Add("7");
-                _ = returnDataTable.Columns.Add("8");
-                _ = returnDataTable.Columns.Add("9");
+                _ = returnDataTable.Columns.Add("Progressivo");
+                _ = returnDataTable.Columns.Add("Cognome");
+                _ = returnDataTable.Columns.Add("Nome");
+                _ = returnDataTable.Columns.Add("CodFiscale");
+                _ = returnDataTable.Columns.Add("Costo periodo");
+                _ = returnDataTable.Columns.Add("Totale parziale");
+                _ = returnDataTable.Columns.Add("Residenza");
+                _ = returnDataTable.Columns.Add("Tipo stanza");
+                _ = returnDataTable.Columns.Add("Data decorrenza");
+                _ = returnDataTable.Columns.Add("Data fine assegnazione");
+                _ = returnDataTable.Columns.Add("Num giorni");
+                _ = returnDataTable.Columns.Add("Stato correttezza");
+                _ = returnDataTable.Columns.Add("Importo borsa totale");
+                _ = returnDataTable.Columns.Add("Costo servizio PA");
+                _ = returnDataTable.Columns.Add("Acconto PA");
+                _ = returnDataTable.Columns.Add("Saldo PA");
+                _ = returnDataTable.Columns.Add("Saldo");
 
                 foreach (Studente studente in studentsWithPA)
                 {
@@ -2500,37 +2514,50 @@ namespace ProcedureNet7
                         continue;
                     }
 
-                    _ = returnDataTable.Rows.Add(progressivo, studente.cognome, studente.nome, studente.codFiscale);
-                    _ = returnDataTable.Rows.Add(" ");
-                    _ = returnDataTable.Rows.Add(" ", "Costo periodo", "Totale parziale", "Residenza", "Tipo stanza", "Data decorrenza", "Data fine assegnazione", "Num giorni");
-                    double costoServizioPA = 0;
-                    double costoPA = 0;
-                    double accontoPA = 0;
+                    if (studente.codFiscale == "BKYDMR94S66Z256Y")
+                    {
+                        string test = "";
+                    }
+
+                    double totalCostoServizioPA = Math.Round(studente.assegnazioni.Sum(a => a.costoTotale), 2);
+                    double accontoPA = Math.Round(studente.importoAccontoPA, 2);
+                    double saldoPA = Math.Round(totalCostoServizioPA - accontoPA, 2);
+                    double saldo = Math.Round(studente.importoDaPagareLordo - saldoPA, 2);
+
                     foreach (Assegnazione assegnazione in studente.assegnazioni)
                     {
-                        double roundedCostoServizioPA = 0;
-                        costoPA = Math.Round(assegnazione.costoTotale, 2);
-                        accontoPA = Math.Round(studente.importoAccontoPA, 2);
-                        costoServizioPA += costoPA;
-                        roundedCostoServizioPA = Math.Round(costoServizioPA, 2);
-                        _ = returnDataTable.Rows.Add(" ", costoPA, roundedCostoServizioPA, assegnazione.codPensionato, assegnazione.codTipoStanza, assegnazione.dataDecorrenza, assegnazione.dataFineAssegnazione, (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days, assegnazione.statoCorrettezzaAssegnazione.ToString());
+                        double costoPA = Math.Round(assegnazione.costoTotale, 2);
+                        double totaleParziale = Math.Round(costoPA, 2);
+
+                        _ = returnDataTable.Rows.Add(
+                            progressivo.ToString(),
+                            studente.cognome,
+                            studente.nome,
+                            studente.codFiscale,
+                            costoPA.ToString("F2"),
+                            totaleParziale.ToString("F2"),
+                            assegnazione.codPensionato,
+                            assegnazione.codTipoStanza,
+                            assegnazione.dataDecorrenza.ToString("dd/MM/yyyy"),
+                            assegnazione.dataFineAssegnazione.ToString("dd/MM/yyyy"),
+                            (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days.ToString(),
+                            assegnazione.statoCorrettezzaAssegnazione.ToString(),
+                            studente.importoBeneficio.ToString("F2"),
+                            totalCostoServizioPA.ToString("F2"),
+                            accontoPA.ToString("F2"),
+                            saldoPA.ToString("F2"),
+                            saldo.ToString("F2")
+                        );
                     }
-                    costoServizioPA = Math.Round(costoServizioPA, 2);
-                    _ = returnDataTable.Rows.Add(" ");
-                    _ = returnDataTable.Rows.Add(" ", studente.cognome, studente.nome);
-                    _ = returnDataTable.Rows.Add(" ", "Importo borsa totale", studente.importoBeneficio);
-                    _ = returnDataTable.Rows.Add(" ", "Costo servizio PA", costoServizioPA);
-                    _ = returnDataTable.Rows.Add(" ", "Acconto PA", studente.importoAccontoPA);
-                    _ = returnDataTable.Rows.Add(" ", "Saldo PA", Math.Round(costoServizioPA - studente.importoAccontoPA, 2));
-                    _ = returnDataTable.Rows.Add(" ");
-                    _ = returnDataTable.Rows.Add(" ", "Saldo", $"Lordo = {Math.Round(studente.importoDaPagareLordo)}", $"Ritenuta = {Math.Round(costoServizioPA - accontoPA)}", $"Netto = {Math.Round(studente.importoDaPagareLordo - (costoServizioPA - accontoPA))}");
-                    _ = returnDataTable.Rows.Add(" ");
-                    _ = returnDataTable.Rows.Add(" ");
+
                     progressivo++;
                 }
 
                 return returnDataTable;
             }
+
+
+
 
             DataTable GenerareFlussoDataTable(List<Studente> studentiDaGenerare, string codEnteFlusso)
             {
@@ -2589,7 +2616,7 @@ namespace ProcedureNet7
                     int straniero = studente.residenza.provincia == "EE" ? 0 : 1;
                     string indirizzoResidenza = straniero == 0 ? studente.residenza.indirizzo.Replace("//", "-") : studente.residenza.indirizzo;
                     string capResidenza = straniero == 0 ? "00000" : studente.residenza.CAP;
-                    string dataSenzaSlash = studente.dataNascita.ToString("ddMMyyyy");
+                    string dataSenzaSlash = studente.dataNascita.Replace("/", "");
 
                     _ = studentsData.Rows.Add(
                         incremental,

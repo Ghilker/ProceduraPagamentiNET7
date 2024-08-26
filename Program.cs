@@ -173,7 +173,7 @@ namespace ProcedureNet7
             {
                 key.SetValue(RegistryUsernameKey, username);
                 key.SetValue(RegistryPasswordHashKey, passwordHash);
-                key.SetValue(RegistryExpirationDateKey, DateTime.Now.AddDays(15).ToString("yyyy-MM-dd HH:mm:ss"));
+                key.SetValue(RegistryExpirationDateKey, DateTime.Now.AddDays(45).ToString("yyyy-MM-dd HH:mm:ss"));
                 key.SetValue(RegistryUserIDKey, userID);
                 key.SetValue(RegistryUserTierKey, userTier);
             }

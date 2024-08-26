@@ -240,10 +240,10 @@ namespace ProcedureNet7
             string fullPath = Path.Combine(folderPath, fileName);
             Directory.CreateDirectory(folderPath); // Ensure the directory exists
 
-            Excel.Application? excelApp = new();
-            Excel.Workbooks? workbooks = null;
-            Excel._Workbook? workbook = null;
-            Excel._Worksheet? worksheet = null;
+            Excel.Application excelApp = new();
+            Excel.Workbooks workbooks = null;
+            Excel._Workbook workbook = null;
+            Excel._Worksheet worksheet = null;
 
             try
             {
@@ -274,7 +274,7 @@ namespace ProcedureNet7
             }
         }
 
-        private static void CleanUp(Excel._Worksheet? worksheet, Excel._Workbook? workbook, Excel.Workbooks? workbooks, Excel.Application? excelApp)
+        private static void CleanUp(Excel._Worksheet worksheet, Excel._Workbook workbook, Excel.Workbooks workbooks, Excel.Application excelApp)
         {
             if (worksheet != null) Marshal.ReleaseComObject(worksheet);
             if (workbook != null)
@@ -314,12 +314,28 @@ namespace ProcedureNet7
             object[,] values = new object[rowCount, columnCount];
 
             for (int i = 0; i < rowCount; i++)
+            {
                 for (int j = 0; j < columnCount; j++)
-                    values[i, j] = dataTable.Rows[i][j];
+                {
+                    if (dataTable.Columns[j].DataType == typeof(string) && IsDate(dataTable.Rows[i][j].ToString()))
+                    {
+                        values[i, j] = "'" + dataTable.Rows[i][j].ToString();
+                    }
+                    else
+                    {
+                        values[i, j] = dataTable.Rows[i][j]?.ToString() ?? string.Empty;
+                    }
+                }
+            }
 
             Excel.Range range = worksheet.Cells[rowOffset, 1];
             range = range.Resize[rowCount, columnCount];
             range.Value = values; // Set the entire block of values in one shot
+        }
+
+        private static bool IsDate(string input)
+        {
+            return DateTime.TryParseExact(input, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out _);
         }
 
         private static void AddDataInBulk(Excel._Worksheet worksheet, DataTable dataTable, bool includeHeaders)

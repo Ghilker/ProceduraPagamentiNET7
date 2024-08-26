@@ -601,7 +601,7 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
                     vValori_calcolati ON Graduatorie.Num_domanda = vValori_calcolati.Num_domanda AND Graduatorie.Anno_accademico = vValori_calcolati.Anno_accademico INNER JOIN
                     Tipologie_status_sede ON vValori_calcolati.Status_sede = Tipologie_status_sede.Status_sede INNER JOIN
                     Tipologie_status_sede AS Tipologie_status_sede_1 ON Graduatorie.StatusSedeCalcolato = Tipologie_status_sede_1.Status_sede
-                WHERE Cod_tipo_graduat = 1 AND Graduatorie.cod_tipo_esito = 2 AND vEsiti_concorsi.cod_tipo_esito = 2 AND Graduatorie.Anno_accademico = '{selectedAA}' AND Graduatorie.Cod_beneficio = '{selectedBeneficio}' AND vEsiti_concorsi.Cod_beneficio = '{selectedBeneficio}' AND Cod_fiscale IN ({fiscalCodes})";
+                WHERE Cod_tipo_graduat = 1 AND Graduatorie.Anno_accademico = '{selectedAA}' AND Graduatorie.Cod_beneficio = '{selectedBeneficio}' AND vEsiti_concorsi.Cod_beneficio = '{selectedBeneficio}' AND Cod_fiscale IN ({fiscalCodes})";
 
             Dictionary<Studente, List<string>> studentiDict = new Dictionary<Studente, List<string>>();
             using (SqlCommand cmd = new(dataQuery, CONNECTION))

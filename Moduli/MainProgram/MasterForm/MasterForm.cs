@@ -204,6 +204,10 @@ namespace ProcedureNet7
                             FormAggiuntaProvvedimenti provvedimenti = new FormAggiuntaProvvedimenti(this);
                             ShowFormInPanel(provvedimenti);
                             break;
+                        case ProcedureVarie.EstrazionePermessiSoggiorno:
+                            FormProceduraEstrazionePermessiSoggiorno estrazionePermessiSoggiorno = new FormProceduraEstrazionePermessiSoggiorno(this);
+                            ShowFormInPanel(estrazionePermessiSoggiorno);
+                            break;
                     }
                 }
 #endif
@@ -291,7 +295,9 @@ namespace ProcedureNet7
             [ProcedureCategory("Varie", "Operatore")]
             ProceduraAllegati,
             [ProcedureCategory("Varie", "Funzionario")]
-            SpecificheImpegni
+            SpecificheImpegni,
+            [ProcedureCategory("Varie", "Funzionario")]
+            EstrazionePermessiSoggiorno
         }
 
         public enum ProcedureVerifiche
