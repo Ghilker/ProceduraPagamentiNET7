@@ -29,29 +29,33 @@
         private void InitializeComponent()
         {
             label1 = new Label();
-            button1 = new Button();
+            circularButton1 = new CircularButton();
             SuspendLayout();
             // 
             // label1
             // 
             label1.AutoSize = true;
             label1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
-            label1.Location = new Point(29, 11);
+            label1.Location = new Point(12, 9);
             label1.Name = "label1";
             label1.Size = new Size(119, 28);
             label1.TabIndex = 59;
             label1.Text = "LA VERIFICA";
             // 
-            // button1
+            // circularButton1
             // 
-            button1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
-            button1.Location = new Point(460, 291);
-            button1.Name = "button1";
-            button1.Size = new Size(312, 49);
-            button1.TabIndex = 58;
-            button1.Text = "AVVIA LA PROCEDURA";
-            button1.UseVisualStyleBackColor = true;
-            button1.Click += button1_Click;
+            circularButton1.BackColor = Color.FromArgb(210, 40, 10);
+            circularButton1.FlatAppearance.BorderSize = 0;
+            circularButton1.FlatStyle = FlatStyle.Flat;
+            circularButton1.Font = new Font("Impact", 27.75F, FontStyle.Regular, GraphicsUnit.Point);
+            circularButton1.ForeColor = Color.White;
+            circularButton1.Location = new Point(595, 145);
+            circularButton1.Name = "circularButton1";
+            circularButton1.Size = new Size(193, 193);
+            circularButton1.TabIndex = 60;
+            circularButton1.Text = "VERIFICA";
+            circularButton1.UseVisualStyleBackColor = false;
+            circularButton1.Click += circularButton1_Click;
             // 
             // FormVerifica
             // 
@@ -59,8 +63,8 @@
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
+            Controls.Add(circularButton1);
             Controls.Add(label1);
-            Controls.Add(button1);
             FormBorderStyle = FormBorderStyle.None;
             Name = "FormVerifica";
             Text = "FormVerifica";
@@ -71,6 +75,6 @@
         #endregion
 
         private Label label1;
-        private Button button1;
+        private CircularButton circularButton1;
     }
 }

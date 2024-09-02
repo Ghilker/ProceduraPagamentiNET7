@@ -22,16 +22,6 @@ namespace ProcedureNet7
             InitializeComponent();
         }
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            if (_masterForm == null)
-            {
-                return;
-            }
-
-            _masterForm.RunBackgroundWorker(RunVerifica);
-        }
-
         private void RunVerifica(SqlConnection mainConnection)
         {
             try
@@ -41,13 +31,13 @@ namespace ProcedureNet7
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
                 ArgsValidation argsValidation = new ArgsValidation();
-                ArgsControlloPuntiBonus argsControlloPuntiBonus = new ArgsControlloPuntiBonus
+                ArgsVerifica argsVerifica = new ArgsVerifica
                 {
-                    _selectedSaveFolder = selectedFolderPath
+
                 };
-                argsValidation.Validate(argsControlloPuntiBonus);
-                ControlloPuntiBonus controlloPuntiBonus = new(_masterForm, mainConnection);
-                controlloPuntiBonus.RunProcedure(argsControlloPuntiBonus);
+                argsValidation.Validate(argsVerifica);
+                Verifica verifica = new(_masterForm, mainConnection);
+                verifica.RunProcedure(argsVerifica);
             }
             catch (ValidationException ex)
             {
@@ -59,9 +49,14 @@ namespace ProcedureNet7
             }
         }
 
-        private void controlloBonusSaveFolder_Click_1(object sender, EventArgs e)
+        private void circularButton1_Click(object sender, EventArgs e)
         {
-            //Utilities.ChooseFolder(controlloBonusFolderLbl, folderBrowserDialog1, ref selectedFolderPath);
+            if (_masterForm == null)
+            {
+                return;
+            }
+
+            _masterForm.RunBackgroundWorker(RunVerifica);
         }
     }
 }

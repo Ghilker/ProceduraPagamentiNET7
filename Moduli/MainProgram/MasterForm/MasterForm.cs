@@ -220,6 +220,10 @@ namespace ProcedureNet7
                             FormControlloPuntiBonus controlloPuntiBonus = new FormControlloPuntiBonus(this);
                             ShowFormInPanel(controlloPuntiBonus);
                             break;
+                        case ProcedureVerifiche.Verifica:
+                            FormVerifica formVerifica = new FormVerifica(this);
+                            ShowFormInPanel(formVerifica);
+                            break;
                     }
                 }
 #endif
@@ -303,7 +307,9 @@ namespace ProcedureNet7
         public enum ProcedureVerifiche
         {
             [ProcedureCategory("Verifiche", "Programmatore")]
-            ProceduraControlloPuntiBonus
+            ProceduraControlloPuntiBonus,
+            [ProcedureCategory("Verifiche", "Programmatore")]
+            Verifica
         }
 
     }
