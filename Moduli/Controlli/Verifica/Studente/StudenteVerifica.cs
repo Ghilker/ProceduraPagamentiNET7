@@ -17,7 +17,7 @@ namespace ProcedureNet7
         public VerificaDomicilio verificaDomicilio;
         public VerificaIscrizione verificaIscrizione;
         public VerificaNucleoFamiliare verificaNucleoFamiliare;
-        public VerificaDatiEconomiciEstero verificaDatiEconomiciEstero;
+        public VerificaDatiEconomici verificaDatiEconomiciEstero;
         public VerificaBeneficiRichiesti verificaBeneficiRichiesti;
     }
 
@@ -139,8 +139,10 @@ namespace ProcedureNet7
         public DateTime dataInizioResidenzaIndipendente; //Residenza_est_da
         public bool redditoSuperiore; //Reddito_2_anni
     }
-    public class VerificaDatiEconomiciEstero //vNucleo_fam_stranieri_DO
+    public class VerificaDatiEconomici //vNucleo_fam_stranieri_DO
     {
+        public string tipologiaReddito;
+
         public int numeroComponenti;
         public double redditoComplessivo;
         public double patrimonioMobiliare;

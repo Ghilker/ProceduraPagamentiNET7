@@ -40,6 +40,9 @@ namespace ProcedureNet7
         public string swift { get; private set; }
         public List<Pagamento> pagamentiEffettuati { get; private set; }
         public string mandatoProvvisorio { get; private set; }
+        public int numeroComponentiNucleoFamiliare { get; private set; }
+        public int numeroComponentiNucleoFamiliareEstero { get; private set; }
+        public bool domicilioCheck { get; private set; }
 
         public Studente(
             string numDomanda,
@@ -228,6 +231,17 @@ namespace ProcedureNet7
         public void SetEraVincitorePA(bool eraVincitorePA)
         {
             this.eraVincitorePA = eraVincitorePA;
+        }
+
+        public void SetNucleoFamiliare(int componentiTotale, int componentiEstero)
+        {
+            numeroComponentiNucleoFamiliare = componentiTotale;
+            numeroComponentiNucleoFamiliareEstero = componentiEstero;
+        }
+
+        public void SetDomicilioCheck(bool check)
+        {
+            this.domicilioCheck = check;
         }
     }
 }

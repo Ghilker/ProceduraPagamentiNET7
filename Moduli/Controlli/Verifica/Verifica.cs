@@ -33,12 +33,34 @@ namespace ProcedureNet7
             {
                 string test = "";
             }
+
+            AddBeneficiRichiesti();
+
+            if (verificaDict.Count > 0)
+            {
+                string test = "";
+            }
+
+            AddNucleoFamiliareStranieri();
+
+            if (verificaDict.Count > 0)
+            {
+                string test = "";
+            }
+
+            AddDatiEconomiciStranieri();
+
+            if (verificaDict.Count > 0)
+            {
+                string test = "";
+            }
+
         }
 
         void CreateVerificaList()
         {
             string dataQuery = @"
-                    SELECT   TOP(5000)   
+                    SELECT   
                     domanda.Cod_fiscale, 
                     domanda.num_domanda, 
                     Studente.Cognome,
@@ -276,11 +298,15 @@ namespace ProcedureNet7
         void AddCarrieraPregressa()
         {
             string dataQuery = @"
-                    select vCARRIERA_PREGRESSA.*, dbo.SlashAnniBeneficiarioBS(vCARRIERA_PREGRESSA.Cod_fiscale, '20242025') as anni_beneficiario, dbo.SlashAnniRestituitiBS(vCARRIERA_PREGRESSA.Cod_fiscale, '20242025') as anni_restituiti
-                    from vCARRIERA_PREGRESSA 
+                    SELECT vCARRIERA_PREGRESSA.*, 
+                           ben.anni_beneficiario,
+                           res.anni_restituiti
+                    FROM vCARRIERA_PREGRESSA
                     inner join #CFEstrazione cfe ON vCARRIERA_PREGRESSA.Cod_fiscale = cfe.Cod_fiscale 
-                    where Anno_accademico = '20242025'
-                    order by Cod_fiscale
+                    CROSS APPLY dbo.SlashAnniBeneficiarioBS(vCARRIERA_PREGRESSA.Cod_fiscale, '20242025') AS ben
+                    CROSS APPLY dbo.SlashAnniRestituitiBS(vCARRIERA_PREGRESSA.Cod_fiscale, '20242025') AS res
+                    WHERE vCARRIERA_PREGRESSA.Anno_accademico = '20242025'
+                    ORDER BY vCARRIERA_PREGRESSA.Cod_fiscale;
                 ";
 
             SqlCommand readData = new(dataQuery, CONNECTION);
@@ -352,5 +378,201 @@ namespace ProcedureNet7
                 }
             }
         }
+
+        void AddBeneficiRichiesti()
+        {
+            string dataQuery = @"
+                WITH FilteredDomanda AS (
+                    SELECT d.Num_domanda, d.Anno_accademico, d.Cod_fiscale, d.Data_validita, d.Utente, d.Tipo_bando, d.Id_Domanda, d.DataCreazioneRecord
+                    FROM Domanda AS d
+                    INNER JOIN vStatus_compilazione AS vv ON d.Anno_accademico = vv.anno_accademico AND d.Num_domanda = vv.num_domanda
+                    WHERE d.Anno_accademico = '20242025' 
+                      AND vv.status_compilazione >= 90 
+                      AND d.Tipo_bando = 'lz'
+                ),
+                DomandaWithJoins AS (
+                    SELECT 
+                        fd.Cod_fiscale,
+                        vben.Cod_beneficio,
+                        vdom.Posto_alloggio_confort,
+                        vci.attesa_ci,
+                        vci.durata_ci,
+                        vci.paese_ci,
+                        vci.data_partenza,
+                        vdom.Possesso_altra_borsa,
+                        vae.Beneficio_residenziale,
+                        vimp.importo_borsa
+                    FROM FilteredDomanda AS fd
+                    LEFT outer JOIN vBenefici_richiesti AS vben ON fd.Anno_accademico = vben.Anno_accademico AND fd.Num_domanda = vben.Num_domanda
+                    LEFT outer JOIN vDATIGENERALI_dom AS vdom ON fd.Anno_accademico = vdom.Anno_accademico AND fd.Num_domanda = vdom.Num_domanda
+                    LEFT outer JOIN vSpecifiche_ci AS vci ON fd.Anno_accademico = vci.anno_accademico AND fd.Num_domanda = vci.num_domanda
+                    LEFT outer JOIN vBenefici_altri_enti AS vae ON fd.Anno_accademico = vae.Anno_accademico AND fd.Num_domanda = vae.Num_domanda
+                    LEFT outer JOIN vImporti_borsa_percepiti AS vimp ON fd.Anno_accademico = vimp.anno_accademico AND fd.Num_domanda = vimp.num_domanda
+                )
+                SELECT *
+                FROM DomandaWithJoins
+
+                ORDER BY Cod_fiscale;
+
+                ";
+
+            SqlCommand readData = new(dataQuery, CONNECTION);
+            Logger.LogInfo(45, "Verifica - aggiunta carriera pregressa");
+
+            using (SqlDataReader reader = readData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+
+                    verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
+                    if (studenteVerifica != null)
+                    {
+                        if (studenteVerifica.verificaBeneficiRichiesti == null)
+                        {
+                            studenteVerifica.verificaBeneficiRichiesti = new VerificaBeneficiRichiesti();
+                        }
+
+                        VerificaBeneficiRichiesti verificaBeneficiRichiesti = studenteVerifica.verificaBeneficiRichiesti;
+
+                        string codBeneficio = Utilities.SafeGetString(reader, "Cod_beneficio");
+                        switch (codBeneficio)
+                        {
+                            case "BS":
+                                verificaBeneficiRichiesti.richiestoBorsaDiStudio = true;
+
+                                verificaBeneficiRichiesti.beneficiAltriEnti = Utilities.SafeGetString(reader, "Possesso_altra_borsa") == "1";
+
+                                verificaBeneficiRichiesti.beneficiPercepitiPrecedenti = Utilities.SafeGetDouble(reader, "importo_borsa") > 0;
+                                verificaBeneficiRichiesti.sommaImportiBeneficiPercepitiPrecedenti = Utilities.SafeGetDouble(reader, "importo_borsa");
+                                break;
+                            case "PA":
+                                verificaBeneficiRichiesti.richiestoPostoAlloggio = true;
+                                verificaBeneficiRichiesti.richiestoPostoAlloggioComfort = Utilities.SafeGetString(reader, "Posto_alloggio_confort") == "1";
+                                verificaBeneficiRichiesti.beneficiOspitalitaResidenziale = Utilities.SafeGetString(reader, "Beneficio_residenziale") == "1";
+                                break;
+                            case "CI":
+                                verificaBeneficiRichiesti.richiestoContributoInternazionale = true;
+                                verificaBeneficiRichiesti.inAttesaCI = Utilities.SafeGetString(reader, "attesa_ci") == "1";
+                                if (!verificaBeneficiRichiesti.inAttesaCI)
+                                {
+                                    verificaBeneficiRichiesti.codNazioneCI = Utilities.SafeGetString(reader, "paese_ci");
+                                    verificaBeneficiRichiesti.dataPartenzaCI = DateTime.Parse(Utilities.SafeGetString(reader, "data_partenza"));
+                                    verificaBeneficiRichiesti.durataMesiCI = Utilities.SafeGetInt(reader, "durata_ci");
+                                }
+                                break;
+                        }
+
+                    }
+                }
+            }
+        }
+
+        void AddNucleoFamiliareStranieri()
+        {
+            string dataQuery = @"
+                    select 
+                        Cod_fiscale,
+                        Num_componenti,
+                        Numero_conviventi_estero,
+                        Cod_status_genit,
+                        Cod_tipologia_nucleo,
+                        motivo_assenza_genit,
+                        Residenza_est_da,
+                        Reddito_2_anni
+                    from vNucleo_familiare 
+                    inner join Domanda on vNucleo_familiare.Anno_accademico = Domanda.Anno_accademico and vNucleo_familiare.Num_domanda = Domanda.Num_domanda
+                    where domanda.Anno_accademico = '20242025' and Domanda.Cod_fiscale in 
+                    (select domanda.Cod_fiscale from Domanda inner join vResidenza on Domanda.Cod_fiscale = vResidenza.COD_FISCALE and Domanda.Anno_accademico = vResidenza.ANNO_ACCADEMICO
+                    where Domanda.Anno_accademico = '20242025' and Domanda.tipo_bando = 'lz'  and vResidenza.provincia_residenza = 'EE')
+                    order by domanda.Cod_fiscale
+
+                ";
+
+            SqlCommand readData = new(dataQuery, CONNECTION);
+            Logger.LogInfo(45, "Verifica - aggiunta nucleo familiare stranieri");
+
+            using (SqlDataReader reader = readData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+
+                    verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
+                    if (studenteVerifica != null)
+                    {
+                        DateTime.TryParse(Utilities.SafeGetString(reader, "Residenza_est_da"), out DateTime result);
+
+
+                        studenteVerifica.verificaNucleoFamiliare = new VerificaNucleoFamiliare()
+                        {
+                            numeroComponentiNF = Utilities.SafeGetInt(reader, "Num_componenti"),
+                            numeroComponentiEsteroNF = Utilities.SafeGetInt(reader, "Numero_conviventi_estero"),
+                            almenoUnGenitore = Utilities.SafeGetString(reader, "Cod_status_genit") != "N",
+                            orfano = Utilities.SafeGetString(reader, "Cod_tipologia_nucleo") == "A" &&
+                                        Utilities.SafeGetString(reader, "Motivo_assenza_genit") == "1" &&
+                                        Utilities.SafeGetString(reader, "Cod_status_genit") == "N",
+                            indipendente = Utilities.SafeGetString(reader, "Cod_tipologia_nucleo") == "B" &&
+                                            Utilities.SafeGetInt(reader, "Num_componenti") == 1 &&
+                                            Utilities.SafeGetString(reader, "Motivo_assenza_genit") == "2" &&
+                                            Utilities.SafeGetString(reader, "Reddito_2_anni") == "1" &&
+                                            DateTime.Now.Year - result.Year >= 2,
+                            dataInizioResidenzaIndipendente = result,
+                            redditoSuperiore = Utilities.SafeGetString(reader, "Reddito_2_anni") == "1"
+                        };
+                    }
+                }
+            }
+        }
+
+        void AddDatiEconomiciStranieri()
+        {
+
+            string dataQuery = @"
+                    select 
+                        Cod_fiscale,
+                        Numero_componenti,
+                        Redd_complessivo,
+                        Patr_mobiliare,
+                        Possesso_abitaz,
+                        Superf_abitaz_MQ,
+                        Poss_altre_abit,
+                        Sup_compl_altre_MQ
+                    from vNucleo_fam_stranieri_DO
+                        inner join Domanda on Domanda.Anno_accademico = vNucleo_fam_stranieri_DO.Anno_accademico and Domanda.Num_domanda = vNucleo_fam_stranieri_DO.Num_domanda
+                    where Domanda.Anno_accademico = '20242025'
+                    order by Cod_fiscale
+
+                ";
+
+            SqlCommand readData = new(dataQuery, CONNECTION);
+            Logger.LogInfo(45, "Verifica - aggiunta nucleo familiare stranieri");
+
+            using (SqlDataReader reader = readData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+
+                    verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
+                    if (studenteVerifica != null)
+                    {
+                        studenteVerifica.verificaDatiEconomiciEstero = new VerificaDatiEconomici()
+                        {
+                            numeroComponenti = Utilities.SafeGetInt(reader, "Numero_componenti"),
+                            possessoAbitazione = Utilities.SafeGetString(reader, "Possesso_abitaz") == "1",
+                            redditoComplessivo = Utilities.SafeGetDouble(reader, "Redd_complessivo"),
+                            patrimonioMobiliare = Utilities.SafeGetDouble(reader, "Patr_mobiliare"),
+                            superficieMQAbitazione = Utilities.SafeGetInt(reader, "Superf_abitaz_MQ"),
+                            possessoAltraAbitazione = Utilities.SafeGetString(reader, "poss_altre_abit") == "1",
+                            superficieMQAltraAbitazione = Utilities.SafeGetInt(reader, "sup_compl_altre_MQ")
+                        };
+
+                    }
+                }
+            }
+
+        }
     }
 }
+

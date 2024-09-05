@@ -975,10 +975,6 @@ namespace ProcedureNet7
                                 Utilities.SafeGetString(reader, "Ritirato_azienda") == "1"
                                 );
                         }
-                        else
-                        {
-                            Logger.LogWarning(null, $"Attenzione: Studente non trovato per il codice fiscale {codFiscale}");
-                        }
                     }
                 }
 
@@ -1481,6 +1477,8 @@ namespace ProcedureNet7
                 PopulateStudentDetrazioni();
                 if (!isIntegrazione)
                 {
+                    PopulateNucleoFamiliare();
+                    PopulateDomicilioCheck();
                     PopulateStudentiAssegnazioni();
                 }
             }
@@ -1666,6 +1664,84 @@ namespace ProcedureNet7
                 }
                 Logger.LogInfo(40, $"UPDATE:Lavorazione studenti - inserimento esiti PA - completato");
             }
+            void PopulateNucleoFamiliare()
+            {
+                string dataQuery = $@"
+                    select domanda.Cod_fiscale, Num_componenti, Numero_conviventi_estero
+                    from Domanda 
+                    inner join #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale
+                    inner join vNucleo_familiare vn on Domanda.Anno_accademico = vn.Anno_accademico and Domanda.Num_domanda = vn.Num_domanda 
+                    where Domanda.Anno_accademico = '{selectedAA}' and Tipo_bando = 'lz'
+                    ";
+
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                Logger.LogInfo(40, $"Lavorazione studenti - inserimento nucleo familiare");
+                List<string> studentiDaRimuovere = new List<string>();
+                using (SqlDataReader reader = readData.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+
+
+                        if (studente != null)
+                        {
+                            int numeroComponenti = Utilities.SafeGetInt(reader, "Num_componenti");
+                            int numeroComponentiEstero = Utilities.SafeGetInt(reader, "Numero_conviventi_estero");
+                            studente.SetNucleoFamiliare(numeroComponenti, numeroComponentiEstero);
+                        }
+                    }
+                }
+
+                Logger.LogInfo(40, $"UPDATE:Lavorazione studenti - inserimento nucleo familiare - completato");
+            }
+            void PopulateDomicilioCheck()
+            {
+                string dataQuery = $@"
+                    SELECT Domanda.Cod_fiscale
+                    FROM Domanda  
+                    inner join  #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale
+                    INNER JOIN vDomicilio ON Domanda.Anno_accademico = vDomicilio.ANNO_ACCADEMICO AND Domanda.Cod_fiscale = vDomicilio.COD_FISCALE
+                    WHERE Domanda.Anno_accademico = '{selectedAA}'
+                        AND Tipo_bando = 'lz' 
+                        AND TITOLO_ONEROSO = 1 
+                        AND (N_SERIE_CONTRATTO IS NOT NULL AND N_SERIE_CONTRATTO <> '')
+                        -- Ensure that the decorrenza or scadenza dates have at least 10 months within the given range
+                        AND DATEDIFF(MONTH, 
+                            CASE 
+                                -- If DATA_DECORRENZA is before 01/10/2023, consider 01/10/2023 as the start of overlap
+                                WHEN DATA_DECORRENZA < '2023-10-01' THEN '2023-10-01' 
+                                ELSE DATA_DECORRENZA 
+                            END, 
+                            CASE 
+                                -- If DATA_SCADENZA is after 30/09/2024, consider 30/09/2024 as the end of overlap
+                                WHEN DATA_SCADENZA > '2024-09-30' THEN '2024-09-30' 
+                                ELSE DATA_SCADENZA 
+                            END
+                        ) >= 9;
+                    ";
+
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                Logger.LogInfo(40, $"Lavorazione studenti - inserimento domicilio check");
+                List<string> studentiDaRimuovere = new List<string>();
+                using (SqlDataReader reader = readData.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+
+
+                        if (studente != null)
+                        {
+                            studente.SetDomicilioCheck(true);
+                        }
+                    }
+                }
+
+                Logger.LogInfo(40, $"UPDATE:Lavorazione studenti - inserimento domicilio check - completato");
+            }
             void PopulateStudentiAssegnazioni()
             {
                 string dateQuery = $@"
@@ -1751,7 +1827,10 @@ namespace ProcedureNet7
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
                         studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
-
+                        if (codFiscale == "RDWMBR97P08Z200N")
+                        {
+                            string test = "Hello";
+                        }
                         if (studente == null || Utilities.SafeGetString(reader, "Cod_Stanza") == "XXX")
                         {
                             continue;
@@ -1823,12 +1902,17 @@ namespace ProcedureNet7
                         }
                         else if (categoriaPagam == "SA")
                         {
+                            if (!DateTime.TryParse(Utilities.SafeGetString(reader, "data_fine_assegnazione").Trim(), out DateTime endDate))
+                            {
+                                endDate = DateTime.MaxValue;
+                            }
+
 
                             AssegnazioneDataCheck result = studente.AddAssegnazione(
                                      Utilities.SafeGetString(reader, "cod_pensionato").Trim(),
                                      Utilities.SafeGetString(reader, "Cod_Stanza").Trim(),
                                      DateTime.Parse(Utilities.SafeGetString(reader, "data_decorrenza").Trim()),
-                                     DateTime.TryParse(Utilities.SafeGetString(reader, "data_fine_assegnazione").Trim(), out DateTime date) ? date : max_data_PA,
+                                     endDate,
                                      Utilities.SafeGetString(reader, "Cod_fine_assegnazione").Trim(),
                                      Utilities.SafeGetString(reader, "tipo_stanza").Trim(),
                                      double.TryParse(Utilities.SafeGetString(reader, "importo_mensile").Trim(), out double importoMensile) ? importoMensile : 0,
@@ -1854,6 +1938,9 @@ namespace ProcedureNet7
                                     break;
                                 case AssegnazioneDataCheck.DataFineAssMaggioreMax:
                                     message = "Assegnazione posto alloggio con data fine assegnazione maggiore del massimo previsto dal bando";
+                                    break;
+                                case AssegnazioneDataCheck.MancanzaDataFineAssegnazione:
+                                    message = "Assegnazione posto alloggio senza data fine";
                                     break;
                             }
                             if (result == AssegnazioneDataCheck.Corretto)
@@ -1996,7 +2083,7 @@ namespace ProcedureNet7
                 {
                     Studente studente = pair.Value;
 
-                    if (studente.codFiscale == "KLNSRA00B64Z224M")
+                    if (studente.codFiscale == "RDWMBR97P08Z200N")
                     {
                         string test = "";
                     }
@@ -2098,7 +2185,8 @@ namespace ProcedureNet7
                             foreach (Assegnazione assegnazione in studente.assegnazioni)
                             {
                                 if (assegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.Corretto ||
-                                    assegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.DataUguale)
+                                    assegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.DataUguale ||
+                                    assegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.MancanzaDataFineAssegnazione)
                                 {
                                     importoPA += Math.Max(assegnazione.costoTotale, 0);
                                 }
@@ -2112,6 +2200,7 @@ namespace ProcedureNet7
                                 if (reversale.codReversale == "01")
                                 {
                                     importoPA -= reversale.importo;
+                                    studente.SetImportoAccontoPA(Math.Round(reversale.importo, 2));
                                 }
 
                                 if (riemessaPrimaRata && reversale.codReversale == "01")
@@ -2493,19 +2582,18 @@ namespace ProcedureNet7
                 _ = returnDataTable.Columns.Add("Cognome");
                 _ = returnDataTable.Columns.Add("Nome");
                 _ = returnDataTable.Columns.Add("CodFiscale");
-                _ = returnDataTable.Columns.Add("Costo periodo");
-                _ = returnDataTable.Columns.Add("Totale parziale");
                 _ = returnDataTable.Columns.Add("Residenza");
-                _ = returnDataTable.Columns.Add("Tipo stanza");
                 _ = returnDataTable.Columns.Add("Data decorrenza");
                 _ = returnDataTable.Columns.Add("Data fine assegnazione");
+                _ = returnDataTable.Columns.Add("Data inizio PA");
+                _ = returnDataTable.Columns.Add("Data fine PA");
                 _ = returnDataTable.Columns.Add("Num giorni");
-                _ = returnDataTable.Columns.Add("Stato correttezza");
                 _ = returnDataTable.Columns.Add("Importo borsa totale");
-                _ = returnDataTable.Columns.Add("Costo servizio PA");
                 _ = returnDataTable.Columns.Add("Acconto PA");
                 _ = returnDataTable.Columns.Add("Saldo PA");
                 _ = returnDataTable.Columns.Add("Saldo");
+                _ = returnDataTable.Columns.Add("Stato correttezza");
+                _ = returnDataTable.Columns.Add("Controllo status sede");
 
                 foreach (Studente studente in studentsWithPA)
                 {
@@ -2514,45 +2602,77 @@ namespace ProcedureNet7
                         continue;
                     }
 
-                    if (studente.codFiscale == "BKYDMR94S66Z256Y")
+                    if (studente.codFiscale == "BBABTI81C52Z224X")
                     {
                         string test = "";
                     }
 
-                    double totalCostoServizioPA = Math.Round(studente.assegnazioni.Sum(a => a.costoTotale), 2);
                     double accontoPA = Math.Round(studente.importoAccontoPA, 2);
-                    double saldoPA = Math.Round(totalCostoServizioPA - accontoPA, 2);
-                    double saldo = Math.Round(studente.importoDaPagareLordo - saldoPA, 2);
+                    double saldoPA = Math.Round(studente.importoSaldoPA, 2);
+                    double saldo = Math.Round(studente.importoDaPagare, 2);
+
+                    DateTime dataIniziale = DateTime.MinValue;
+                    DateTime dataFinale = DateTime.MinValue;
+
+                    foreach (Assegnazione assegnazioneCheck in studente.assegnazioni)
+                    {
+                        if (dataIniziale == DateTime.MinValue)
+                        {
+                            dataIniziale = assegnazioneCheck.dataDecorrenza;
+                        }
+
+                        if (dataFinale < assegnazioneCheck.dataFineAssegnazione)
+                        {
+                            dataFinale = assegnazioneCheck.dataFineAssegnazione;
+                        }
+                    }
+
+                    bool controlloApprofondito = false;
+
+                    // Check if the student has been "in" for more than 7 months
+                    bool isMoreThanSevenMonths = (dataFinale - dataIniziale).TotalDays > 7 * 30;  // Approximate 7 months as 7 * 30 days
+
+                    // If the student has been "in" for less than or equal to 7 months, do further checks
+                    if (dataFinale < new DateTime(2024, 7, 15) && !isMoreThanSevenMonths)
+                    {
+                        bool hasDomicilio = studente.domicilioCheck;
+                        bool isMoreThanHalfAbroad = studente.numeroComponentiNucleoFamiliareEstero >= (studente.numeroComponentiNucleoFamiliare / 2.0);
+
+                        // Determine if the student needs a controllo
+                        if (!hasDomicilio && !isMoreThanHalfAbroad)
+                        {
+                            controlloApprofondito = true;
+                        }
+                    }
+
+
+
 
                     foreach (Assegnazione assegnazione in studente.assegnazioni)
                     {
-                        double costoPA = Math.Round(assegnazione.costoTotale, 2);
-                        double totaleParziale = Math.Round(costoPA, 2);
-
                         _ = returnDataTable.Rows.Add(
                             progressivo.ToString(),
                             studente.cognome,
                             studente.nome,
                             studente.codFiscale,
-                            costoPA.ToString("F2"),
-                            totaleParziale.ToString("F2"),
                             assegnazione.codPensionato,
-                            assegnazione.codTipoStanza,
                             assegnazione.dataDecorrenza.ToString("dd/MM/yyyy"),
                             assegnazione.dataFineAssegnazione.ToString("dd/MM/yyyy"),
+                            dataIniziale.ToString("dd/MM/yyyy"),
+                            dataFinale.ToString("dd/MM/yyyy"),
                             (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days.ToString(),
-                            assegnazione.statoCorrettezzaAssegnazione.ToString(),
                             studente.importoBeneficio.ToString("F2"),
-                            totalCostoServizioPA.ToString("F2"),
                             accontoPA.ToString("F2"),
                             saldoPA.ToString("F2"),
-                            saldo.ToString("F2")
+                            saldo.ToString("F2"),
+                            assegnazione.statoCorrettezzaAssegnazione.ToString(),
+                            controlloApprofondito ? "CONTROLLARE" : "OK"
                         );
                     }
 
                     progressivo++;
                 }
-
+                _ = returnDataTable.Rows.Add(" ");
                 return returnDataTable;
             }
 

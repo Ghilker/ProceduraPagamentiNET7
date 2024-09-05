@@ -319,7 +319,7 @@ namespace ProcedureNet7
                 {
                     if (dataTable.Columns[j].DataType == typeof(string) && IsDate(dataTable.Rows[i][j].ToString()))
                     {
-                        values[i, j] = "'" + dataTable.Rows[i][j].ToString();
+                        values[i, j] = "#" + dataTable.Rows[i][j].ToString();
                     }
                     else
                     {

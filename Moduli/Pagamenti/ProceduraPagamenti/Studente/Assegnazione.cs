@@ -57,6 +57,12 @@ namespace ProcedureNet7
 
         public double CalculateTotalDailyCost(DateTime startDate, DateTime endDate, double monthlyCost, DateTime minDate, DateTime maxDate, List<Assegnazione> assegnazioni, bool fuoriCorso)
         {
+            if (endDate == DateTime.MaxValue)
+            {
+                endDate = maxDate;
+                dataFineAssegnazione = maxDate;
+                statoCorrettezzaAssegnazione = AssegnazioneDataCheck.MancanzaDataFineAssegnazione;
+            }
             if (endDate == startDate)
             {
                 statoCorrettezzaAssegnazione = AssegnazioneDataCheck.DataUguale;
@@ -82,16 +88,27 @@ namespace ProcedureNet7
             }
 
             int currentAssegnazioneDays = (endDate - startDate).Days + 1;
+            int previousAssegnazioniDays = 0;
 
+            // If assegnazioni are provided and the user is fuoriCorso, adjust the days calculation
             if (assegnazioni != null && fuoriCorso)
             {
-                int previousAssegnazioniDays = 0;
                 foreach (Assegnazione assegnazione in assegnazioni)
                 {
+                    // Calculate the days for this particular Assegnazione
                     int assegnazioneDays = (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days + 1;
+
+                    // Accumulate the days from previous assegnazioni
                     previousAssegnazioniDays += assegnazioneDays;
+
+                    // Check if the total days exceed 165, and adjust accordingly
+                    if (previousAssegnazioniDays >= 165)
+                    {
+                        return 0; // No more days allowed if we hit or exceed 165
+                    }
                 }
 
+                // After processing previous assegnazioni, check how many days are left for the current one
                 if (previousAssegnazioniDays + currentAssegnazioneDays > 165)
                 {
                     currentAssegnazioneDays = 165 - previousAssegnazioniDays;
@@ -99,6 +116,7 @@ namespace ProcedureNet7
             }
             else if (fuoriCorso)
             {
+                // If fuoriCorso and there are no previous assegnazioni, apply the 165 days limit
                 if (currentAssegnazioneDays > 165)
                 {
                     currentAssegnazioneDays = 165;
@@ -119,6 +137,8 @@ namespace ProcedureNet7
         Incorretto,
         DataUguale,
         DataDecorrenzaMinoreDiMin,
-        DataFineAssMaggioreMax
+        DataFineAssMaggioreMax,
+        MancanzaDataFineAssegnazione,
+        UscitaPrecedenteAlLimite
     }
 }
