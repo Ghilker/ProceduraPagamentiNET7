@@ -10,11 +10,11 @@ namespace ProcedureNet7
 {
     public partial class StudentOverview : Form
     {
-        private Dictionary<string, Studente> daPagare;
-        private List<Studente> studenti;
+        private Dictionary<string, StudentePagam> daPagare;
+        private List<StudentePagam> studenti;
         private DataGridView dataGridView;
 
-        public StudentOverview(List<Studente> studenti, ref Dictionary<string, Studente> daPagare, Form mainForm)
+        public StudentOverview(List<StudentePagam> studenti, ref Dictionary<string, StudentePagam> daPagare, Form mainForm)
         {
             InitializeComponent();
             this.daPagare = daPagare;
@@ -32,7 +32,7 @@ namespace ProcedureNet7
             PopulateDataGridView(studenti, mainForm);
         }
 
-        private void PopulateDataGridView(List<Studente> studenti, Form mainForm)
+        private void PopulateDataGridView(List<StudentePagam> studenti, Form mainForm)
         {
             DataTable studentiDt = Utilities.ConvertListToDataTable(studenti);
 
@@ -174,7 +174,7 @@ namespace ProcedureNet7
             }
         }
 
-        private IList? GetListByColumnName(Studente studente, string columnName)
+        private IList? GetListByColumnName(StudentePagam studente, string columnName)
         {
             return columnName switch
             {

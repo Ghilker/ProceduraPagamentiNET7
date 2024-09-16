@@ -648,6 +648,23 @@ namespace ProcedureNet7
             return strimToTrim.Replace(" ", "");
         }
 
+        public static string RemoveNonAlphanumeric(string input)
+        {
+            // Use Regex to replace any character that is not a letter or number with an empty string
+            return Regex.Replace(input, "[^a-zA-Z0-9]", "");
+        }
+        public static string RemoveNonNumeric(string input)
+        {
+            // Use Regex to replace any character that is not a letter or number with an empty string
+            return Regex.Replace(input, "[^0-9]", "");
+        }
+
+        public static string RemoveNonAlphanumericAndKeepSpaces(string input)
+        {
+            // Use Regex to replace any character that is not a letter, number, or space with an empty string
+            return Regex.Replace(input, "[^a-zA-Z0-9 ]", "");
+        }
+
         public static string SafeGetString(this IDataRecord record, string fieldName)
         {
             if (record[fieldName] is DBNull or null)

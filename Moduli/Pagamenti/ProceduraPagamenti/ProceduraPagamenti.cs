@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -35,8 +36,8 @@ namespace ProcedureNet7
 
         double importoTotale = 0;
 
-        Dictionary<string, Studente> studentiDaPagare = new();
-        readonly Dictionary<Studente, List<string>> studentiConErroriPA = new();
+        Dictionary<string, StudentePagam> studentiDaPagare = new();
+        readonly Dictionary<StudentePagam, List<string>> studentiConErroriPA = new();
 
         List<string> impegniList = new();
 
@@ -152,27 +153,40 @@ namespace ProcedureNet7
 
                 GenerateStudentListToPay();
                 ProcessStudentList();
-
-                Logger.LogInfo(100, $"Numero studenti lavorati: {studentiProcessatiAmount}", System.Drawing.Color.DarkGreen);
-                foreach (KeyValuePair<string, Dictionary<string, int>> impegno in impegnoAmount)
+                _ = _masterForm.Invoke((MethodInvoker)delegate
                 {
-                    int totaleImpegno = 0;
-                    foreach (KeyValuePair<string, int> ente in impegno.Value)
+                    DialogResult result = MessageBox.Show(_masterForm, "Completare procedura?", "Attenzione", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
                     {
-                        totaleImpegno += ente.Value;
+                        if (result == DialogResult.OK)
+                        {
+                            Logger.LogInfo(100, $"Numero studenti lavorati: {studentiProcessatiAmount}", System.Drawing.Color.DarkGreen);
+                            foreach (KeyValuePair<string, Dictionary<string, int>> impegno in impegnoAmount)
+                            {
+                                int totaleImpegno = 0;
+                                foreach (KeyValuePair<string, int> ente in impegno.Value)
+                                {
+                                    totaleImpegno += ente.Value;
+                                }
+
+                                Logger.LogInfo(null, $" - di cui: {totaleImpegno} con impegno n°{impegno.Key}", ColorTranslator.FromHtml("#A4449A"));
+
+                                foreach (KeyValuePair<string, int> ente in impegno.Value)
+                                {
+                                    Logger.LogInfo(null, $" - - di cui: {ente.Value} per {ente.Key}", System.Drawing.Color.DarkBlue);
+                                }
+                            }
+                            Logger.LogInfo(null, $"Totale pagamenti: {Math.Round(importoTotale, 2)} €");
+                            sqlTransaction?.Commit();
+                        }
+                        else
+                        {
+                            Logger.LogInfo(null, $"Procedura chiusa dall'utente");
+                            sqlTransaction?.Rollback();
+                        }
                     }
+                });
 
-                    Logger.LogInfo(null, $" - di cui: {totaleImpegno} con impegno n°{impegno.Key}", ColorTranslator.FromHtml("#A4449A"));
 
-                    foreach (KeyValuePair<string, int> ente in impegno.Value)
-                    {
-                        Logger.LogInfo(null, $" - - di cui: {ente.Value} per {ente.Key}", System.Drawing.Color.DarkBlue);
-                    }
-                }
-
-                Logger.LogInfo(null, $"Totale pagamenti: {Math.Round(importoTotale, 2)} €");
-
-                sqlTransaction?.Commit();
             }
             catch (Exception ex)
             {
@@ -537,48 +551,95 @@ namespace ProcedureNet7
             {
                 Logger.LogInfo(10, "Set in movimenti contabili elementari dello stato a 0 dove era in elaborazione");
                 string updateSQL = $@"          
-                        UPDATE [MOVIMENTI_CONTABILI_ELEMENTARI] SET stato = 0, codice_movimento = NULL 
-                        WHERE 
-                            stato = 2 AND 
-                            segno = 0 AND
-                            ID_CAUSALE not in ('01', '02') AND
-                            codice_movimento in 
-                                (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
+                UPDATE [MOVIMENTI_CONTABILI_ELEMENTARI] SET stato = 0, codice_movimento = NULL 
+                WHERE 
+                    stato = 2 AND 
+                    segno = 0 AND
+                    ID_CAUSALE not in ('01', '02') AND
+                    codice_movimento in 
+                        (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
                 SqlCommand updateCmd = new(updateSQL, CONNECTION, sqlTransaction)
                 {
                     CommandTimeout = 9000000
                 };
-
                 _ = updateCmd.ExecuteNonQuery();
+
                 Logger.LogInfo(10, "Pulizia da movimenti contabili elementari del vecchio codice mandato");
-                string deleteSQL = $@"          DELETE FROM [MOVIMENTI_CONTABILI_ELEMENTARI] WHERE codice_movimento in 
-                                            (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
+                string deleteSQL = $@"DELETE FROM [MOVIMENTI_CONTABILI_ELEMENTARI] WHERE codice_movimento in 
+                              (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
                 SqlCommand deleteCmd = new(deleteSQL, CONNECTION, sqlTransaction)
                 {
                     CommandTimeout = 9000000
                 };
                 _ = deleteCmd.ExecuteNonQuery();
+
                 Logger.LogInfo(10, "Pulizia da stati del movimento contabile del vecchio codice mandato");
-                string deleteStatiSQL = $@"     DELETE FROM [STATI_DEL_MOVIMENTO_CONTABILE] WHERE codice_movimento in 
-                                            (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
+                string deleteStatiSQL = $@"DELETE FROM [STATI_DEL_MOVIMENTO_CONTABILE] WHERE codice_movimento in 
+                                   (SELECT codice_movimento FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%'))";
                 SqlCommand deleteStatiCmd = new(deleteStatiSQL, CONNECTION, sqlTransaction)
                 {
                     CommandTimeout = 9000000
                 };
                 _ = deleteStatiCmd.ExecuteNonQuery();
+
                 Logger.LogInfo(10, "Pulizia da movimenti contabili generali del vecchio codice mandato");
-                string deleteGeneraliSQL = $@"  DELETE FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%')";
+                string deleteGeneraliSQL = $@"DELETE FROM [MOVIMENTI_CONTABILI_GENERALI] WHERE cod_mandato LIKE ('{selectedVecchioMandato}%')";
                 SqlCommand deleteGeneraliCmd = new(deleteGeneraliSQL, CONNECTION, sqlTransaction)
                 {
                     CommandTimeout = 9000000
                 };
                 _ = deleteGeneraliCmd.ExecuteNonQuery();
+
+                Logger.LogInfo(10, "Starting index optimization");
+
+                // Step to reorganize/rebuild indexes
+                string rebuildIndexesSQL = @"
+                    DECLARE @TableName NVARCHAR(255);
+                    DECLARE IndexCursor CURSOR FOR
+                    SELECT DISTINCT t.name 
+                    FROM sys.indexes i 
+                    INNER JOIN sys.tables t ON i.object_id = t.object_id 
+                    WHERE t.name IN ('MOVIMENTI_CONTABILI_ELEMENTARI', 'MOVIMENTI_CONTABILI_GENERALI', 'STATI_DEL_MOVIMENTO_CONTABILE');
+
+                    OPEN IndexCursor;
+                    FETCH NEXT FROM IndexCursor INTO @TableName;
+
+                    WHILE @@FETCH_STATUS = 0
+                    BEGIN
+                        EXEC ('ALTER INDEX ALL ON ' + @TableName + ' REORGANIZE;');
+                        FETCH NEXT FROM IndexCursor INTO @TableName;
+                    END;
+
+                    CLOSE IndexCursor;
+                    DEALLOCATE IndexCursor;
+                ";
+                SqlCommand rebuildIndexesCmd = new(rebuildIndexesSQL, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
+                _ = rebuildIndexesCmd.ExecuteNonQuery();
+
+                // Step to update statistics
+                Logger.LogInfo(10, "Updating statistics");
+                string updateStatisticsSQL = @"
+                    UPDATE STATISTICS [MOVIMENTI_CONTABILI_ELEMENTARI];
+                    UPDATE STATISTICS [MOVIMENTI_CONTABILI_GENERALI];
+                    UPDATE STATISTICS [STATI_DEL_MOVIMENTO_CONTABILE];
+                 ";
+                SqlCommand updateStatisticsCmd = new(updateStatisticsSQL, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
+                _ = updateStatisticsCmd.ExecuteNonQuery();
+
+                Logger.LogInfo(10, "Index and statistics optimization complete.");
             }
             catch
             {
                 throw;
             }
         }
+
 
         private void GenerateStudentListToPay()
         {
@@ -722,7 +783,7 @@ namespace ProcedureNet7
                     }
 
 
-                    Studente studente = new(
+                    StudentePagam studente = new(
                             Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "num_domanda")),
                             Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "cod_fiscale").ToUpper()),
                             Utilities.SafeGetString(reader, "Cognome").Trim().ToUpper(),
@@ -809,7 +870,7 @@ namespace ProcedureNet7
             {
                 PopulateStudentsInformations();
 
-                List<Studente> studenti = studentiDaPagare.Values.ToList();
+                List<StudentePagam> studenti = studentiDaPagare.Values.ToList();
                 bool continueProcessing = true;
                 _ = _masterForm?.Invoke((MethodInvoker)delegate
                 {
@@ -818,7 +879,7 @@ namespace ProcedureNet7
                         continueProcessing = ShowStudentOverview(studenti);
                     }
 
-                    bool ShowStudentOverview(List<Studente> studenti)
+                    bool ShowStudentOverview(List<StudentePagam> studenti)
                     {
                         bool result = false;
                         _ = _masterForm.Invoke((MethodInvoker)delegate
@@ -855,7 +916,7 @@ namespace ProcedureNet7
                     }
                 });
 
-                List<Studente> studentiAfter = studentiDaPagare.Values.ToList();
+                List<StudentePagam> studentiAfter = studentiDaPagare.Values.ToList();
                 if (studentiDaPagare.Count > 0 && generateFiles)
                 {
                     GenerateOutputFiles();
@@ -899,7 +960,7 @@ namespace ProcedureNet7
                             string test = "";
                         }
 
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         if (studente != null)
                         {
                             studentiDaRimuovereHash.Add(studente.codFiscale);
@@ -949,7 +1010,7 @@ namespace ProcedureNet7
                             string test = "";
                         }
 
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         if (studente != null)
                         {
                             string cod_tipo_pagam = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_tipo_pagam")).ToUpper();
@@ -981,7 +1042,7 @@ namespace ProcedureNet7
                 HashSet<string> studentiDaRimuovereHash = new();
                 foreach (var pair in studentiDaPagare)
                 {
-                    Studente studenteDaControllare = pair.Value;
+                    StudentePagam studenteDaControllare = pair.Value;
                     bool stessoPagamento = false;
 
                     if (studenteDaControllare.pagamentiEffettuati == null || studenteDaControllare.pagamentiEffettuati.Count <= 0)
@@ -1049,7 +1110,7 @@ namespace ProcedureNet7
                 HashSet<string> studentiDaRimuovere = new();
                 foreach (var pair in studentiDaPagare)
                 {
-                    Studente studente = pair.Value;
+                    StudentePagam studente = pair.Value;
                     if (studente.codFiscale == "BLDLSS00M23E958G")
                     {
                         string test = "";
@@ -1123,7 +1184,7 @@ namespace ProcedureNet7
                 HashSet<string> studentiDaRimuovere = new();
                 foreach (var pair in studentiDaPagare)
                 {
-                    Studente studente = pair.Value;
+                    StudentePagam studente = pair.Value;
                     if (studente.pagamentiEffettuati == null || studente.pagamentiEffettuati.Count <= 0)
                     {
                         studentiDaRimuovere.Add(studente.codFiscale);
@@ -1284,7 +1345,7 @@ namespace ProcedureNet7
                     {
                         string test = "";
                     }
-                    studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                    studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                     if (studente != null && !listaStudentiDaEliminareBlocchi.Contains(studente.codFiscale))
                     {
                         listaStudentiDaEliminareBlocchi.Add(studente.codFiscale);
@@ -1327,7 +1388,7 @@ namespace ProcedureNet7
                     {
                         string test = "";
                     }
-                    studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                    studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                     if (studente != null && !listaStudentiDaEliminareIBAN.Contains(studente.codFiscale))
                     {
                         listaStudentiDaEliminareIBAN.Add(studente.codFiscale);
@@ -1374,7 +1435,7 @@ namespace ProcedureNet7
                     {
                         string test = "";
                     }
-                    studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                    studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                     if (studente != null && !listaStudentiDaEliminareNonVincitori.Contains(studente.codFiscale))
                     {
                         listaStudentiDaEliminareNonVincitori.Add(studente.codFiscale);
@@ -1420,7 +1481,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         if (studente != null && !listaStudentiDaEliminarePEC.Contains(studente.codFiscale))
                         {
                             listaStudentiDaEliminarePEC.Add(studente.codFiscale);
@@ -1500,7 +1561,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         studente?.SetLuogoNascita(
                                 Utilities.SafeGetString(reader, "COD_COMUNE_NASC"),
                                 Utilities.SafeGetString(reader, "descrizione"),
@@ -1534,7 +1595,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         studente?.SetResidenza(
                                 Utilities.SafeGetString(reader, "INDIRIZZO"),
                                 Utilities.SafeGetString(reader, "Cod_comune"),
@@ -1562,7 +1623,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         studente?.SetInformations(
                                 long.TryParse(Regex.Replace(Utilities.SafeGetString(reader, "telefono_cellulare"), @"[^\d]", ""), out long telefonoNumber) ? telefonoNumber : 0,
                                 Utilities.SafeGetString(reader, "indirizzo_e_mail"),
@@ -1590,7 +1651,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         studente?.AddReversale(
                                     Utilities.SafeGetString(reader, "cod_reversale"),
                                     double.TryParse(Utilities.SafeGetString(reader, "importo"), out double importo) ? importo : 0,
@@ -1618,7 +1679,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "CODICE_FISCALE").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         studente?.AddDetrazione(
                                     Utilities.SafeGetString(reader, "ID_CAUSALE"),
                                     double.TryParse(Utilities.SafeGetString(reader, "IMPORTO"), out double importo) ? importo : 0,
@@ -1647,7 +1708,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         studente?.SetEraVincitorePA(true);
 
                         if (studente != null && selectedRichiestoPA == "3")
@@ -1682,7 +1743,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
 
 
                         if (studente != null)
@@ -1730,7 +1791,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
 
 
                         if (studente != null)
@@ -1826,7 +1887,7 @@ namespace ProcedureNet7
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         if (codFiscale == "RDWMBR97P08Z200N")
                         {
                             string test = "Hello";
@@ -1967,7 +2028,7 @@ namespace ProcedureNet7
                     studentiDaPagare.Remove(codFiscale);
                 }
 
-                foreach (Studente studente in studentiConErroriPA.Keys)
+                foreach (StudentePagam studente in studentiConErroriPA.Keys)
                 {
                     if (studente.assegnazioni.Count == 1 && studente.vincitorePA)
                     {
@@ -2022,7 +2083,7 @@ namespace ProcedureNet7
                     {
                         string impegnoToSet;
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out Studente? studente);
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                         if (studente != null)
                         {
                             if (isIntegrazione)
@@ -2081,9 +2142,9 @@ namespace ProcedureNet7
                 object importoTotaleLock = new();
                 Parallel.ForEach(studentiDaPagare, pair =>
                 {
-                    Studente studente = pair.Value;
+                    StudentePagam studente = pair.Value;
 
-                    if (studente.codFiscale == "RDWMBR97P08Z200N")
+                    if (studente.codFiscale == "LAIMMM97H25Z236R")
                     {
                         string test = "";
                     }
@@ -2314,10 +2375,13 @@ namespace ProcedureNet7
                         return;
                     }
 
-                    studente.SetImportoDaPagareLordo(Math.Round(importoDaPagare - importiPagati, 2));
-                    importoDaPagare = importoDaPagare - (importiPagati + importoPA + importoDetrazioni + importoReversali);
+                    studente.SetImportoDaPagareLordo(Math.Round(importoDaPagare - importiPagati - importoReversali, 2));
+                    importoDaPagare -= (importiPagati + importoPA + importoDetrazioni + importoReversali);
                     importoDaPagare = Math.Round(importoDaPagare, 2);
-                    importoTotale += importoDaPagare;
+                    lock (importoTotaleLock)
+                    {
+                        importoTotale += importoDaPagare;
+                    }
                     if ((importoDaPagare == 0 || Math.Abs(importoDaPagare) < 5) && !studentiDaRimuovereDallaTabella.ContainsKey(studente.codFiscale))
                     {
                         studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
@@ -2335,7 +2399,7 @@ namespace ProcedureNet7
                 Logger.LogInfo(55, $"UPDATE:Lavorazione studenti - Calcolo importi - Completato");
                 foreach (var pair in studentiDaPagare)
                 {
-                    Studente studente = pair.Value;
+                    StudentePagam studente = pair.Value;
 
                     if (studente.importoDaPagare > 0)
                     { continue; }
@@ -2426,6 +2490,50 @@ namespace ProcedureNet7
                 ProcessImpegno(impegno, currentFolder);
             }
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Completato");
+
+            Logger.LogInfo(10, "Starting index optimization");
+
+            // Step to reorganize/rebuild indexes
+            string rebuildIndexesSQL = @"
+                    DECLARE @TableName NVARCHAR(255);
+                    DECLARE IndexCursor CURSOR FOR
+                    SELECT DISTINCT t.name 
+                    FROM sys.indexes i 
+                    INNER JOIN sys.tables t ON i.object_id = t.object_id 
+                    WHERE t.name IN ('MOVIMENTI_CONTABILI_ELEMENTARI', 'MOVIMENTI_CONTABILI_GENERALI', 'STATI_DEL_MOVIMENTO_CONTABILE');
+
+                    OPEN IndexCursor;
+                    FETCH NEXT FROM IndexCursor INTO @TableName;
+
+                    WHILE @@FETCH_STATUS = 0
+                    BEGIN
+                        EXEC ('ALTER INDEX ALL ON ' + @TableName + ' REORGANIZE;');
+                        FETCH NEXT FROM IndexCursor INTO @TableName;
+                    END;
+
+                    CLOSE IndexCursor;
+                    DEALLOCATE IndexCursor;
+                ";
+            SqlCommand rebuildIndexesCmd = new(rebuildIndexesSQL, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            };
+            _ = rebuildIndexesCmd.ExecuteNonQuery();
+
+            // Step to update statistics
+            Logger.LogInfo(10, "Updating statistics");
+            string updateStatisticsSQL = @"
+                    UPDATE STATISTICS [MOVIMENTI_CONTABILI_ELEMENTARI];
+                    UPDATE STATISTICS [MOVIMENTI_CONTABILI_GENERALI];
+                    UPDATE STATISTICS [STATI_DEL_MOVIMENTO_CONTABILE];
+                 ";
+            SqlCommand updateStatisticsCmd = new(updateStatisticsSQL, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            };
+            _ = updateStatisticsCmd.ExecuteNonQuery();
+
+            Logger.LogInfo(10, "Index and statistics optimization complete.");
         }
         private void ProcessImpegno(string impegno, string currentFolder)
         {
@@ -2438,7 +2546,7 @@ namespace ProcedureNet7
                 GenerateOutputFilesPA(currentFolder, groupedStudents, impegno);
             }
 
-            void GenerateOutputFilesPA(string currentFolder, List<Studente> studentsWithSameImpegno, string impegno)
+            void GenerateOutputFilesPA(string currentFolder, List<StudentePagam> studentsWithSameImpegno, string impegno)
             {
                 Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Senza detrazioni");
                 var studentsWithPA = studentsWithSameImpegno
@@ -2483,7 +2591,7 @@ namespace ProcedureNet7
                     GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
                 }
             }
-            void ProcessStudentsByAnnoCorso(List<Studente> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio, string codEnteFlusso, string impegnoFlusso)
+            void ProcessStudentsByAnnoCorso(List<StudentePagam> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio, string codEnteFlusso, string impegnoFlusso)
             {
                 if (processMatricole && processAnniSuccessivi)
                 {
@@ -2501,7 +2609,7 @@ namespace ProcedureNet7
                     }
                 }
             }
-            void ProcessStudentsByCodEnte(string selectedCodEnte, List<Studente> studentsWithPA, string newFolderPath, string impegno)
+            void ProcessStudentsByCodEnte(string selectedCodEnte, List<StudentePagam> studentsWithPA, string newFolderPath, string impegno)
             {
                 if (studentsWithPA.Count <= 0)
                 {
@@ -2547,7 +2655,7 @@ namespace ProcedureNet7
                 }
 
             }
-            void ProcessAndWriteStudents(List<Studente> students, string folderPath, string fileName, string codEnteFlusso, string impegnoFlusso)
+            void ProcessAndWriteStudents(List<StudentePagam> students, string folderPath, string fileName, string codEnteFlusso, string impegnoFlusso)
             {
                 if (students.Any())
                 {
@@ -2564,7 +2672,7 @@ namespace ProcedureNet7
                 }
             }
 
-            static void GenerateGiuliaFile(string newFolderPath, List<Studente> studentsWithPA, string impegno)
+            static void GenerateGiuliaFile(string newFolderPath, List<StudentePagam> studentsWithPA, string impegno)
             {
                 DataTable dataTable = GenerareGiuliaDataTable(studentsWithPA, impegno);
                 if (dataTable.Rows.Count > 0)
@@ -2572,7 +2680,7 @@ namespace ProcedureNet7
                     Utilities.ExportDataTableToExcel(dataTable, newFolderPath, true, "Dettaglio PA");
                 }
             }
-            static DataTable GenerareGiuliaDataTable(List<Studente> studentsWithPA, string impegno)
+            static DataTable GenerareGiuliaDataTable(List<StudentePagam> studentsWithPA, string impegno)
             {
                 Logger.LogInfo(60, $"Lavorazione studenti - impegno n°{impegno} - Generazione Dettaglio PA");
                 int progressivo = 1;
@@ -2589,13 +2697,14 @@ namespace ProcedureNet7
                 _ = returnDataTable.Columns.Add("Data fine PA");
                 _ = returnDataTable.Columns.Add("Num giorni");
                 _ = returnDataTable.Columns.Add("Importo borsa totale");
+                _ = returnDataTable.Columns.Add("Importo lordo borsa");
                 _ = returnDataTable.Columns.Add("Acconto PA");
                 _ = returnDataTable.Columns.Add("Saldo PA");
-                _ = returnDataTable.Columns.Add("Saldo");
+                _ = returnDataTable.Columns.Add("Importo netto borsa");
                 _ = returnDataTable.Columns.Add("Stato correttezza");
                 _ = returnDataTable.Columns.Add("Controllo status sede");
 
-                foreach (Studente studente in studentsWithPA)
+                foreach (StudentePagam studente in studentsWithPA)
                 {
                     if (studente.assegnazioni == null || studente.assegnazioni.Count <= 0)
                     {
@@ -2662,8 +2771,9 @@ namespace ProcedureNet7
                             dataFinale.ToString("dd/MM/yyyy"),
                             (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days.ToString(),
                             studente.importoBeneficio.ToString("F2"),
+                            studente.importoDaPagareLordo.ToString("F2"),
                             accontoPA.ToString("F2"),
-                            saldoPA.ToString("F2"),
+                            (saldoPA - accontoPA).ToString("F2"),
                             saldo.ToString("F2"),
                             assegnazione.statoCorrettezzaAssegnazione.ToString(),
                             controlloApprofondito ? "CONTROLLARE" : "OK"
@@ -2679,7 +2789,7 @@ namespace ProcedureNet7
 
 
 
-            DataTable GenerareFlussoDataTable(List<Studente> studentiDaGenerare, string codEnteFlusso)
+            DataTable GenerareFlussoDataTable(List<StudentePagam> studentiDaGenerare, string codEnteFlusso)
             {
                 if (!studentiDaGenerare.Any())
                 {
@@ -2719,7 +2829,7 @@ namespace ProcedureNet7
                 int incremental = 1;
 
 
-                foreach (Studente studente in studentiDaGenerare)
+                foreach (StudentePagam studente in studentiDaGenerare)
                 {
                     _ = DateTime.TryParse(selectedDataRiferimento, out DateTime dataTabella);
                     string dataCreazioneTabella = dataTabella.ToString("ddMMyy");
@@ -2737,6 +2847,8 @@ namespace ProcedureNet7
                     string indirizzoResidenza = straniero == 0 ? studente.residenza.indirizzo.Replace("//", "-") : studente.residenza.indirizzo;
                     string capResidenza = straniero == 0 ? "00000" : studente.residenza.CAP;
                     string dataSenzaSlash = studente.dataNascita.Replace("/", "");
+                    bool hasAssegnazione = studente.assegnazioni != null && studente.assegnazioni.Count > 0;
+
 
                     _ = studentsData.Rows.Add(
                         incremental,
@@ -2744,7 +2856,7 @@ namespace ProcedureNet7
                         studente.cognome,
                         studente.nome,
                         studente.importoDaPagareLordo,
-                        studente.importoSaldoPA == 0 ? studente.importoAccontoPA : studente.importoSaldoPA,
+                        hasAssegnazione ? (studente.importoSaldoPA == 0 ? studente.importoAccontoPA : studente.importoSaldoPA) : 0,
                         studente.importoDaPagare,
                         1,
                         studente.IBAN,
@@ -2773,7 +2885,7 @@ namespace ProcedureNet7
                 }
                 return studentsData;
             }
-            DataTable GenerareExcelDataTableConDetrazioni(List<Studente> studentiDaGenerare, List<string> sediStudi, string impegno)
+            DataTable GenerareExcelDataTableConDetrazioni(List<StudentePagam> studentiDaGenerare, List<string> sediStudi, string impegno)
             {
                 if (!studentiDaGenerare.Any())
                 {
@@ -2797,6 +2909,7 @@ namespace ProcedureNet7
                 _ = studentsData.Columns.Add("5");
                 _ = studentsData.Columns.Add("6");
                 _ = studentsData.Columns.Add("7");
+                _ = studentsData.Columns.Add("8");
 
                 _ = studentsData.Rows.Add(titolo);
                 _ = studentsData.Rows.Add("ALLEGATO DETERMINA");
@@ -2812,13 +2925,13 @@ namespace ProcedureNet7
 
                     _ = studentsData.Rows.Add(" ");
                     _ = studentsData.Rows.Add(nomeCodEnte);
-                    _ = studentsData.Rows.Add("N.PROG.", "CODICE_FISCALE", "COGNOME", "NOME", "TOTALE LORDO", nomePA, "IMPORTO NETTO");
+                    _ = studentsData.Rows.Add("N.PROG.", "NUMERO DOMANDA", "CODICE FISCALE", "COGNOME", "NOME", "TOTALE LORDO", nomePA, "IMPORTO NETTO");
 
                     int progressivo = 1;
                     double totaleLordo = 0;
                     double totalePA = 0;
                     double totaleNetto = 0;
-                    foreach (Studente s in studentiDaGenerare)
+                    foreach (StudentePagam s in studentiDaGenerare)
                     {
                         if (s.codEnte != codEnte)
                         {
@@ -2827,7 +2940,7 @@ namespace ProcedureNet7
 
                         double costoPA = categoriaPagam == "PR" ? s.importoAccontoPA : s.importoSaldoPA;
 
-                        _ = studentsData.Rows.Add(progressivo, s.codFiscale, s.cognome, s.nome, s.importoDaPagareLordo.ToString().Replace(",", "."), costoPA.ToString().Replace(",", "."), s.importoDaPagare.ToString().Replace(",", "."));
+                        _ = studentsData.Rows.Add(progressivo, s.numDomanda, s.codFiscale, s.cognome, s.nome, s.importoDaPagareLordo.ToString().Replace(",", "."), costoPA.ToString().Replace(",", "."), s.importoDaPagare.ToString().Replace(",", "."));
                         totaleLordo += s.importoDaPagareLordo;
                         totalePA += costoPA;
                         totaleNetto += s.importoDaPagare;
@@ -2835,7 +2948,7 @@ namespace ProcedureNet7
                     }
                     _ = studentsData.Rows.Add(" ");
                     _ = studentsData.Rows.Add(" ");
-                    _ = studentsData.Rows.Add(" ", " ", " ", "TOTALE", Math.Round(totaleLordo, 2).ToString().Replace(",", "."), Math.Round(totalePA, 2).ToString().Replace(",", "."), Math.Round(totaleNetto, 2).ToString().Replace(",", "."));
+                    _ = studentsData.Rows.Add(" ", " ", " ", " ", "TOTALE", Math.Round(totaleLordo, 2).ToString().Replace(",", "."), Math.Round(totalePA, 2).ToString().Replace(",", "."), Math.Round(totaleNetto, 2).ToString().Replace(",", "."));
                     _ = studentsData.Rows.Add(" ");
                     _ = studentsData.Rows.Add(" ");
                 }
@@ -2843,7 +2956,7 @@ namespace ProcedureNet7
 
                 return studentsData;
             }
-            DataTable GenerareExcelDataTableNoDetrazioni(List<Studente> studentiDaGenerare, string impegno)
+            DataTable GenerareExcelDataTableNoDetrazioni(List<StudentePagam> studentiDaGenerare, string impegno)
             {
                 if (!studentiDaGenerare.Any())
                 {
@@ -2867,38 +2980,42 @@ namespace ProcedureNet7
                 _ = studentsData.Columns.Add("5");
                 _ = studentsData.Columns.Add("6");
                 _ = studentsData.Columns.Add("7");
+                _ = studentsData.Columns.Add("8");
 
                 _ = studentsData.Rows.Add(titolo);
                 _ = studentsData.Rows.Add("ALLEGATO DETERMINA");
                 _ = studentsData.Rows.Add(" ");
                 _ = studentsData.Rows.Add(" ");
-                _ = studentsData.Rows.Add("N.PROG.", "CODICE_FISCALE", "COGNOME", "NOME", "TOTALE LORDO", "ACCONTO PA", "IMPORTO NETTO");
+                _ = studentsData.Rows.Add("N.PROG.", "NUMERO DOMANDA", "CODICE FISCALE", "COGNOME", "NOME", "TOTALE LORDO", "ACCONTO PA", "IMPORTO NETTO");
 
                 int progressivo = 1;
                 double totaleLordo = 0;
                 double totaleAcconto = 0;
                 double totaleNetto = 0;
-                foreach (Studente s in studentiDaGenerare)
+                foreach (StudentePagam s in studentiDaGenerare)
                 {
-                    _ = studentsData.Rows.Add(progressivo, s.codFiscale, s.cognome, s.nome, s.importoDaPagareLordo.ToString().Replace(",", "."), s.importoAccontoPA.ToString().Replace(",", "."), s.importoDaPagare.ToString().Replace(",", "."));
+
+                    double importoAcconto = (s.assegnazioni != null && s.assegnazioni.Count > 0) ? s.importoAccontoPA : 0;
+
+                    _ = studentsData.Rows.Add(progressivo, s.numDomanda, s.codFiscale, s.cognome, s.nome, s.importoDaPagareLordo.ToString().Replace(",", "."), importoAcconto.ToString().Replace(",", "."), s.importoDaPagare.ToString().Replace(",", "."));
                     totaleLordo += s.importoDaPagareLordo;
-                    totaleAcconto += s.importoAccontoPA;
+                    totaleAcconto += importoAcconto;
                     totaleNetto += s.importoDaPagare;
                     progressivo++;
                 }
                 _ = studentsData.Rows.Add(" ");
                 _ = studentsData.Rows.Add(" ");
-                _ = studentsData.Rows.Add(" ", " ", " ", "TOTALE", Math.Round(totaleLordo, 2).ToString().Replace(",", "."), Math.Round(totaleAcconto, 2).ToString().Replace(",", "."), Math.Round(totaleNetto, 2).ToString().Replace(",", "."));
+                _ = studentsData.Rows.Add(" ", " ", " ", " ", "TOTALE", Math.Round(totaleLordo, 2).ToString().Replace(",", "."), Math.Round(totaleAcconto, 2).ToString().Replace(",", "."), Math.Round(totaleNetto, 2).ToString().Replace(",", "."));
                 _ = studentsData.Rows.Add(" ");
                 _ = studentsData.Rows.Add(" ");
                 return studentsData;
             }
         }
 
-        private void InsertIntoMovimentazioni(List<Studente> studentiDaProcessare, string impegno)
+        private void InsertIntoMovimentazioni(List<StudentePagam> studentiDaProcessare, string impegno)
         {
-            List<Studente> studentiSenzaImpegno = new();
-            foreach (Studente studente in studentiDaProcessare)
+            List<StudentePagam> studentiSenzaImpegno = new();
+            foreach (StudentePagam studente in studentiDaProcessare)
             {
                 if (string.IsNullOrWhiteSpace(studente.numeroImpegno) || impegno != studente.numeroImpegno)
                 {
@@ -2918,13 +3035,13 @@ namespace ProcedureNet7
                 int lastCodiceMovimento = 0;
                 int nextCodiceMovimento = 0;
                 Logger.LogInfo(80, $"Lavorazione studenti - Inserimento in movimenti contabili");
-                Dictionary<int, Studente> codMovimentiPerStudente = new();
+                Dictionary<int, StudentePagam> codMovimentiPerStudente = new();
                 string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_GENERALI (ID_CAUSALE_MOVIMENTO_GENERALE, IMPORTO_MOVIMENTO, UTENTE_VALIDAZIONE, DATA_VALIDITA_MOVIMENTO_GENERALE, NOTE_VALIDAZIONE_MOVIMENTO, COD_MANDATO) VALUES ";
                 string note = "Inserimento tramite elaborazione file pagamenti";
 
                 if (studentiDaProcessare.Any())
                 {
-                    Studente firstStudent = studentiDaProcessare.First();
+                    StudentePagam firstStudent = studentiDaProcessare.First();
                     string firstStudentValues = string.Format("('{0}', {1}, '{2}', '{3}', '{4}', '{5}')",
                             codTipoPagamento,
                             firstStudent.importoDaPagare.ToString(CultureInfo.InvariantCulture),
@@ -2972,7 +3089,7 @@ namespace ProcedureNet7
                     var batch = studentiDaProcessare.Skip(1 + batchNumber * batchSize).Take(batchSize);
                     List<string> valuesList = new();
 
-                    foreach (Studente studente in batch)
+                    foreach (StudentePagam studente in batch)
                     {
                         string studenteValues = string.Format("('{0}', {1}, '{2}', '{3}', '{4}', '{5}')",
                             codTipoPagamento,
@@ -3025,7 +3142,7 @@ namespace ProcedureNet7
                 throw;
             }
 
-            void InsertIntoStatiDelMovimentoContabile(Dictionary<int, Studente> codMovimentiPerStudente)
+            void InsertIntoStatiDelMovimentoContabile(Dictionary<int, StudentePagam> codMovimentiPerStudente)
             {
                 try
                 {
@@ -3078,7 +3195,7 @@ namespace ProcedureNet7
                     throw;
                 }
             }
-            void InsertIntoMovimentiContabiliElementariPagamenti(Dictionary<int, Studente> codMovimentiPerStudente)
+            void InsertIntoMovimentiContabiliElementariPagamenti(Dictionary<int, StudentePagam> codMovimentiPerStudente)
             {
                 try
                 {
@@ -3109,7 +3226,7 @@ namespace ProcedureNet7
                     List<string> batchStatements = new();
                     int currentBatchSize = 0;
                     Logger.LogInfo(80, $"Lavorazione studenti - Movimenti contabili elementari");
-                    foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
+                    foreach (KeyValuePair<int, StudentePagam> entry in codMovimentiPerStudente)
                     {
                         int codMovimento = entry.Key;
                         double importoLordo = entry.Value.importoDaPagareLordo;
@@ -3125,7 +3242,7 @@ namespace ProcedureNet7
 
                         string importoFinale = importoLordo.ToString(CultureInfo.InvariantCulture);
 
-                        // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
+                        // Assuming you might need some data from the StudentePagam object, you can access it like this: entry.Value
                         string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '{codMovimentoElementare}', '{codMovimento}', '{importoFinale}', '{segno}', '{DateTime.Now:yyyy}','2', '{DateTime.Now:dd/MM/yyyy}', 'sa', '', '')";
 
                         batchStatements.Add(insertStatement);
@@ -3166,7 +3283,7 @@ namespace ProcedureNet7
                     throw;
                 }
             }
-            void InsertIntoMovimentiContabiliElementariDetrazioni(Dictionary<int, Studente> codMovimentiPerStudente)
+            void InsertIntoMovimentiContabiliElementariDetrazioni(Dictionary<int, StudentePagam> codMovimentiPerStudente)
             {
                 try
                 {
@@ -3178,7 +3295,7 @@ namespace ProcedureNet7
                     List<string> batchStatements = new();
                     int currentBatchSize = 0;
 
-                    foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
+                    foreach (KeyValuePair<int, StudentePagam> entry in codMovimentiPerStudente)
                     {
 
                         if (entry.Value.detrazioni == null || entry.Value.detrazioni.Count <= 0)
@@ -3205,7 +3322,7 @@ namespace ProcedureNet7
                                 continue;
                             }
 
-                            // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
+                            // Assuming you might need some data from the StudentePagam object, you can access it like this: entry.Value
                             string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '01', '{codMovimento}', '{importoDaDetrarre}', '{segno}', '{DateTime.Now:yyyy}','2', '{DateTime.Now:dd/MM/yyyy}', 'sa', '', '')";
 
                             batchStatements.Add(insertStatement);
@@ -3245,7 +3362,7 @@ namespace ProcedureNet7
                     throw;
                 }
             }
-            void InsertIntoMovimentiContabiliElementariAssegnazioni(Dictionary<int, Studente> codMovimentiPerStudente)
+            void InsertIntoMovimentiContabiliElementariAssegnazioni(Dictionary<int, StudentePagam> codMovimentiPerStudente)
             {
                 try
                 {
@@ -3257,7 +3374,7 @@ namespace ProcedureNet7
                     List<string> batchStatements = new();
                     int currentBatchSize = 0;
 
-                    foreach (KeyValuePair<int, Studente> entry in codMovimentiPerStudente)
+                    foreach (KeyValuePair<int, StudentePagam> entry in codMovimentiPerStudente)
                     {
 
                         if (entry.Value.assegnazioni == null || entry.Value.assegnazioni.Count <= 0)
@@ -3265,35 +3382,39 @@ namespace ProcedureNet7
                             continue;
                         }
 
+                        double costoPA = 0;
                         foreach (Assegnazione assegnazione in entry.Value.assegnazioni)
                         {
                             if (assegnazione.costoTotale <= 0)
                             {
                                 continue;
                             }
+                            costoPA += assegnazione.costoTotale;
+                        }
+                        costoPA = Math.Round(costoPA - entry.Value.importoAccontoPA, 2);
+                        int codMovimento = entry.Key;
 
-                            int codMovimento = entry.Key;
-                            string costoPostoAlloggio = assegnazione.costoTotale.ToString(CultureInfo.InvariantCulture);
-                            int segno = 0;
+                        string costoPostoAlloggio = costoPA.ToString(CultureInfo.InvariantCulture);
+                        int segno = 0;
 
-                            // Assuming you might need some data from the Studente object, you can access it like this: entry.Value
-                            string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '02', '{codMovimento}', '{costoPostoAlloggio}', '{segno}', '{DateTime.Now:yyyy}','2', '{DateTime.Now:dd/MM/yyyy}', 'sa', '', '')";
+                        // Assuming you might need some data from the StudentePagam object, you can access it like this: entry.Value
+                        string insertStatement = $"('{entry.Value.codFiscale}', '{selectedAA}', '02', '{codMovimento}', '{costoPostoAlloggio}', '{segno}', '{DateTime.Now:yyyy}','2', '{DateTime.Now:dd/MM/yyyy}', 'sa', '', '')";
 
-                            batchStatements.Add(insertStatement);
-                            currentBatchSize++;
+                        batchStatements.Add(insertStatement);
+                        currentBatchSize++;
 
-                            // Execute batch when reaching batchSize or end of dictionary
-                            if (currentBatchSize == batchSize || (codMovimento == codMovimentiPerStudente.Keys.Last() && assegnazione == entry.Value.assegnazioni.Last()))
-                            {
-                                _ = finalQueryBuilder.Append(baseSqlInsert);
-                                _ = finalQueryBuilder.Append(string.Join(",", batchStatements));
-                                _ = finalQueryBuilder.Append("; "); // End the SQL statement with a semicolon and a space for separation
+                        // Execute batch when reaching batchSize or end of dictionary
+                        if (currentBatchSize == batchSize || (codMovimento == codMovimentiPerStudente.Keys.Last()))
+                        {
+                            _ = finalQueryBuilder.Append(baseSqlInsert);
+                            _ = finalQueryBuilder.Append(string.Join(",", batchStatements));
+                            _ = finalQueryBuilder.Append("; "); // End the SQL statement with a semicolon and a space for separation
 
-                                batchStatements.Clear(); // Clear the batch for the next round
-                                currentBatchSize = 0; // Reset the batch size counter
-                            }
+                            batchStatements.Clear(); // Clear the batch for the next round
+                            currentBatchSize = 0; // Reset the batch size counter
                         }
                     }
+
 
                     // Execute any remaining statements that didn't fill a complete batch
                     if (batchStatements.Count > 0)

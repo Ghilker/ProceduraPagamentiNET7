@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    public class Studente
+    public class StudentePagam
     {
         public string numeroImpegno { get; private set; }
         public string codFiscale { get; private set; }
@@ -44,7 +44,7 @@ namespace ProcedureNet7
         public int numeroComponentiNucleoFamiliareEstero { get; private set; }
         public bool domicilioCheck { get; private set; }
 
-        public Studente(
+        public StudentePagam(
             string numDomanda,
             string codFiscale,
             string cognome,

@@ -14,25 +14,29 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
 	<AssemblyName>DebugProcedure</AssemblyName>
-    <Optimize>True</Optimize>
+    <Optimize>False</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VERIFICHE|AnyCPU'">
     <DefineConstants>$(DefineConstants);VERIFICHE</DefineConstants>
     <AssemblyName>DebugProcedure</AssemblyName>
-    <Optimize>True</Optimize>
+    <Optimize>False</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='PAGAMENTI|AnyCPU'">
     <DefineConstants>$(DefineConstants);PAGAMENTI</DefineConstants>
 	<AssemblyName>ProcedurePagamenti</AssemblyName>
-    <Optimize>True</Optimize>
+    <Optimize>False</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='VARIE|AnyCPU'">
-    <Optimize>True</Optimize>
+    <Optimize>False</Optimize>
     <DefineConstants>$(DefineConstants);VARIE</DefineConstants>
 	<AssemblyName>ProcedureVarie</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>False</Optimize>
   </PropertyGroup>
 
   <ItemGroup>

@@ -224,6 +224,10 @@ namespace ProcedureNet7
                             FormVerifica formVerifica = new FormVerifica(this);
                             ShowFormInPanel(formVerifica);
                             break;
+                        case ProcedureVerifiche.ElaborazioneFileUni:
+                            FormElaborazioneFileUni formElaborazioneFileUni = new FormElaborazioneFileUni(this);
+                            ShowFormInPanel(formElaborazioneFileUni);
+                            break;
                     }
                 }
 #endif
@@ -309,7 +313,9 @@ namespace ProcedureNet7
             [ProcedureCategory("Verifiche", "Programmatore")]
             ProceduraControlloPuntiBonus,
             [ProcedureCategory("Verifiche", "Programmatore")]
-            Verifica
+            Verifica,
+            [ProcedureCategory("Verifiche", "Programmatore")]
+            ElaborazioneFileUni
         }
 
     }

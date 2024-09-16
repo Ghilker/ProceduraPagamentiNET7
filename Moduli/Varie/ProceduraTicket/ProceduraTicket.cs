@@ -225,7 +225,7 @@ namespace ProcedureNet7
                         From = new MailAddress("giacomo.pavone@laziodisco.it"),
                         Subject = $"Estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
                         Body = @"<p>Buongiorno,</p>
-                             <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/09/2023 con gli esiti di borsa e i blocchi presenti, integrato con le università di appartenenza dello studente.</p>
+                             <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/07/2024 con gli esiti di borsa e i blocchi presenti, integrato con le università di appartenenza dello studente.</p>
                              <p><strong>Attenzione</strong>, è stata modificata l'estrazione in modo tale da comprendere anche i ticket di studenti che hanno presentato domanda per gli anni accademici precedenti; questi risulteranno senza numero domanda, esiti BS o PA o blocchi.</p>
                              <p>Una volta aperto il file dovete <strong>abilitare la modifica e le macro</strong>, altrimenti le funzioni di ricerca e riordino non funzioneranno.</p>
                              <ul>
