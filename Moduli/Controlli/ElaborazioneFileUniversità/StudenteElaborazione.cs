@@ -8,27 +8,30 @@ namespace ProcedureNet7
 {
     public class StudenteElaborazione
     {
-        public string codFiscale;
+        public string codFiscale = string.Empty;
 
-        public string tipoIscrizioneUni;
+        public string tipoIscrizioneUni = string.Empty;
         public bool iscrCondizione;
-        public string tipoCorsoUni;
-        public string descrCorsoUni;
+        public string tipoCorsoUni = string.Empty;
+        public string descrCorsoUni = string.Empty;
         public int annoCorsoUni;
-        public string aaImmatricolazioneUni;
+        public string aaImmatricolazioneUni = string.Empty;
         public int creditiConseguitiUni;
         public int creditiConvalidatiUni;
         public bool tassaRegionalePagata;
         public bool titoloAcquisito;
 
         public bool disabile;
-        public string tipoCorsoDic;
+        public string tipoCorsoDic = string.Empty;
         public int annoCorsoDic;
         public int durataLegaleCorso;
         public int creditiConseguitiDic;
         public int creditiExtraCurrDic;
         public int creditiDaRinunciaDic;
         public int creditiTirocinioDic;
+        public bool stemDic;
+        public string sessoDic = string.Empty;
+        public string descrCorsoDic = string.Empty;
 
         public int creditiRichiestiDB;
 
@@ -37,11 +40,11 @@ namespace ProcedureNet7
         public bool seCFU;
         public bool congruenzaAnno;
 
-        public Dictionary<string, string> blocchiPresenti;
-        public List<string> blocchiDaTogliere;
-        public List<string> blocchiDaMettere;
+        public Dictionary<string, string> blocchiPresenti = new();
+        public List<string> blocchiDaTogliere = new();
+        public List<string> blocchiDaMettere = new();
 
-        public List<string> colErroriElaborazione;
+        public List<string> colErroriElaborazione = new();
 
         public bool daRimuovere;
     }

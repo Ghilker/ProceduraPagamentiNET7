@@ -17,6 +17,11 @@ namespace ProcedureNet7
     {
         string folderPath = string.Empty;
 
+        bool checkCondizione;
+        bool checkStem;
+        bool checkTassaRegionale;
+        bool checkTitoloAcquisito;
+
         List<StudenteElaborazione> studentiRimossi = new();
 
         public ElaborazioneFileUni(MasterForm? _masterForm, SqlConnection? connection_string) : base(_masterForm, connection_string) { }
@@ -24,14 +29,18 @@ namespace ProcedureNet7
         public override void RunProcedure(ArgsElaborazioneFileUni args)
         {
             folderPath = args._selectedUniFolder;
-            var excelFiles = Directory.GetFiles(folderPath, "*.xlsx"); // Get all Excel files in the folder
-
+            var excelFiles = Directory.GetFiles(folderPath, "*.xlsx")
+                                .Where(filePath => !Path.GetFileName(filePath).Contains("~"));
             foreach (var filePath in excelFiles)
             {
+                string nameAndDate = Path.GetFileNameWithoutExtension(filePath);
+                string[] parts = nameAndDate.Split('-');
+                string uniName = parts[0];
                 DataTable initialStudentData = Utilities.ReadExcelToDataTable(filePath);
                 List<StudenteElaborazione> studenteElaborazioneList = new List<StudenteElaborazione>();
                 if (initialStudentData.Rows.Count > 0)
                 {
+
                     foreach (DataRow row in initialStudentData.AsEnumerable())
                     {
                         StudenteElaborazione studente = new();
@@ -52,43 +61,47 @@ namespace ProcedureNet7
 
                         if (initialStudentData.Columns.Contains("TIPO_CORSO_UNI"))
                         {
-                            ProcessTipoCorso(row, studente, filePath);
+                            ProcessTipoCorso(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("TIPO_ISCRIZIONE_UNI"))
                         {
-                            ProcessTipoIscrizione(row, studente, filePath);
+                            ProcessTipoIscrizione(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("CONDIZIONE"))
                         {
-                            ProcessIscrizioneCondizione(row, studente, filePath);
+                            checkCondizione = true;
+                            ProcessIscrizioneCondizione(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("DESCR_CORSO_UNI"))
                         {
-                            ProcessDescrizioneCorso(row, studente, filePath);
+                            checkStem = true;
+                            ProcessDescrizioneCorso(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("ANNO_CORSO_UNI"))
                         {
-                            ProcessAnnoCorso(row, studente, filePath);
+                            ProcessAnnoCorso(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("ANNO_IMMATRICOLAZIONE_UNI"))
                         {
-                            ProcessAnnoImmatricolazione(row, studente, filePath);
+                            ProcessAnnoImmatricolazione(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("CREDITI_UNI"))
                         {
-                            ProcessCrediti(row, studente, filePath);
+                            ProcessCrediti(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("CREDITI_CONVALIDATI"))
                         {
-                            ProcessCreditiConvalidati(row, studente, filePath);
+                            ProcessCreditiConvalidati(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("TASSA_REGIONALE"))
                         {
-                            ProcessTassaRegionale(row, studente, filePath);
+                            checkTassaRegionale = true;
+                            ProcessTassaRegionale(row, studente, uniName);
                         }
                         if (initialStudentData.Columns.Contains("ACQUISIZIONE_TITOLO"))
                         {
-                            ProcessAcquisizioneTitolo(row, studente, filePath);
+                            checkTitoloAcquisito = true;
+                            ProcessAcquisizioneTitolo(row, studente, uniName);
                         }
 
                         // Add the fully processed student to the list
@@ -123,18 +136,21 @@ namespace ProcedureNet7
                     }
                 }
 
-                // Pass the filtered data (students with errors) to the UniElaborazioneDati form
-                UniElaborazioneDati form = new UniElaborazioneDati(studentiConErroriTable, _masterForm, studentiConErrori);
-                DialogResult result = form.ShowDialog(); // Open the form modally
+                if (studentiConErrori.Count > 0)
+                {
+                    // Pass the filtered data (students with errors) to the UniElaborazioneDati form
+                    UniElaborazioneDati form = new UniElaborazioneDati(studentiConErroriTable, _masterForm, studentiConErrori);
+                    DialogResult result = form.ShowDialog(); // Open the form modally
 
-                if (result == DialogResult.OK)
-                {
-                    studentiRimossi.AddRange(studenteElaborazioneList.Where(studenteCheck => studenteCheck.daRimuovere));
-                    studenteElaborazioneList.RemoveAll(studentiRimossi.Contains);
-                }
-                else
-                {
-                    return;
+                    if (result == DialogResult.OK)
+                    {
+                        studentiRimossi.AddRange(studenteElaborazioneList.Where(studenteCheck => studenteCheck.daRimuovere));
+                        studenteElaborazioneList.RemoveAll(studentiRimossi.Contains);
+                    }
+                    else
+                    {
+                        return;
+                    }
                 }
 
                 #region CREAZIONE CF TABLE
@@ -145,11 +161,22 @@ namespace ProcedureNet7
                     codFiscali.Add(studentecf.codFiscale);
                 }
 
-                Logger.LogDebug(null, "Creazione tabella CF");
-                string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
-                using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION))
+                // Check if the table exists, create if not, otherwise truncate
+                Logger.LogDebug(null, "Verifica e creazione/troncamento della tabella CF");
+
+                string checkTableExistsQuery = @"
+                    IF OBJECT_ID('tempdb..#CFEstrazione') IS NOT NULL 
+                    BEGIN
+                        TRUNCATE TABLE #CFEstrazione;
+                    END
+                    ELSE
+                    BEGIN
+                        CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));
+                    END";
+
+                using (SqlCommand checkTableCmd = new SqlCommand(checkTableExistsQuery, CONNECTION))
                 {
-                    createCmd.ExecuteNonQuery();
+                    checkTableCmd.ExecuteNonQuery();
                 }
 
                 Logger.LogDebug(null, "Inserimento in tabella CF dei codici fiscali");
@@ -171,13 +198,26 @@ namespace ProcedureNet7
                     bulkCopy.WriteToServer(cfTable);
                 }
 
-                Logger.LogDebug(null, "Creazione index della tabella CF");
-                string indexingCFTable = "CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale)";
-                using (SqlCommand indexingCFTableCmd = new SqlCommand(indexingCFTable, CONNECTION))
+                // Check if the index already exists before creating it
+                Logger.LogDebug(null, "Verifica esistenza indice della tabella CF");
+
+                string checkIndexExistsQuery = @"
+                    IF NOT EXISTS (
+                        SELECT 1 
+                        FROM tempdb.sys.indexes 
+                        WHERE name = 'idx_Cod_fiscale' 
+                        AND object_id = OBJECT_ID('tempdb..#CFEstrazione')
+                    )
+                    BEGIN
+                        CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale);
+                    END";
+
+                using (SqlCommand checkIndexCmd = new SqlCommand(checkIndexExistsQuery, CONNECTION))
                 {
-                    indexingCFTableCmd.ExecuteNonQuery();
+                    checkIndexCmd.ExecuteNonQuery();
                 }
 
+                // Update statistics after ensuring the data and index are there
                 Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
                 string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
                 using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION))
@@ -186,10 +226,13 @@ namespace ProcedureNet7
                 }
                 #endregion
 
+
+
                 string queryData = $@"
                             SELECT        
 	                            Domanda.Cod_fiscale, 
 	                            vdom.Invalido, 
+                                Studente.sesso,
 	                            vi.Cod_tipologia_studi, 
 	                            vi.Anno_corso, 
                                 Corsi_laurea.durata_legale,
@@ -197,11 +240,14 @@ namespace ProcedureNet7
 	                            COALESCE (vm.Crediti_extra_curriculari, 0) AS Crediti_extra_curriculari, 
 	                            COALESCE (vm.Crediti_riconosciuti_da_rinuncia, 0) AS Crediti_riconosciuti_da_rinuncia, 
 	                            CAST(vi.Crediti_tirocinio AS INT) AS Crediti_tirocinio,
+                                Corsi_laurea.Corso_Stem,
+                                Corsi_laurea.Descrizione as Descrizione_corso,
 	                            dbo.SlashBlocchi(Domanda.Num_domanda, Domanda.Anno_accademico, 'bs') as cod_blocchi,
 	                            dbo.SlashDescrBlocchi(Domanda.Num_domanda, Domanda.Anno_accademico, 'bs') as descr_blocchi
                             FROM            
 	                            Domanda INNER JOIN
                                 #CFEstrazione cf on domanda.cod_fiscale = cf.cod_fiscale INNER JOIN
+                                Studente on domanda.cod_fiscale = studente.cod_fiscale INNER JOIN
 	                            vDATIGENERALI_dom AS vdom ON Domanda.Anno_accademico = vdom.Anno_accademico AND Domanda.Num_domanda = vdom.Num_domanda INNER JOIN
 	                            vIscrizioni AS vi ON Domanda.Anno_accademico = vi.Anno_accademico AND Domanda.Cod_fiscale = vi.Cod_fiscale INNER JOIN
 	                            vMerito AS vm ON Domanda.Anno_accademico = vm.Anno_accademico AND Domanda.Num_domanda = vm.Num_domanda INNER JOIN
@@ -236,6 +282,9 @@ namespace ProcedureNet7
                             studente.creditiExtraCurrDic = Utilities.SafeGetInt(reader, "Crediti_extra_curriculari");
                             studente.creditiDaRinunciaDic = Utilities.SafeGetInt(reader, "Crediti_riconosciuti_da_rinuncia");
                             studente.creditiTirocinioDic = Utilities.SafeGetInt(reader, "Crediti_tirocinio");
+                            studente.stemDic = Utilities.SafeGetInt(reader, "Corso_Stem") == 1;
+                            studente.sessoDic = Utilities.SafeGetString(reader, "Sesso");
+                            studente.descrCorsoDic = Utilities.SafeGetString(reader, "Descrizione_corso");
 
                             string blockCodesString = Utilities.SafeGetString(reader, "cod_blocchi");
                             string blockDescriptionsString = Utilities.SafeGetString(reader, "descr_blocchi");
@@ -268,10 +317,12 @@ namespace ProcedureNet7
                 PopulateSeCFU(studenteElaborazioneList);
                 PopulateCongruenzaAnno(studenteElaborazioneList);
 
-                ProcessStudents(studenteElaborazioneList, filePath);
+                ProcessStudents(studenteElaborazioneList, uniName);
+
+                PopulateDataInFile(studenteElaborazioneList, filePath, nameAndDate);
             }
 
-            void ProcessTipoCorso(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessTipoCorso(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 string cellToProcess = row["TIPO_CORSO_UNI"].ToString().ToUpper();
                 if (cellToProcess == "")
@@ -283,7 +334,7 @@ namespace ProcedureNet7
                     studente.colErroriElaborazione.Add("TIPO_CORSO_UNI");
                     return;
                 }
-                string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                 switch (uniType)
                 {
                     case "LUMSA":
@@ -423,10 +474,10 @@ namespace ProcedureNet7
 
                 }
             }
-            void ProcessTipoIscrizione(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessTipoIscrizione(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 string cellToProcess = row["TIPO_ISCRIZIONE_UNI"].ToString().ToUpper();
-                string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                 if (cellToProcess == "")
                 {
                     if (studente.colErroriElaborazione == null)
@@ -501,10 +552,10 @@ namespace ProcedureNet7
                         break;
                 }
             }
-            void ProcessIscrizioneCondizione(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessIscrizioneCondizione(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 string cellToProcess = row["CONDIZIONE"].ToString().ToUpper();
-                string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                 if (cellToProcess == "")
                 {
                     return;
@@ -534,10 +585,10 @@ namespace ProcedureNet7
                         break;
                 }
             }
-            void ProcessDescrizioneCorso(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessDescrizioneCorso(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 string cellToProcess = Utilities.RemoveNonAlphanumericAndKeepSpaces(row["DESCR_CORSO_UNI"].ToString().ToUpper());
-                string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                 if (cellToProcess == "")
                 {
                     return;
@@ -564,12 +615,12 @@ namespace ProcedureNet7
                         break;
                 }
             }
-            void ProcessAnnoCorso(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessAnnoCorso(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 string studenteTipoCorso = studente.tipoCorsoUni;
                 string studenteTipoIscrizione = studente.tipoIscrizioneUni;
                 string cellToProcess = row["ANNO_CORSO_UNI"].ToString().ToUpper();
-                string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                 try
                 {
                     if (uniType == "TORVERGATA")
@@ -651,69 +702,68 @@ namespace ProcedureNet7
                     studente.colErroriElaborazione.Add("ANNO_CORSO_UNI");
                 }
             }
-            void ProcessAnnoImmatricolazione(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessAnnoImmatricolazione(DataRow row, StudenteElaborazione studente, string uniType)
             {
-                string cellToProcess = (row["ANNO_IMMATRICOLAZIONE_UNI"].ToString().ToUpper());
-                if (!AcademicYearProcessor.ProcessAcademicYear(cellToProcess, out string annoAccademicoProcessed))
-                {
-                    if (studente.colErroriElaborazione == null)
-                    {
-                        studente.colErroriElaborazione = new();
-                    }
-                    studente.colErroriElaborazione.Add("ANNO_IMMATRICOLAZIONE_UNI");
-                }
-                studente.aaImmatricolazioneUni = annoAccademicoProcessed;
-                //string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
-                //switch (uniType)
+                string cellToProcess = Utilities.RemoveNonNumeric(row["ANNO_IMMATRICOLAZIONE_UNI"].ToString().ToUpper());
+                //if (!AcademicYearProcessor.ProcessAcademicYear(cellToProcess, out string annoAccademicoProcessed))
                 //{
-                //    case "LUMSA":
-                //    case "ROMA3":
-                //    case "UNICAS":
-                //    case "UNIVIT":
-                //    case "SANRAF":
-                //    case "TORVERGATA":
-                //    case "UNIEU":
-                //    case "CONSCEC":
-                //    case "LUISS":
-                //    case "ABAFROS":
-                //    case "RUFA":
-                //    case "UNICAMILLUS":
-                //    case "ACCDANZA":
-                //        studente.aaImmatricolazioneUni = cellToProcess;
-                //        break;
-                //    case "ABAROMA":
-                //        studente.aaImmatricolazioneUni = "20" + cellToProcess.Substring(0, 2) + "20" + cellToProcess.Substring(2, 2);
-                //        break;
-                //    case "SAPIENZA":
-                //        string annoPrecedente = (int.Parse(cellToProcess) - 1).ToString();
-                //        studente.aaImmatricolazioneUni = annoPrecedente + cellToProcess;
-                //        break;
-                //    case "MERCATORUM":
-                //        int lenght = cellToProcess.Length;
-                //        if (lenght == 8)
-                //        {
-                //            studente.aaImmatricolazioneUni = cellToProcess;
-                //        }
-                //        else if (lenght == 6)
-                //        {
-                //            studente.aaImmatricolazioneUni = cellToProcess.Substring(0, 4) + "20" + cellToProcess.Substring(4, 2);
-                //        }
-                //        else
-                //        {
-                //            //ERRORE
-                //        }
-                //        break;
+                //    if (studente.colErroriElaborazione == null)
+                //    {
+                //        studente.colErroriElaborazione = new();
+                //    }
+                //    studente.colErroriElaborazione.Add("ANNO_IMMATRICOLAZIONE_UNI");
                 //}
+                //studente.aaImmatricolazioneUni = annoAccademicoProcessed;
+                switch (uniType)
+                {
+                    case "LUMSA":
+                    case "ROMA3":
+                    case "UNICAS":
+                    case "UNIVIT":
+                    case "SANRAF":
+                    case "TORVERGATA":
+                    case "UNIEU":
+                    case "CONSCEC":
+                    case "LUISS":
+                    case "ABAFROS":
+                    case "RUFA":
+                    case "UNICAMILLUS":
+                    case "ACCDANZA":
+                        studente.aaImmatricolazioneUni = cellToProcess;
+                        break;
+                    case "ABAROMA":
+                        studente.aaImmatricolazioneUni = "20" + cellToProcess.Substring(0, 2) + "20" + cellToProcess.Substring(2, 2);
+                        break;
+                    case "SAPIENZA":
+                        string annoPrecedente = (int.Parse(cellToProcess) - 1).ToString();
+                        studente.aaImmatricolazioneUni = annoPrecedente + cellToProcess;
+                        break;
+                    case "MERCATORUM":
+                        int lenght = cellToProcess.Length;
+                        if (lenght == 8)
+                        {
+                            studente.aaImmatricolazioneUni = cellToProcess;
+                        }
+                        else if (lenght == 6)
+                        {
+                            studente.aaImmatricolazioneUni = cellToProcess.Substring(0, 4) + "20" + cellToProcess.Substring(4, 2);
+                        }
+                        else
+                        {
+                            //ERRORE
+                        }
+                        break;
+                }
             }
-            void ProcessCrediti(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessCrediti(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 try
                 {
                     string cellToProcess = row["CREDITI_UNI"].ToString().ToUpper();
-                    string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                     if (uniType == "TORVERGATA")
                     {
-                        cellToProcess = (int.Parse(cellToProcess) * 0.1).ToString();
+                        cellToProcess = (int.Parse(cellToProcess.Replace(".", "")) * 0.1).ToString();
                     }
                     switch (uniType)
                     {
@@ -746,7 +796,7 @@ namespace ProcedureNet7
                     studente.colErroriElaborazione.Add("CREDITI_UNI");
                 }
             }
-            void ProcessCreditiConvalidati(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessCreditiConvalidati(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 try
                 {
@@ -755,7 +805,7 @@ namespace ProcedureNet7
                     {
                         return;
                     }
-                    string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                     if (uniType == "TORVERGATA")
                     {
                         cellToProcess = (int.Parse(cellToProcess) * 0.1).ToString();
@@ -792,10 +842,10 @@ namespace ProcedureNet7
                     studente.colErroriElaborazione.Add("CREDITI_CONVALIDATI");
                 }
             }
-            void ProcessTassaRegionale(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessTassaRegionale(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 string cellToProcess = Utilities.RemoveNonAlphanumericAndKeepSpaces(row["TASSA_REGIONALE"].ToString().ToUpper());
-                string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                 if (cellToProcess == "")
                 {
                     return;
@@ -843,10 +893,10 @@ namespace ProcedureNet7
                 }
 
             }
-            void ProcessAcquisizioneTitolo(DataRow row, StudenteElaborazione studente, string filePath)
+            void ProcessAcquisizioneTitolo(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 string cellToProcess = Utilities.RemoveNonAlphanumericAndKeepSpaces(row["ACQUISIZIONE_TITOLO"].ToString().ToUpper());
-                string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
+
                 if (cellToProcess == "")
                 {
                     return;
@@ -939,7 +989,7 @@ namespace ProcedureNet7
             }
             void PopulateCongruenzaAnno(List<StudenteElaborazione> studenteElaborazioneList)
             {
-                string currentAcademicYear = "20242025"; // Example: This should be passed dynamically depending on the year you're checking
+                string currentAcademicYear = "20232024"; // Example: This should be passed dynamically depending on the year you're checking
 
                 foreach (StudenteElaborazione studente in studenteElaborazioneList)
                 {
@@ -995,10 +1045,8 @@ namespace ProcedureNet7
                 }
             }
 
-            void ProcessStudents(List<StudenteElaborazione> studenteElaborazioneList, string filePath)
+            void ProcessStudents(List<StudenteElaborazione> studenteElaborazioneList, string uniType)
             {
-                string uniType = Path.GetFileNameWithoutExtension(filePath).ToUpper();
-
                 string queryData = $@"
                     SELECT DISTINCT 
 	                    Crediti_richiesti.Tipologia_corso, 
@@ -1100,9 +1148,16 @@ namespace ProcedureNet7
 
                     if (studente.seAnno && studente.seTitpo && studente.seCFU)
                     {
-                        if (studente.titoloAcquisito)
+                        if (checkTitoloAcquisito)
                         {
-                            studente.blocchiDaTogliere.Add("BIS");
+                            if (studente.titoloAcquisito)
+                            {
+                                studente.blocchiDaTogliere.Add("BIS");
+                            }
+                            else if (studente.tipoCorsoUni == "5")
+                            {
+                                studente.blocchiDaMettere.Add("BIS");
+                            }
                         }
                         if (studente.creditiConseguitiDic <= studente.creditiConseguitiUni)
                         {
@@ -1163,7 +1218,7 @@ namespace ProcedureNet7
                         }
                     }
 
-                    if (!studente.disabile)
+                    if (checkTassaRegionale && !studente.disabile)
                     {
                         if (studente.tassaRegionalePagata)
                         {
@@ -1175,18 +1230,126 @@ namespace ProcedureNet7
                         }
                     }
 
-                    if (studente.iscrCondizione)
+                    if (checkCondizione && studente.iscrCondizione)
                     {
                         studente.blocchiDaMettere.Add("IMR");
+                    }
+                    else
+                    {
+                        studente.blocchiDaTogliere.Add("IMR");
                     }
 
                     if (studente.creditiDaRinunciaDic == 0 && studente.creditiConvalidatiUni > 0)
                     {
                         studente.blocchiDaMettere.Add("CRC");
                     }
+
+                    if (checkStem && studente.sessoDic == "F" && studente.stemDic)
+                    {
+                        bool isStem = StringSimilarityChecker.AreStringsSimilar(studente.descrCorsoUni, studente.descrCorsoDic);
+                        if (!isStem)
+                        {
+                            studente.blocchiDaMettere.Add("VST");
+                        }
+                    }
+
+
+                    studente.blocchiDaTogliere = studente.blocchiDaTogliere
+                        .Where(studente.blocchiPresenti.ContainsKey)
+                        .ToList();
+
+                    studente.blocchiDaMettere = studente.blocchiDaMettere
+                        .Where(blocco => !studente.blocchiPresenti.ContainsKey(blocco))
+                        .ToList();
                 }
             }
+
+            void PopulateDataInFile(List<StudenteElaborazione> studenteElaborazioneList, string filepath, string fileName)
+            {
+                DataTable producedTable = new DataTable();
+
+                producedTable.Columns.Add("Codice Fiscale");
+                producedTable.Columns.Add("Tipo Iscrizione UNI");
+                producedTable.Columns.Add("Iscrizione con Condizione UNI");
+                producedTable.Columns.Add("Tipo Corso UNI");
+                producedTable.Columns.Add("Descrizione Corso UNI");
+                producedTable.Columns.Add("Anno Corso UNI");
+                producedTable.Columns.Add("Anno Immatricolazione UNI");
+                producedTable.Columns.Add("Crediti Conseguiti UNI");
+                producedTable.Columns.Add("Crediti Convalidati UNI");
+                producedTable.Columns.Add("Tassa Regionale Pagata UNI");
+                producedTable.Columns.Add("Titolo Acquisito UNI");
+                producedTable.Columns.Add("     ");
+                producedTable.Columns.Add("Se Tipo");
+                producedTable.Columns.Add("Se Anno");
+                producedTable.Columns.Add("Se CFU");
+                producedTable.Columns.Add("Congruenza AA");
+                producedTable.Columns.Add("      ");
+                producedTable.Columns.Add("Disabile DIC");
+                producedTable.Columns.Add("Sesso DIC");
+                producedTable.Columns.Add("Tipo Corso DIC");
+                producedTable.Columns.Add("Anno Corso DIC");
+                producedTable.Columns.Add("Durata Legale Corso DIC");
+                producedTable.Columns.Add("Crediti Conseguiti DIC");
+                producedTable.Columns.Add("Crediti Extra Curr DIC");
+                producedTable.Columns.Add("Crediti Rinuncia DIC");
+                producedTable.Columns.Add("Crediti Tirocinio DIC");
+                producedTable.Columns.Add("Stem DIC");
+                producedTable.Columns.Add("Descrizione Corso Dic");
+                producedTable.Columns.Add("Descrizione blocchi presenti");
+                producedTable.Columns.Add("Cod blocchi presenti");
+                producedTable.Columns.Add("Blocchi da TOGLIERE");
+                producedTable.Columns.Add("Blocchi da METTERE");
+
+                foreach (StudenteElaborazione studente in studenteElaborazioneList)
+                {
+                    string descrBlocchi = string.Join("#", studente.blocchiPresenti.Values);
+                    string codBlocchi = string.Join("#", studente.blocchiPresenti.Keys);
+                    string blocchiDaTogliere = string.Join("/", studente.blocchiDaTogliere);
+                    string blocchiDaMettere = string.Join("/", studente.blocchiDaMettere);
+
+                    producedTable.Rows.Add(
+                        studente.codFiscale.ToString(),
+                        studente.tipoIscrizioneUni.ToString(),
+                        studente.iscrCondizione ? "SI" : "NO",
+                        studente.tipoCorsoUni.ToString(),
+                        studente.descrCorsoUni.ToString(),
+                        studente.annoCorsoUni.ToString(),
+                        studente.aaImmatricolazioneUni.ToString(),
+                        studente.creditiConseguitiUni.ToString(),
+                        studente.creditiConvalidatiUni.ToString(),
+                        studente.tassaRegionalePagata ? "SI" : "NO",
+                        studente.titoloAcquisito ? "SI" : "NO",
+                        " ",
+                        studente.seTitpo ? "OK" : "NOK",
+                        studente.seAnno ? "OK" : "NOK",
+                        studente.seCFU ? "OK" : "NOK",
+                        studente.congruenzaAnno ? "OK" : "NOK",
+                        " ",
+                        studente.disabile ? "SI" : "NO",
+                        studente.sessoDic.ToString(),
+                        studente.tipoCorsoDic.ToString(),
+                        studente.annoCorsoDic.ToString(),
+                        studente.durataLegaleCorso.ToString(),
+                        studente.creditiConseguitiDic.ToString(),
+                        studente.creditiExtraCurrDic.ToString(),
+                        studente.creditiDaRinunciaDic.ToString(),
+                        studente.creditiTirocinioDic.ToString(),
+                        studente.stemDic ? "SI" : "NO",
+                        studente.descrCorsoDic.ToString(),
+                        descrBlocchi,
+                        codBlocchi,
+                        blocchiDaTogliere,
+                        blocchiDaMettere
+                        );
+                }
+
+                Utilities.ExportDataTableToExcel(producedTable, Path.Combine(folderPath, "Output"), true, fileName);
+
+            }
         }
+
+
     }
     public class CreditRecord
     {
