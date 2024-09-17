@@ -1,7 +1,7 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Threading;
 using System.Windows.Forms; // Required for working with WinForms UI components
+
 public class Logger : IDisposable
 {
     private readonly LogLevel logLevelThreshold = LogLevel.INFO;
@@ -14,7 +14,7 @@ public class Logger : IDisposable
     private readonly ProgressBar progressBar;
     private readonly RichTextBox logTextBox;
     private readonly System.Timers.Timer uiUpdateTimer;
-    private readonly ConcurrentQueue<(int sequence, LogLevel level, string message, Color? textColor)> logQueue = new();
+    private readonly CircularBuffer<(int sequence, LogLevel level, string message, Color? textColor)> logQueue;
     private int logSequence = 0;
 
     private Logger(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold)
@@ -23,6 +23,9 @@ public class Logger : IDisposable
         this.progressBar = progressBar;
         this.logTextBox = logTextBox;
         this.logLevelThreshold = logLevelThreshold;
+
+        // Initialize the circular buffer with a size of 1024 (can be adjusted based on performance needs)
+        logQueue = new CircularBuffer<(int sequence, LogLevel level, string message, Color? textColor)>(1024);
 
         uiUpdateTimer = new System.Timers.Timer(100);
         uiUpdateTimer.Elapsed += (sender, e) => FlushLogQueueToUI();
@@ -79,7 +82,7 @@ public class Logger : IDisposable
     {
         while (isRunning)
         {
-            if (logSignal.WaitOne(1000) || !logQueue.IsEmpty)
+            if (logSignal.WaitOne(1000) || logQueue.Count > 0)
             {
                 FlushLogQueue();
             }
@@ -131,6 +134,7 @@ public class Logger : IDisposable
             });
         }
     }
+
     private int CalculateDynamicBatchSize()
     {
         int queueCount = logQueue.Count;
@@ -229,4 +233,52 @@ public class Logger : IDisposable
         logSignal.Dispose();
     }
 }
+
+// Circular buffer implementation
+public class CircularBuffer<T>
+{
+    private readonly T[] buffer;
+    private int head;
+    private int tail;
+    private int size;
+
+    public CircularBuffer(int capacity)
+    {
+        buffer = new T[capacity];
+        head = 0;
+        tail = 0;
+        size = 0;
+    }
+
+    public int Count => size;
+
+    public void Enqueue(T item)
+    {
+        buffer[tail] = item;
+        tail = (tail + 1) % buffer.Length;
+        if (size < buffer.Length)
+        {
+            size++;
+        }
+        else
+        {
+            head = (head + 1) % buffer.Length; // Overwrite the oldest item if full
+        }
+    }
+
+    public bool TryDequeue(out T item)
+    {
+        if (size == 0)
+        {
+            item = default;
+            return false;
+        }
+
+        item = buffer[head];
+        head = (head + 1) % buffer.Length;
+        size--;
+        return true;
+    }
+}
+
 public enum LogLevel { DEBUG, INFO, WARN, ERROR }

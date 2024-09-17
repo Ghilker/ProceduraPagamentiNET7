@@ -1,15 +1,5 @@
-﻿using DocumentFormat.OpenXml.Drawing.Diagrams;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Data;
+﻿using System.Data;
 using System.Data.SqlClient;
-using System.Linq;
-using System.Net.Http.Headers;
-using System.Security.Permissions;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
@@ -30,7 +20,7 @@ namespace ProcedureNet7
         {
             folderPath = args._selectedUniFolder;
             var excelFiles = Directory.GetFiles(folderPath, "*.xlsx")
-                                .Where(filePath => !Path.GetFileName(filePath).Contains("~"));
+                                .Where(filePath => !Path.GetFileName(filePath).Contains('~'));
             foreach (var filePath in excelFiles)
             {
                 string nameAndDate = Path.GetFileNameWithoutExtension(filePath);
@@ -322,6 +312,8 @@ namespace ProcedureNet7
                 PopulateDataInFile(studenteElaborazioneList, filePath, nameAndDate);
             }
 
+            Logger.LogInfo(100, "Fine elaborazione");
+
             void ProcessTipoCorso(DataRow row, StudenteElaborazione studente, string uniType)
             {
                 string cellToProcess = row["TIPO_CORSO_UNI"].ToString().ToUpper();
@@ -426,11 +418,11 @@ namespace ProcedureNet7
                         {
                             studente.tipoCorsoUni = "3";
                         }
-                        else if (cellToProcess == "MS")
+                        else if (cellToProcess == "LM")
                         {
                             studente.tipoCorsoUni = "4";
                         }
-                        else if (cellToProcess == "LM")
+                        else if (cellToProcess == "MS")
                         {
                             studente.tipoCorsoUni = "5";
                         }
@@ -944,7 +936,6 @@ namespace ProcedureNet7
                 }
             }
 
-
             void PopulateSeTipo(List<StudenteElaborazione> studenteElaborazioneList)
             {
                 foreach (StudenteElaborazione studente in studenteElaborazioneList)
@@ -1303,10 +1294,11 @@ namespace ProcedureNet7
 
                 foreach (StudenteElaborazione studente in studenteElaborazioneList)
                 {
-                    string descrBlocchi = string.Join("#", studente.blocchiPresenti.Values);
-                    string codBlocchi = string.Join("#", studente.blocchiPresenti.Keys);
-                    string blocchiDaTogliere = string.Join("/", studente.blocchiDaTogliere);
-                    string blocchiDaMettere = string.Join("/", studente.blocchiDaMettere);
+                    string descrBlocchi = studente.blocchiPresenti.Values.Count > 0 ? "#" + string.Join("#", studente.blocchiPresenti.Values) : " ";
+                    string codBlocchi = studente.blocchiPresenti.Keys.Count > 0 ? "#" + string.Join("#", studente.blocchiPresenti.Keys) : " ";
+                    string blocchiDaTogliere = studente.blocchiDaTogliere.Count > 0 ? "/" + string.Join("/", studente.blocchiDaTogliere) : " ";
+                    string blocchiDaMettere = studente.blocchiDaMettere.Count > 0 ? "/" + string.Join("/", studente.blocchiDaMettere) : " ";
+
 
                     producedTable.Rows.Add(
                         studente.codFiscale.ToString(),
@@ -1344,12 +1336,79 @@ namespace ProcedureNet7
                         );
                 }
 
-                Utilities.ExportDataTableToExcel(producedTable, Path.Combine(folderPath, "Output"), true, fileName);
+                string filePath = Utilities.ExportDataTableToExcel(producedTable, Path.Combine(folderPath, "Output"), true, fileName);
+
+                // Open Excel application
+                var excelApp = new Microsoft.Office.Interop.Excel.Application();
+                var workbook = excelApp.Workbooks.Open(filePath);
+                var worksheet = (Microsoft.Office.Interop.Excel.Worksheet)workbook.Sheets[1];
+
+                // Define soft colors for blue shades
+                var softBlueColor1 = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(155, 195, 230));
+                var softBlueColor2 = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(190, 215, 240));
+                var softRedColor = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(245, 100, 100));
+                var darkBlueColor = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(50, 120, 185));
+
+                // Get the width of the first column
+                var firstColumnWidth = worksheet.Columns[1].ColumnWidth;
+
+                // Loop through columns and apply colors to the body of the table
+                for (int i = 1; i <= producedTable.Columns.Count; i++)
+                {
+                    string columnName = producedTable.Columns[i - 1].ColumnName;
+
+                    // Set each column to have the same width as the first column
+                    worksheet.Columns[i].ColumnWidth = firstColumnWidth;
+
+                    // Apply red background if the column name contains spaces
+                    if (string.IsNullOrWhiteSpace(columnName))
+                    {
+                        worksheet.Columns[i].Interior.Color = softRedColor;
+                    }
+                    else
+                    {
+                        // Apply alternating blue shades for non-empty columns
+                        if (i % 2 == 0)
+                        {
+                            worksheet.Columns[i].Interior.Color = softBlueColor1; // First shade of blue
+                        }
+                        else
+                        {
+                            worksheet.Columns[i].Interior.Color = softBlueColor2; // Second shade of blue
+                        }
+                    }
+                }
+
+                // Apply darker blue to the headers (row 1)
+                for (int i = 1; i <= producedTable.Columns.Count; i++)
+                {
+                    var headerCell = worksheet.Cells[1, i];
+                    headerCell.Interior.Color = darkBlueColor;
+                    headerCell.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White); // Make text white for better contrast
+                    headerCell.Font.Bold = true; // Make header bold for emphasis
+                }
+
+                // Apply borders to all filled cells (range of filled cells)
+                var usedRange = worksheet.UsedRange;
+                usedRange.Borders.LineStyle = Microsoft.Office.Interop.Excel.XlLineStyle.xlContinuous;
+                usedRange.Borders.Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThin;
+
+                // Save and close the workbook
+                workbook.Save();
+                workbook.Close(false);
+                excelApp.Quit();
+
+                // Release COM objects to free memory
+                System.Runtime.InteropServices.Marshal.ReleaseComObject(worksheet);
+                System.Runtime.InteropServices.Marshal.ReleaseComObject(workbook);
+                System.Runtime.InteropServices.Marshal.ReleaseComObject(excelApp);
+
+                // Force garbage collection
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
 
             }
         }
-
-
     }
     public class CreditRecord
     {
