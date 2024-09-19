@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal abstract class BaseProcedure<TArgs> : IDisposable
+    public abstract class BaseProcedure<TArgs> : IDisposable
     {
         protected SqlConnection? CONNECTION;
         protected MasterForm? _masterForm;

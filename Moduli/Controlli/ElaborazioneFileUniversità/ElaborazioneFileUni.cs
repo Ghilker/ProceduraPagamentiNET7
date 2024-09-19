@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace ProcedureNet7
 {
-    internal class ElaborazioneFileUni : BaseProcedure<ArgsElaborazioneFileUni>
+    public class ElaborazioneFileUni : BaseProcedure<ArgsElaborazioneFileUni>
     {
         string folderPath = string.Empty;
 
@@ -219,32 +219,51 @@ namespace ProcedureNet7
 
 
                 string queryData = $@"
-                            SELECT        
-	                            Domanda.Cod_fiscale, 
-	                            vdom.Invalido, 
-                                Studente.sesso,
-	                            vi.Cod_tipologia_studi, 
-	                            vi.Anno_corso, 
-                                Corsi_laurea.durata_legale,
-	                            CAST(vm.Numero_crediti AS INT) AS Numero_crediti, 
-	                            COALESCE (vm.Crediti_extra_curriculari, 0) AS Crediti_extra_curriculari, 
-	                            COALESCE (vm.Crediti_riconosciuti_da_rinuncia, 0) AS Crediti_riconosciuti_da_rinuncia, 
-	                            CAST(vi.Crediti_tirocinio AS INT) AS Crediti_tirocinio,
-                                Corsi_laurea.Corso_Stem,
-                                Corsi_laurea.Descrizione as Descrizione_corso,
-	                            dbo.SlashBlocchi(Domanda.Num_domanda, Domanda.Anno_accademico, 'bs') as cod_blocchi,
-	                            dbo.SlashDescrBlocchi(Domanda.Num_domanda, Domanda.Anno_accademico, 'bs') as descr_blocchi
-                            FROM            
-	                            Domanda INNER JOIN
-                                #CFEstrazione cf on domanda.cod_fiscale = cf.cod_fiscale INNER JOIN
-                                Studente on domanda.cod_fiscale = studente.cod_fiscale INNER JOIN
-	                            vDATIGENERALI_dom AS vdom ON Domanda.Anno_accademico = vdom.Anno_accademico AND Domanda.Num_domanda = vdom.Num_domanda INNER JOIN
-	                            vIscrizioni AS vi ON Domanda.Anno_accademico = vi.Anno_accademico AND Domanda.Cod_fiscale = vi.Cod_fiscale INNER JOIN
-	                            vMerito AS vm ON Domanda.Anno_accademico = vm.Anno_accademico AND Domanda.Num_domanda = vm.Num_domanda INNER JOIN
-                                Corsi_laurea ON vi.Cod_corso_laurea = Corsi_laurea.Cod_corso_laurea AND vi.Cod_facolta = Corsi_laurea.Cod_facolta AND vi.Cod_sede_studi = Corsi_laurea.Cod_sede_studi AND vi.Cod_tipo_ordinamento = Corsi_laurea.Cod_tipo_ordinamento
-                            WHERE        
-	                            (Domanda.Anno_accademico = '20232024') AND 
-	                            (Domanda.Tipo_bando = 'lz') and (Corsi_laurea.Anno_accad_fine is null or corsi_laurea.anno_accad_fine = '20232024' )
+                        SELECT        
+                            Domanda.Cod_fiscale, 
+                            Domanda.Num_domanda,
+                            vdom.Invalido, 
+                            Studente.sesso,
+                            vi.Cod_tipologia_studi, 
+                            vi.Anno_corso, 
+                            Corsi_laurea.durata_legale,
+                            CAST(vm.Numero_crediti AS INT) AS Numero_crediti, 
+                            COALESCE(vm.Crediti_extra_curriculari, 0) AS Crediti_extra_curriculari, 
+                            COALESCE(vm.Crediti_riconosciuti_da_rinuncia, 0) AS Crediti_riconosciuti_da_rinuncia, 
+                            CAST(vi.Crediti_tirocinio AS INT) AS Crediti_tirocinio,
+                            Corsi_laurea.Corso_Stem,
+                            Corsi_laurea.Descrizione AS Descrizione_corso,
+                            dbo.SlashBlocchi(Domanda.Num_domanda, Domanda.Anno_accademico, 'bs') AS cod_blocchi,
+                            dbo.SlashDescrBlocchi(Domanda.Num_domanda, Domanda.Anno_accademico, 'bs') AS descr_blocchi,
+                            COALESCE(esiti_bs.Cod_tipo_esito, -1) AS Cod_tipo_esito_bs,
+                            COALESCE(esiti_pa.Cod_tipo_esito, -1) AS Cod_tipo_esito_pa,
+							dbo.SlashIncongruenze(Domanda.Num_domanda, Domanda.Anno_accademico) AS Descr_incongruenze,
+							dbo.SlashIncongruenzeCod(Domanda.Num_domanda, Domanda.Anno_accademico) AS Cod_incongruenze
+                        FROM            
+                            Domanda
+                        INNER JOIN #CFEstrazione cfe on domanda.cod_fiscale = cfe.cod_fiscale
+                        INNER JOIN Studente ON Domanda.Cod_fiscale = Studente.Cod_fiscale
+                        INNER JOIN vDATIGENERALI_dom AS vdom ON Domanda.Anno_accademico = vdom.Anno_accademico AND Domanda.Num_domanda = vdom.Num_domanda
+                        INNER JOIN vIscrizioni AS vi ON Domanda.Anno_accademico = vi.Anno_accademico AND Domanda.Cod_fiscale = vi.Cod_fiscale
+                        INNER JOIN vMerito AS vm ON Domanda.Anno_accademico = vm.Anno_accademico AND Domanda.Num_domanda = vm.Num_domanda
+                        INNER JOIN
+                            Corsi_laurea ON vi.Cod_corso_laurea = Corsi_laurea.Cod_corso_laurea 
+                            AND vi.Cod_facolta = Corsi_laurea.Cod_facolta 
+                            AND vi.Cod_sede_studi = Corsi_laurea.Cod_sede_studi 
+                            AND vi.Cod_tipo_ordinamento = Corsi_laurea.Cod_tipo_ordinamento
+                        LEFT JOIN
+                            vEsiti_concorsi AS esiti_bs ON Domanda.Anno_accademico = esiti_bs.Anno_accademico 
+                            AND Domanda.Num_domanda = esiti_bs.Num_domanda 
+                            AND esiti_bs.Cod_beneficio = 'BS'
+                        LEFT JOIN
+                            vEsiti_concorsi AS esiti_pa ON Domanda.Anno_accademico = esiti_pa.Anno_accademico 
+                            AND Domanda.Num_domanda = esiti_pa.Num_domanda 
+                            AND esiti_pa.Cod_beneficio = 'PA'
+                        WHERE        
+                            Domanda.Anno_accademico = '20242025' 
+                            AND Domanda.Tipo_bando = 'lz' 
+                            AND (Corsi_laurea.Anno_accad_fine IS NULL OR Corsi_laurea.Anno_accad_fine = '20242025')
+
                             ";
 
                 SqlCommand readData = new(queryData, CONNECTION);
@@ -260,9 +279,9 @@ namespace ProcedureNet7
 
                         if (studente != null)
                         {
-                            // You can now work with the found student in the studenteElaborazioneList
-                            // For example, update the properties of the student
-                            Console.WriteLine($"Found student with CodFiscale: {codFiscale}");
+                            studente.numDomanda = Utilities.SafeGetString(reader, "Num_domanda");
+                            studente.esitoBS = Utilities.SafeGetInt(reader, "Cod_tipo_esito_bs");
+                            studente.esitoPA = Utilities.SafeGetInt(reader, "Cod_tipo_esito_pa");
 
                             // Example: update student properties based on query results
                             studente.tipoCorsoDic = Utilities.SafeGetString(reader, "Cod_tipologia_studi");
@@ -274,6 +293,7 @@ namespace ProcedureNet7
                             studente.creditiTirocinioDic = Utilities.SafeGetInt(reader, "Crediti_tirocinio");
                             studente.stemDic = Utilities.SafeGetInt(reader, "Corso_Stem") == 1;
                             studente.sessoDic = Utilities.SafeGetString(reader, "Sesso");
+                            studente.disabile = Utilities.SafeGetInt(reader, "Invalido") == 1;
                             studente.descrCorsoDic = Utilities.SafeGetString(reader, "Descrizione_corso");
 
                             string blockCodesString = Utilities.SafeGetString(reader, "cod_blocchi");
@@ -294,6 +314,19 @@ namespace ProcedureNet7
                                 // Add the code-description pair to the dictionary
                                 studente.blocchiPresenti[blockCodes[i]] = blockDescriptions[i];
                             }
+
+                            string incongruenzeCodesString = Utilities.SafeGetString(reader, "cod_incongruenze");
+                            string incongruenzeDescrString = Utilities.SafeGetString(reader, "Descr_incongruenze");
+
+                            List<string> incongruenzeCodes = incongruenzeCodesString.Split(new char[] { '#' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                            List<string> incongruenzeDescr = incongruenzeDescrString.Split(new char[] { '#' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+
+                            studente.incongruenzePresenti = new Dictionary<string, string>();
+
+                            for (int i = 0; i < incongruenzeCodes.Count && i < incongruenzeDescr.Count; i++)
+                            {
+                                studente.incongruenzePresenti[incongruenzeCodes[i]] = incongruenzeDescr[i];
+                            }
                         }
                     }
                 }
@@ -309,7 +342,7 @@ namespace ProcedureNet7
 
                 ProcessStudents(studenteElaborazioneList, uniName);
 
-                PopulateDataInFile(studenteElaborazioneList, filePath, nameAndDate);
+                PopulateDataInFile(studenteElaborazioneList, filePath, nameAndDate, initialStudentData);
             }
 
             Logger.LogInfo(100, "Fine elaborazione");
@@ -706,45 +739,60 @@ namespace ProcedureNet7
                 //    studente.colErroriElaborazione.Add("ANNO_IMMATRICOLAZIONE_UNI");
                 //}
                 //studente.aaImmatricolazioneUni = annoAccademicoProcessed;
-                switch (uniType)
+                try
                 {
-                    case "LUMSA":
-                    case "ROMA3":
-                    case "UNICAS":
-                    case "UNIVIT":
-                    case "SANRAF":
-                    case "TORVERGATA":
-                    case "UNIEU":
-                    case "CONSCEC":
-                    case "LUISS":
-                    case "ABAFROS":
-                    case "RUFA":
-                    case "UNICAMILLUS":
-                    case "ACCDANZA":
-                        studente.aaImmatricolazioneUni = cellToProcess;
-                        break;
-                    case "ABAROMA":
-                        studente.aaImmatricolazioneUni = "20" + cellToProcess.Substring(0, 2) + "20" + cellToProcess.Substring(2, 2);
-                        break;
-                    case "SAPIENZA":
-                        string annoPrecedente = (int.Parse(cellToProcess) - 1).ToString();
-                        studente.aaImmatricolazioneUni = annoPrecedente + cellToProcess;
-                        break;
-                    case "MERCATORUM":
-                        int lenght = cellToProcess.Length;
-                        if (lenght == 8)
-                        {
-                            studente.aaImmatricolazioneUni = cellToProcess;
-                        }
-                        else if (lenght == 6)
-                        {
-                            studente.aaImmatricolazioneUni = cellToProcess.Substring(0, 4) + "20" + cellToProcess.Substring(4, 2);
-                        }
-                        else
-                        {
-                            //ERRORE
-                        }
-                        break;
+                    string annoImmatricolazione = string.Empty;
+                    switch (uniType)
+                    {
+                        case "LUMSA":
+                        case "ROMA3":
+                        case "UNICAS":
+                        case "UNIVIT":
+                        case "SANRAF":
+                        case "TORVERGATA":
+                        case "UNIEU":
+                        case "CONSCEC":
+                        case "LUISS":
+                        case "ABAFROS":
+                        case "RUFA":
+                        case "UNICAMILLUS":
+                        case "ACCDANZA":
+                            annoImmatricolazione = cellToProcess;
+                            break;
+                        case "ABAROMA":
+                            annoImmatricolazione = "20" + cellToProcess.Substring(0, 2) + "20" + cellToProcess.Substring(2, 2);
+                            break;
+                        case "SAPIENZA":
+                            string annoPrecedente = (int.Parse(cellToProcess) - 1).ToString();
+                            annoImmatricolazione = annoPrecedente + cellToProcess;
+                            break;
+                        case "MERCATORUM":
+                            int lenght = cellToProcess.Length;
+                            if (lenght == 8)
+                            {
+                                annoImmatricolazione = cellToProcess;
+                            }
+                            else if (lenght == 6)
+                            {
+                                annoImmatricolazione = cellToProcess.Substring(0, 4) + "20" + cellToProcess.Substring(4, 2);
+                            }
+                            break;
+                    }
+
+                    if (annoImmatricolazione.Length != 8)
+                    {
+                        throw new();
+                    }
+
+                    studente.aaImmatricolazioneUni = annoImmatricolazione;
+                }
+                catch
+                {
+                    if (studente.colErroriElaborazione == null)
+                    {
+                        studente.colErroriElaborazione = new();
+                    }
+                    studente.colErroriElaborazione.Add("ANNO_IMMATRICOLAZIONE_UNI");
                 }
             }
             void ProcessCrediti(DataRow row, StudenteElaborazione studente, string uniType)
@@ -755,6 +803,10 @@ namespace ProcedureNet7
 
                     if (uniType == "TORVERGATA")
                     {
+                        if (string.IsNullOrWhiteSpace(cellToProcess) && studente.annoCorsoUni == 1)
+                        {
+                            cellToProcess = "0";
+                        }
                         cellToProcess = (int.Parse(cellToProcess.Replace(".", "")) * 0.1).ToString();
                     }
                     switch (uniType)
@@ -800,6 +852,10 @@ namespace ProcedureNet7
 
                     if (uniType == "TORVERGATA")
                     {
+                        if (string.IsNullOrWhiteSpace(cellToProcess) && studente.annoCorsoUni == 1)
+                        {
+                            cellToProcess = "0";
+                        }
                         cellToProcess = (int.Parse(cellToProcess) * 0.1).ToString();
                     }
                     switch (uniType)
@@ -906,24 +962,35 @@ namespace ProcedureNet7
                         case "RUFA":
                         case "UNICAMILLUS":
                         case "ACCDANZA":
-                        case "ROMA3":
-                        case "UNICAS":
-                        case "UNIVIT":
                         case "TORVERGATA":
                         case "ABAROMA":
                         case "ABAFROS":
                         case "MERCATORUM":
-                            if (cellToProcess == "S" || cellToProcess == "SI" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK" || IsDate(cellToProcess))
+                            if (cellToProcess == "S" || cellToProcess == "SI" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK")
                             {
-                                studente.tassaRegionalePagata = true;
+                                studente.titoloAcquisito = true;
+
+                                if (row.Table.Columns.Contains("DESCR_TITOLO") && row["DESCR_TITOLO"] != null && row["DESCR_TITOLO"] != DBNull.Value)
+                                {
+                                    studente.descrTitoloAcquisito = Utilities.RemoveNonAlphanumericAndKeepSpaces(row["DESCR_TITOLO"].ToString().ToUpper());
+                                }
+                                else
+                                {
+                                    studente.descrTitoloAcquisito = string.Empty; // Set to empty if column doesn't exist or value is null
+                                }
+                            }
+
+
+                            break;
+                        case "ROMA3":
+                        case "UNICAS":
+                        case "UNIVIT":
+                            if (cellToProcess != "")
+                            {
+                                studente.titoloAcquisito = true;
+                                studente.descrTitoloAcquisito = cellToProcess;
                             }
                             break;
-                    }
-                    bool IsDate(string input)
-                    {
-                        // Try to parse the input string as a DateTime
-                        DateTime date;
-                        return DateTime.TryParse(input, out date);
                     }
                 }
                 catch
@@ -970,7 +1037,7 @@ namespace ProcedureNet7
             {
                 foreach (StudenteElaborazione studente in studenteElaborazioneList)
                 {
-                    int creditiUni = studente.creditiConseguitiUni + studente.creditiConvalidatiUni;
+                    int creditiUni = studente.creditiConseguitiUni - studente.creditiConvalidatiUni;
                     int creditiDic = studente.creditiConseguitiDic - studente.creditiDaRinunciaDic - studente.creditiTirocinioDic - studente.creditiExtraCurrDic;
                     if (creditiDic <= creditiUni)
                     {
@@ -980,7 +1047,7 @@ namespace ProcedureNet7
             }
             void PopulateCongruenzaAnno(List<StudenteElaborazione> studenteElaborazioneList)
             {
-                string currentAcademicYear = "20232024"; // Example: This should be passed dynamically depending on the year you're checking
+                string currentAcademicYear = "20242025"; // Example: This should be passed dynamically depending on the year you're checking
 
                 foreach (StudenteElaborazione studente in studenteElaborazioneList)
                 {
@@ -1049,8 +1116,8 @@ namespace ProcedureNet7
 	                    Crediti_richiesti 
 	                    LEFT OUTER JOIN Corsi_laurea ON Crediti_richiesti.Cod_corso_laurea = Corsi_laurea.Cod_corso_laurea
                     WHERE        
-                    (Crediti_richiesti.Anno_accademico = 20232024) AND 
-                    (Corsi_laurea.Anno_accad_fine IS NULL) OR (Crediti_richiesti.Anno_accademico = 20232024) AND (Crediti_richiesti.Cod_corso_laurea IN ('LUISS', 'LUMSA', 'UNINT'))
+                    (Crediti_richiesti.Anno_accademico = 20242025) AND 
+                    (Corsi_laurea.Anno_accad_fine IS NULL) OR (Crediti_richiesti.Anno_accademico = 20242025) AND (Crediti_richiesti.Cod_corso_laurea IN ('LUISS', 'LUMSA', 'UNINT'))
                     ORDER BY Crediti_richiesti.Cod_corso_laurea, Crediti_richiesti.Tipologia_corso, Crediti_richiesti.Anno_corso
                     ";
 
@@ -1136,6 +1203,7 @@ namespace ProcedureNet7
                     studente.blocchiDaMettere = new();
 
                     studente.blocchiDaTogliere.Add("BVI");
+                    studente.incongruenzeDaTogliere.Add("12");
 
                     if (studente.seAnno && studente.seTitpo && studente.seCFU)
                     {
@@ -1161,15 +1229,18 @@ namespace ProcedureNet7
                     if (studente.seTitpo)
                     {
                         studente.blocchiDaTogliere.Add("ITD");
+                        studente.incongruenzeDaTogliere.Add("64");
                     }
                     else
                     {
                         studente.blocchiDaMettere.Add("ITD");
+                        studente.incongruenzeDaMettere.Add("64");
                     }
 
                     if (studente.seAnno)
                     {
                         studente.blocchiDaTogliere.Add("IAD");
+                        studente.incongruenzeDaTogliere.Add("63");
                     }
                     else
                     {
@@ -1178,28 +1249,34 @@ namespace ProcedureNet7
                             studente.blocchiDaTogliere.Add("VAI");
                         }
                         studente.blocchiDaMettere.Add("IAD");
+                        studente.incongruenzeDaMettere.Add("63");
                     }
 
                     if (studente.seCFU)
                     {
                         studente.blocchiDaTogliere.Add("BMI");
                         studente.blocchiDaTogliere.Add("IMD");
+                        studente.incongruenzeDaTogliere.Add("01");
+                        studente.incongruenzeDaTogliere.Add("75");
                     }
                     else
                     {
                         if (studente.creditiConseguitiUni < studente.creditiRichiestiDB)
                         {
                             studente.blocchiDaMettere.Add("BMI");
+                            studente.incongruenzeDaMettere.Add("75");
                         }
                         else
                         {
                             studente.blocchiDaMettere.Add("IMD");
+                            studente.incongruenzeDaMettere.Add("75");
                         }
                     }
 
                     if (studente.congruenzaAnno)
                     {
                         studente.blocchiDaTogliere.Add("VAI");
+                        studente.incongruenzeDaTogliere.Add("85");
                     }
                     else
                     {
@@ -1207,6 +1284,7 @@ namespace ProcedureNet7
                         {
                             studente.blocchiDaMettere.Add("VAI");
                         }
+                        studente.incongruenzeDaMettere.Add("85");
                     }
 
                     if (checkTassaRegionale && !studente.disabile)
@@ -1214,16 +1292,23 @@ namespace ProcedureNet7
                         if (studente.tassaRegionalePagata)
                         {
                             studente.blocchiDaTogliere.Add("BTR");
+                            studente.incongruenzeDaTogliere.Add("81");
                         }
                         else
                         {
                             studente.blocchiDaMettere.Add("BTR");
+                            studente.incongruenzeDaMettere.Add("81");
                         }
                     }
 
                     if (checkCondizione && studente.iscrCondizione)
                     {
                         studente.blocchiDaMettere.Add("IMR");
+                        if (studente.incongruenzeDaTogliere.Contains("12"))
+                        {
+                            studente.incongruenzeDaTogliere.Remove("12");
+                        }
+                        studente.incongruenzeDaMettere.Add("12");
                     }
                     else
                     {
@@ -1252,10 +1337,18 @@ namespace ProcedureNet7
                     studente.blocchiDaMettere = studente.blocchiDaMettere
                         .Where(blocco => !studente.blocchiPresenti.ContainsKey(blocco))
                         .ToList();
+
+                    studente.incongruenzeDaTogliere = studente.incongruenzeDaTogliere
+                        .Where(studente.incongruenzePresenti.ContainsKey)
+                        .ToList();
+
+                    studente.incongruenzeDaMettere = studente.incongruenzeDaMettere
+                        .Where(incongruenza => !studente.incongruenzePresenti.ContainsKey(incongruenza))
+                        .ToList();
                 }
             }
 
-            void PopulateDataInFile(List<StudenteElaborazione> studenteElaborazioneList, string filepath, string fileName)
+            void PopulateDataInFile(List<StudenteElaborazione> studenteElaborazioneList, string filepath, string fileName, DataTable initialStudentData)
             {
                 DataTable producedTable = new DataTable();
 
@@ -1270,12 +1363,17 @@ namespace ProcedureNet7
                 producedTable.Columns.Add("Crediti Convalidati UNI");
                 producedTable.Columns.Add("Tassa Regionale Pagata UNI");
                 producedTable.Columns.Add("Titolo Acquisito UNI");
+                producedTable.Columns.Add("Descrizione Titolo Acquisito UNI");
                 producedTable.Columns.Add("     ");
                 producedTable.Columns.Add("Se Tipo");
                 producedTable.Columns.Add("Se Anno");
                 producedTable.Columns.Add("Se CFU");
                 producedTable.Columns.Add("Congruenza AA");
                 producedTable.Columns.Add("      ");
+                producedTable.Columns.Add("Codice Fiscale ");
+                producedTable.Columns.Add("Numero Domanda");
+                producedTable.Columns.Add("Esito BS");
+                producedTable.Columns.Add("Esito PA");
                 producedTable.Columns.Add("Disabile DIC");
                 producedTable.Columns.Add("Sesso DIC");
                 producedTable.Columns.Add("Tipo Corso DIC");
@@ -1291,6 +1389,10 @@ namespace ProcedureNet7
                 producedTable.Columns.Add("Cod blocchi presenti");
                 producedTable.Columns.Add("Blocchi da TOGLIERE");
                 producedTable.Columns.Add("Blocchi da METTERE");
+                producedTable.Columns.Add("Descrizione incongruenze");
+                producedTable.Columns.Add("Cod incongruenze presenti");
+                producedTable.Columns.Add("Incongruenze da TOGLIERE");
+                producedTable.Columns.Add("Incongruenze da METTERE");
 
                 foreach (StudenteElaborazione studente in studenteElaborazioneList)
                 {
@@ -1299,26 +1401,35 @@ namespace ProcedureNet7
                     string blocchiDaTogliere = studente.blocchiDaTogliere.Count > 0 ? "/" + string.Join("/", studente.blocchiDaTogliere) : " ";
                     string blocchiDaMettere = studente.blocchiDaMettere.Count > 0 ? "/" + string.Join("/", studente.blocchiDaMettere) : " ";
 
+                    string descrIncongruenze = studente.incongruenzePresenti.Values.Count > 0 ? "#" + string.Join("#", studente.incongruenzePresenti.Values) : " ";
+                    string codIncongruenze = studente.incongruenzePresenti.Keys.Count > 0 ? "#" + string.Join("#", studente.incongruenzePresenti.Keys) : " ";
+                    string incongruenzeDaTogliere = studente.incongruenzeDaTogliere.Count > 0 ? "/" + string.Join("/", studente.incongruenzeDaTogliere) : " ";
+                    string incongruenzeDaMettere = studente.incongruenzeDaMettere.Count > 0 ? "/" + string.Join("/", studente.incongruenzeDaMettere) : " ";
 
                     producedTable.Rows.Add(
                         studente.codFiscale.ToString(),
                         studente.tipoIscrizioneUni.ToString(),
-                        studente.iscrCondizione ? "SI" : "NO",
+                        studente.iscrCondizione ? "1" : "0",
                         studente.tipoCorsoUni.ToString(),
                         studente.descrCorsoUni.ToString(),
                         studente.annoCorsoUni.ToString(),
                         studente.aaImmatricolazioneUni.ToString(),
                         studente.creditiConseguitiUni.ToString(),
                         studente.creditiConvalidatiUni.ToString(),
-                        studente.tassaRegionalePagata ? "SI" : "NO",
-                        studente.titoloAcquisito ? "SI" : "NO",
+                        studente.tassaRegionalePagata ? "1" : "0",
+                        studente.titoloAcquisito ? "1" : "0",
+                        studente.descrTitoloAcquisito,
                         " ",
                         studente.seTitpo ? "OK" : "NOK",
                         studente.seAnno ? "OK" : "NOK",
                         studente.seCFU ? "OK" : "NOK",
                         studente.congruenzaAnno ? "OK" : "NOK",
                         " ",
-                        studente.disabile ? "SI" : "NO",
+                        studente.codFiscale,
+                        studente.numDomanda,
+                        studente.esitoBS >= 0 ? studente.esitoBS : "Non richiesto",
+                        studente.esitoPA >= 0 ? studente.esitoPA : "Non richiesto",
+                        studente.disabile ? "1" : "0",
                         studente.sessoDic.ToString(),
                         studente.tipoCorsoDic.ToString(),
                         studente.annoCorsoDic.ToString(),
@@ -1327,12 +1438,16 @@ namespace ProcedureNet7
                         studente.creditiExtraCurrDic.ToString(),
                         studente.creditiDaRinunciaDic.ToString(),
                         studente.creditiTirocinioDic.ToString(),
-                        studente.stemDic ? "SI" : "NO",
+                        studente.stemDic ? "1" : "0",
                         studente.descrCorsoDic.ToString(),
                         descrBlocchi,
                         codBlocchi,
                         blocchiDaTogliere,
-                        blocchiDaMettere
+                        blocchiDaMettere,
+                        descrIncongruenze,
+                        codIncongruenze,
+                        incongruenzeDaTogliere,
+                        incongruenzeDaMettere
                         );
                 }
 
@@ -1343,55 +1458,84 @@ namespace ProcedureNet7
                 var workbook = excelApp.Workbooks.Open(filePath);
                 var worksheet = (Microsoft.Office.Interop.Excel.Worksheet)workbook.Sheets[1];
 
-                // Define soft colors for blue shades
-                var softBlueColor1 = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(155, 195, 230));
-                var softBlueColor2 = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(190, 215, 240));
+                // Define soft colors
                 var softRedColor = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(245, 100, 100));
                 var darkBlueColor = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(50, 120, 185));
+
+                // Get row and column counts
+                var rowCount = producedTable.Rows.Count + 1; // Including header
+                var columnCount = producedTable.Columns.Count;
+
+                // Apply formatting to header row
+                var headerRange = worksheet.Range[worksheet.Cells[1, 1], worksheet.Cells[1, columnCount]];
+                headerRange.Interior.Color = darkBlueColor;
+                headerRange.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White);
+                headerRange.Font.Bold = true;
 
                 // Get the width of the first column
                 var firstColumnWidth = worksheet.Columns[1].ColumnWidth;
 
-                // Loop through columns and apply colors to the body of the table
-                for (int i = 1; i <= producedTable.Columns.Count; i++)
+                // Apply formatting to columns in bulk
+                for (int i = 1; i <= columnCount; i++)
                 {
                     string columnName = producedTable.Columns[i - 1].ColumnName;
+                    var columnRange = worksheet.Columns[i];
 
                     // Set each column to have the same width as the first column
-                    worksheet.Columns[i].ColumnWidth = firstColumnWidth;
+                    columnRange.ColumnWidth = firstColumnWidth;
 
                     // Apply red background if the column name contains spaces
                     if (string.IsNullOrWhiteSpace(columnName))
                     {
-                        worksheet.Columns[i].Interior.Color = softRedColor;
-                    }
-                    else
-                    {
-                        // Apply alternating blue shades for non-empty columns
-                        if (i % 2 == 0)
-                        {
-                            worksheet.Columns[i].Interior.Color = softBlueColor1; // First shade of blue
-                        }
-                        else
-                        {
-                            worksheet.Columns[i].Interior.Color = softBlueColor2; // Second shade of blue
-                        }
+                        columnRange.ColumnWidth = 3;
+                        columnRange.Interior.Color = softRedColor;
                     }
                 }
 
-                // Apply darker blue to the headers (row 1)
-                for (int i = 1; i <= producedTable.Columns.Count; i++)
-                {
-                    var headerCell = worksheet.Cells[1, i];
-                    headerCell.Interior.Color = darkBlueColor;
-                    headerCell.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White); // Make text white for better contrast
-                    headerCell.Font.Bold = true; // Make header bold for emphasis
-                }
-
-                // Apply borders to all filled cells (range of filled cells)
+                // Apply borders to used range
                 var usedRange = worksheet.UsedRange;
                 usedRange.Borders.LineStyle = Microsoft.Office.Interop.Excel.XlLineStyle.xlContinuous;
                 usedRange.Borders.Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThin;
+
+                // Add new worksheet after the existing ones
+                var newWorksheet = (Microsoft.Office.Interop.Excel.Worksheet)workbook.Sheets.Add(After: workbook.Sheets[workbook.Sheets.Count]);
+                newWorksheet.Name = "Raw";
+
+                // Write the initialStudentData into newWorksheet in bulk
+                int initialRowCount = initialStudentData.Rows.Count;
+                int initialColCount = initialStudentData.Columns.Count;
+
+                // Create an array to hold the data including headers
+                object[,] dataArray = new object[initialRowCount + 1, initialColCount];
+
+                // Write column headers to the first row of dataArray
+                for (int col = 0; col < initialColCount; col++)
+                {
+                    dataArray[0, col] = initialStudentData.Columns[col].ColumnName;
+                }
+
+                // Write data to dataArray
+                for (int row = 0; row < initialRowCount; row++)
+                {
+                    for (int col = 0; col < initialColCount; col++)
+                    {
+                        dataArray[row + 1, col] = initialStudentData.Rows[row][col];
+                    }
+                }
+
+                // Define the range where data will be written
+                var startCell = (Microsoft.Office.Interop.Excel.Range)newWorksheet.Cells[1, 1];
+                var endCell = (Microsoft.Office.Interop.Excel.Range)newWorksheet.Cells[initialRowCount + 1, initialColCount];
+                var writeRange = newWorksheet.Range[startCell, endCell];
+
+                // Assign the data array to the Excel Range in bulk
+                writeRange.Value2 = dataArray;
+
+                // Apply formatting to header row in newWorksheet
+                var newHeaderRange = newWorksheet.Range[newWorksheet.Cells[1, 1], newWorksheet.Cells[1, initialColCount]];
+                newHeaderRange.Interior.Color = darkBlueColor;
+                newHeaderRange.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White);
+                newHeaderRange.Font.Bold = true;
 
                 // Save and close the workbook
                 workbook.Save();
@@ -1399,6 +1543,7 @@ namespace ProcedureNet7
                 excelApp.Quit();
 
                 // Release COM objects to free memory
+                System.Runtime.InteropServices.Marshal.ReleaseComObject(newWorksheet);
                 System.Runtime.InteropServices.Marshal.ReleaseComObject(worksheet);
                 System.Runtime.InteropServices.Marshal.ReleaseComObject(workbook);
                 System.Runtime.InteropServices.Marshal.ReleaseComObject(excelApp);
@@ -1408,6 +1553,7 @@ namespace ProcedureNet7
                 GC.WaitForPendingFinalizers();
 
             }
+
         }
     }
     public class CreditRecord

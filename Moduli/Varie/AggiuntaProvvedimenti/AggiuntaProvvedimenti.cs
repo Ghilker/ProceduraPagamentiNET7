@@ -163,7 +163,7 @@ namespace ProcedureNet7
                     }
                     DataTable allStudentsData = Utilities.ReadExcelToDataTable(excelFilePath, true);
                     DataGridView? studentsGridView = null;
-                    if (beneficioProvvedimento == "BS")
+                    if (beneficioProvvedimento == "BS" || beneficioProvvedimento == "CI")
                     {
                         MessageBox.Show("Selezionare il primo numero domanda", "Seleziona", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         studentsGridView = Utilities.CreateDataGridView(allStudentsData, _masterForm, provvedimentiPanel, OnNumDomandaClicked);
@@ -182,7 +182,10 @@ namespace ProcedureNet7
                     });
 
                     HandleProvvedimenti(numProvvedimento, aaProvvedimento, dataProvvedimento, provvedimentoSelezionato, notaProvvedimento);
-                    HandleSpecificheImpegni(excelFilePath);
+                    if (requireNuovaSpecifica)
+                    {
+                        HandleSpecificheImpegni(excelFilePath);
+                    }
                 }
 
                 Logger.Log(100, "Fine lavorazione", LogLevel.INFO);
@@ -254,7 +257,7 @@ namespace ProcedureNet7
                 sqlTransaction = CONNECTION.BeginTransaction();
                 List<string> localStudentInfo = _studentInformation;
 
-                if (beneficioProvvedimento != "BS")
+                if (beneficioProvvedimento != "BS" && beneficioProvvedimento != "CI")
                 {
                     localStudentInfo = new List<string>();
                     string fiscalCodesString = string.Join(", ", _studentInformation.Select(fiscalCode => $"'{fiscalCode}'"));

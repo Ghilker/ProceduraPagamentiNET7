@@ -9,6 +9,9 @@ namespace ProcedureNet7
     public class StudenteElaborazione
     {
         public string codFiscale = string.Empty;
+        public string numDomanda = string.Empty;
+        public int esitoBS;
+        public int esitoPA;
 
         public string tipoIscrizioneUni = string.Empty;
         public bool iscrCondizione;
@@ -20,6 +23,7 @@ namespace ProcedureNet7
         public int creditiConvalidatiUni;
         public bool tassaRegionalePagata;
         public bool titoloAcquisito;
+        public string descrTitoloAcquisito;
 
         public bool disabile;
         public string tipoCorsoDic = string.Empty;
@@ -43,6 +47,10 @@ namespace ProcedureNet7
         public Dictionary<string, string> blocchiPresenti = new();
         public List<string> blocchiDaTogliere = new();
         public List<string> blocchiDaMettere = new();
+
+        public Dictionary<string, string> incongruenzePresenti = new();
+        public List<string> incongruenzeDaTogliere = new();
+        public List<string> incongruenzeDaMettere = new();
 
         public List<string> colErroriElaborazione = new();
 

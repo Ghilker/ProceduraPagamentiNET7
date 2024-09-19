@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 
 namespace ProcedureNet7
 {
-    internal class ProceduraPagamenti : BaseProcedure<ArgsPagamenti>
+    public class ProceduraPagamenti : BaseProcedure<ArgsPagamenti>
     {
         string selectedSaveFolder = string.Empty;
         string selectedAA = string.Empty;

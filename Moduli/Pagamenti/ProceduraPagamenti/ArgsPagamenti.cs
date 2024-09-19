@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class ArgsPagamenti : IValidatableObject
+    public class ArgsPagamenti : IValidatableObject
     {
         [Required(ErrorMessage = "Selezionare la cartella del salvataggio")]
         public string _selectedSaveFolder { get; set; }

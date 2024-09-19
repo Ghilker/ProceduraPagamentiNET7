@@ -9,6 +9,7 @@
     <Configurations>Debug;Release;PAGAMENTI;VARIE;VERIFICHE</Configurations>
     <SignAssembly>False</SignAssembly>
     <UseWPF>False</UseWPF>
+	  <InternalsVisibleTo>ProcedurePagamentiNET7.Tests</InternalsVisibleTo>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

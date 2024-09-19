@@ -13,7 +13,7 @@ using Excel = Microsoft.Office.Interop.Excel;
 
 namespace ProcedureNet7
 {
-    internal static class Utilities
+    public static class Utilities
     {
         public static DataTable ReadExcelToDataTable(string filePath, bool firstRowAsData = false)
         {

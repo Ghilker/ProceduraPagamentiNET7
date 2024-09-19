@@ -342,9 +342,9 @@
             provvedimentiRequiredSpecificheImpegni.AutoSize = true;
             provvedimentiRequiredSpecificheImpegni.Location = new Point(29, 256);
             provvedimentiRequiredSpecificheImpegni.Name = "provvedimentiRequiredSpecificheImpegni";
-            provvedimentiRequiredSpecificheImpegni.Size = new Size(239, 19);
+            provvedimentiRequiredSpecificheImpegni.Size = new Size(340, 19);
             provvedimentiRequiredSpecificheImpegni.TabIndex = 63;
-            provvedimentiRequiredSpecificheImpegni.Text = "Necessaria modifica specifiche impegno";
+            provvedimentiRequiredSpecificheImpegni.Text = "Necessaria chiusura/eventuale apertura specifiche impegno";
             provvedimentiRequiredSpecificheImpegni.UseVisualStyleBackColor = true;
             provvedimentiRequiredSpecificheImpegni.CheckedChanged += ProvvedimentiRequiredSpecificheImpegni_CheckedChanged;
             // 

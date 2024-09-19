@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class ArgsElaborazioneFileUni
+    public class ArgsElaborazioneFileUni
     {
         [Required(ErrorMessage = "Selezionare l'anno accademico")]
         [ValidAAFormat(ErrorMessage = "L'anno accademico deve essere nel formato xxxxyyyy")]

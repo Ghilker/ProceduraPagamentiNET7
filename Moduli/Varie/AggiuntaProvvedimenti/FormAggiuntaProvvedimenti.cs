@@ -36,7 +36,8 @@ namespace ProcedureNet7
         };
         private readonly Dictionary<string, string> provvedimentiCodBeneficioItems = new()
         {
-            { "BS", "Borsa di studio, Posto alloggio, Contributo integrativo" },
+            { "BS", "Borsa di studio, Posto alloggio" },
+            { "CI", "Contributo integrativo" },
             { "PL", "Premio di laurea" },
             { "BL", "Buono libro" },
         };
