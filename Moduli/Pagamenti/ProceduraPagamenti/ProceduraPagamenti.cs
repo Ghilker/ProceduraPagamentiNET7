@@ -931,7 +931,9 @@ namespace ProcedureNet7
         {
             ControlloInMovimentazioni();
             FilterPagamenti();
+
             ControlloProvvedimenti();
+
 
             void ControlloInMovimentazioni()
             {
@@ -1278,9 +1280,9 @@ namespace ProcedureNet7
             {
                 string sqlProvv = $@"
                 select distinct specifiche_impegni.Cod_fiscale, Importo_assegnato, bs.Imp_beneficio from specifiche_impegni 
-                inner join vEsiti_concorsibs bs on specifiche_impegni.Anno_accademico = bs.Anno_accademico and specifiche_impegni.Num_domanda = bs.Num_domanda
+                inner join vEsiti_concorsi bs on specifiche_impegni.Anno_accademico = bs.Anno_accademico and specifiche_impegni.Num_domanda = bs.Num_domanda
                 inner join #CFEstrazione cfe on specifiche_impegni.cod_fiscale = cfe.cod_fiscale
-                where bs.Anno_accademico = '{selectedAA}' and Cod_beneficio = '{tipoBeneficio}' and data_fine_validita is null and Cod_tipo_esito = 2
+                where bs.Anno_accademico = '{selectedAA}' and specifiche_impegni.Cod_beneficio = '{tipoBeneficio}' and bs.Cod_beneficio = '{tipoBeneficio}' and data_fine_validita is null and Cod_tipo_esito = 2
                 order by Cod_fiscale";
 
                 SqlCommand readData = new(sqlProvv, CONNECTION, sqlTransaction);
