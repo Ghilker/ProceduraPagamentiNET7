@@ -93,6 +93,10 @@ namespace ProcedureNet7
                             checkTitoloAcquisito = true;
                             ProcessAcquisizioneTitolo(row, studente, uniName);
                         }
+                        if (initialStudentData.Columns.Contains("MATRICOLA"))
+                        {
+                            studente.matricola = row["MATRICOLA"].ToString().ToUpper();
+                        }
 
                         // Add the fully processed student to the list
                         studenteElaborazioneList.Add(studente);
@@ -363,11 +367,11 @@ namespace ProcedureNet7
                 switch (uniType)
                 {
                     case "LUMSA":
-                        if (cellToProcess == "L2")
+                        if (cellToProcess == "L2" || cellToProcess == "TR")
                         {
                             studente.tipoCorsoUni = "3";
                         }
-                        else if (cellToProcess == "LM5")
+                        else if (cellToProcess == "LM5" || cellToProcess == "CU")
                         {
                             studente.tipoCorsoUni = "4";
                         }
@@ -401,6 +405,14 @@ namespace ProcedureNet7
                         else if (cellToProcess.Contains("BIENNALE"))
                         {
                             studente.tipoCorsoUni = "5";
+                        }
+                        else if (cellToProcess.Contains("DOTTORATO"))
+                        {
+                            studente.tipoCorsoUni = "6";
+                        }
+                        else if (cellToProcess.Contains("SPECIALIZZAZIONE"))
+                        {
+                            studente.tipoCorsoUni = "7";
                         }
                         else
                         {
@@ -589,7 +601,6 @@ namespace ProcedureNet7
                 {
                     case "LUMSA":
                     case "UNIEU":
-                    case "SAPIENZA":
                     case "SANRAF":
                     case "CONSCEC":
                     case "LUISS":
@@ -603,9 +614,19 @@ namespace ProcedureNet7
                     case "ABAROMA":
                     case "ABAFROS":
                     case "MERCATORUM":
-                        if (cellToProcess == "SI" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK")
+                        if (cellToProcess == "SI" || cellToProcess == "SÌ" || cellToProcess == "SÍ" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK")
                         {
                             studente.iscrCondizione = true;
+                        }
+                        break;
+                    case "SAPIENZA":
+                        if (cellToProcess == "IMMATRICOLATO CON RISERVA")
+                        {
+                            studente.iscrCondizione = true;
+                        }
+                        if (cellToProcess.Contains("USCITA") || cellToProcess.Contains("ABBANDONO"))
+                        {
+                            studente.controlloImmatricolazione = true;
                         }
                         break;
                 }
@@ -1010,7 +1031,7 @@ namespace ProcedureNet7
                     if (
                             studente.tipoCorsoDic == studente.tipoCorsoUni ||
                             (
-                                studente.annoCorsoDic == 1 &&
+                                (studente.annoCorsoDic == 1 || studente.annoCorsoDic == 2 || studente.annoCorsoDic == 3) &&
                                 (
                                     (studente.tipoCorsoDic == "3" && studente.tipoCorsoUni == "4") ||
                                     (studente.tipoCorsoDic == "4" && studente.tipoCorsoUni == "3")
@@ -1037,7 +1058,7 @@ namespace ProcedureNet7
             {
                 foreach (StudenteElaborazione studente in studenteElaborazioneList)
                 {
-                    int creditiUni = studente.creditiConseguitiUni - studente.creditiConvalidatiUni;
+                    int creditiUni = studente.creditiConseguitiUni + studente.creditiConvalidatiUni;
                     int creditiDic = studente.creditiConseguitiDic - studente.creditiDaRinunciaDic - studente.creditiTirocinioDic - studente.creditiExtraCurrDic;
                     if (creditiDic <= creditiUni)
                     {
@@ -1213,10 +1234,6 @@ namespace ProcedureNet7
                             {
                                 studente.blocchiDaTogliere.Add("BIS");
                             }
-                            else if (studente.tipoCorsoUni == "5")
-                            {
-                                studente.blocchiDaMettere.Add("BIS");
-                            }
                         }
                         if (studente.creditiConseguitiDic <= studente.creditiConseguitiUni)
                         {
@@ -1258,13 +1275,14 @@ namespace ProcedureNet7
                         studente.blocchiDaTogliere.Add("IMD");
                         studente.incongruenzeDaTogliere.Add("01");
                         studente.incongruenzeDaTogliere.Add("75");
+                        studente.incongruenzeDaTogliere.Add("25");
                     }
                     else
                     {
                         if (studente.creditiConseguitiUni < studente.creditiRichiestiDB)
                         {
                             studente.blocchiDaMettere.Add("BMI");
-                            studente.incongruenzeDaMettere.Add("75");
+                            studente.incongruenzeDaMettere.Add("25");
                         }
                         else
                         {
@@ -1304,15 +1322,12 @@ namespace ProcedureNet7
                     if (checkCondizione && studente.iscrCondizione)
                     {
                         studente.blocchiDaMettere.Add("IMR");
-                        if (studente.incongruenzeDaTogliere.Contains("12"))
-                        {
-                            studente.incongruenzeDaTogliere.Remove("12");
-                        }
-                        studente.incongruenzeDaMettere.Add("12");
+                        studente.incongruenzeDaMettere.Add("65");
                     }
                     else
                     {
                         studente.blocchiDaTogliere.Add("IMR");
+                        studente.incongruenzeDaTogliere.Add("65");
                     }
 
                     if (studente.creditiDaRinunciaDic == 0 && studente.creditiConvalidatiUni > 0)
@@ -1353,6 +1368,7 @@ namespace ProcedureNet7
                 DataTable producedTable = new DataTable();
 
                 producedTable.Columns.Add("Codice Fiscale");
+                producedTable.Columns.Add("Matricola");
                 producedTable.Columns.Add("Tipo Iscrizione UNI");
                 producedTable.Columns.Add("Iscrizione con Condizione UNI");
                 producedTable.Columns.Add("Tipo Corso UNI");
@@ -1376,15 +1392,14 @@ namespace ProcedureNet7
                 producedTable.Columns.Add("Esito PA");
                 producedTable.Columns.Add("Disabile DIC");
                 producedTable.Columns.Add("Sesso DIC");
+                producedTable.Columns.Add("Stem DIC");
+                producedTable.Columns.Add("Descrizione Corso Dic");
                 producedTable.Columns.Add("Tipo Corso DIC");
                 producedTable.Columns.Add("Anno Corso DIC");
-                producedTable.Columns.Add("Durata Legale Corso DIC");
                 producedTable.Columns.Add("Crediti Conseguiti DIC");
                 producedTable.Columns.Add("Crediti Extra Curr DIC");
                 producedTable.Columns.Add("Crediti Rinuncia DIC");
                 producedTable.Columns.Add("Crediti Tirocinio DIC");
-                producedTable.Columns.Add("Stem DIC");
-                producedTable.Columns.Add("Descrizione Corso Dic");
                 producedTable.Columns.Add("Descrizione blocchi presenti");
                 producedTable.Columns.Add("Cod blocchi presenti");
                 producedTable.Columns.Add("Blocchi da TOGLIERE");
@@ -1408,6 +1423,7 @@ namespace ProcedureNet7
 
                     producedTable.Rows.Add(
                         studente.codFiscale.ToString(),
+                        studente.matricola.ToString(),
                         studente.tipoIscrizioneUni.ToString(),
                         studente.iscrCondizione ? "1" : "0",
                         studente.tipoCorsoUni.ToString(),
@@ -1431,15 +1447,14 @@ namespace ProcedureNet7
                         studente.esitoPA >= 0 ? studente.esitoPA : "Non richiesto",
                         studente.disabile ? "1" : "0",
                         studente.sessoDic.ToString(),
+                        studente.stemDic ? "1" : "0",
+                        studente.descrCorsoDic.ToString(),
                         studente.tipoCorsoDic.ToString(),
                         studente.annoCorsoDic.ToString(),
-                        studente.durataLegaleCorso.ToString(),
                         studente.creditiConseguitiDic.ToString(),
                         studente.creditiExtraCurrDic.ToString(),
                         studente.creditiDaRinunciaDic.ToString(),
                         studente.creditiTirocinioDic.ToString(),
-                        studente.stemDic ? "1" : "0",
-                        studente.descrCorsoDic.ToString(),
                         descrBlocchi,
                         codBlocchi,
                         blocchiDaTogliere,

@@ -144,24 +144,16 @@ namespace ProcedureNet7
         public string tipologiaReddito;
         public string tipologiaRedditoIntegrazione;
 
-        //Italiani - vCerfificaz_isee_CO
-        public double ISEE;
         public double ISP;
+        public double ISR;
         public double SEQ;
-
-        //vDichiarazisee
-        public double redditoLavoroDipendente; //Superiore a 9000 per gli ultimi due anni
-        public double pensione;
-        public bool indipendente;
-
-        //stranieri
-        public int numeroComponenti;
-        public double redditoComplessivo;
         public double patrimonioMobiliare;
-        public bool possessoAbitazione;
-        public int superficieMQAbitazione;
-        public bool possessoAltraAbitazione;
-        public int superficieMQAltraAbitazione;
+        public double detrazioni;
+
+        public double ISEDSU;
+        public double ISEEDSU;
+        public double ISPDSU;
+        public double ISPEDSU;
     }
     public class VerificaBeneficiRichiesti
     {

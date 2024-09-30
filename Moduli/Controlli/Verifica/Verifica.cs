@@ -525,6 +525,8 @@ namespace ProcedureNet7
         {
             List<string> codiciFiscaliIT = new List<string>();
             List<string> codiciFiscaliEE = new List<string>();
+            List<string> codiciFiscaliIntIT = new List<string>();
+            List<string> codiciFiscaliIntEE = new List<string>();
 
             string dataQuery = @"
                     select Cod_fiscale, Tipo_redd_nucleo_fam_origine, Tipo_redd_nucleo_fam_integr 
@@ -555,9 +557,18 @@ namespace ProcedureNet7
                         {
                             codiciFiscaliIT.Add(codFiscale);
                         }
-                        else
+                        else if (tipoRedditiOrigine == "ee")
                         {
                             codiciFiscaliEE.Add(codFiscale);
+                        }
+
+                        if (tipoRedditiIntegrazione == "it")
+                        {
+                            codiciFiscaliIntIT.Add(codFiscale);
+                        }
+                        else if (tipoRedditiIntegrazione == "ee")
+                        {
+                            codiciFiscaliIntEE.Add(codFiscale);
                         }
                     }
 
@@ -566,6 +577,8 @@ namespace ProcedureNet7
 
             AddDatiEconomiciItaliani(codiciFiscaliIT);
             AddDatiEconomiciStranieri(codiciFiscaliEE);
+            AddDatiEconomiciItalianiInt(codiciFiscaliIntIT);
+            AddDatiEconomiciStranieriInt(codiciFiscaliIntEE);
 
         }
         void AddDatiEconomiciItaliani(List<string> codiciFiscaliItaliani)
@@ -640,25 +653,69 @@ namespace ProcedureNet7
             #endregion
 
             string dataQuery = @"
-                    select 
-                        Cod_fiscale,
-                        Numero_componenti,
-                        Redd_complessivo,
-                        Patr_mobiliare,
-                        Possesso_abitaz,
-                        Superf_abitaz_MQ,
-                        Poss_altre_abit,
-                        Sup_compl_altre_MQ
-                    from vNucleo_fam_stranieri_DO
-                        inner join Domanda on Domanda.Anno_accademico = vNucleo_fam_stranieri_DO.Anno_accademico and Domanda.Num_domanda = vNucleo_fam_stranieri_DO.Num_domanda
-                        inner join #CFEstrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale
-                    where Domanda.Anno_accademico = '20242025'
-                    order by Cod_fiscale
+                WITH codici_pagam AS (
+                    SELECT dpn.Cod_tipo_pagam_new AS cod_tipo_pagam
+                    FROM Decod_pagam_new dpn
+                    INNER JOIN Tipologie_pagam tp ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
+                    WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS' AND tp.visibile = 1
 
+                    UNION
+
+                    SELECT dpn.Cod_tipo_pagam_old AS cod_tipo_pagam
+                    FROM Decod_pagam_new dpn
+                    INNER JOIN Tipologie_pagam tp ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
+                    WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS' AND LEFT(tp.Cod_tipo_pagam, 3) <> 'BSA' AND tp.visibile = 1
+                ),
+                sumPagamenti AS (
+                    SELECT
+                        SUM(p.imp_pagato) AS somma,
+                        d.Cod_fiscale
+                    FROM Pagamenti p
+                    INNER JOIN Domanda d ON p.Anno_accademico = d.Anno_accademico AND p.Num_domanda = d.Num_domanda
+                    WHERE
+                        p.Ritirato_azienda = 0
+                        AND p.Ese_finanziario = 2022
+                        AND p.cod_tipo_pagam IN (SELECT cod_tipo_pagam FROM codici_pagam)
+                    GROUP BY d.Cod_fiscale
+                ),
+                impAltreBorse AS (
+                    SELECT
+                        vb.num_domanda,
+                        vb.anno_accademico,
+                        SUM(vb.importo_borsa) AS importo_borsa
+                    FROM vimporti_borsa_percepiti vb
+                    INNER JOIN Allegati a ON vb.anno_accademico = a.anno_accademico AND vb.num_domanda = a.num_domanda
+                    INNER JOIN vstatus_allegati vs ON a.id_allegato = vs.id_allegato
+                    WHERE
+                        vb.data_fine_validita IS NULL
+                        AND a.data_fine_validita IS NULL
+                        AND a.cod_tipo_allegato = '07'
+                        AND vs.cod_status = '05'
+		                AND vb.anno_accademico = 20232024
+                    GROUP BY vb.num_domanda, vb.anno_accademico
+                )
+                SELECT
+                    d.Anno_accademico,
+                    d.Num_domanda,
+                    d.Cod_fiscale,
+                    ISNULL(sp.somma, 0) AS detrazioniADISU,
+                    ISNULL(iab.importo_borsa, 0) AS detrazioniAltreBorse,
+                    cteISP.ISP,
+                    cteISP.ISR,
+                    cteISP.Scala_equivalenza as SEQ
+                FROM Domanda d
+                INNER JOIN #CFEstrazione cfe on d.cod_fiscale = cfe.cod_fiscale
+                INNER JOIN vCertificaz_ISEE_CO cteISP ON d.Anno_accademico = cteISP.Anno_accademico AND d.Num_domanda = cteISP.Num_domanda
+                LEFT JOIN sumPagamenti sp ON d.Cod_fiscale = sp.Cod_fiscale
+                LEFT JOIN impAltreBorse iab ON d.Num_domanda = iab.num_domanda AND d.Anno_accademico = iab.anno_accademico
+                WHERE
+                    d.Anno_accademico = 20232024
+                    AND d.tipo_bando = 'LZ'
+                ORDER BY d.Num_domanda;
                 ";
 
             SqlCommand readData = new(dataQuery, CONNECTION);
-            Logger.LogInfo(45, "Verifica - aggiunta nucleo familiare stranieri");
+            Logger.LogInfo(45, "Verifica - aggiunta dati economici redditi italiani");
 
             using (SqlDataReader reader = readData.ExecuteReader())
             {
@@ -669,7 +726,13 @@ namespace ProcedureNet7
                     verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
                     if (studenteVerifica != null)
                     {
-
+                        studenteVerifica.verificaDatiEconomici = new()
+                        {
+                            ISR = Utilities.SafeGetDouble(reader, "ISR"),
+                            ISP = Utilities.SafeGetDouble(reader, "ISP"),
+                            SEQ = Utilities.SafeGetDouble(reader, "SEQ"),
+                            detrazioni = Utilities.SafeGetDouble(reader, "detrazioniADISU") + Utilities.SafeGetDouble(reader, "detrazioniAltreBorse")
+                        };
                     }
                 }
             }
@@ -777,13 +840,7 @@ namespace ProcedureNet7
                     {
                         studenteVerifica.verificaDatiEconomici = new VerificaDatiEconomici()
                         {
-                            numeroComponenti = Utilities.SafeGetInt(reader, "Numero_componenti"),
-                            possessoAbitazione = Utilities.SafeGetString(reader, "Possesso_abitaz") == "1",
-                            redditoComplessivo = Utilities.SafeGetDouble(reader, "Redd_complessivo"),
-                            patrimonioMobiliare = Utilities.SafeGetDouble(reader, "Patr_mobiliare"),
-                            superficieMQAbitazione = Utilities.SafeGetInt(reader, "Superf_abitaz_MQ"),
-                            possessoAltraAbitazione = Utilities.SafeGetString(reader, "poss_altre_abit") == "1",
-                            superficieMQAltraAbitazione = Utilities.SafeGetInt(reader, "sup_compl_altre_MQ")
+
                         };
 
                     }
@@ -791,12 +848,247 @@ namespace ProcedureNet7
             }
 
         }
+        void AddDatiEconomiciItalianiInt(List<string> codiciFiscaliStranieri)
+        {
+            #region CREAZIONE CF TABLE
+            Logger.LogInfo(30, "Lavorazione studenti");
+
+
+            // Check if the table exists, create if not, otherwise truncate
+            Logger.LogDebug(null, "Verifica e creazione/troncamento della tabella CF");
+
+            string checkTableExistsQuery = @"
+                    IF OBJECT_ID('tempdb..#CFEstrazione') IS NOT NULL 
+                    BEGIN
+                        TRUNCATE TABLE #CFEstrazione;
+                    END
+                    ELSE
+                    BEGIN
+                        CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));
+                    END";
+
+            using (SqlCommand checkTableCmd = new SqlCommand(checkTableExistsQuery, CONNECTION))
+            {
+                checkTableCmd.ExecuteNonQuery();
+            }
+
+            Logger.LogDebug(null, "Inserimento in tabella CF dei codici fiscali");
+            Logger.LogInfo(30, "Lavorazione studenti - creazione tabella codici fiscali");
+
+            // Create a DataTable to hold the fiscal codes
+            using (DataTable cfTable = new DataTable())
+            {
+                cfTable.Columns.Add("Cod_fiscale", typeof(string));
+
+                foreach (var cf in codiciFiscaliStranieri)
+                {
+                    cfTable.Rows.Add(cf);
+                }
+
+                // Use SqlBulkCopy to efficiently insert the data into the temporary table
+                using SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION);
+                bulkCopy.DestinationTableName = "#CFEstrazione";
+                bulkCopy.WriteToServer(cfTable);
+            }
+
+            // Check if the index already exists before creating it
+            Logger.LogDebug(null, "Verifica esistenza indice della tabella CF");
+
+            string checkIndexExistsQuery = @"
+                    IF NOT EXISTS (
+                        SELECT 1 
+                        FROM tempdb.sys.indexes 
+                        WHERE name = 'idx_Cod_fiscale' 
+                        AND object_id = OBJECT_ID('tempdb..#CFEstrazione')
+                    )
+                    BEGIN
+                        CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale);
+                    END";
+
+            using (SqlCommand checkIndexCmd = new SqlCommand(checkIndexExistsQuery, CONNECTION))
+            {
+                checkIndexCmd.ExecuteNonQuery();
+            }
+
+            // Update statistics after ensuring the data and index are there
+            Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
+            string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
+            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION))
+            {
+                updateStatisticsCmd.ExecuteNonQuery();
+            }
+            #endregion
+
+            string dataQuery = @"
+                WITH codici_pagam AS (
+                    SELECT dpn.Cod_tipo_pagam_new AS cod_tipo_pagam
+                    FROM Decod_pagam_new dpn
+                    INNER JOIN Tipologie_pagam tp ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
+                    WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS' AND tp.visibile = 1
+
+                    UNION
+
+                    SELECT dpn.Cod_tipo_pagam_old AS cod_tipo_pagam
+                    FROM Decod_pagam_new dpn
+                    INNER JOIN Tipologie_pagam tp ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
+                    WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS' AND LEFT(tp.Cod_tipo_pagam, 3) <> 'BSA' AND tp.visibile = 1
+                ),
+                sumPagamenti AS (
+                    SELECT
+                        SUM(p.imp_pagato) AS somma,
+                        d.Cod_fiscale
+                    FROM Pagamenti p
+                    INNER JOIN Domanda d ON p.Anno_accademico = d.Anno_accademico AND p.Num_domanda = d.Num_domanda
+                    WHERE
+                        p.Ritirato_azienda = 0
+                        AND p.Ese_finanziario = 2022
+                        AND p.cod_tipo_pagam IN (SELECT cod_tipo_pagam FROM codici_pagam)
+                    GROUP BY d.Cod_fiscale
+                ),
+                impAltreBorse AS (
+                    SELECT
+                        vb.num_domanda,
+                        vb.anno_accademico,
+                        SUM(vb.importo_borsa) AS importo_borsa
+                    FROM vimporti_borsa_percepiti vb
+                    INNER JOIN Allegati a ON vb.anno_accademico = a.anno_accademico AND vb.num_domanda = a.num_domanda
+                    INNER JOIN vstatus_allegati vs ON a.id_allegato = vs.id_allegato
+                    WHERE
+                        vb.data_fine_validita IS NULL
+                        AND a.data_fine_validita IS NULL
+                        AND a.cod_tipo_allegato = '07'
+                        AND vs.cod_status = '05'
+		                AND vb.anno_accademico = 20232024
+                    GROUP BY vb.num_domanda, vb.anno_accademico
+                )
+                SELECT
+                    d.Anno_accademico,
+                    d.Num_domanda,
+                    d.Cod_fiscale,
+                    ISNULL(sp.somma, 0) AS detrazioniADISU,
+                    ISNULL(iab.importo_borsa, 0) AS detrazioniAltreBorse,
+                    cteISP.ISP,
+                    cteISP.ISR,
+                    cteISP.Scala_equivalenza as SEQ
+                FROM Domanda d
+                INNER JOIN #CFEstrazione cfe on d.cod_fiscale = cfe.cod_fiscale
+                INNER JOIN vCertificaz_ISEE_CI cteISP ON d.Anno_accademico = cteISP.Anno_accademico AND d.Num_domanda = cteISP.Num_domanda
+                LEFT JOIN sumPagamenti sp ON d.Cod_fiscale = sp.Cod_fiscale
+                LEFT JOIN impAltreBorse iab ON d.Num_domanda = iab.num_domanda AND d.Anno_accademico = iab.anno_accademico
+                WHERE
+                    d.Anno_accademico = 20232024
+                    AND d.tipo_bando = 'LZ'
+                ORDER BY d.Num_domanda;
+                ";
+
+            SqlCommand readData = new(dataQuery, CONNECTION);
+            Logger.LogInfo(45, "Verifica - aggiunta dati economici integrazione redditi italiani");
+
+            using (SqlDataReader reader = readData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+
+                    verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
+                    if (studenteVerifica != null)
+                    {
+                        if (studenteVerifica.verificaDatiEconomici == null)
+                        {
+                            studenteVerifica.verificaDatiEconomici = new()
+                            {
+                                ISR = Utilities.SafeGetDouble(reader, "ISR"),
+                                ISP = Utilities.SafeGetDouble(reader, "ISP"),
+                                SEQ = Utilities.SafeGetDouble(reader, "SEQ"),
+                                detrazioni = Utilities.SafeGetDouble(reader, "detrazioniADISU") + Utilities.SafeGetDouble(reader, "detrazioniAltreBorse")
+                            };
+                        }
+                        else
+                        {
+                            studenteVerifica.verificaDatiEconomici.ISR += Utilities.SafeGetDouble(reader, "ISR");
+                            studenteVerifica.verificaDatiEconomici.ISP += Utilities.SafeGetDouble(reader, "ISP");
+                        }
+                    }
+                }
+            }
+        }
+        void AddDatiEconomiciStranieriInt(List<string> codiciFiscaliStranieri)
+        {
+            #region CREAZIONE CF TABLE
+            Logger.LogInfo(30, "Lavorazione studenti");
+
+
+            // Check if the table exists, create if not, otherwise truncate
+            Logger.LogDebug(null, "Verifica e creazione/troncamento della tabella CF");
+
+            string checkTableExistsQuery = @"
+                    IF OBJECT_ID('tempdb..#CFEstrazione') IS NOT NULL 
+                    BEGIN
+                        TRUNCATE TABLE #CFEstrazione;
+                    END
+                    ELSE
+                    BEGIN
+                        CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));
+                    END";
+
+            using (SqlCommand checkTableCmd = new SqlCommand(checkTableExistsQuery, CONNECTION))
+            {
+                checkTableCmd.ExecuteNonQuery();
+            }
+
+            Logger.LogDebug(null, "Inserimento in tabella CF dei codici fiscali");
+            Logger.LogInfo(30, "Lavorazione studenti - creazione tabella codici fiscali");
+
+            // Create a DataTable to hold the fiscal codes
+            using (DataTable cfTable = new DataTable())
+            {
+                cfTable.Columns.Add("Cod_fiscale", typeof(string));
+
+                foreach (var cf in codiciFiscaliStranieri)
+                {
+                    cfTable.Rows.Add(cf);
+                }
+
+                // Use SqlBulkCopy to efficiently insert the data into the temporary table
+                using SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION);
+                bulkCopy.DestinationTableName = "#CFEstrazione";
+                bulkCopy.WriteToServer(cfTable);
+            }
+
+            // Check if the index already exists before creating it
+            Logger.LogDebug(null, "Verifica esistenza indice della tabella CF");
+
+            string checkIndexExistsQuery = @"
+                    IF NOT EXISTS (
+                        SELECT 1 
+                        FROM tempdb.sys.indexes 
+                        WHERE name = 'idx_Cod_fiscale' 
+                        AND object_id = OBJECT_ID('tempdb..#CFEstrazione')
+                    )
+                    BEGIN
+                        CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale);
+                    END";
+
+            using (SqlCommand checkIndexCmd = new SqlCommand(checkIndexExistsQuery, CONNECTION))
+            {
+                checkIndexCmd.ExecuteNonQuery();
+            }
+
+            // Update statistics after ensuring the data and index are there
+            Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
+            string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
+            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION))
+            {
+                updateStatisticsCmd.ExecuteNonQuery();
+            }
+            #endregion
+        }
     }
 }
 
 /*
  * 
- * SELECT   top(10) domanda.num_domanda, Domanda.Cod_fiscale,domanda.id_domanda
+SELECT   top(10) domanda.num_domanda, Domanda.Cod_fiscale,domanda.id_domanda
 			FROM         Domanda INNER JOIN
                       vDatiGenerali_dom ON Domanda.Anno_accademico = vDatiGenerali_dom.Anno_accademico AND 
                       Domanda.Num_domanda = vDatiGenerali_dom.Num_domanda INNER JOIN

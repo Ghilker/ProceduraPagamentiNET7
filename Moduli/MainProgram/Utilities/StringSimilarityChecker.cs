@@ -184,7 +184,7 @@ namespace ProcedureNet7
             double overlapRatio = 0.5,
             double jaccardRatio = 0.5,
             double diceThreshold = 0.5,
-            double preCheckThreshold = 0.65,
+            double preCheckThreshold = 0.45,
             int methodsToUse = 4)
         {
             // Normalize both strings

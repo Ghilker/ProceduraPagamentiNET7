@@ -13,6 +13,8 @@ namespace ProcedureNet7
         public int esitoBS;
         public int esitoPA;
 
+        public string matricola = string.Empty;
+
         public string tipoIscrizioneUni = string.Empty;
         public bool iscrCondizione;
         public string tipoCorsoUni = string.Empty;
@@ -24,6 +26,7 @@ namespace ProcedureNet7
         public bool tassaRegionalePagata;
         public bool titoloAcquisito;
         public string descrTitoloAcquisito;
+        public bool controlloImmatricolazione;
 
         public bool disabile;
         public string tipoCorsoDic = string.Empty;

@@ -931,6 +931,7 @@ namespace ProcedureNet7
         {
             ControlloInMovimentazioni();
             FilterPagamenti();
+            ControlloProvvedimenti();
 
             void ControlloInMovimentazioni()
             {
@@ -980,7 +981,7 @@ namespace ProcedureNet7
             {
                 Logger.LogDebug(null, "Inizio del filtraggio dei pagamenti degli studenti");
                 string sqlPagam = $@"
-                    SELECT
+                    SELECT distinct
                         Domanda.Cod_fiscale,
                         Decod_pagam_new.Cod_tipo_pagam_new AS Cod_tipo_pagam,
                         Pagamenti.Imp_pagato,
@@ -1044,6 +1045,7 @@ namespace ProcedureNet7
                 {
                     StudentePagam studenteDaControllare = pair.Value;
                     bool stessoPagamento = false;
+                    bool okTassaRegionale = false;
 
                     if (studenteDaControllare.pagamentiEffettuati == null || studenteDaControllare.pagamentiEffettuati.Count <= 0)
                     {
@@ -1066,9 +1068,15 @@ namespace ProcedureNet7
                             }
                             break;
                         }
+
+                        if (isTR && (pagamento.codTipoPagam == "BSS0" || pagamento.codTipoPagam == "BSS1" || pagamento.codTipoPagam == "BSS2") && !pagamento.ritiratoAzienda)
+                        {
+                            okTassaRegionale = true;
+                        }
+
                         importiPagati += pagamento.importoPagamento;
                     }
-                    if (stessoPagamento && !studentiDaRimuovereHash.Contains(studenteDaControllare.codFiscale))
+                    if ((stessoPagamento || (isTR && !okTassaRegionale)) && !studentiDaRimuovereHash.Contains(studenteDaControllare.codFiscale))
                     {
                         studentiDaRimuovereHash.Add(studenteDaControllare.codFiscale);
                         continue;
@@ -1091,7 +1099,7 @@ namespace ProcedureNet7
                     isIntegrazione = true;
                     Logger.LogInfo(null, "Il tipo di pagamento indica una integrazione");
                 }
-                if (lastValue != "0" && lastValue != "9" && lastValue != "6")
+                if (lastValue != "0" && lastValue != "9" && lastValue != "6" && lastValue != "I")
                 {
                     ControlloRiemissioni(firstPart, lastValue);
                     isRiemissione = true;
@@ -1180,7 +1188,6 @@ namespace ProcedureNet7
             void ControlloIntegrazioni()
             {
                 Logger.LogDebug(null, "Inizio del controllo delle integrazioni per gli studenti");
-                ControlloProvvedimenti();
                 HashSet<string> studentiDaRimuovere = new();
                 foreach (var pair in studentiDaPagare)
                 {
@@ -1248,6 +1255,12 @@ namespace ProcedureNet7
                                     pagamentoPossibile = true;
                                 }
                                 break;
+                            case "I9":
+                                if (selectedTipoPagamento == "II")
+                                {
+                                    pagamentoPossibile = true;
+                                }
+                                break;
                         }
                     }
                     if (!pagamentoPossibile)
@@ -1264,16 +1277,11 @@ namespace ProcedureNet7
             void ControlloProvvedimenti()
             {
                 string sqlProvv = $@"
-                SELECT DISTINCT 
-                    Domanda.Cod_fiscale
-                FROM            
-                    Domanda INNER JOIN
-                    #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale INNER JOIN
-                    PROVVEDIMENTI ON Domanda.Num_domanda = PROVVEDIMENTI.Num_domanda AND Domanda.Anno_accademico = PROVVEDIMENTI.Anno_accademico
-                WHERE        
-                    (Domanda.Anno_accademico = {selectedAA}) AND 
-                    (PROVVEDIMENTI.tipo_provvedimento IN ('05', '13'))
-                ORDER BY Domanda.Cod_fiscale";
+                select distinct specifiche_impegni.Cod_fiscale, Importo_assegnato, bs.Imp_beneficio from specifiche_impegni 
+                inner join vEsiti_concorsibs bs on specifiche_impegni.Anno_accademico = bs.Anno_accademico and specifiche_impegni.Num_domanda = bs.Num_domanda
+                inner join #CFEstrazione cfe on specifiche_impegni.cod_fiscale = cfe.cod_fiscale
+                where bs.Anno_accademico = '{selectedAA}' and Cod_beneficio = '{tipoBeneficio}' and data_fine_validita is null and Cod_tipo_esito = 2
+                order by Cod_fiscale";
 
                 SqlCommand readData = new(sqlProvv, CONNECTION, sqlTransaction);
                 Logger.LogInfo(null, "Lavorazione studenti - controllo provvedimenti");
@@ -1288,7 +1296,14 @@ namespace ProcedureNet7
                         {
                             string test = "";
                         }
-                        listaStudentiDaMantenere.Add(codFiscale);
+
+                        double importoAttuale = Utilities.SafeGetDouble(reader, "Imp_beneficio");
+                        double importoAssegnato = Utilities.SafeGetDouble(reader, "Importo_assegnato");
+
+                        if (importoAssegnato == importoAttuale)
+                        {
+                            listaStudentiDaMantenere.Add(codFiscale);
+                        }
                     }
                 }
 
@@ -1903,8 +1918,8 @@ namespace ProcedureNet7
                             continue;
                         }
 
-                        bool studenteFuoriCorso = studente.annoCorso == -1;
-                        bool studenteDisabileFuoriCorso = (studente.annoCorso == -2 || studente.annoCorso == -1) && studente.disabile;
+                        bool studenteFuoriCorso = studente.annoCorso == -1 && !studente.disabile;
+                        bool studenteDisabileFuoriCorso = studente.annoCorso == -2 && studente.disabile;
 
                         if (categoriaPagam == "PR" && !processedFiscalCodes.Contains(codFiscale))
                         {
@@ -1950,7 +1965,7 @@ namespace ProcedureNet7
                                 continue;
                             }
 
-                            if (studente.annoCorso > 0)
+                            if (!studenteFuoriCorso && !studenteDisabileFuoriCorso)
                             {
                                 studente.AddDetrazione("01", detrazione_PA, "Detrazione acconto PA");
                             }
@@ -2038,8 +2053,8 @@ namespace ProcedureNet7
                             continue;
                         }
 
-                        bool studenteFuoriCorso = studente.annoCorso == -1;
-                        bool studenteDisabileFuoriCorso = (studente.annoCorso == -2 || studente.annoCorso == -1) && studente.disabile;
+                        bool studenteFuoriCorso = studente.annoCorso == -1 && !studente.disabile;
+                        bool studenteDisabileFuoriCorso = studente.annoCorso == -2 && studente.disabile;
 
                         _ = studente.AddAssegnazione(
                             vecchiaAssegnazione.codPensionato,
@@ -2144,7 +2159,7 @@ namespace ProcedureNet7
                 {
                     StudentePagam studente = pair.Value;
 
-                    if (studente.codFiscale == "LAIMMM97H25Z236R")
+                    if (studente.codFiscale == "PCALSS94C41D423Y")
                     {
                         string test = "";
                     }
