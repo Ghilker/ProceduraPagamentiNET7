@@ -45,6 +45,8 @@ namespace ProcedureNet7
             label1 = new Label();
             button1 = new Button();
             folderBrowserDialog = new FolderBrowserDialog();
+            lavorazioneMassivaCheck = new CheckBox();
+            elaborazioneMassivaBox = new ComboBox();
             SuspendLayout();
             // 
             // proceduraPagamentiFiltroCheck
@@ -179,6 +181,25 @@ namespace ProcedureNet7
             button1.UseVisualStyleBackColor = true;
             button1.Click += RunProcedureBtnClick;
             // 
+            // lavorazioneMassivaCheck
+            // 
+            lavorazioneMassivaCheck.AutoSize = true;
+            lavorazioneMassivaCheck.Location = new Point(460, 20);
+            lavorazioneMassivaCheck.Name = "lavorazioneMassivaCheck";
+            lavorazioneMassivaCheck.Size = new Size(172, 19);
+            lavorazioneMassivaCheck.TabIndex = 54;
+            lavorazioneMassivaCheck.Text = "Attiva elaborazione massiva";
+            lavorazioneMassivaCheck.UseVisualStyleBackColor = true;
+            // 
+            // elaborazioneMassivaBox
+            // 
+            elaborazioneMassivaBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            elaborazioneMassivaBox.FormattingEnabled = true;
+            elaborazioneMassivaBox.Location = new Point(460, 38);
+            elaborazioneMassivaBox.Name = "elaborazioneMassivaBox";
+            elaborazioneMassivaBox.Size = new Size(312, 23);
+            elaborazioneMassivaBox.TabIndex = 55;
+            // 
             // FormProceduraPagamenti
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -186,6 +207,8 @@ namespace ProcedureNet7
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             ControlBox = false;
+            Controls.Add(elaborazioneMassivaBox);
+            Controls.Add(lavorazioneMassivaCheck);
             Controls.Add(label1);
             Controls.Add(button1);
             Controls.Add(proceduraPagamentiFiltroCheck);
@@ -226,5 +249,7 @@ namespace ProcedureNet7
         private Label label1;
         private Button button1;
         private FolderBrowserDialog folderBrowserDialog;
+        private CheckBox lavorazioneMassivaCheck;
+        private ComboBox elaborazioneMassivaBox;
     }
 }

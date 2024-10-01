@@ -22,6 +22,7 @@ namespace ProcedureNet7
             _masterForm = masterForm;
             InitializeComponent();
             PagamentiSettings.CreatePagamentiComboBox(ref pagamentiTipoProceduraCombo, PagamentiSettings.pagamentiTipoProcedura);
+            PagamentiSettings.CreatePagamentiComboBox(ref elaborazioneMassivaBox, PagamentiSettings.pagamentiDirect);
         }
 
         private void PagamentiSalvataggioBTN_Click(object sender, EventArgs e)
@@ -50,6 +51,7 @@ namespace ProcedureNet7
                 ArgsValidation argsValidation = new ArgsValidation();
                 string pagamentiSelectedTipoProcedura = "";
                 string pagamentiRiepilogoTipoProcedura = "";
+                string pagamentiElaborazioneMassiva = "";
                 _ = Invoke(new MethodInvoker(() =>
                 {
                     dynamic selectedItem = pagamentiTipoProceduraCombo.SelectedItem;
@@ -57,6 +59,9 @@ namespace ProcedureNet7
 
                     dynamic selectedItemRiepilogo = pagamentiTipoProceduraCombo.SelectedItem;
                     pagamentiRiepilogoTipoProcedura = selectedItemRiepilogo?.Text ?? "";
+
+                    dynamic selectedItemMassivo = elaborazioneMassivaBox.SelectedItem;
+                    pagamentiElaborazioneMassiva = selectedItemMassivo?.Value ?? "";
                 }));
 
                 RiepilogoArguments.Instance.tipoProcedura = pagamentiRiepilogoTipoProcedura;
@@ -70,6 +75,8 @@ namespace ProcedureNet7
                     _tipoProcedura = pagamentiSelectedTipoProcedura,
                     _vecchioMandato = pagamentiOldMandatoTxt.Text,
                     _filtroManuale = proceduraPagamentiFiltroCheck.Checked,
+                    _elaborazioneMassivaCheck = lavorazioneMassivaCheck.Checked,
+                    _elaborazioneMassivaString = pagamentiElaborazioneMassiva
                 };
                 argsValidation.Validate(argsPagamenti);
                 using ProceduraPagamenti pagamenti = new(_masterForm, mainConnection);

@@ -203,6 +203,10 @@ namespace ProcedureNet7
                 {
                     while (reader.Read())
                     {
+                        if (reader.GetString(0) == "Id_DatiGenerali_dom" || reader.GetString(0) == "Id_Domanda")
+                        {
+                            continue;
+                        }
                         columnNames.Add(reader.GetString(0));
                     }
                 }

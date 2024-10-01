@@ -41,7 +41,7 @@ namespace ProcedureNet7
                 string test = "";
             }
 
-            AddNucleoFamiliareStranieri();
+            AddNucleoFamiliare();
 
             if (verificaDict.Count > 0)
             {
@@ -115,7 +115,7 @@ namespace ProcedureNet7
                                 FROM            Domanda AS d INNER JOIN
                                                             vStatus_compilazione AS vv ON d.Anno_accademico = vv.anno_accademico AND d.Num_domanda = vv.num_domanda
                                 WHERE        (d.Anno_accademico = '20242025') AND (vv.status_compilazione >= 90) AND (d.Tipo_bando = 'lz')))
-                    and Corsi_laurea.Anno_accad_fine is null
+                    and Corsi_laurea.Anno_accad_fine is null 
 			                    order by Domanda.Cod_fiscale
                 ";
 
@@ -383,6 +383,7 @@ namespace ProcedureNet7
                 WITH FilteredDomanda AS (
                     SELECT d.Num_domanda, d.Anno_accademico, d.Cod_fiscale, d.Data_validita, d.Utente, d.Tipo_bando, d.Id_Domanda, d.DataCreazioneRecord
                     FROM Domanda AS d
+                    INNER JOIN #CFEstrazione cfe on d.cod_fiscale = cfe.cod_fiscale
                     INNER JOIN vStatus_compilazione AS vv ON d.Anno_accademico = vv.anno_accademico AND d.Num_domanda = vv.num_domanda
                     WHERE d.Anno_accademico = '20242025' 
                       AND vv.status_compilazione >= 90 
@@ -465,11 +466,11 @@ namespace ProcedureNet7
                 }
             }
         }
-        void AddNucleoFamiliareStranieri()
+        void AddNucleoFamiliare()
         {
             string dataQuery = @"
                     select 
-                        Cod_fiscale,
+                        domanda.Cod_fiscale,
                         Num_componenti,
                         Numero_conviventi_estero,
                         Cod_status_genit,
@@ -479,15 +480,14 @@ namespace ProcedureNet7
                         Reddito_2_anni
                     from vNucleo_familiare 
                     inner join Domanda on vNucleo_familiare.Anno_accademico = Domanda.Anno_accademico and vNucleo_familiare.Num_domanda = Domanda.Num_domanda
-                    where domanda.Anno_accademico = '20242025' and Domanda.Cod_fiscale in 
-                    (select domanda.Cod_fiscale from Domanda inner join vResidenza on Domanda.Cod_fiscale = vResidenza.COD_FISCALE and Domanda.Anno_accademico = vResidenza.ANNO_ACCADEMICO
-                    where Domanda.Anno_accademico = '20242025' and Domanda.tipo_bando = 'lz'  and vResidenza.provincia_residenza = 'EE')
+                    INNER JOIN #CFEstrazione cfe on domanda.cod_fiscale = cfe.cod_fiscale
+                    where domanda.Anno_accademico = '20242025'
                     order by domanda.Cod_fiscale
 
                 ";
 
             SqlCommand readData = new(dataQuery, CONNECTION);
-            Logger.LogInfo(45, "Verifica - aggiunta nucleo familiare stranieri");
+            Logger.LogInfo(45, "Verifica - aggiunta nucleo familiare");
 
             using (SqlDataReader reader = readData.ExecuteReader())
             {
@@ -529,8 +529,9 @@ namespace ProcedureNet7
             List<string> codiciFiscaliIntEE = new List<string>();
 
             string dataQuery = @"
-                    select Cod_fiscale, Tipo_redd_nucleo_fam_origine, Tipo_redd_nucleo_fam_integr 
+                    select domanda.Cod_fiscale, Tipo_redd_nucleo_fam_origine, Tipo_redd_nucleo_fam_integr 
                     from Domanda 
+                    INNER JOIN #CFEstrazione cfe on domanda.cod_fiscale = cfe.cod_fiscale
                     inner join vTipologie_redditi on Domanda.Anno_accademico = vTipologie_redditi.Anno_accademico and Domanda.Num_domanda = vTipologie_redditi.Num_domanda 
                     where domanda.Anno_accademico = 20242025 and Tipo_bando = 'lz'
                     order by Cod_fiscale

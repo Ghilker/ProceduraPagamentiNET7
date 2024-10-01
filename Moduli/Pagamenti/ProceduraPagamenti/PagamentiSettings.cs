@@ -16,6 +16,12 @@ namespace ProcedureNet7
             { "2", "Solo Creazione Tabella D'Appoggio" },
         };
 
+        public static Dictionary<string, string> pagamentiDirect = new()
+        {
+            { "#BS#P0#PR#00#2#2#0000", "Prima rata borsa - Massivo" },
+            { "#BS#S0#SA#00#2#2#0000", "Saldo borsa - Massivo" },
+        };
+
         public static void CreatePagamentiComboBox(ref ComboBox comboBox, Dictionary<string, string> toInsert, bool needCode = false)
         {
             comboBox.Items.Clear();
@@ -302,7 +308,6 @@ namespace ProcedureNet7
 		                                Cod_tipo_esito='2' AND
                                         domanda.Anno_accademico = @annoAccademico AND
                                         Domanda.Tipo_bando in ('lz', 'pl', 'bl', 'ca')
-
                                 )
                             ";
 

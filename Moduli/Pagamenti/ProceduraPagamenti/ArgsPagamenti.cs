@@ -28,6 +28,10 @@ namespace ProcedureNet7
 
         public bool _filtroManuale { get; set; }
 
+        public bool _elaborazioneMassivaCheck { get; set; }
+
+        public string _elaborazioneMassivaString { get; set; }
+
         public ArgsPagamenti()
         {
             _annoAccademico = string.Empty;
@@ -44,6 +48,11 @@ namespace ProcedureNet7
             if (string.IsNullOrWhiteSpace(_tipoProcedura))
             {
                 errorMessages.Add("Indicare il tipo di procedura da eseguire");
+            }
+
+            if (_elaborazioneMassivaCheck && string.IsNullOrWhiteSpace(_elaborazioneMassivaString))
+            {
+                errorMessages.Add("Selezionare il tipo di elaborazione massiva");
             }
 
             if (errorMessages.Any())
