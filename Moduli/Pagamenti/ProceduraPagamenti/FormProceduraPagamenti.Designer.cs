@@ -47,12 +47,14 @@ namespace ProcedureNet7
             folderBrowserDialog = new FolderBrowserDialog();
             lavorazioneMassivaCheck = new CheckBox();
             elaborazioneMassivaBox = new ComboBox();
+            forzareStudenteCheck = new CheckBox();
+            forzareStudenteTxt = new TextBox();
             SuspendLayout();
             // 
             // proceduraPagamentiFiltroCheck
             // 
             proceduraPagamentiFiltroCheck.AutoSize = true;
-            proceduraPagamentiFiltroCheck.Location = new Point(460, 76);
+            proceduraPagamentiFiltroCheck.Location = new Point(460, 75);
             proceduraPagamentiFiltroCheck.Name = "proceduraPagamentiFiltroCheck";
             proceduraPagamentiFiltroCheck.Size = new Size(102, 19);
             proceduraPagamentiFiltroCheck.TabIndex = 38;
@@ -200,6 +202,23 @@ namespace ProcedureNet7
             elaborazioneMassivaBox.Size = new Size(312, 23);
             elaborazioneMassivaBox.TabIndex = 55;
             // 
+            // forzareStudenteCheck
+            // 
+            forzareStudenteCheck.AutoSize = true;
+            forzareStudenteCheck.Location = new Point(460, 104);
+            forzareStudenteCheck.Name = "forzareStudenteCheck";
+            forzareStudenteCheck.Size = new Size(113, 19);
+            forzareStudenteCheck.TabIndex = 56;
+            forzareStudenteCheck.Text = "Forzare studente";
+            forzareStudenteCheck.UseVisualStyleBackColor = true;
+            // 
+            // forzareStudenteTxt
+            // 
+            forzareStudenteTxt.Location = new Point(579, 102);
+            forzareStudenteTxt.Name = "forzareStudenteTxt";
+            forzareStudenteTxt.Size = new Size(186, 23);
+            forzareStudenteTxt.TabIndex = 57;
+            // 
             // FormProceduraPagamenti
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -207,6 +226,8 @@ namespace ProcedureNet7
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             ControlBox = false;
+            Controls.Add(forzareStudenteTxt);
+            Controls.Add(forzareStudenteCheck);
             Controls.Add(elaborazioneMassivaBox);
             Controls.Add(lavorazioneMassivaCheck);
             Controls.Add(label1);
@@ -251,5 +272,7 @@ namespace ProcedureNet7
         private FolderBrowserDialog folderBrowserDialog;
         private CheckBox lavorazioneMassivaCheck;
         private ComboBox elaborazioneMassivaBox;
+        private CheckBox forzareStudenteCheck;
+        private TextBox forzareStudenteTxt;
     }
 }

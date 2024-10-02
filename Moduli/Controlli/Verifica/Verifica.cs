@@ -551,6 +551,7 @@ namespace ProcedureNet7
                     verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
                     if (studenteVerifica != null)
                     {
+                        studenteVerifica.verificaDatiEconomici = new();
                         studenteVerifica.verificaDatiEconomici.tipologiaReddito = tipoRedditiOrigine;
                         studenteVerifica.verificaDatiEconomici.tipologiaRedditoIntegrazione = tipoRedditiIntegrazione;
 
@@ -692,7 +693,7 @@ namespace ProcedureNet7
                         AND a.data_fine_validita IS NULL
                         AND a.cod_tipo_allegato = '07'
                         AND vs.cod_status = '05'
-		                AND vb.anno_accademico = 20232024
+		                AND vb.anno_accademico = 20242025
                     GROUP BY vb.num_domanda, vb.anno_accademico
                 )
                 SELECT
@@ -710,7 +711,7 @@ namespace ProcedureNet7
                 LEFT JOIN sumPagamenti sp ON d.Cod_fiscale = sp.Cod_fiscale
                 LEFT JOIN impAltreBorse iab ON d.Num_domanda = iab.num_domanda AND d.Anno_accademico = iab.anno_accademico
                 WHERE
-                    d.Anno_accademico = 20232024
+                    d.Anno_accademico = 20242025
                     AND d.tipo_bando = 'LZ'
                 ORDER BY d.Num_domanda;
                 ";
@@ -727,10 +728,13 @@ namespace ProcedureNet7
                     verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
                     if (studenteVerifica != null)
                     {
+                        double ISPdb = Utilities.SafeGetDouble(reader, "ISP");
+                        double ISRdb = Utilities.SafeGetDouble(reader, "ISR");
                         studenteVerifica.verificaDatiEconomici = new()
                         {
-                            ISR = Utilities.SafeGetDouble(reader, "ISR"),
-                            ISP = Utilities.SafeGetDouble(reader, "ISP"),
+                            ISR = ISRdb,
+                            ISP = ISPdb,
+                            ISPDSU = ISPdb,
                             SEQ = Utilities.SafeGetDouble(reader, "SEQ"),
                             detrazioni = Utilities.SafeGetDouble(reader, "detrazioniADISU") + Utilities.SafeGetDouble(reader, "detrazioniAltreBorse")
                         };
@@ -810,20 +814,69 @@ namespace ProcedureNet7
             #endregion
 
             string dataQuery = @"
+                    WITH codici_pagam AS (
+                        SELECT dpn.Cod_tipo_pagam_new AS cod_tipo_pagam
+                        FROM Decod_pagam_new dpn
+                        INNER JOIN Tipologie_pagam tp ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
+                        WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS' AND tp.visibile = 1
+
+                        UNION
+
+                        SELECT dpn.Cod_tipo_pagam_old AS cod_tipo_pagam
+                        FROM Decod_pagam_new dpn
+                        INNER JOIN Tipologie_pagam tp ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
+                        WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS' AND LEFT(tp.Cod_tipo_pagam, 3) <> 'BSA' AND tp.visibile = 1
+                    ),
+                    sumPagamenti AS (
+                        SELECT
+                            SUM(p.imp_pagato) AS somma,
+                            d.Cod_fiscale
+                        FROM Pagamenti p
+                        INNER JOIN Domanda d ON p.Anno_accademico = d.Anno_accademico AND p.Num_domanda = d.Num_domanda
+                        WHERE
+                            p.Ritirato_azienda = 0
+                            AND p.Ese_finanziario = 2022
+                            AND p.cod_tipo_pagam IN (SELECT cod_tipo_pagam FROM codici_pagam)
+                        GROUP BY d.Cod_fiscale
+                    ),
+                    impAltreBorse AS (
+                        SELECT
+                            vb.num_domanda,
+                            vb.anno_accademico,
+                            SUM(vb.importo_borsa) AS importo_borsa
+                        FROM vimporti_borsa_percepiti vb
+                        INNER JOIN Allegati a ON vb.anno_accademico = a.anno_accademico AND vb.num_domanda = a.num_domanda
+                        INNER JOIN vstatus_allegati vs ON a.id_allegato = vs.id_allegato
+                        WHERE
+                            vb.data_fine_validita IS NULL
+                            AND a.data_fine_validita IS NULL
+                            AND a.cod_tipo_allegato = '07'
+                            AND vs.cod_status = '05'
+                            AND vb.anno_accademico = 20242025
+                        GROUP BY vb.num_domanda, vb.anno_accademico
+                    )
                     select 
-                        Cod_fiscale,
+                        Domanda.Cod_fiscale,
                         Numero_componenti,
                         Redd_complessivo,
                         Patr_mobiliare,
                         Possesso_abitaz,
                         Superf_abitaz_MQ,
                         Poss_altre_abit,
-                        Sup_compl_altre_MQ
+                        Sup_compl_altre_MQ,
+                        Franchigia,
+                        franchigia_pat_mobiliare,
+                        tasso_rendimento_pat_mobiliare,
+                        ISNULL(sp.somma, 0) AS detrazioniADISU,
+                        ISNULL(iab.importo_borsa, 0) AS detrazioniAltreBorse
                     from vNucleo_fam_stranieri_DO
                         inner join Domanda on Domanda.Anno_accademico = vNucleo_fam_stranieri_DO.Anno_accademico and Domanda.Num_domanda = vNucleo_fam_stranieri_DO.Num_domanda
+	                    inner join DatiGenerali_con dc on Domanda.Anno_accademico = dc.Anno_accademico
                         inner join #CFEstrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale
+                        LEFT JOIN sumPagamenti sp ON Domanda.Cod_fiscale = sp.Cod_fiscale
+                        LEFT JOIN impAltreBorse iab ON Domanda.Num_domanda = iab.num_domanda AND Domanda.Anno_accademico = iab.anno_accademico
                     where Domanda.Anno_accademico = '20242025'
-                    order by Cod_fiscale
+                    order by Domanda.Cod_fiscale
 
                 ";
 
@@ -839,9 +892,17 @@ namespace ProcedureNet7
                     verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
                     if (studenteVerifica != null)
                     {
+
+                        double calculatedISP = Math.Max((Utilities.SafeGetDouble(reader, "Superf_abitaz_MQ") + Utilities.SafeGetDouble(reader, "Sup_compl_altre_MQ")) * 500 - Utilities.SafeGetDouble(reader, "Franchigia"), 0);
+                        double calculatedPatrimonioMob = Math.Max(Utilities.SafeGetDouble(reader, "Patr_mobiliare") - Utilities.SafeGetDouble(reader, "franchigia_pat_mobiliare"), 0);
+                        double calculatedISPDSU = calculatedISP + calculatedPatrimonioMob;
+                        double calculatedISR = Math.Max(Utilities.SafeGetDouble(reader, "Redd_complessivo") + calculatedPatrimonioMob * Utilities.SafeGetDouble(reader, "tasso_rendimento_pat_mobiliare") -
+                                                        (Utilities.SafeGetDouble(reader, "detrazioniADISU") + Utilities.SafeGetDouble(reader, "detrazioniAltreBorse")), 0);
+
                         studenteVerifica.verificaDatiEconomici = new VerificaDatiEconomici()
                         {
-
+                            ISPDSU = calculatedISPDSU,
+                            ISR = calculatedISR,
                         };
 
                     }
@@ -959,7 +1020,7 @@ namespace ProcedureNet7
                         AND a.data_fine_validita IS NULL
                         AND a.cod_tipo_allegato = '07'
                         AND vs.cod_status = '05'
-		                AND vb.anno_accademico = 20232024
+		                AND vb.anno_accademico = 20242025
                     GROUP BY vb.num_domanda, vb.anno_accademico
                 )
                 SELECT
@@ -977,13 +1038,13 @@ namespace ProcedureNet7
                 LEFT JOIN sumPagamenti sp ON d.Cod_fiscale = sp.Cod_fiscale
                 LEFT JOIN impAltreBorse iab ON d.Num_domanda = iab.num_domanda AND d.Anno_accademico = iab.anno_accademico
                 WHERE
-                    d.Anno_accademico = 20232024
+                    d.Anno_accademico = 20242025
                     AND d.tipo_bando = 'LZ'
                 ORDER BY d.Num_domanda;
                 ";
 
             SqlCommand readData = new(dataQuery, CONNECTION);
-            Logger.LogInfo(45, "Verifica - aggiunta dati economici integrazione redditi italiani");
+            Logger.LogInfo(45, "Verifica - aggiunta dati economici redditi italiani");
 
             using (SqlDataReader reader = readData.ExecuteReader())
             {
@@ -994,20 +1055,24 @@ namespace ProcedureNet7
                     verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
                     if (studenteVerifica != null)
                     {
-                        if (studenteVerifica.verificaDatiEconomici == null)
+                        double ISPdb = Utilities.SafeGetDouble(reader, "ISP");
+                        double ISRdb = Utilities.SafeGetDouble(reader, "ISR");
+                        if (studenteVerifica.verificaDatiEconomici != null)
                         {
-                            studenteVerifica.verificaDatiEconomici = new()
-                            {
-                                ISR = Utilities.SafeGetDouble(reader, "ISR"),
-                                ISP = Utilities.SafeGetDouble(reader, "ISP"),
-                                SEQ = Utilities.SafeGetDouble(reader, "SEQ"),
-                                detrazioni = Utilities.SafeGetDouble(reader, "detrazioniADISU") + Utilities.SafeGetDouble(reader, "detrazioniAltreBorse")
-                            };
+                            studenteVerifica.verificaDatiEconomici.ISR += ISRdb;
+                            studenteVerifica.verificaDatiEconomici.ISP += ISPdb;
+                            studenteVerifica.verificaDatiEconomici.ISPDSU = studenteVerifica.verificaDatiEconomici.ISP;
                         }
                         else
                         {
-                            studenteVerifica.verificaDatiEconomici.ISR += Utilities.SafeGetDouble(reader, "ISR");
-                            studenteVerifica.verificaDatiEconomici.ISP += Utilities.SafeGetDouble(reader, "ISP");
+                            studenteVerifica.verificaDatiEconomici = new()
+                            {
+                                ISR = ISRdb,
+                                ISP = ISPdb,
+                                ISPDSU = ISPdb,
+                                SEQ = Utilities.SafeGetDouble(reader, "SEQ"),
+                                detrazioni = Utilities.SafeGetDouble(reader, "detrazioniADISU") + Utilities.SafeGetDouble(reader, "detrazioniAltreBorse")
+                            };
                         }
                     }
                 }
@@ -1083,6 +1148,108 @@ namespace ProcedureNet7
                 updateStatisticsCmd.ExecuteNonQuery();
             }
             #endregion
+
+            string dataQuery = @"
+                    WITH codici_pagam AS (
+                        SELECT dpn.Cod_tipo_pagam_new AS cod_tipo_pagam
+                        FROM Decod_pagam_new dpn
+                        INNER JOIN Tipologie_pagam tp ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
+                        WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS' AND tp.visibile = 1
+
+                        UNION
+
+                        SELECT dpn.Cod_tipo_pagam_old AS cod_tipo_pagam
+                        FROM Decod_pagam_new dpn
+                        INNER JOIN Tipologie_pagam tp ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
+                        WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS' AND LEFT(tp.Cod_tipo_pagam, 3) <> 'BSA' AND tp.visibile = 1
+                    ),
+                    sumPagamenti AS (
+                        SELECT
+                            SUM(p.imp_pagato) AS somma,
+                            d.Cod_fiscale
+                        FROM Pagamenti p
+                        INNER JOIN Domanda d ON p.Anno_accademico = d.Anno_accademico AND p.Num_domanda = d.Num_domanda
+                        WHERE
+                            p.Ritirato_azienda = 0
+                            AND p.Ese_finanziario = 2022
+                            AND p.cod_tipo_pagam IN (SELECT cod_tipo_pagam FROM codici_pagam)
+                        GROUP BY d.Cod_fiscale
+                    ),
+                    impAltreBorse AS (
+                        SELECT
+                            vb.num_domanda,
+                            vb.anno_accademico,
+                            SUM(vb.importo_borsa) AS importo_borsa
+                        FROM vimporti_borsa_percepiti vb
+                        INNER JOIN Allegati a ON vb.anno_accademico = a.anno_accademico AND vb.num_domanda = a.num_domanda
+                        INNER JOIN vstatus_allegati vs ON a.id_allegato = vs.id_allegato
+                        WHERE
+                            vb.data_fine_validita IS NULL
+                            AND a.data_fine_validita IS NULL
+                            AND a.cod_tipo_allegato = '07'
+                            AND vs.cod_status = '05'
+                            AND vb.anno_accademico = 20242025
+                        GROUP BY vb.num_domanda, vb.anno_accademico
+                    )
+                    select 
+                        Domanda.Cod_fiscale,
+                        Numero_componenti,
+                        Redd_complessivo,
+                        Patr_mobiliare,
+                        Possesso_abitaz,
+                        Superf_abitaz_MQ,
+                        Poss_altre_abit,
+                        Sup_compl_altre_MQ,
+                        Franchigia,
+                        franchigia_pat_mobiliare,
+                        tasso_rendimento_pat_mobiliare,
+                        ISNULL(sp.somma, 0) AS detrazioniADISU,
+                        ISNULL(iab.importo_borsa, 0) AS detrazioniAltreBorse
+                    from vNucleo_fam_stranieri_DI
+                        inner join Domanda on Domanda.Anno_accademico = vNucleo_fam_stranieri_DI.Anno_accademico and Domanda.Num_domanda = vNucleo_fam_stranieri_DI.Num_domanda
+	                    inner join DatiGenerali_con dc on Domanda.Anno_accademico = dc.Anno_accademico
+                        inner join #CFEstrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale
+                        LEFT JOIN sumPagamenti sp ON Domanda.Cod_fiscale = sp.Cod_fiscale
+                        LEFT JOIN impAltreBorse iab ON Domanda.Num_domanda = iab.num_domanda AND Domanda.Anno_accademico = iab.anno_accademico
+                    where Domanda.Anno_accademico = '20242025'
+                    order by Domanda.Cod_fiscale
+
+                ";
+
+            SqlCommand readData = new(dataQuery, CONNECTION);
+            Logger.LogInfo(45, "Verifica - aggiunta nucleo familiare stranieri");
+
+            using (SqlDataReader reader = readData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+
+                    verificaDict.TryGetValue(codFiscale, out StudenteVerifica? studenteVerifica);
+                    if (studenteVerifica != null)
+                    {
+
+                        double calculatedISP = Math.Max((Utilities.SafeGetDouble(reader, "Superf_abitaz_MQ") + Utilities.SafeGetDouble(reader, "Sup_compl_altre_MQ")) * 500, 0);
+                        double calculatedPatrimonioMob = Math.Max(Utilities.SafeGetDouble(reader, "Patr_mobiliare"), 0);
+                        double calculatedISPDSU = calculatedISP + calculatedPatrimonioMob;
+                        double calculatedISR = Math.Max(Utilities.SafeGetDouble(reader, "Redd_complessivo") + calculatedPatrimonioMob * Utilities.SafeGetDouble(reader, "tasso_rendimento_pat_mobiliare"), 0);
+
+                        if (studenteVerifica.verificaDatiEconomici != null)
+                        {
+                            studenteVerifica.verificaDatiEconomici.ISPDSU += calculatedISPDSU;
+                            studenteVerifica.verificaDatiEconomici.ISR += calculatedISR;
+                        }
+                        else
+                        {
+                            studenteVerifica.verificaDatiEconomici = new VerificaDatiEconomici()
+                            {
+                                ISPDSU = calculatedISPDSU,
+                                ISR = calculatedISR,
+                            };
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1095,7 +1262,7 @@ SELECT   top(10) domanda.num_domanda, Domanda.Cod_fiscale,domanda.id_domanda
                       Domanda.Num_domanda = vDatiGenerali_dom.Num_domanda INNER JOIN
                       vStatus_compilazione ON Domanda.Anno_accademico = vStatus_compilazione.anno_accademico AND 
                       vDatiGenerali_dom.Num_domanda = vStatus_compilazione.num_domanda
-		WHERE     ((vStatus_compilazione.status_compilazione > 6 and vStatus_compilazione.anno_accademico<20082009) or vStatus_compilazione.status_compilazione >=70  )  and domanda.anno_accademico=20232024 and domanda.tipo_bando like 'L%';
+		WHERE     ((vStatus_compilazione.status_compilazione > 6 and vStatus_compilazione.anno_accademico<20082009) or vStatus_compilazione.status_compilazione >=70  )  and domanda.anno_accademico=20242025 and domanda.tipo_bando like 'L%';
 
 		SELECT     Tipo_studente,rifug_politico,studente_detenuto
 		FROM         vDatiGenerali_dom

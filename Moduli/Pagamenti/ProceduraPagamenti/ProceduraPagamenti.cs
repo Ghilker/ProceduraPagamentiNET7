@@ -39,6 +39,9 @@ namespace ProcedureNet7
         bool massivoDefault = false;
         string massivoString = string.Empty;
 
+        bool studenteForzato = false;
+        string studenteForzatoCF = string.Empty;
+
         Dictionary<string, StudentePagam> studentiDaPagare = new();
         readonly Dictionary<StudentePagam, List<string>> studentiConErroriPA = new();
 
@@ -239,6 +242,8 @@ namespace ProcedureNet7
             usingFiltroManuale = args._filtroManuale;
             massivoDefault = args._elaborazioneMassivaCheck;
             massivoString = args._elaborazioneMassivaString;
+            studenteForzato = args._forzareStudenteCheck;
+            studenteForzatoCF = args._forzareStudenteString;
         }
 
         private void HandleTipoPagamentoDialog()
@@ -338,7 +343,10 @@ namespace ProcedureNet7
             {
                 isTR = true;
             }
-            SqlCommand readData = new($"SELECT * FROM impegni WHERE Cod_beneficio = '{tipoBeneficio}' and anno_accademico = '{selectedAA}' and categoria_pagamento = '{categoriaPagam}'", CONNECTION, sqlTransaction);
+            SqlCommand readData = new($"SELECT * FROM impegni WHERE Cod_beneficio = '{tipoBeneficio}' and anno_accademico = '{selectedAA}' and categoria_pagamento = '{categoriaPagam}'", CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            };
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -396,7 +404,10 @@ namespace ProcedureNet7
                 return;
             }
 
-            using (SqlCommand command = new($"SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = N'{dbTableName}'", CONNECTION, sqlTransaction))
+            using (SqlCommand command = new($"SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = N'{dbTableName}'", CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
             {
                 dbTableExists = command.ExecuteScalar() != null;
             }
@@ -517,8 +528,12 @@ namespace ProcedureNet7
                                                 StatisticheTotali  LEFT OUTER JOIN
                                                 PagamentiTotali ON StatisticheTotali.Anno_accademico = PagamentiTotali.Anno_accademico AND StatisticheTotali.Num_domanda = PagamentiTotali.Num_domanda 
                                                 WHERE 
-                                                StatisticheTotali.Anno_accademico = @annoAccademico 
-	                                            AND StatisticheTotali.Cod_fiscale IN (
+                                                StatisticheTotali.Anno_accademico = @annoAccademico
+                                                ");
+
+            if (!studenteForzato)
+            {
+                queryBuilder.Append($@"         AND StatisticheTotali.Cod_fiscale IN (
 													SELECT 
 														Cod_fiscale
 													FROM
@@ -538,8 +553,12 @@ namespace ProcedureNet7
                                                             SELECT Cod_tipo_pagam_old FROM Decod_pagam_new WHERE Cod_tipo_pagam_new = '{codTipoPagamento}'
                                                         )
                                                     OR cod_tipo_pagam = '{codTipoPagamento}'
-                                                    )
-                                            ");
+                                                    )");
+            }
+            if (studenteForzato)
+            {
+                queryBuilder.AppendLine($"      AND StatisticheTotali.Cod_fiscale = '{studenteForzatoCF}'");
+            }
 
             string sqlQuery = queryBuilder.ToString();
 
@@ -878,7 +897,10 @@ namespace ProcedureNet7
 
             Logger.LogDebug(null, "Creazione tabella CF");
             string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
-            using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction))
+            using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
             {
                 createCmd.ExecuteNonQuery();
             }
@@ -904,26 +926,32 @@ namespace ProcedureNet7
 
             Logger.LogDebug(null, "Creazione index della tabella CF");
             string indexingCFTable = "CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale)";
-            using (SqlCommand indexingCFTableCmd = new SqlCommand(indexingCFTable, CONNECTION, sqlTransaction))
+            using (SqlCommand indexingCFTableCmd = new SqlCommand(indexingCFTable, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
             {
                 indexingCFTableCmd.ExecuteNonQuery();
             }
 
             Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
             string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
-            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION, sqlTransaction))
+            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
             {
                 updateStatisticsCmd.ExecuteNonQuery();
             }
             #endregion
 
+
             ControlloPagamenti();
-
             Logger.LogDebug(30, $"Numero studenti prima della pulizia = {studentiDaPagare.Count}");
-
             CheckLiquefazione();
-
             Logger.LogDebug(30, $"Numero studenti dopo la pulizia = {studentiDaPagare.Count}");
+
+
             if (studentiDaPagare.Count > 0)
             {
                 PopulateStudentsInformations();
@@ -987,11 +1015,17 @@ namespace ProcedureNet7
         }
         private void ControlloPagamenti()
         {
-            ControlloInMovimentazioni();
+            if (!studenteForzato)
+            {
+                ControlloInMovimentazioni();
+            }
+
             FilterPagamenti();
 
-            ControlloProvvedimenti();
-
+            if (tipoBeneficio == "BS" && !isTR && !studenteForzato)
+            {
+                ControlloProvvedimenti();
+            }
 
             void ControlloInMovimentazioni()
             {
@@ -1008,7 +1042,10 @@ namespace ProcedureNet7
                             WHERE        (COD_MANDATO LIKE '{codTipoPagamento}%')))
                             ";
                 HashSet<string> studentiDaRimuovereHash = new();
-                SqlCommand readData = new(sqlPagam, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(sqlPagam, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(11, $"Lavorazione studenti - controllo movimentazioni");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -1058,7 +1095,10 @@ namespace ProcedureNet7
                     WHERE
                         Domanda.Anno_accademico = '{selectedAA}'";
                 }
-                SqlCommand readData = new(sqlPagam, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(sqlPagam, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(11, $"Lavorazione studenti - inserimento pagamenti");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -1076,19 +1116,22 @@ namespace ProcedureNet7
                         {
                             string cod_tipo_pagam = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_tipo_pagam")).ToUpper();
 
-                            if (cod_tipo_pagam.Substring(0, 2) != tipoBeneficio)
+                            if (!studenteForzato)
                             {
-                                continue;
-                            }
+                                if (cod_tipo_pagam.Substring(0, 2) != tipoBeneficio)
+                                {
+                                    continue;
+                                }
 
-                            if (cod_tipo_pagam.Substring(0, 3) == "BST" && !isTR)
-                            {
-                                continue;
-                            }
+                                if (cod_tipo_pagam.Substring(0, 3) == "BST" && !isTR)
+                                {
+                                    continue;
+                                }
 
-                            if (cod_tipo_pagam.Substring(0, 2) != "BS" && isTR)
-                            {
-                                continue;
+                                if (cod_tipo_pagam.Substring(0, 2) != "BS" && isTR)
+                                {
+                                    continue;
+                                }
                             }
                             double.TryParse(Utilities.SafeGetString(reader, "Imp_pagato"), out double impPagato);
                             studente.AddPagamentoEffettuato(
@@ -1103,6 +1146,8 @@ namespace ProcedureNet7
                 HashSet<string> studentiDaRimuovereHash = new();
                 foreach (var pair in studentiDaPagare)
                 {
+                    if (studenteForzato) { continue; }
+
                     StudentePagam studenteDaControllare = pair.Value;
                     bool stessoPagamento = false;
                     bool okTassaRegionale = false;
@@ -1141,8 +1186,14 @@ namespace ProcedureNet7
                         studentiDaRimuovereHash.Add(studenteDaControllare.codFiscale);
                         continue;
                     }
+
                     Math.Round(importiPagati, 2);
                     studenteDaControllare.SetImportiPagati(importiPagati);
+
+                    if (tipoBeneficio == "BS" && !isTR && Math.Abs(studenteDaControllare.importoBeneficio - studenteDaControllare.importoPagato) < 5)
+                    {
+                        studentiDaRimuovereHash.Add(studenteDaControllare.codFiscale);
+                    }
                 }
 
                 foreach (string codFiscale in studentiDaRimuovereHash)
@@ -1343,7 +1394,10 @@ namespace ProcedureNet7
                 where bs.Anno_accademico = '{selectedAA}' and specifiche_impegni.Cod_beneficio = '{tipoBeneficio}' and bs.Cod_beneficio = '{tipoBeneficio}' and data_fine_validita is null and Cod_tipo_esito = 2
                 order by Cod_fiscale";
 
-                SqlCommand readData = new(sqlProvv, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(sqlProvv, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(null, "Lavorazione studenti - controllo provvedimenti");
                 HashSet<string> listaStudentiDaMantenere = new();
 
@@ -1415,7 +1469,10 @@ namespace ProcedureNet7
                 sqlKiller += " AND cod_tipologia_blocco in ('BPD', 'BSS', 'BS1')";
             }
             sqlKiller += " )";
-            SqlCommand readData = new(sqlKiller, CONNECTION, sqlTransaction);
+            SqlCommand readData = new(sqlKiller, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            };
             Logger.LogInfo(12, $"Lavorazione studenti - controllo eliminabili");
             HashSet<string> listaStudentiDaEliminareBlocchi = new();
             using (SqlDataReader reader = readData.ExecuteReader())
@@ -1444,7 +1501,10 @@ namespace ProcedureNet7
                     WHERE
                         cod_fiscale IN ({listaCFblocchi})
                     ";
-                SqlCommand blocchiUpdate = new(sqlUpdateBlocchi, CONNECTION, sqlTransaction);
+                SqlCommand blocchiUpdate = new(sqlUpdateBlocchi, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 blocchiUpdate.ExecuteNonQuery();
             }
 
@@ -1458,7 +1518,10 @@ namespace ProcedureNet7
                 WHERE 
                     IBAN = ''
              ";
-            SqlCommand IBANDATA = new(sqlStudentiSenzaIBAN, CONNECTION, sqlTransaction);
+            SqlCommand IBANDATA = new(sqlStudentiSenzaIBAN, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            };
             Logger.LogInfo(12, $"Lavorazione studenti - controllo IBAN");
             HashSet<string> listaStudentiDaEliminareIBAN = new();
             using (SqlDataReader reader = IBANDATA.ExecuteReader())
@@ -1487,7 +1550,10 @@ namespace ProcedureNet7
                     WHERE
                         cod_fiscale IN ({listaCFIBAN})
                     ";
-                SqlCommand ibanUpdate = new(sqlUpdateIban, CONNECTION, sqlTransaction);
+                SqlCommand ibanUpdate = new(sqlUpdateIban, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 ibanUpdate.ExecuteNonQuery();
             }
 
@@ -1505,7 +1571,10 @@ namespace ProcedureNet7
                     AND cod_tipo_esito <> 2
                     
              ";
-            SqlCommand nonVincitori = new(sqlStudentiNonVincitori, CONNECTION, sqlTransaction);
+            SqlCommand nonVincitori = new(sqlStudentiNonVincitori, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            };
             Logger.LogInfo(12, $"Lavorazione studenti - controllo Vincitori");
             HashSet<string> listaStudentiDaEliminareNonVincitori = new();
             using (SqlDataReader reader = nonVincitori.ExecuteReader())
@@ -1534,7 +1603,10 @@ namespace ProcedureNet7
                     WHERE
                         cod_fiscale IN ({listaCFEscluso})
                     ";
-                SqlCommand esclusoUpdate = new(sqlUpdateEscluso, CONNECTION, sqlTransaction);
+                SqlCommand esclusoUpdate = new(sqlUpdateEscluso, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 esclusoUpdate.ExecuteNonQuery();
             }
             HashSet<string> listaStudentiDaEliminarePEC = new();
@@ -1555,7 +1627,10 @@ namespace ProcedureNet7
                             AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vDomicilio where ANNO_ACCADEMICO = '{selectedAA}' AND (Indirizzo_domicilio = '' or Indirizzo_domicilio = 'ROMA' or Indirizzo_domicilio = 'CASSINO' or Indirizzo_domicilio = 'FROSINONE'  or prov = 'EE'))
                             AND Indirizzo_PEC IS NULL
                         ";
-                SqlCommand nonPecCmd = new(sqlStudentiPecKiller, CONNECTION, sqlTransaction);
+                SqlCommand nonPecCmd = new(sqlStudentiPecKiller, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(12, $"Lavorazione studenti - controllo PEC");
 
                 using (SqlDataReader reader = nonPecCmd.ExecuteReader())
@@ -1580,7 +1655,10 @@ namespace ProcedureNet7
                         WHERE
                             cod_fiscale IN ({listaCFPEC})
                         ";
-                    SqlCommand pecUpdate = new(sqlUpdatePec, CONNECTION, sqlTransaction);
+                    SqlCommand pecUpdate = new(sqlUpdatePec, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
                     pecUpdate.ExecuteNonQuery();
                 }
             }
@@ -1636,7 +1714,10 @@ namespace ProcedureNet7
                     LEFT OUTER JOIN Comuni ON Studente.Cod_comune_nasc = Comuni.Cod_comune 
                     INNER JOIN #CFEstrazione cfe ON Studente.Cod_fiscale = cfe.Cod_fiscale";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(30, $"Lavorazione studenti - inserimento in luogo nascita");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -1670,7 +1751,10 @@ namespace ProcedureNet7
                                                        WHERE        (COD_FISCALE = luogo_reperibilita_studente.cod_fiscale) AND (ANNO_ACCADEMICO = luogo_reperibilita_studente.anno_accademico) AND (TIPO_LUOGO = 'RES')))
                         ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(35, $"Lavorazione studenti - inserimento in residenza");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -1698,7 +1782,10 @@ namespace ProcedureNet7
                         INNER JOIN #CFEstrazione cfe ON Studente.Cod_fiscale = cfe.Cod_fiscale 
                     ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(40, $"Lavorazione studenti - inserimento in informazioni");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -1726,7 +1813,10 @@ namespace ProcedureNet7
                     WHERE Reversali.Ritirato_azienda = 0 AND Domanda.Anno_accademico = '{selectedAA}'
                     ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(45, $"Lavorazione studenti - inserimento in reversali");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -1754,7 +1844,10 @@ namespace ProcedureNet7
                     WHERE SEGNO = 0 AND Anno_accademico = '{selectedAA}' AND CODICE_MOVIMENTO IS NULL
                     ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(45, $"Lavorazione studenti - inserimento in detrazioni");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -1782,7 +1875,10 @@ namespace ProcedureNet7
                     where domanda.Anno_accademico = '{selectedAA}' and Esiti_concorsi.Cod_beneficio = 'PA' and Esiti_concorsi.Cod_tipo_esito = '2'
                     ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(40, $"Lavorazione studenti - inserimento esiti PA");
                 List<string> studentiDaRimuovere = new List<string>();
                 using (SqlDataReader reader = readData.ExecuteReader())
@@ -1817,7 +1913,10 @@ namespace ProcedureNet7
                     where Domanda.Anno_accademico = '{selectedAA}' and Tipo_bando = 'lz'
                     ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(40, $"Lavorazione studenti - inserimento nucleo familiare");
                 List<string> studentiDaRimuovere = new List<string>();
                 using (SqlDataReader reader = readData.ExecuteReader())
@@ -1865,7 +1964,10 @@ namespace ProcedureNet7
                         ) >= 9;
                     ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(40, $"Lavorazione studenti - inserimento domicilio check");
                 List<string> studentiDaRimuovere = new List<string>();
                 using (SqlDataReader reader = readData.ExecuteReader())
@@ -1902,7 +2004,10 @@ namespace ProcedureNet7
                 double detrazione_PA = 0;
                 double detrazione_PA_fuori_corso = 0;
 
-                SqlCommand readDate = new(dateQuery, CONNECTION, sqlTransaction);
+                SqlCommand readDate = new(dateQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 using (SqlDataReader reader = readDate.ExecuteReader())
                 {
                     while (reader.Read())
@@ -1960,7 +2065,10 @@ namespace ProcedureNet7
                     ORDER BY Assegnazione_PA.id_assegnazione_pa
                     ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(50, $"Lavorazione studenti - inserimento in assegnazioni");
                 HashSet<string> processedFiscalCodes = new();
                 HashSet<string> studentiDaRimuovere = new();
@@ -2154,7 +2262,10 @@ namespace ProcedureNet7
                         Data_fine_validita IS NULL
                     ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction);
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 Logger.LogInfo(45, $"Lavorazione studenti - inserimento impegni");
                 HashSet<string> studentiSenzaImpegno = new();
                 HashSet<string> studentiDaRimuovereIntegrazione = new();
@@ -2322,14 +2433,14 @@ namespace ProcedureNet7
                                 }
                             }
                         }
-                        if (categoriaPagam == "SA" && hasPrimaRata && primaRataStorno && !riemessaPrimaRata)
+                        if (!studenteForzato && categoriaPagam == "SA" && hasPrimaRata && primaRataStorno && !riemessaPrimaRata)
                         {
                             studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
                             studentiRimossi.Rows.Add(studente.codFiscale, "Prima rata non riemessa");
                             return;
                         }
 
-                        if (categoriaPagam == "SA" && integrazionePrimaRata && stornoIntegrazionePrimaRata && !riemessaIntegrazionePrimaRata)
+                        if (!studenteForzato && categoriaPagam == "SA" && integrazionePrimaRata && stornoIntegrazionePrimaRata && !riemessaIntegrazionePrimaRata)
                         {
                             studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
                             studentiRimossi.Rows.Add(studente.codFiscale, "Integrazione prima rata non riemessa");
@@ -2449,7 +2560,7 @@ namespace ProcedureNet7
                     {
                         importoDaPagare = 140;
 
-                        if (!hasSaldo || (hasSaldo && saldoStorno && !riemessaSecondaRata))
+                        if ((!hasSaldo || (hasSaldo && saldoStorno && !riemessaSecondaRata)) && !studenteForzato)
                         {
                             studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
                             studentiRimossi.Rows.Add(studente.codFiscale, "Non ha saldo/saldo non riemesso");
@@ -2519,7 +2630,10 @@ namespace ProcedureNet7
                 {
                     Logger.LogInfo(55, $"Lavorazione studenti - Rimozione dalla tabella d'appoggio");
                     string createTempTableSql = "CREATE TABLE #TempCodFiscale (cod_fiscale VARCHAR(255));";
-                    SqlCommand createTableCommand = new(createTempTableSql, CONNECTION, sqlTransaction);
+                    SqlCommand createTableCommand = new(createTempTableSql, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
                     createTableCommand.ExecuteNonQuery();
 
                     DataTable codFiscalesTable = new DataTable();
@@ -2552,11 +2666,17 @@ namespace ProcedureNet7
                         FROM {dbTableName} AS main
                         INNER JOIN #TempCodFiscale temp ON main.cod_fiscale = temp.cod_fiscale;
                     ";
-                    SqlCommand deleteCommand = new(deleteSql, CONNECTION, sqlTransaction);
+                    SqlCommand deleteCommand = new(deleteSql, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
                     deleteCommand.ExecuteNonQuery();
 
                     // Optionally, drop the temporary table if not automatically cleaned up
-                    SqlCommand dropTableCommand = new("DROP TABLE #TempCodFiscale;", CONNECTION, sqlTransaction);
+                    SqlCommand dropTableCommand = new("DROP TABLE #TempCodFiscale;", CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
                     dropTableCommand.ExecuteNonQuery();
 
                     Logger.LogInfo(55, $"UPDATE:Lavorazione studenti - Rimozione dalla tabella d'appoggio - Completato");
@@ -2604,7 +2724,10 @@ namespace ProcedureNet7
             string currentCodTipoPagamento = tipoBeneficio + selectedTipoPagamento;
 
             string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{currentCodTipoPagamento}'";
-            SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction);
+            SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            };
             string pagamentoDescrizione = (string)cmd.ExecuteScalar();
             string beneficioFolderPath = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, pagamentoDescrizione));
 
@@ -2615,12 +2738,20 @@ namespace ProcedureNet7
             {
                 Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno}");
                 string sqlImpegno = $"SELECT Descr FROM Impegni WHERE anno_accademico = '{selectedAA}' AND num_impegno = '{impegno}' AND categoria_pagamento = '{categoriaPagam}'";
-                SqlCommand cmdImpegno = new(sqlImpegno, CONNECTION, sqlTransaction);
+                SqlCommand cmdImpegno = new(sqlImpegno, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 string impegnoDescrizione = (string)cmdImpegno.ExecuteScalar();
                 string currentFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
                 ProcessImpegno(impegno, currentFolder);
             }
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Completato");
+
+            if (!insertInDatabase)
+            {
+                return;
+            }
 
             Logger.LogInfo(10, "Starting index optimization");
 
@@ -2757,7 +2888,10 @@ namespace ProcedureNet7
 
                     string nomeCodEnte = "";
                     string sqlCodEnte = $"SELECT Descrizione FROM Enti_di_gestione WHERE cod_ente = '{codEnte}'";
-                    SqlCommand cmdSede = new(sqlCodEnte, CONNECTION, sqlTransaction);
+                    SqlCommand cmdSede = new(sqlCodEnte, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
                     nomeCodEnte = (string)cmdSede.ExecuteScalar();
                     nomeCodEnte = Utilities.SanitizeColumnName(nomeCodEnte);
                     Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}");
@@ -3023,7 +3157,10 @@ namespace ProcedureNet7
                 }
                 DataTable studentsData = new();
                 string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
-                SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction);
+                SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 string pagamentoDescrizione = (string)cmd.ExecuteScalar();
 
                 string annoAccedemicoFileName = string.Concat(selectedAA.AsSpan(2, 2), selectedAA.AsSpan(6, 2));
@@ -3047,7 +3184,10 @@ namespace ProcedureNet7
                 foreach (string codEnte in sediStudi)
                 {
                     string sqlCodEnte = $"SELECT descrizione FROM Enti_di_gestione WHERE cod_ente = '{codEnte}'";
-                    SqlCommand cmdSede = new(sqlCodEnte, CONNECTION, sqlTransaction);
+                    SqlCommand cmdSede = new(sqlCodEnte, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
                     string nomeCodEnte = (string)cmdSede.ExecuteScalar();
 
 
@@ -3094,7 +3234,10 @@ namespace ProcedureNet7
                 }
                 DataTable studentsData = new();
                 string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
-                SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction);
+                SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
                 string pagamentoDescrizione = (string)cmd.ExecuteScalar();
 
                 string annoAccedemicoFileName = string.Concat(selectedAA.AsSpan(2, 2), selectedAA.AsSpan(6, 2));
@@ -3180,13 +3323,19 @@ namespace ProcedureNet7
                             note,
                             firstStudent.mandatoProvvisorio);
                     string initialInsertQuery = $"{baseSqlInsert} {firstStudentValues};";
-                    using (SqlCommand cmd = new(initialInsertQuery, CONNECTION, sqlTransaction))
+                    using (SqlCommand cmd = new(initialInsertQuery, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    })
                     {
                         _ = cmd.ExecuteNonQuery();
                     }
                     string sqlCodMovimento = "SELECT TOP(1) CODICE_MOVIMENTO FROM MOVIMENTI_CONTABILI_GENERALI ORDER BY CODICE_MOVIMENTO DESC";
                     object? result;
-                    using (SqlCommand cmdCM = new(sqlCodMovimento, CONNECTION, sqlTransaction))
+                    using (SqlCommand cmdCM = new(sqlCodMovimento, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    })
                     {
                         result = cmdCM.ExecuteScalar() ?? null;
                     }
@@ -3252,7 +3401,10 @@ namespace ProcedureNet7
                 {
                     if (!string.IsNullOrWhiteSpace(finalQuery))
                     {
-                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction);
+                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction)
+                        {
+                            CommandTimeout = 9000000
+                        };
                         _ = cmd.ExecuteNonQuery();
                     }
                 }
@@ -3310,7 +3462,10 @@ namespace ProcedureNet7
                     }
                     try
                     {
-                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction);
+                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction)
+                        {
+                            CommandTimeout = 9000000
+                        };
                         _ = cmd.ExecuteNonQuery();
                     }
                     catch
@@ -3331,7 +3486,10 @@ namespace ProcedureNet7
                 {
                     string codMovimentoElementare = "00";
                     string sqlCodMovimento = $"SELECT DISTINCT Cod_mov_contabile_elem FROM Decod_pagam_new where Cod_tipo_pagam_new = '{codTipoPagamento}'";
-                    SqlCommand cmdCM = new(sqlCodMovimento, CONNECTION, sqlTransaction);
+                    SqlCommand cmdCM = new(sqlCodMovimento, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
                     object result = cmdCM.ExecuteScalar();
                     if (result != null)
                     {
@@ -3398,7 +3556,10 @@ namespace ProcedureNet7
                     try
                     {
                         // Execute all accumulated SQL statements at once
-                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction);
+                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction)
+                        {
+                            CommandTimeout = 9000000
+                        };
                         _ = cmd.ExecuteNonQuery(); // Execute the query
                     }
                     catch
@@ -3447,7 +3608,10 @@ namespace ProcedureNet7
                                     WHERE ID_CAUSALE = '{detrazione.codReversale}'
                                     AND ANNO_ACCADEMICO = '{selectedAA}'
                                     AND CODICE_FISCALE = '{entry.Value.codFiscale}'";
-                                using SqlCommand cmd = new(updateStr, CONNECTION, sqlTransaction);
+                                using SqlCommand cmd = new(updateStr, CONNECTION, sqlTransaction)
+                                {
+                                    CommandTimeout = 9000000
+                                };
                                 _ = cmd.ExecuteNonQuery();
                                 continue;
                             }
@@ -3482,7 +3646,10 @@ namespace ProcedureNet7
                     string finalQuery = finalQueryBuilder.ToString();
                     if (!string.IsNullOrWhiteSpace(finalQuery))
                     {
-                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction);
+                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction)
+                        {
+                            CommandTimeout = 9000000
+                        };
                         _ = cmd.ExecuteNonQuery();
                     }
                     Logger.LogInfo(80, $"Lavorazione studenti - Movimenti contabili elementari - Detrazioni - Completo");
@@ -3557,7 +3724,10 @@ namespace ProcedureNet7
                     string finalQuery = finalQueryBuilder.ToString();
                     if (!string.IsNullOrWhiteSpace(finalQuery))
                     {
-                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction);
+                        using SqlCommand cmd = new(finalQuery, CONNECTION, sqlTransaction)
+                        {
+                            CommandTimeout = 9000000
+                        };
                         _ = cmd.ExecuteNonQuery();
                     }
                     Logger.LogInfo(80, $"Lavorazione studenti - Movimenti contabili elementari - Assegnazioni - Completo");

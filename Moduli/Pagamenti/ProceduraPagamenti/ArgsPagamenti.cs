@@ -32,6 +32,10 @@ namespace ProcedureNet7
 
         public string _elaborazioneMassivaString { get; set; }
 
+        public bool _forzareStudenteCheck { get; set; }
+
+        public string _forzareStudenteString { get; set; }
+
         public ArgsPagamenti()
         {
             _annoAccademico = string.Empty;
@@ -53,6 +57,11 @@ namespace ProcedureNet7
             if (_elaborazioneMassivaCheck && string.IsNullOrWhiteSpace(_elaborazioneMassivaString))
             {
                 errorMessages.Add("Selezionare il tipo di elaborazione massiva");
+            }
+
+            if (_forzareStudenteCheck && string.IsNullOrWhiteSpace(_forzareStudenteString))
+            {
+                errorMessages.Add("Indicare il codice fiscale dello studente da forzare");
             }
 
             if (errorMessages.Any())
