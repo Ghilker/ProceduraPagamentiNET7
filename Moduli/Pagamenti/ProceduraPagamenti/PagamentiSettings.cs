@@ -19,7 +19,8 @@ namespace ProcedureNet7
         public static Dictionary<string, string> pagamentiDirect = new()
         {
             { "#BS#P0#PR#00#2#2#0000", "Prima rata borsa - Massivo" },
-            { "#BS#S0#SA#00#2#2#0000", "Saldo borsa - Massivo" }
+            { "#BS#S0#SA#00#2#2#0000", "Saldo borsa - Massivo" },
+            { "#BS#T0#SA#00#2#2#0000", "Tassa regionale - Massivo" },
         };
 
         public static void CreatePagamentiComboBox(ref ComboBox comboBox, Dictionary<string, string> toInsert, bool needCode = false)
