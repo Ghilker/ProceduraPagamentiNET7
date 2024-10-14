@@ -208,6 +208,14 @@ namespace ProcedureNet7
                             FormProceduraEstrazionePermessiSoggiorno estrazionePermessiSoggiorno = new FormProceduraEstrazionePermessiSoggiorno(this);
                             ShowFormInPanel(estrazionePermessiSoggiorno);
                             break;
+                        case ProcedureVarie.ControlloISEEUP:
+                            FormControlloISEEUP controlloISEEUP = new FormControlloISEEUP(this);
+                            ShowFormInPanel(controlloISEEUP);
+                            break;
+                        case ProcedureVarie.ProceduraControlloPS:
+                            FormProceduraControlloPS controlloPS = new FormProceduraControlloPS(this);
+                            ShowFormInPanel(controlloPS);
+                            break;
                     }
                 }
 #endif
@@ -305,7 +313,11 @@ namespace ProcedureNet7
             [ProcedureCategory("Varie", "Funzionario")]
             SpecificheImpegni,
             [ProcedureCategory("Varie", "Funzionario")]
-            EstrazionePermessiSoggiorno
+            EstrazionePermessiSoggiorno,
+            [ProcedureCategory("Varie", "Funzionario")]
+            ControlloISEEUP,
+            [ProcedureCategory("Varie", "Funzionario")]
+            ProceduraControlloPS
         }
 
         public enum ProcedureVerifiche

@@ -14,6 +14,10 @@ namespace ProcedureNet7
 
         protected BaseProcedure(MasterForm? _masterForm, SqlConnection? connection_string)
         {
+            if (_masterForm == null)
+            {
+                throw new ArgumentNullException("MASTERFORM NON PUO ESSERE NULLO");
+            }
             this._masterForm = _masterForm;
             CONNECTION = connection_string;
         }

@@ -12,18 +12,15 @@ namespace ProcedureNet7
         [Required(ErrorMessage = "Selezionare il file excel")]
         public string _selectedFile { get; set; }
 
-        [Required(ErrorMessage = "Indicare il numero della determina")]
         public string _numDetermina { get; set; }
 
-        [Required(ErrorMessage = "Indicare la data della determina")]
-        [ValidDateFormat(ErrorMessage = "La data deve essere nel formato dd/mm/yyyy")]
         public string _selectedDate { get; set; }
 
-        [Required(ErrorMessage = "Indicare l'anno accademico della determina")]
+        [Required(ErrorMessage = "Indicare l'anno accademico")]
         [ValidAAFormat(ErrorMessage = "L'anno accademico deve essere nel formato xxxxyyyy")]
         public string _selectedAA { get; set; }
 
-        [Required(ErrorMessage = "Indicare la descrizione della determina")]
+        public bool _soloApertura { get; set; }
         public string _descrDetermina { get; set; }
         public bool _aperturaNuovaSpecifica { get; set; }
         public string _selectedCodBeneficio { get; set; }
@@ -75,10 +72,6 @@ namespace ProcedureNet7
             if (string.IsNullOrWhiteSpace(_tipoFondo))
             {
                 errorMessages.Add("Indicare il tipo di fondo.");
-            }
-            if (string.IsNullOrWhiteSpace(_capitolo))
-            {
-                errorMessages.Add("Indicare il capitolo.");
             }
             if (string.IsNullOrWhiteSpace(_esePR))
             {

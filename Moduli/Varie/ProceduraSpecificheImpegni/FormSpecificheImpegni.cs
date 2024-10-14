@@ -54,6 +54,7 @@ namespace ProcedureNet7
                     _selectedDate = specificheDataDetBox.Text,
                     _tipoFondo = specificheTipoFondoBox.Text,
                     _aperturaNuovaSpecifica = specificheNewLineCheck.Checked,
+                    _soloApertura = soloAperturaCheck.Checked,
                     _capitolo = specificheCapitoloBox.Text,
                     _descrDetermina = specificheDescrDetBox.Text,
                     _esePR = specificheEsePRBox.Text,

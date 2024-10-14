@@ -15,6 +15,7 @@ namespace ProcedureNet7
         public string dataNascita { get; private set; }
         public string sesso { get; private set; }
         public string codEnte { get; private set; }
+        public string codCittadinanza { get; private set; }
         public Residenza residenza { get; private set; }
         public LuogoNascita luogoNascita { get; private set; }
         public bool disabile { get; private set; }
@@ -38,11 +39,16 @@ namespace ProcedureNet7
         public bool superamentoEsamiTassaRegionale { get; private set; }
         public string IBAN { get; private set; }
         public string swift { get; private set; }
+        public bool bonificoEstero { get; private set; }
         public List<Pagamento> pagamentiEffettuati { get; private set; }
         public string mandatoProvvisorio { get; private set; }
         public int numeroComponentiNucleoFamiliare { get; private set; }
         public int numeroComponentiNucleoFamiliareEstero { get; private set; }
         public bool domicilioCheck { get; private set; }
+
+
+        public TipoDocumento tipoDocumento { get; private set; }
+        public DateTime scadenzaDocumento { get; private set; }
 
         public StudentePagam(
             string numDomanda,
@@ -52,6 +58,7 @@ namespace ProcedureNet7
             string dataNascita,
             string sesso,
             string codEnte,
+            string codCittadinanza,
             bool disabile,
             double importoBeneficio,
             int annoCorso,
@@ -68,6 +75,7 @@ namespace ProcedureNet7
             this.dataNascita = dataNascita;
             this.sesso = sesso;
             this.codEnte = codEnte;
+            this.codCittadinanza = codCittadinanza;
             this.disabile = disabile;
             this.importoBeneficio = importoBeneficio;
             this.annoCorso = annoCorso;
@@ -87,6 +95,7 @@ namespace ProcedureNet7
             mandatoProvvisorio = string.Empty;
             residenza = new Residenza();
             luogoNascita = new LuogoNascita();
+            tipoDocumento = TipoDocumento.Nessuno;
         }
 
         public AssegnazioneDataCheck AddAssegnazione(
@@ -189,13 +198,15 @@ namespace ProcedureNet7
             long telefono,
             string email,
             string iban,
-            string swift
+            string swift,
+            bool bonificoEstero
             )
         {
             this.telefono = telefono;
             this.indirizzoEmail = email;
             this.IBAN = iban;
             this.swift = swift;
+            this.bonificoEstero = bonificoEstero;
         }
 
         public void SetImportiPagati(double amount)
@@ -243,5 +254,18 @@ namespace ProcedureNet7
         {
             this.domicilioCheck = check;
         }
+
+        public void SetTipoDocumento(TipoDocumento tipoDocumento, DateTime scadenzaDocumento)
+        {
+            this.tipoDocumento = tipoDocumento;
+            this.scadenzaDocumento = scadenzaDocumento;
+        }
+    }
+
+    public enum TipoDocumento
+    {
+        Nessuno,
+        Passaporto,
+        PermessoSoggiorno
     }
 }

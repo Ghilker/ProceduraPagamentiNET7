@@ -12,6 +12,10 @@ namespace ProcedureNet7
         public string numDomanda;
 
         public int esitoVERIFICATO;
+
+        public List<string> blocchiPresenti = new();
+        public List<string> incongruenzePresenti = new();
+
         public VerificaAnagrafica verificaAnagrafica;
         public VerificaResidenza verificaResidenza;
         public VerificaDomicilio verificaDomicilio;
@@ -19,6 +23,10 @@ namespace ProcedureNet7
         public VerificaNucleoFamiliare verificaNucleoFamiliare;
         public VerificaDatiEconomici verificaDatiEconomici;
         public VerificaBeneficiRichiesti verificaBeneficiRichiesti;
+
+
+        public EsitoDatiEconomici esitoDatiEconomici;
+        public EsitoStatusSede esitoStatusSede;
     }
 
     public class VerificaAnagrafica
@@ -174,4 +182,24 @@ namespace ProcedureNet7
         public bool beneficiPercepitiPrecedenti; //vImporti_borsa_percepiti (vero se presente e > 0)
         public double sommaImportiBeneficiPercepitiPrecedenti;
     }
+
+
+
+    public class EsitoDatiEconomici
+    {
+        public List<string> incongruenzeDaMettere = new();
+        public List<string> incongruenzeDaTogliere = new();
+
+        public List<string> blocchiDaMettere = new();
+        public List<string> blocchiDaTogliere = new();
+
+        public bool sottoSoglia;
+        public List<string> motiviDiEsclusione = new();
+    }
+    public class EsitoStatusSede
+    {
+        public string statusSede = string.Empty;
+    }
+
+
 }

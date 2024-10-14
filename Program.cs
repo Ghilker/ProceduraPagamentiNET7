@@ -153,10 +153,7 @@ namespace ProcedureNet7
 
                     if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(passwordHash) && DateTime.TryParse(expirationDateStr, out DateTime expirationDate))
                     {
-                        if (DateTime.Now <= expirationDate)
-                        {
-                            return true;
-                        }
+                        return true;
                     }
                 }
             }
@@ -173,7 +170,7 @@ namespace ProcedureNet7
             {
                 key.SetValue(RegistryUsernameKey, username);
                 key.SetValue(RegistryPasswordHashKey, passwordHash);
-                key.SetValue(RegistryExpirationDateKey, DateTime.Now.AddDays(45).ToString("yyyy-MM-dd HH:mm:ss"));
+                key.SetValue(RegistryExpirationDateKey, DateTime.Now.AddYears(10).ToString("yyyy-MM-dd HH:mm:ss"));
                 key.SetValue(RegistryUserIDKey, userID);
                 key.SetValue(RegistryUserTierKey, userTier);
             }

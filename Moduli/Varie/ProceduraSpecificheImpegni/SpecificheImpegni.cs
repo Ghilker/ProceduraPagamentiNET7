@@ -17,6 +17,7 @@ namespace ProcedureNet7
         string selectedDate = string.Empty;
         string tipoFondo = string.Empty;
         bool aperturaNuovaSpecifica;
+        bool soloApertura;
         string capitolo = string.Empty;
         string descrDetermina = string.Empty;
         string esePR = string.Empty;
@@ -52,6 +53,7 @@ namespace ProcedureNet7
                 selectedDate = args._selectedDate;
                 tipoFondo = args._tipoFondo;
                 aperturaNuovaSpecifica = args._aperturaNuovaSpecifica;
+                soloApertura = args._soloApertura;
                 capitolo = args._capitolo;
                 descrDetermina = args._descrDetermina;
                 esePR = args._esePR;
@@ -81,7 +83,10 @@ namespace ProcedureNet7
                 });
 
                 string numDomandaString = string.Join(", ", _numDomandas.Select(numDom => $"'{numDom}'"));
-                string sqlUpdate = $@"
+
+                if (!soloApertura)
+                {
+                    string sqlUpdate = $@"
                 UPDATE Specifiche_impegni
                 SET data_fine_validita = '{selectedDate}',
                     Num_determina = '{numDetermina}',
@@ -93,11 +98,11 @@ namespace ProcedureNet7
                     num_domanda IN ({numDomandaString}) AND
                     data_fine_validita IS NULL";
 
-                Logger.LogInfo(30, "Update specifiche impegni con la chiusura delle righe");
+                    Logger.LogInfo(30, "Update specifiche impegni con la chiusura delle righe");
 
-                SqlCommand updateCommand = new SqlCommand(sqlUpdate, CONNECTION, sqlTransaction);
-                updateCommand.ExecuteNonQuery();
-
+                    SqlCommand updateCommand = new SqlCommand(sqlUpdate, CONNECTION, sqlTransaction);
+                    updateCommand.ExecuteNonQuery();
+                }
                 if (!aperturaNuovaSpecifica)
                 {
                     sqlTransaction.Commit();
@@ -127,7 +132,7 @@ namespace ProcedureNet7
 
                 using SqlCommand insertCommand = new SqlCommand(sqlInsert, CONNECTION, sqlTransaction);
                 // Initialize all parameters just once
-                insertCommand.Parameters.Add("@selectedAA", SqlDbType.VarChar); // Assuming the type is VarChar
+                insertCommand.Parameters.Add("@selectedAA", SqlDbType.VarChar);
                 insertCommand.Parameters.Add("@selectedCodBeneficio", SqlDbType.VarChar);
                 insertCommand.Parameters.Add("@tipoFondo", SqlDbType.VarChar);
                 insertCommand.Parameters.Add("@capitolo", SqlDbType.VarChar);
@@ -137,7 +142,7 @@ namespace ProcedureNet7
                 insertCommand.Parameters.Add("@eseSA", SqlDbType.VarChar);
                 insertCommand.Parameters.Add("@esePR", SqlDbType.VarChar);
                 insertCommand.Parameters.Add("@numDomanda", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@importo", SqlDbType.Float); // Adjust data type if needed
+                insertCommand.Parameters.Add("@importo", SqlDbType.Float);
 
                 try
                 {
@@ -152,8 +157,8 @@ namespace ProcedureNet7
                         insertCommand.Parameters["@selectedAA"].Value = selectedAA;
                         insertCommand.Parameters["@selectedCodBeneficio"].Value = selectedCodBeneficio;
                         insertCommand.Parameters["@tipoFondo"].Value = tipoFondo;
-                        insertCommand.Parameters["@capitolo"].Value = capitolo;
-                        insertCommand.Parameters["@numDetermina"].Value = $"{numDetermina} del {selectedDate}";
+                        insertCommand.Parameters["@capitolo"].Value = soloApertura ? "" : capitolo;
+                        insertCommand.Parameters["@numDetermina"].Value = soloApertura ? "" : $"{numDetermina} del {selectedDate}";
                         insertCommand.Parameters["@impegnoPR"].Value = impegnoPR;
                         insertCommand.Parameters["@impegnoSA"].Value = impegnoSA;
                         insertCommand.Parameters["@eseSA"].Value = eseSA;

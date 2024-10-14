@@ -1,4 +1,5 @@
 ﻿using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Wordprocessing;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -11,13 +12,17 @@ namespace ProcedureNet7
 {
     internal class Verifica : BaseProcedure<ArgsVerifica>
     {
-        // Replace List with Dictionary
+        DatiVerifica DatiVerifica;
+        bool postGraduatorieDefinitive;
+
         Dictionary<string, StudenteVerifica> verificaDict = new Dictionary<string, StudenteVerifica>();
 
         public Verifica(MasterForm? _masterForm, SqlConnection? connection_string) : base(_masterForm, connection_string) { }
 
         public override void RunProcedure(ArgsVerifica args)
         {
+            AddDatiVerifica();
+
             CreateVerificaList();
 
             if (verificaDict.Count > 0)
@@ -50,11 +55,74 @@ namespace ProcedureNet7
 
             AddDatiEconomici();
 
+
+            List<StudenteVerifica> studenti = verificaDict.Values.ToList();
+
+            DataTable studentsTable = new DataTable();
+            studentsTable.Columns.Add("CodFiscale");
+            studentsTable.Columns.Add("ISEDSU");
+            studentsTable.Columns.Add("ISEEDSU");
+            studentsTable.Columns.Add("ISPDSU");
+            studentsTable.Columns.Add("ISPEDSU");
+
+            foreach (StudenteVerifica studenteVerifica in studenti)
+            {
+                studentsTable.Rows.Add(studenteVerifica.codFiscale, studenteVerifica.verificaDatiEconomici.ISEDSU.ToString(), studenteVerifica.verificaDatiEconomici.ISEEDSU.ToString(), studenteVerifica.verificaDatiEconomici.ISPDSU.ToString(), studenteVerifica.verificaDatiEconomici.ISPEDSU.ToString());
+            }
+
+            Utilities.ExportDataTableToExcel(studentsTable, "C:\\Users\\giacomo_pavone\\Desktop\\Pagamenti");
+
             if (verificaDict.Count > 0)
             {
                 string test = "";
             }
 
+        }
+
+        void AddDatiVerifica()
+        {
+            string dataQuery = "SELECT top(1) Cod_tipo_graduat from graduatorie where anno_accademico = 20232024 and Cod_beneficio = 'bs' order by Cod_tipo_graduat desc";
+            SqlCommand readData = new(dataQuery, CONNECTION);
+            Logger.LogInfo(45, "Verifica - estrazione dati generali");
+
+            using (SqlDataReader reader = readData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    postGraduatorieDefinitive = Utilities.SafeGetInt(reader, "Cod_tipo_graduat") == 1;
+                }
+            }
+
+            dataQuery = $@"
+                select 
+                Soglia_Isee,
+                Soglia_Ispe, 
+                Importo_borsa_A, 
+                Importo_borsa_B, 
+                Importo_borsa_C,
+                quota_mensa  
+                from DatiGenerali_con 
+                where Anno_accademico = 20232024
+            ";
+
+            readData = new(dataQuery, CONNECTION);
+            Logger.LogInfo(45, "Verifica - estrazione dati generali");
+
+            using (SqlDataReader reader = readData.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    DatiVerifica = new DatiVerifica()
+                    {
+                        sogliaISEE = Utilities.SafeGetDouble(reader, "Soglia_Isee"),
+                        sogliaISPE = Utilities.SafeGetDouble(reader, "Soglia_Ispe"),
+                        importoBorsaA = Utilities.SafeGetDouble(reader, "Importo_borsa_A"),
+                        importoBorsaB = Utilities.SafeGetDouble(reader, "Importo_borsa_B"),
+                        importoBorsaC = Utilities.SafeGetDouble(reader, "Importo_borsa_C"),
+                        quotaMensa = Utilities.SafeGetDouble(reader, "quota_mensa"),
+                    };
+                }
+            }
         }
 
         void CreateVerificaList()
@@ -114,8 +182,8 @@ namespace ProcedureNet7
                                 (SELECT DISTINCT d.Num_domanda
                                 FROM            Domanda AS d INNER JOIN
                                                             vStatus_compilazione AS vv ON d.Anno_accademico = vv.anno_accademico AND d.Num_domanda = vv.num_domanda
-                                WHERE        (d.Anno_accademico = '20242025') AND (vv.status_compilazione >= 90) AND (d.Tipo_bando = 'lz')))
-                    and Corsi_laurea.Anno_accad_fine is null 
+                                WHERE        (d.Anno_accademico = '20232024') AND (vv.status_compilazione >= 90) AND (d.Tipo_bando = 'lz')))
+                    and Corsi_laurea.Anno_accad_fine is null  
 			                    order by Domanda.Cod_fiscale
                 ";
 
@@ -302,9 +370,9 @@ namespace ProcedureNet7
                            res.anni_restituiti
                     FROM vCARRIERA_PREGRESSA
                     inner join #CFEstrazione cfe ON vCARRIERA_PREGRESSA.Cod_fiscale = cfe.Cod_fiscale 
-                    CROSS APPLY dbo.SlashAnniBeneficiarioBS(vCARRIERA_PREGRESSA.Cod_fiscale, '20242025') AS ben
-                    CROSS APPLY dbo.SlashAnniRestituitiBS(vCARRIERA_PREGRESSA.Cod_fiscale, '20242025') AS res
-                    WHERE vCARRIERA_PREGRESSA.Anno_accademico = '20242025'
+                    CROSS APPLY dbo.SlashAnniBeneficiarioBS(vCARRIERA_PREGRESSA.Cod_fiscale, '20232024') AS ben
+                    CROSS APPLY dbo.SlashAnniRestituitiBS(vCARRIERA_PREGRESSA.Cod_fiscale, '20232024') AS res
+                    WHERE vCARRIERA_PREGRESSA.Anno_accademico = '20232024'
                     ORDER BY vCARRIERA_PREGRESSA.Cod_fiscale;
                 ";
 
@@ -385,7 +453,7 @@ namespace ProcedureNet7
                     FROM Domanda AS d
                     INNER JOIN #CFEstrazione cfe on d.cod_fiscale = cfe.cod_fiscale
                     INNER JOIN vStatus_compilazione AS vv ON d.Anno_accademico = vv.anno_accademico AND d.Num_domanda = vv.num_domanda
-                    WHERE d.Anno_accademico = '20242025' 
+                    WHERE d.Anno_accademico = '20232024' 
                       AND vv.status_compilazione >= 90 
                       AND d.Tipo_bando = 'lz'
                 ),
@@ -481,7 +549,7 @@ namespace ProcedureNet7
                     from vNucleo_familiare 
                     inner join Domanda on vNucleo_familiare.Anno_accademico = Domanda.Anno_accademico and vNucleo_familiare.Num_domanda = Domanda.Num_domanda
                     INNER JOIN #CFEstrazione cfe on domanda.cod_fiscale = cfe.cod_fiscale
-                    where domanda.Anno_accademico = '20242025'
+                    where domanda.Anno_accademico = '20232024'
                     order by domanda.Cod_fiscale
 
                 ";
@@ -533,7 +601,7 @@ namespace ProcedureNet7
                     from Domanda 
                     INNER JOIN #CFEstrazione cfe on domanda.cod_fiscale = cfe.cod_fiscale
                     inner join vTipologie_redditi on Domanda.Anno_accademico = vTipologie_redditi.Anno_accademico and Domanda.Num_domanda = vTipologie_redditi.Num_domanda 
-                    where domanda.Anno_accademico = 20242025 and Tipo_bando = 'lz'
+                    where domanda.Anno_accademico = 20232024 and Tipo_bando = 'lz'
                     order by Cod_fiscale
 
                 ";
@@ -581,7 +649,7 @@ namespace ProcedureNet7
             AddDatiEconomiciStranieri(codiciFiscaliEE);
             AddDatiEconomiciItalianiInt(codiciFiscaliIntIT);
             AddDatiEconomiciStranieriInt(codiciFiscaliIntEE);
-
+            CalcoloDatiEconomici();
         }
         void AddDatiEconomiciItaliani(List<string> codiciFiscaliItaliani)
         {
@@ -676,7 +744,7 @@ namespace ProcedureNet7
                     INNER JOIN Domanda d ON p.Anno_accademico = d.Anno_accademico AND p.Num_domanda = d.Num_domanda
                     WHERE
                         p.Ritirato_azienda = 0
-                        AND p.Ese_finanziario = 2022
+                        AND p.Ese_finanziario = 2021
                         AND p.cod_tipo_pagam IN (SELECT cod_tipo_pagam FROM codici_pagam)
                     GROUP BY d.Cod_fiscale
                 ),
@@ -693,7 +761,7 @@ namespace ProcedureNet7
                         AND a.data_fine_validita IS NULL
                         AND a.cod_tipo_allegato = '07'
                         AND vs.cod_status = '05'
-		                AND vb.anno_accademico = 20242025
+		                AND vb.anno_accademico = 20232024
                     GROUP BY vb.num_domanda, vb.anno_accademico
                 )
                 SELECT
@@ -711,7 +779,7 @@ namespace ProcedureNet7
                 LEFT JOIN sumPagamenti sp ON d.Cod_fiscale = sp.Cod_fiscale
                 LEFT JOIN impAltreBorse iab ON d.Num_domanda = iab.num_domanda AND d.Anno_accademico = iab.anno_accademico
                 WHERE
-                    d.Anno_accademico = 20242025
+                    d.Anno_accademico = 20232024
                     AND d.tipo_bando = 'LZ'
                 ORDER BY d.Num_domanda;
                 ";
@@ -835,7 +903,7 @@ namespace ProcedureNet7
                         INNER JOIN Domanda d ON p.Anno_accademico = d.Anno_accademico AND p.Num_domanda = d.Num_domanda
                         WHERE
                             p.Ritirato_azienda = 0
-                            AND p.Ese_finanziario = 2022
+                            AND p.Ese_finanziario = 2021
                             AND p.cod_tipo_pagam IN (SELECT cod_tipo_pagam FROM codici_pagam)
                         GROUP BY d.Cod_fiscale
                     ),
@@ -852,7 +920,7 @@ namespace ProcedureNet7
                             AND a.data_fine_validita IS NULL
                             AND a.cod_tipo_allegato = '07'
                             AND vs.cod_status = '05'
-                            AND vb.anno_accademico = 20242025
+                            AND vb.anno_accademico = 20232024
                         GROUP BY vb.num_domanda, vb.anno_accademico
                     )
                     select 
@@ -875,7 +943,7 @@ namespace ProcedureNet7
                         inner join #CFEstrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale
                         LEFT JOIN sumPagamenti sp ON Domanda.Cod_fiscale = sp.Cod_fiscale
                         LEFT JOIN impAltreBorse iab ON Domanda.Num_domanda = iab.num_domanda AND Domanda.Anno_accademico = iab.anno_accademico
-                    where Domanda.Anno_accademico = '20242025'
+                    where Domanda.Anno_accademico = '20232024'
                     order by Domanda.Cod_fiscale
 
                 ";
@@ -903,6 +971,7 @@ namespace ProcedureNet7
                         {
                             ISPDSU = calculatedISPDSU,
                             ISR = calculatedISR,
+                            SEQ = CalculateSEQ(studenteVerifica.verificaNucleoFamiliare.numeroComponentiNF),
                         };
 
                     }
@@ -1003,7 +1072,7 @@ namespace ProcedureNet7
                     INNER JOIN Domanda d ON p.Anno_accademico = d.Anno_accademico AND p.Num_domanda = d.Num_domanda
                     WHERE
                         p.Ritirato_azienda = 0
-                        AND p.Ese_finanziario = 2022
+                        AND p.Ese_finanziario = 2021
                         AND p.cod_tipo_pagam IN (SELECT cod_tipo_pagam FROM codici_pagam)
                     GROUP BY d.Cod_fiscale
                 ),
@@ -1020,7 +1089,7 @@ namespace ProcedureNet7
                         AND a.data_fine_validita IS NULL
                         AND a.cod_tipo_allegato = '07'
                         AND vs.cod_status = '05'
-		                AND vb.anno_accademico = 20242025
+		                AND vb.anno_accademico = 20232024
                     GROUP BY vb.num_domanda, vb.anno_accademico
                 )
                 SELECT
@@ -1038,7 +1107,7 @@ namespace ProcedureNet7
                 LEFT JOIN sumPagamenti sp ON d.Cod_fiscale = sp.Cod_fiscale
                 LEFT JOIN impAltreBorse iab ON d.Num_domanda = iab.num_domanda AND d.Anno_accademico = iab.anno_accademico
                 WHERE
-                    d.Anno_accademico = 20242025
+                    d.Anno_accademico = 20232024
                     AND d.tipo_bando = 'LZ'
                 ORDER BY d.Num_domanda;
                 ";
@@ -1171,7 +1240,7 @@ namespace ProcedureNet7
                         INNER JOIN Domanda d ON p.Anno_accademico = d.Anno_accademico AND p.Num_domanda = d.Num_domanda
                         WHERE
                             p.Ritirato_azienda = 0
-                            AND p.Ese_finanziario = 2022
+                            AND p.Ese_finanziario = 2021
                             AND p.cod_tipo_pagam IN (SELECT cod_tipo_pagam FROM codici_pagam)
                         GROUP BY d.Cod_fiscale
                     ),
@@ -1188,7 +1257,7 @@ namespace ProcedureNet7
                             AND a.data_fine_validita IS NULL
                             AND a.cod_tipo_allegato = '07'
                             AND vs.cod_status = '05'
-                            AND vb.anno_accademico = 20242025
+                            AND vb.anno_accademico = 20232024
                         GROUP BY vb.num_domanda, vb.anno_accademico
                     )
                     select 
@@ -1211,7 +1280,7 @@ namespace ProcedureNet7
                         inner join #CFEstrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale
                         LEFT JOIN sumPagamenti sp ON Domanda.Cod_fiscale = sp.Cod_fiscale
                         LEFT JOIN impAltreBorse iab ON Domanda.Num_domanda = iab.num_domanda AND Domanda.Anno_accademico = iab.anno_accademico
-                    where Domanda.Anno_accademico = '20242025'
+                    where Domanda.Anno_accademico = '20232024'
                     order by Domanda.Cod_fiscale
 
                 ";
@@ -1245,93 +1314,89 @@ namespace ProcedureNet7
                             {
                                 ISPDSU = calculatedISPDSU,
                                 ISR = calculatedISR,
+                                SEQ = CalculateSEQ(studenteVerifica.verificaNucleoFamiliare.numeroComponentiNF),
                             };
                         }
                     }
                 }
             }
         }
+        double CalculateSEQ(int numComponenti)
+        {
+            double calculatedSEQ = 1;
+
+            if (numComponenti < 1)
+            {
+                return 1;
+            }
+
+            switch (numComponenti)
+            {
+                case 1:
+                    calculatedSEQ = 1;
+                    break;
+                case 2:
+                    calculatedSEQ = 1.57;
+                    break;
+                case 3:
+                    calculatedSEQ = 2.04;
+                    break;
+                case 4:
+                    calculatedSEQ = 2.46;
+                    break;
+                case 5:
+                    calculatedSEQ = 2.85;
+                    break;
+                default:
+                    calculatedSEQ = 2.85 + (numComponenti - 5) * 0.35;
+                    break;
+            }
+
+            return Math.Round(calculatedSEQ, 2);
+        }
+
+        void CalcoloDatiEconomici()
+        {
+            foreach (StudenteVerifica studenteVerifica in verificaDict.Values.ToList())
+            {
+                VerificaDatiEconomici verificaDatiEconomici = studenteVerifica.verificaDatiEconomici;
+
+                if (verificaDatiEconomici == null)
+                {
+                    continue;
+                }
+
+                double calculatedISEDSU = verificaDatiEconomici.ISR + 0.2 * verificaDatiEconomici.ISPDSU;
+                double calculatedISEEDSU = calculatedISEDSU / verificaDatiEconomici.SEQ;
+                double calculatedISPEDSU = verificaDatiEconomici.ISPDSU / verificaDatiEconomici.SEQ;
+
+                verificaDatiEconomici.ISEDSU = Math.Round(calculatedISEDSU, 2);
+                verificaDatiEconomici.ISEEDSU = Math.Round(calculatedISEEDSU, 2);
+                verificaDatiEconomici.ISPEDSU = Math.Round(calculatedISPEDSU, 2);
+            }
+        }
+
+        void CalcoloStatusSede()
+        {
+            foreach (StudenteVerifica studenteVerifica in verificaDict.Values.ToList())
+            {
+                bool possibileFuoriSede = false;
+
+                VerificaResidenza studenteResidenza = studenteVerifica.verificaResidenza;
+                bool italiano = studenteResidenza.residenzaItaliana;
+                if (italiano)
+                {
+                    string provinciaResidenza = studenteResidenza.provinciaResidenzaItaliana;
+                    if (provinciaResidenza != "RM" && provinciaResidenza != "VT" && provinciaResidenza != "FR" && provinciaResidenza != "LT")
+                    {
+                        possibileFuoriSede = true;
+                    }
+                }
+                else
+                {
+                    possibileFuoriSede = true;
+                }
+            }
+        }
     }
 }
-
-/*
- * 
-SELECT   top(10) domanda.num_domanda, Domanda.Cod_fiscale,domanda.id_domanda
-			FROM         Domanda INNER JOIN
-                      vDatiGenerali_dom ON Domanda.Anno_accademico = vDatiGenerali_dom.Anno_accademico AND 
-                      Domanda.Num_domanda = vDatiGenerali_dom.Num_domanda INNER JOIN
-                      vStatus_compilazione ON Domanda.Anno_accademico = vStatus_compilazione.anno_accademico AND 
-                      vDatiGenerali_dom.Num_domanda = vStatus_compilazione.num_domanda
-		WHERE     ((vStatus_compilazione.status_compilazione > 6 and vStatus_compilazione.anno_accademico<20082009) or vStatus_compilazione.status_compilazione >=70  )  and domanda.anno_accademico=20242025 and domanda.tipo_bando like 'L%';
-
-		SELECT     Tipo_studente,rifug_politico,studente_detenuto
-		FROM         vDatiGenerali_dom
-		WHERE     (Anno_accademico = @anno_accademico) AND (Num_domanda = @num_domanda)
-
-if @tipo_studente='1' or @tipo_studente='0' or @tipo_studente='4' or @tipo_studente='5'
-
-SELECT     status_compilazione
-FROM         vStatus_compilazione
-WHERE     anno_accademico = @anno_accademico AND num_domanda = @num_domanda
-
-
-SELECT     Soglia_Isee, Soglia_Ispe, Franchigia, tasso_rendimento_pat_mobiliare, franchigia_pat_mobiliare
-FROM         DatiGenerali_con
-WHERE     (Anno_accademico = @anno_accademico)
-
-
-SELECT     Tipo_redd_nucleo_fam_origine, Tipo_redd_nucleo_fam_integr,altri_mezzi
-FROM         Tipologie_redditi
-WHERE     (Anno_accademico =@anno_accademico) AND (Data_validita =
-		        (SELECT     MAX(data_validita)
-		                FROM          tipologie_redditi TR
-
-
-		                WHERE      tr.anno_accademico = tipologie_redditi.anno_accademico AND tr.num_domanda = tipologie_redditi.num_domanda))
-            and num_domanda=@num_domanda
-
-
-SELECT     Num_componenti , Cod_tipologia_nucleo,isnull(Numero_conviventi_estero,0)
-FROM         Nucleo_familiare
-WHERE     num_domanda=@num_domanda and (Anno_accademico = @anno_accademico) AND (Data_validita =
-	                (SELECT     MAX(data_validita)
-	                        FROM          nucleo_familiare NF
-	                    WHERE      NF.anno_accademico = nucleo_familiare.anno_accademico AND NF.num_domanda = nucleo_familiare.num_domanda))
-
-
-if @tipo_fam='it'
-    SELECT        status_inps, tipo_certificaz
-	FROM         vStatus_INPS
-	WHERE     (anno_accademico = @anno_accademico) AND (cod_fiscale = @cod_fiscale) AND (data_fine_validita IS NULL) and tipo_certificaz not in('CI','DI') and num_domanda= @num_domanda
-
-    if  @status_inps='2'
-            SELECT       Cod_tipo_attestazione
-            FROM        vCertificaz_ISEE
-            WHERE     (anno_accademico = @anno_accademico) AND (num_domanda = @num_domanda) and Tipologia_certificazione='CO' 
-        if @tipo_attestazione<>''
-
-                set @incongruenza_inps=0
-                set	@tipo_Certificaz='CO'
-                set @importodetrazione_laziodisu=0
-                set @importodetrazione=0
-
-                SELECT sum(imp_pagato) //@importodetrazione_laziodisu
-                FROM            Pagamenti INNER JOIN
-                Domanda ON Pagamenti.Anno_accademico = Domanda.Anno_accademico AND Pagamenti.Num_domanda = Domanda.Num_domanda
-                WHERE        (Pagamenti.Ritirato_azienda = 0) AND (Pagamenti.Cod_tipo_pagam IN ('01', '06', '09', '34', '39', '41', 'R1', 'R3', 'R4', 'R9', 'RR', 'S0', 'S1', 'S3', 'S5')) AND 
-                (	Pagamenti.Ese_finanziario = 2022) and cod_fiscale=@Cod_Fiscale
-
-                --- verifico se oltre ai pagamenti di laziodisu lo studente ha dichiarato anche altre borse
-                SELECT    importo_borsa //@importodetrazione
-                FROM         VStatus_Allegati INNER JOIN
-		                ALLEGATI ON VStatus_Allegati.id_allegato = ALLEGATI.id_allegato INNER JOIN
-		                vImporti_borsa_percepiti ON ALLEGATI.anno_accademico = vImporti_borsa_percepiti.anno_accademico AND 
-			                ALLEGATI.num_domanda = vImporti_borsa_percepiti.num_domanda
-		                where vImporti_borsa_percepiti.anno_accademico=@anno_accademico and vImporti_borsa_percepiti.data_fine_validita is null
-			                and ALLEGATI.data_fine_validita is null and ALLEGATI.cod_tipo_allegato='07' and VStatus_Allegati.cod_status in('03','05')
-			                and vImporti_borsa_percepiti.num_domanda=@num_domanda
-
-
-
-
-*/

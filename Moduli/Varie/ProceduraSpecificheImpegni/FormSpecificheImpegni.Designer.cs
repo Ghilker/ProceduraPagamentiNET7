@@ -57,6 +57,7 @@
             button1 = new Button();
             newSpecificaPanel = new Panel();
             openFileDialog = new OpenFileDialog();
+            soloAperturaCheck = new CheckBox();
             newSpecificaPanel.SuspendLayout();
             SuspendLayout();
             // 
@@ -159,7 +160,7 @@
             // specificheNewLineCheck
             // 
             specificheNewLineCheck.AutoSize = true;
-            specificheNewLineCheck.Location = new Point(633, 86);
+            specificheNewLineCheck.Location = new Point(465, 86);
             specificheNewLineCheck.Name = "specificheNewLineCheck";
             specificheNewLineCheck.Size = new Size(157, 19);
             specificheNewLineCheck.TabIndex = 37;
@@ -312,6 +313,16 @@
             // 
             openFileDialog.FileName = "openFileDialog1";
             // 
+            // soloAperturaCheck
+            // 
+            soloAperturaCheck.AutoSize = true;
+            soloAperturaCheck.Location = new Point(628, 86);
+            soloAperturaCheck.Name = "soloAperturaCheck";
+            soloAperturaCheck.Size = new Size(181, 19);
+            soloAperturaCheck.TabIndex = 53;
+            soloAperturaCheck.Text = "Solo apertura nuova specifica";
+            soloAperturaCheck.UseVisualStyleBackColor = true;
+            // 
             // FormSpecificheImpegni
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -319,6 +330,7 @@
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             ControlBox = false;
+            Controls.Add(soloAperturaCheck);
             Controls.Add(label32);
             Controls.Add(newSpecificaPanel);
             Controls.Add(label1);
@@ -375,5 +387,6 @@
         private Button button1;
         private Panel newSpecificaPanel;
         private OpenFileDialog openFileDialog;
+        private CheckBox soloAperturaCheck;
     }
 }

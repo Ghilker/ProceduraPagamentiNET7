@@ -6,6 +6,8 @@ namespace ProcedureNet7
     public class ElaborazioneFileUni : BaseProcedure<ArgsElaborazioneFileUni>
     {
         string folderPath = string.Empty;
+        string inputFolder = string.Empty;
+        string outputFolder = string.Empty;
 
         bool checkCondizione;
         bool checkStem;
@@ -19,7 +21,9 @@ namespace ProcedureNet7
         public override void RunProcedure(ArgsElaborazioneFileUni args)
         {
             folderPath = args._selectedUniFolder;
-            var excelFiles = Directory.GetFiles(folderPath, "*.xlsx")
+            inputFolder = Path.Combine(folderPath, "Da elaborare");
+            outputFolder = Path.Combine(folderPath, "Da controllare");
+            var excelFiles = Directory.GetFiles(inputFolder, "*.xlsx")
                                 .Where(filePath => !Path.GetFileName(filePath).Contains('~'));
             foreach (var filePath in excelFiles)
             {
@@ -394,6 +398,7 @@ namespace ProcedureNet7
                         }
                         break;
                     case "SAPIENZA":
+                    case "PANTHEON":
                         if (cellToProcess.Contains("TRIENNALE"))
                         {
                             studente.tipoCorsoUni = "3";
@@ -445,6 +450,10 @@ namespace ProcedureNet7
                         else if (cellToProcess.Contains("MAGISTRALE"))
                         {
                             studente.tipoCorsoUni = "5";
+                        }
+                        else if (cellToProcess.Contains("MASTER"))
+                        {
+                            studente.tipoCorsoUni = "-1";
                         }
                         else
                         {
@@ -513,7 +522,7 @@ namespace ProcedureNet7
             }
             void ProcessTipoIscrizione(DataRow row, StudenteElaborazione studente, string uniType)
             {
-                string cellToProcess = row["TIPO_ISCRIZIONE_UNI"].ToString().ToUpper();
+                string cellToProcess = row["TIPO_ISCRIZIONE_UNI"].ToString().ToUpper().Trim();
 
                 if (cellToProcess == "")
                 {
@@ -538,6 +547,7 @@ namespace ProcedureNet7
                     case "ROMA3":
                     case "UNICAS":
                     case "UNIVIT":
+                    case "PANTHEON":
                         if (cellToProcess == "IC" || cellToProcess == "IN CORSO" || cellToProcess == "C" || cellToProcess == "IMMATRICOLAZIONE")
                         {
                             studente.tipoIscrizioneUni = "IC";
@@ -546,7 +556,7 @@ namespace ProcedureNet7
                         {
                             studente.tipoIscrizioneUni = "FC";
                         }
-                        else if (cellToProcess == "RI" || cellToProcess == "RIPETENTE")
+                        else if (cellToProcess == "RI" || cellToProcess == "RIPETENTE" || cellToProcess == "RIP")
                         {
                             studente.tipoIscrizioneUni = "RI";
                         }
@@ -591,7 +601,7 @@ namespace ProcedureNet7
             }
             void ProcessIscrizioneCondizione(DataRow row, StudenteElaborazione studente, string uniType)
             {
-                string cellToProcess = row["CONDIZIONE"].ToString().ToUpper();
+                string cellToProcess = row["CONDIZIONE"].ToString().ToUpper().Trim();
 
                 if (cellToProcess == "")
                 {
@@ -614,6 +624,7 @@ namespace ProcedureNet7
                     case "ABAROMA":
                     case "ABAFROS":
                     case "MERCATORUM":
+                    case "PANTHEON":
                         if (cellToProcess == "SI" || cellToProcess == "SÌ" || cellToProcess == "SÍ" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK")
                         {
                             studente.iscrCondizione = true;
@@ -633,7 +644,7 @@ namespace ProcedureNet7
             }
             void ProcessDescrizioneCorso(DataRow row, StudenteElaborazione studente, string uniType)
             {
-                string cellToProcess = Utilities.RemoveNonAlphanumericAndKeepSpaces(row["DESCR_CORSO_UNI"].ToString().ToUpper());
+                string cellToProcess = Utilities.RemoveNonAlphanumericAndKeepSpaces(row["DESCR_CORSO_UNI"].ToString().ToUpper().Trim());
 
                 if (cellToProcess == "")
                 {
@@ -657,6 +668,7 @@ namespace ProcedureNet7
                     case "ABAROMA":
                     case "ABAFROS":
                     case "MERCATORUM":
+                    case "PANTHEON":
                         studente.descrCorsoUni = cellToProcess;
                         break;
                 }
@@ -665,7 +677,7 @@ namespace ProcedureNet7
             {
                 string studenteTipoCorso = studente.tipoCorsoUni;
                 string studenteTipoIscrizione = studente.tipoIscrizioneUni;
-                string cellToProcess = row["ANNO_CORSO_UNI"].ToString().ToUpper();
+                string cellToProcess = row["ANNO_CORSO_UNI"].ToString().ToUpper().Trim();
 
                 try
                 {
@@ -687,7 +699,69 @@ namespace ProcedureNet7
                             studente.tipoIscrizioneUni = "FC";
                         }
                     }
-                    else if (studenteTipoIscrizione == "IC" || studenteTipoIscrizione == "RI" || studenteTipoIscrizione == "NN")
+                    else if (uniType == "PANTHEON")
+                    {
+                        switch (cellToProcess)
+                        {
+                            case "PRIMO":
+                                if (studente.tipoIscrizioneUni == "IC")
+                                {
+                                    studente.annoCorsoUni = 1;
+                                }
+                                else if (studente.tipoIscrizioneUni == "FC")
+                                {
+                                    studente.annoCorsoUni = -1;
+                                }
+                                else { throw new(); }
+                                break;
+                            case "SECONDO":
+                                if (studente.tipoIscrizioneUni == "IC")
+                                {
+                                    studente.annoCorsoUni = 2;
+                                }
+                                else if (studente.tipoIscrizioneUni == "FC")
+                                {
+                                    studente.annoCorsoUni = -2;
+                                }
+                                else { throw new(); }
+                                break;
+                            case "TERZO":
+                                if (studente.tipoIscrizioneUni == "IC")
+                                {
+                                    studente.annoCorsoUni = 3;
+                                }
+                                else if (studente.tipoIscrizioneUni == "FC")
+                                {
+                                    studente.annoCorsoUni = -3;
+                                }
+                                else { throw new(); }
+                                break;
+                            case "QUARTO":
+                                if (studente.tipoIscrizioneUni == "IC")
+                                {
+                                    studente.annoCorsoUni = 4;
+                                }
+                                else if (studente.tipoIscrizioneUni == "FC")
+                                {
+                                    studente.annoCorsoUni = -4;
+                                }
+                                else { throw new(); }
+                                break;
+                            case "QUINTO":
+                                if (studente.tipoIscrizioneUni == "IC")
+                                {
+                                    studente.annoCorsoUni = 5;
+                                }
+                                else if (studente.tipoIscrizioneUni == "FC")
+                                {
+                                    studente.annoCorsoUni = -5;
+                                }
+                                else { throw new(); }
+                                break;
+                            default: throw new();
+                        }
+                    }
+                    else if (uniType != "PANTHEON" && (studenteTipoIscrizione == "IC" || studenteTipoIscrizione == "RI" || studenteTipoIscrizione == "NN"))
                     {
                         studente.annoCorsoUni = int.Parse(cellToProcess);
                     }
@@ -778,6 +852,7 @@ namespace ProcedureNet7
                         case "RUFA":
                         case "UNICAMILLUS":
                         case "ACCDANZA":
+                        case "PANTHEON":
                             annoImmatricolazione = cellToProcess;
                             break;
                         case "ABAROMA":
@@ -848,6 +923,7 @@ namespace ProcedureNet7
                         case "ABAROMA":
                         case "ABAFROS":
                         case "MERCATORUM":
+                        case "PANTHEON":
                             studente.creditiConseguitiUni = int.Parse(cellToProcess);
                             break;
                     }
@@ -897,6 +973,7 @@ namespace ProcedureNet7
                         case "ABAROMA":
                         case "ABAFROS":
                         case "MERCATORUM":
+                        case "PANTHEON":
                             studente.creditiConvalidatiUni = int.Parse(cellToProcess);
                             break;
                     }
@@ -987,6 +1064,7 @@ namespace ProcedureNet7
                         case "ABAROMA":
                         case "ABAFROS":
                         case "MERCATORUM":
+                        case "PANTHEON":
                             if (cellToProcess == "S" || cellToProcess == "SI" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK")
                             {
                                 studente.titoloAcquisito = true;
@@ -1250,8 +1328,16 @@ namespace ProcedureNet7
                     }
                     else
                     {
-                        studente.blocchiDaMettere.Add("ITD");
-                        studente.incongruenzeDaMettere.Add("64");
+                        if (studente.tipoCorsoUni == "-1")
+                        {
+                            studente.blocchiDaMettere.Add("VCS");
+                            studente.incongruenzeDaMettere.Add("48");
+                        }
+                        else
+                        {
+                            studente.blocchiDaMettere.Add("ITD");
+                            studente.incongruenzeDaMettere.Add("64");
+                        }
                     }
 
                     if (studente.seAnno)
@@ -1341,6 +1427,7 @@ namespace ProcedureNet7
                         if (!isStem)
                         {
                             studente.blocchiDaMettere.Add("VST");
+                            studente.incongruenzeDaMettere.Add("83");
                         }
                     }
 
@@ -1466,7 +1553,7 @@ namespace ProcedureNet7
                         );
                 }
 
-                string filePath = Utilities.ExportDataTableToExcel(producedTable, Path.Combine(folderPath, "Output"), true, fileName);
+                string filePath = Utilities.ExportDataTableToExcel(producedTable, outputFolder, true, fileName);
 
                 // Open Excel application
                 var excelApp = new Microsoft.Office.Interop.Excel.Application();

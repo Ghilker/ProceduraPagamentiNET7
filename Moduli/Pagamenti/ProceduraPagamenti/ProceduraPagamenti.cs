@@ -201,7 +201,6 @@ namespace ProcedureNet7
                     }
                 });
 
-
             }
             catch (Exception ex)
             {
@@ -295,6 +294,7 @@ namespace ProcedureNet7
                 ProcessPagamentoSettingsDialogResult(dialogResult, selectPagamentoSettings);
             });
         }
+
         private void ProcessPagamentoSettingsDialogResult(DialogResult dialogResult, SelectPagamentoSettings selectPagamentoSettings)
         {
             if (dialogResult == DialogResult.OK)
@@ -319,7 +319,6 @@ namespace ProcedureNet7
                 return;
             }
             //"#BS#P0#PR#00#2#2#0000"
-
 
             List<string> parts = massivoString.Split(new[] { '#' }, StringSplitOptions.RemoveEmptyEntries).ToList();
 
@@ -352,7 +351,6 @@ namespace ProcedureNet7
                     impegniList.Add(Utilities.SafeGetString(reader, "num_impegno"));
                 }
             }
-
         }
 
         private void HandleTableNameSelectionDialog()
@@ -866,6 +864,7 @@ namespace ProcedureNet7
                             ((DateTime)reader["Data_nascita"]).ToString("dd/MM/yyyy"),
                             Utilities.SafeGetString(reader, "sesso").Trim().ToUpper(),
                             studenteCodEnte,
+                            Utilities.SafeGetString(reader, "Cod_cittadinanza"),
                             disabile == 1,
                             double.TryParse(Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "imp_beneficio")), out double importoBeneficio) ? importoBeneficio : 0,
                             annoCorso,
@@ -1387,9 +1386,9 @@ namespace ProcedureNet7
             {
                 string sqlProvv = $@"
                 select distinct specifiche_impegni.Cod_fiscale, Importo_assegnato, bs.Imp_beneficio from specifiche_impegni 
-                inner join vEsiti_concorsi bs on specifiche_impegni.Anno_accademico = bs.Anno_accademico and specifiche_impegni.Num_domanda = bs.Num_domanda
+                inner join vEsiti_concorsi bs on specifiche_impegni.Anno_accademico = bs.Anno_accademico and specifiche_impegni.Num_domanda = bs.Num_domanda and specifiche_impegni.Cod_beneficio = bs.Cod_beneficio
                 inner join #CFEstrazione cfe on specifiche_impegni.cod_fiscale = cfe.cod_fiscale
-                where bs.Anno_accademico = '{selectedAA}' and specifiche_impegni.Cod_beneficio = '{tipoBeneficio}' and bs.Cod_beneficio = '{tipoBeneficio}' and data_fine_validita is null and Cod_tipo_esito = 2
+                where bs.Anno_accademico = '{selectedAA}' and specifiche_impegni.Cod_beneficio = '{tipoBeneficio}' and data_fine_validita is null and Cod_tipo_esito = 2
                 order by Cod_fiscale";
 
                 SqlCommand readData = new(sqlProvv, CONNECTION, sqlTransaction)
@@ -1795,7 +1794,8 @@ namespace ProcedureNet7
                                 long.TryParse(Regex.Replace(Utilities.SafeGetString(reader, "telefono_cellulare"), @"[^\d]", ""), out long telefonoNumber) ? telefonoNumber : 0,
                                 Utilities.SafeGetString(reader, "indirizzo_e_mail"),
                                 Utilities.SafeGetString(reader, "IBAN"),
-                                Utilities.SafeGetString(reader, "swift")
+                                Utilities.SafeGetString(reader, "swift"),
+                                Utilities.SafeGetString(reader, "Bonifico_estero") != "1"
                             );
                     }
                 }
@@ -2340,6 +2340,21 @@ namespace ProcedureNet7
                 {
                     StudentePagam studente = pair.Value;
 
+                    if (studente.codFiscale == "PDLMYJ99H67H501P")
+                    {
+                        string stest = "";
+                    }
+                    if (studente.codFiscale == "RZZFNC99S42H501Y")
+                    {
+                        string stest = "";
+                    }
+
+                    if (studente.codFiscale == "STNRCR01L07D972T")
+                    {
+                        string stest = "";
+                    }
+
+
                     // Initialize variables
                     double importoDaPagare = studente.importoBeneficio;
                     double importoMassimo = studente.importoBeneficio;
@@ -2452,12 +2467,7 @@ namespace ProcedureNet7
                         {
                             foreach (Assegnazione assegnazione in studente.assegnazioni)
                             {
-                                if (assegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.Corretto ||
-                                    assegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.DataUguale ||
-                                    assegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.MancanzaDataFineAssegnazione)
-                                {
-                                    importoPA += Math.Max(assegnazione.costoTotale, 0);
-                                }
+                                importoPA += Math.Max(assegnazione.costoTotale, 0);
                             }
                         }
 
@@ -2746,6 +2756,8 @@ namespace ProcedureNet7
             string pagamentoDescrizione = (string)cmd.ExecuteScalar();
             string beneficioFolderPath = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, pagamentoDescrizione));
 
+            //EstrazioneDatiBanca(beneficioFolderPath);
+
             bool doAllImpegni = selectedImpegno == "0000";
             IEnumerable<string> impegnoList = doAllImpegni ? impegniList : new List<string> { selectedImpegno };
 
@@ -2812,6 +2824,118 @@ namespace ProcedureNet7
 
             Logger.LogInfo(10, "Index and statistics optimization complete.");
         }
+
+        private void EstrazioneDatiBanca(string beneficioFolderPath)
+        {
+            List<StudentePagam> studentiDaControllareBanca = new();
+            List<string> studentiBancaCF = new();
+            Dictionary<string, string> codiciCittadinanza = new()
+            {
+                { "Z224", "IRANIANA"},
+            };
+
+
+            foreach (KeyValuePair<string, StudentePagam> entry in studentiDaPagare)
+            {
+                StudentePagam studente = entry.Value;
+                if (!codiciCittadinanza.ContainsKey(studente.codCittadinanza))
+                {
+                    continue;
+                }
+
+                if (studente.IBAN.Substring(0, 2).ToUpper() != "LT")
+                {
+                    continue;
+                }
+
+                if (studente.swift.Substring(0, 8).ToUpper() != "REVOLT21")
+                {
+                    continue;
+                }
+
+                studentiDaControllareBanca.Add(studente);
+                studentiBancaCF.Add(studente.codFiscale);
+            }
+
+            #region CF TABLE INIZIALE
+            Logger.LogInfo(30, "Lavorazione studenti");
+
+            Logger.LogDebug(null, "Pulizia tabella CF");
+            string createTempTable = "TRUNCATE TABLE #CFEstrazione;";
+            using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                createCmd.ExecuteNonQuery();
+            }
+
+            Logger.LogDebug(null, "Inserimento in tabella CF dei codici fiscali");
+            Logger.LogInfo(30, "Lavorazione studenti - creazione tabella codici fiscali");
+
+            // Create a DataTable to hold the fiscal codes
+            using (DataTable cfTable = new DataTable())
+            {
+                cfTable.Columns.Add("Cod_fiscale", typeof(string));
+
+                foreach (var cf in studentiBancaCF)
+                {
+                    cfTable.Rows.Add(cf);
+                }
+
+                // Use SqlBulkCopy to efficiently insert the data into the temporary table
+                using SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction);
+                bulkCopy.DestinationTableName = "#CFEstrazione";
+                bulkCopy.WriteToServer(cfTable);
+            }
+
+            Logger.LogDebug(null, "Creazione index della tabella CF");
+            string indexingCFTable = "CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale)";
+            using (SqlCommand indexingCFTableCmd = new SqlCommand(indexingCFTable, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                indexingCFTableCmd.ExecuteNonQuery();
+            }
+
+            Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
+            string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
+            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                updateStatisticsCmd.ExecuteNonQuery();
+            }
+            #endregion
+
+            string queryIniziale = $@"
+SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale WHERE anno_accademico = '{selectedAA}' and tipo_bando = 'lz'
+   
+   and domanda.cod_fiscale in (SELECT distinct cod_fiscale
+        FROM vSpecifiche_permesso_soggiorno 
+        INNER JOIN VStatus_Allegati ON vSpecifiche_permesso_soggiorno.id_allegato = VStatus_Allegati.id_allegato
+        WHERE 
+        vSpecifiche_permesso_soggiorno.Tipo_documento = '03' 
+        AND ((vSpecifiche_permesso_soggiorno.Tipo_permesso = '01' AND vSpecifiche_permesso_soggiorno.Data_scadenza >= GETDATE()) OR vSpecifiche_permesso_soggiorno.Tipo_permesso = '02' OR vSpecifiche_permesso_soggiorno.Tipo_permesso = '03')
+        AND cod_status = '05' 
+        AND (Anno_accademico IS NULL OR Anno_accademico = '20232024'))
+	)
+                ";
+
+            DataTable studentiBanca = new();
+            studentiBanca.Columns.Add("CodFiscale");
+            studentiBanca.Columns.Add("Nome");
+            studentiBanca.Columns.Add("Cognome");
+            studentiBanca.Columns.Add("Data nascita");
+            studentiBanca.Columns.Add("IBAN");
+            studentiBanca.Columns.Add("Cittadinanza");
+            studentiBanca.Columns.Add("Tipo documento");
+            studentiBanca.Columns.Add("Data scadenza");
+
+        }
+
         private void ProcessImpegno(string impegno, string currentFolder)
         {
             var groupedStudents = studentiDaPagare.Values

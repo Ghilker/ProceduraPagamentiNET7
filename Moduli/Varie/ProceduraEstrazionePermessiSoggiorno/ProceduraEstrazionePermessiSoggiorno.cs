@@ -37,42 +37,54 @@ namespace ProcedureNet7
                 DataTable dataTableCon2324 = new DataTable();
                 string queryCon2324 = $@"
                     SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
-                    FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
-                    inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
-                    inner join vBenefici_richiesti on Domanda.Anno_accademico = vBenefici_richiesti.Anno_accademico and Domanda.Num_domanda = vBenefici_richiesti.Num_domanda
-                    inner join vEsiti_concorsiPA on Domanda.Anno_accademico = vEsiti_concorsiPA.Anno_accademico and Domanda.Num_domanda = vEsiti_concorsiPA.Num_domanda
-                                        WHERE        (Domanda.Anno_accademico = '20242025') AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
-                                                                 (SELECT 
-                    distinct Cod_fiscale
-                    FROM 
-                        dbo.STATUS_ALLEGATI sa
-                    INNER JOIN 
-                        dbo.TIPOLOGIE_STATUS_ALLEGATI tsa ON sa.cod_status = tsa.cod_status
-                    INNER JOIN 
-                        dbo.Specifiche_permesso_soggiorno sps ON sa.id_allegato = sps.id_allegato
-                    WHERE 
-                        sa.data_validita = (
-                            SELECT MAX(data_validita) 
-                            FROM dbo.STATUS_ALLEGATI AS STA 
-                            WHERE STA.id_allegato = sa.id_allegato
-                        )
-                        AND sps.Data_validita = (
-                            SELECT MAX(Data_validita) 
-                            FROM dbo.Specifiche_permesso_soggiorno AS br 
-                            WHERE br.Num_domanda = sps.Num_domanda 
-                            AND br.Cod_fiscale = sps.Cod_fiscale
-                        )
-	                    and sa.cod_status = '01' and (sps.Anno_accademico >= '20232024' or sps.Anno_accademico is null)
-                    )
-                    --and Domanda.Cod_fiscale not in (select Cod_fiscale from Domanda where Anno_accademico = '20232024') 
-                    and status_compilazione >= '90'
-                    and vBenefici_richiesti.Cod_beneficio = 'PA'
-					and vEsiti_concorsiPA.Cod_tipo_esito<> 0
-                    ORDER BY domanda.Cod_fiscale;
+FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
+inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
+                    WHERE        (Domanda.Anno_accademico >= '20232024') AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
+(SELECT DISTINCT 
+    sps.Cod_fiscale
+FROM STATUS_ALLEGATI AS sa
+INNER JOIN Specifiche_permesso_soggiorno AS sps ON sa.id_allegato = sps.id_allegato
+WHERE
+    sa.data_validita = (
+        SELECT MAX(data_validita)
+        FROM STATUS_ALLEGATI AS STA
+        WHERE id_allegato = sa.id_allegato
+    )
+    AND sps.Data_validita = (
+        SELECT MAX(Data_validita)
+        FROM Specifiche_permesso_soggiorno AS br
+        WHERE Num_domanda = sps.Num_domanda AND Cod_fiscale = sps.Cod_fiscale
+    )
+    AND sa.cod_status = '01'
+    AND sps.Anno_accademico IS NULL
+    AND NOT EXISTS (
+        SELECT 1
+        FROM STATUS_ALLEGATI AS sa2
+        INNER JOIN Specifiche_permesso_soggiorno AS sps2 ON sa2.id_allegato = sps2.id_allegato
+        WHERE
+            sa2.cod_status = '05'
+            AND sps2.Cod_fiscale = sps.Cod_fiscale
+            AND (
+                (sps.Tipo_documento = '02'
+                 AND sps2.Tipo_documento = sps.Tipo_documento
+                 AND sps2.Data_richiesta_rilascio_rinnovo = sps.Data_richiesta_rilascio_rinnovo)
+                OR (sps.Tipo_documento = '03'
+                    AND sps2.Tipo_documento = sps.Tipo_documento
+                    AND sps2.Tipo_permesso = sps.Tipo_permesso
+                    AND sps2.Data_scadenza = sps.Data_scadenza)
+                
+            )
+    )
+)
+and status_compilazione >= '90'
+ORDER BY domanda.Cod_fiscale;
                 ";
 
                 Logger.LogInfo(30, "Executing SQL query for CON 23/24.");
-                SqlCommand readDataCon2324 = new(queryCon2324, CONNECTION);
+                SqlCommand readDataCon2324 = new(queryCon2324, CONNECTION)
+                {
+                    CommandTimeout = 90000000
+                };
                 using (SqlDataReader readerCon2324 = readDataCon2324.ExecuteReader())
                 {
                     dataTableCon2324.Load(readerCon2324);
@@ -83,43 +95,55 @@ namespace ProcedureNet7
                 // Second query (SENZA 23/24)
                 DataTable dataTableSenza2324 = new DataTable();
                 string querySenza2324 = $@"
-                    SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
-                    FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
-                    inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
-                    inner join vBenefici_richiesti on Domanda.Anno_accademico = vBenefici_richiesti.Anno_accademico and Domanda.Num_domanda = vBenefici_richiesti.Num_domanda
-                    inner join vEsiti_concorsiPA on Domanda.Anno_accademico = vEsiti_concorsiPA.Anno_accademico and Domanda.Num_domanda = vEsiti_concorsiPA.Num_domanda
-                                        WHERE        (Domanda.Anno_accademico = '20242025') AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
-                                                                 (SELECT 
-                    distinct Cod_fiscale
-                    FROM 
-                        dbo.STATUS_ALLEGATI sa
-                    INNER JOIN 
-                        dbo.TIPOLOGIE_STATUS_ALLEGATI tsa ON sa.cod_status = tsa.cod_status
-                    INNER JOIN 
-                        dbo.Specifiche_permesso_soggiorno sps ON sa.id_allegato = sps.id_allegato
-                    WHERE 
-                        sa.data_validita = (
-                            SELECT MAX(data_validita) 
-                            FROM dbo.STATUS_ALLEGATI AS STA 
-                            WHERE STA.id_allegato = sa.id_allegato
-                        )
-                        AND sps.Data_validita = (
-                            SELECT MAX(Data_validita) 
-                            FROM dbo.Specifiche_permesso_soggiorno AS br 
-                            WHERE br.Num_domanda = sps.Num_domanda 
-                            AND br.Cod_fiscale = sps.Cod_fiscale
-                        )
-	                    and sa.cod_status = '01' and (sps.Anno_accademico >= '20232024' or sps.Anno_accademico is null)
-                    )
-                    --and Domanda.Cod_fiscale not in (select Cod_fiscale from Domanda where Anno_accademico = '20232024') 
-                    and status_compilazione >= '90'
-                    and vBenefici_richiesti.Cod_beneficio = 'PA'
-					and vEsiti_concorsiPA.Cod_tipo_esito<> 0
-                    ORDER BY domanda.Cod_fiscale;
+SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
+FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
+inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
+                    WHERE        (Domanda.Anno_accademico = 20242025) AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
+(SELECT DISTINCT 
+    sps.Cod_fiscale
+FROM STATUS_ALLEGATI AS sa
+INNER JOIN Specifiche_permesso_soggiorno AS sps ON sa.id_allegato = sps.id_allegato
+WHERE
+    sa.data_validita = (
+        SELECT MAX(data_validita)
+        FROM STATUS_ALLEGATI AS STA
+        WHERE id_allegato = sa.id_allegato
+    )
+    AND sps.Data_validita = (
+        SELECT MAX(Data_validita)
+        FROM Specifiche_permesso_soggiorno AS br
+        WHERE Num_domanda = sps.Num_domanda AND Cod_fiscale = sps.Cod_fiscale
+    )
+    AND sa.cod_status = '01'
+    AND sps.Anno_accademico IS NULL
+    AND NOT EXISTS (
+        SELECT 1
+        FROM STATUS_ALLEGATI AS sa2
+        INNER JOIN Specifiche_permesso_soggiorno AS sps2 ON sa2.id_allegato = sps2.id_allegato
+        WHERE
+            sa2.cod_status = '05'
+            AND sps2.Cod_fiscale = sps.Cod_fiscale
+            AND (
+                (sps.Tipo_documento = '02'
+                 AND sps2.Tipo_documento = sps.Tipo_documento
+                 AND sps2.Data_richiesta_rilascio_rinnovo = sps.Data_richiesta_rilascio_rinnovo)
+                OR (sps.Tipo_documento = '03'
+                    AND sps2.Tipo_documento = sps.Tipo_documento
+                    AND sps2.Tipo_permesso = sps.Tipo_permesso
+                    AND sps2.Data_scadenza = sps.Data_scadenza)
+                
+            )
+    )
+)
+and status_compilazione >= '90'
+ORDER BY domanda.Cod_fiscale;
                 ";
 
                 Logger.LogInfo(50, "Executing SQL query for SENZA 23/24.");
-                SqlCommand readDataSenza2324 = new(querySenza2324, CONNECTION);
+                SqlCommand readDataSenza2324 = new(querySenza2324, CONNECTION)
+                {
+                    CommandTimeout = 90000000
+                };
                 using (SqlDataReader readerSenza2324 = readDataSenza2324.ExecuteReader())
                 {
                     dataTableSenza2324.Load(readerSenza2324);
@@ -255,9 +279,11 @@ namespace ProcedureNet7
                         Subject = $"Estrazione studenti per PS - {DateTime.Now:dd/MM/yyyy}",
                         Body = $@"  <p>Buongiorno,</p>
                            <p>su richiesta di Rita che legge in copia,</p>
-                           <p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
+                           <p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere <b>urgentemente</b> validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
+                            <p>L'allegato presente in questa mail sostituisce gli allegati già ricevuti in precedenza.</p>
+                            <p>Ti chiedo di suddividere il file e condividere le parti con il personale a te assegnato.</p> 
 
-                           <p>Buon lavoro</p>",
+                           <p>Grazie e buon lavoro!</p>",
                         IsBodyHtml = true
                     };
 
