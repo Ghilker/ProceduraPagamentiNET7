@@ -36,7 +36,7 @@ namespace ProcedureNet7
 
                 };
                 argsValidation.Validate(argsVerifica);
-                Verifica verifica = new(_masterForm, mainConnection);
+                ProcedureNet7.Verifica.Verifica verifica = new(_masterForm, mainConnection);
                 verifica.RunProcedure(argsVerifica);
             }
             catch (ValidationException ex)

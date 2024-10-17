@@ -4,54 +4,56 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ProcedureNet7.Verifica
+namespace ProcedureNet7
 {
-    public class StudenteVerifica
+    internal class StudenteVerificaOld
     {
         public string codFiscale;
         public string numDomanda;
 
-        public ValoriCalcolati valoriCalcolati;
+        public int esitoVERIFICATO;
 
-        public StatusDomanda statusDomanda;
-        public Anagrafica anagrafica;
-        public Residenza residenza;
-        public Domicilio domicilio;
-        public Merito merito;
-        public BeneficiRichiesti beneficiRichiesti;
-        public Variazioni variazioni;
-        public Incongruenze incongruenze;
-    }
-    public class StatusDomanda
-    {
-        public int statusDomanda;
-        public bool DomandaCompleta;
-        public bool DomandaTrasmessa;
-    }
-    public class Anagrafica
-    {
-        public string nome;
-        public string cognome;
-        public DateTime dataNascita;
-        public string codComuneNascita;
-        public string sesso;
+        public List<string> blocchiPresenti = new();
+        public List<string> incongruenzePresenti = new();
 
-        public bool straniero;
-        public bool cittadinoUE;
-    }
-    public class Residenza
-    {
-        public string codComuneResidenza;
-        public bool oltre50km;
-        public bool tempoPercorrenza120;
+        public VerificaAnagrafica verificaAnagrafica;
+        public VerificaResidenza verificaResidenza;
+        public VerificaDomicilio verificaDomicilio;
+        public VerificaIscrizione verificaIscrizione;
+        public VerificaNucleoFamiliare verificaNucleoFamiliare;
+        public VerificaDatiEconomici verificaDatiEconomici;
+        public VerificaBeneficiRichiesti verificaBeneficiRichiesti;
 
-        public bool residenzaUE;
+
+        public EsitoDatiEconomici esitoDatiEconomici;
+        public EsitoStatusSede esitoStatusSede;
     }
-    public class Domicilio
+
+    public class VerificaAnagrafica
     {
-        public bool possiedeDomicilio;
-        public string codComuneDomicilio;
-        public bool titoloOneroso;
+        public string cognome;//studente
+        public string nome;//studente
+        public DateTime dataNascita;//studente
+        public string sesso;//studente
+        public string comuneNascita;//studente
+        public string cittadinanza;//vCittadinanza
+        public bool invalidità;//vDatiGenerali_dom
+        public bool rifugiatoPolitico;//vDatiGenerali_dom
+
+    }
+    public class VerificaResidenza
+    {
+        public bool residenzaItaliana;//vResidenza (vero se provincia_residenza <> 'EE')
+
+        public string provinciaResidenzaItaliana;
+        public string comuneResidenzaItaliana;
+
+
+    }
+    public class VerificaDomicilio
+    {
+        public bool diversoDaResidenza; //vDomicilio (vero se esiste o se TITOLO_ONEROSO IS NOT NULL) in generale, per le graduatorie è vero se in LUOGO_REPERIBILITA_STUDENTE INSERIMENTO_DATI_CONTRATTO è 1 e tipo_luogo = 'dom'
+        public string comuneDomicilio;//vDomicilio
 
         public bool contrOneroso;//vDomicilio TITOLO_ONEROSO (vero se 1)
         public bool contrLocazione;//TIPO_CONTRATTO_TITOLO_ONEROSO (vero se vuoto o 0)
@@ -80,7 +82,7 @@ namespace ProcedureNet7.Verifica
         public int durataMesiContrattoIstituto;//vDomicilio.durata_contratto
         public double importoMensileRataIstituto;
     }
-    public class Merito
+    public class VerificaIscrizione
     {
         public string codSedeStudi;//vIscrizioni cod_sede_studi
         public string comuneSedeStudi;//corsi_laurea.comune_sede_studi
@@ -137,65 +139,69 @@ namespace ProcedureNet7.Verifica
         public int annoCorsoDoppiaIscrizione;
         public int sommaCreditiDoppiaIscrizione;
     }
-    public class BeneficiRichiesti
+    public class VerificaNucleoFamiliare //bestemmie
     {
-        public bool richiestaBS;
-        public bool richiestaPA;
-        public bool richiestaCI;
-
-        public bool vincitoreBS;
-        public bool vincitorePA;
-        public bool vincitoreCI;
-
-        public bool rinunciaBS;
-        public bool rinunciaPA;
-        public bool rinunciaCI;
-        public bool rinunciaBenefici;
-
-        public bool decadutoBS;
-        public bool decadutoPA;
-        public bool decadutoCI;
-        public bool decadutoBenefici;
-
-        public bool revocatoBS;
-        public bool revocatoPA;
-        public bool revocatoCI;
-        public bool revocatoBenefici;
-
-        public bool revocatoSedeDistaccata;
-        public bool revocatoMancataIscrizione;
-        public bool revocatoIscrittoRipetente;
-        public bool revocatoISEE;
-        public bool revocatoLaureato;
-        public bool revocatoPatrimonio;
-        public bool revocatoReddito;
-        public bool revocatoEsami;
-        public bool revocatoFuoriTermine;
-        public bool revocatoIseeFuoriTermine;
-        public bool revocatoIseeNonProdotta;
-        public bool revocatoTrasmissioneIseeFuoriTermine;
-        public bool revocatoNoContrattoLocazione;
+        public int numeroComponentiNF;
+        public int numeroComponentiEsteroNF;
+        public bool almenoUnGenitore; //controllo cod_status_genit nella tabella vNucleo_familiare (status N = falso, altrimenti sempre vero)
+        public bool orfano; //Cod_tipologia_nucleo = 'A' and motivo_assenza_genit = 1 and cod_status_genit = 'N' == vero
+        public bool indipendente;//cod_tipologia_nucleo = 'B' and num_componenti = 1 and motivo_assenza_genit = 2
+        public DateTime dataInizioResidenzaIndipendente; //Residenza_est_da
+        public bool redditoSuperiore; //Reddito_2_anni
     }
-    public class Variazioni
+    public class VerificaDatiEconomici //vNucleo_fam_stranieri_DO
     {
-        public List<Variazione> variazioni;
+        public string tipologiaReddito;
+        public string tipologiaRedditoIntegrazione;
 
-        public class Variazione
-        {
-            public string codTipoVariazione;
-            public string codBeneficio;
-            public DateTime dataValidita;
-        }
+        public double ISP;
+        public double ISR;
+        public double SEQ;
+        public double patrimonioMobiliare;
+        public double detrazioni;
+
+        public double ISEDSU;
+        public double ISEEDSU;
+        public double ISPDSU;
+        public double ISPEDSU;
     }
-    public class Incongruenze
+    public class VerificaBeneficiRichiesti
     {
-        public bool incongruenzaIscrizione;
-        public bool incongruenzaAnnoImmatricolazione;
-        public bool incongruenzaAnnoCorso;
+        public bool richiestoBorsaDiStudio; //vBenefici_richiesti
+        public bool richiestoPostoAlloggio;//vBenefici_richiesti
+        public bool richiestoPostoAlloggioComfort; //DatiGenerali_dom
+        public bool richiestoContributoInternazionale;//vBenefici_richiesti
+
+        public bool inAttesaCI; //vspecifiche_CI
+        public string codNazioneCI;//vspecifiche_CI
+        public DateTime dataPartenzaCI;//vspecifiche_CI
+        public int durataMesiCI;//vspecifiche_CI
+
+        public bool beneficiAltriEnti; //datiGenerali_dom.possesso_altra_borsa
+
+        public bool beneficiOspitalitaResidenziale; //vBenefici_altri_enti (vero se presente)
+
+        public bool beneficiPercepitiPrecedenti; //vImporti_borsa_percepiti (vero se presente e > 0)
+        public double sommaImportiBeneficiPercepitiPrecedenti;
     }
 
-    public class ValoriCalcolati
+
+
+    public class EsitoDatiEconomici
     {
-        public int annoCorsoCalcolato;
+        public List<string> incongruenzeDaMettere = new();
+        public List<string> incongruenzeDaTogliere = new();
+
+        public List<string> blocchiDaMettere = new();
+        public List<string> blocchiDaTogliere = new();
+
+        public bool sottoSoglia;
+        public List<string> motiviDiEsclusione = new();
     }
+    public class EsitoStatusSede
+    {
+        public string statusSede = string.Empty;
+    }
+
+
 }

@@ -74,7 +74,7 @@ namespace ProcedureNet7
 
                 if (studentiDaSbloccare.Any())
                 {
-                    RemoveBlock(CONNECTION, sqlTransaction, studentiDaSbloccare);
+                    BlocksUtil.RemoveBlock(CONNECTION, sqlTransaction, studentiDaSbloccare, "BSS", selectedAA, "Verif_IBAN");
                 }
 
                 sqlTransaction.Commit();
@@ -84,134 +84,6 @@ namespace ProcedureNet7
                 sqlTransaction.Rollback();
                 Logger.LogError(100, $"Errore: {ex.Message}");
             }
-        }
-
-        private void RemoveBlock(SqlConnection conn, SqlTransaction transaction, List<string> codFiscaleCol, string blockCode = "BSS")
-        {
-            string annoAccademico = selectedAA ?? string.Empty;
-            string utente = "Area4";
-
-            // Build the list of Cod_fiscale parameters
-            List<string> codFiscaleParamNames = new List<string>();
-            List<SqlParameter> codFiscaleParams = new List<SqlParameter>();
-            int index = 0;
-            foreach (string cf in codFiscaleCol)
-            {
-                string paramName = "@cf" + index;
-                codFiscaleParamNames.Add(paramName);
-                codFiscaleParams.Add(new SqlParameter(paramName, cf));
-                index++;
-            }
-
-            string codFiscaleInClause = string.Join(", ", codFiscaleParamNames);
-
-            // Now, get the list of columns from DatiGenerali_dom
-            List<string> columnNames = GetColumnNames(conn, transaction, "DatiGenerali_dom");
-
-            // Get the list of columns from vDATIGENERALI_dom
-            List<string> vColumns = GetColumnNames(conn, transaction, "vDATIGENERALI_dom");
-
-            // Define the columns that need explicit values
-            Dictionary<string, string> explicitValues = new Dictionary<string, string>()
-            {
-                { "Data_validita", "CURRENT_TIMESTAMP" }, // SQL expression
-                { "Utente", "@utenteValue" },             // Parameter
-                { "Blocco_pagamento", "0" },              // For RemoveBlock
-            };
-
-            List<string> insertColumns = new List<string>();
-            List<string> selectColumns = new List<string>();
-
-            foreach (string columnName in columnNames)
-            {
-                insertColumns.Add($"[{columnName}]");
-
-                if (explicitValues.ContainsKey(columnName))
-                {
-                    selectColumns.Add(explicitValues[columnName]);
-                }
-                else if (vColumns.Contains(columnName))
-                {
-                    selectColumns.Add($"v.[{columnName}]");
-                }
-                else
-                {
-                    // Assign NULL for columns not in vDATIGENERALI_dom and not in explicitValues
-                    selectColumns.Add("NULL");
-                }
-            }
-
-            string insertColumnsList = string.Join(", ", insertColumns);
-            string selectColumnsList = string.Join(", ", selectColumns);
-
-            string sql = $@"
-                    UPDATE Motivazioni_blocco_pagamenti
-                    SET Blocco_pagamento_attivo = 0, 
-                        Data_fine_validita = CURRENT_TIMESTAMP, 
-                        Utente_sblocco = @utenteValue
-                    WHERE Anno_accademico = @annoAcademico 
-                        AND Cod_tipologia_blocco = @blockCode 
-                        AND Blocco_pagamento_attivo = 1
-                        AND Num_domanda IN 
-                            (SELECT Num_domanda
-                             FROM Domanda d
-                             WHERE Anno_accademico = @annoAcademico 
-                                 AND d.tipo_bando IN ('lz') 
-                                 AND d.Cod_fiscale IN ({codFiscaleInClause}));
-
-                    INSERT INTO [DatiGenerali_dom] ({insertColumnsList})
-                    SELECT DISTINCT {selectColumnsList}
-                    FROM 
-                        Domanda d
-                        INNER JOIN vDATIGENERALI_dom v ON d.Anno_accademico = v.Anno_accademico AND 
-                                                         d.Num_domanda = v.Num_domanda
-                    WHERE 
-                        d.Anno_accademico = @annoAcademico AND
-                        d.tipo_bando IN ('lz', 'l2') AND
-                        d.Cod_fiscale IN ({codFiscaleInClause}) AND
-                        d.Num_domanda NOT IN (
-                            SELECT DISTINCT Num_domanda
-                            FROM Motivazioni_blocco_pagamenti
-                            WHERE Anno_accademico = @annoAcademico 
-                                AND Data_fine_validita IS NULL
-                                AND Blocco_pagamento_attivo = 1
-                        );
-                    ";
-
-            using (SqlCommand command = new SqlCommand(sql, conn, transaction))
-            {
-                command.Parameters.AddWithValue("@annoAcademico", annoAccademico);
-                command.Parameters.AddWithValue("@utenteValue", utente);
-                command.Parameters.AddWithValue("@blockCode", blockCode);
-                foreach (var param in codFiscaleParams)
-                {
-                    command.Parameters.Add(param);
-                }
-
-                command.ExecuteNonQuery();
-            }
-        }
-        private List<string> GetColumnNames(SqlConnection conn, SqlTransaction transaction, string tableName)
-        {
-            List<string> columnNames = new List<string>();
-            string query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @TableName";
-
-            using (SqlCommand cmd = new SqlCommand(query, conn, transaction))
-            {
-                cmd.Parameters.AddWithValue("@TableName", tableName);
-                using (SqlDataReader reader = cmd.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        if (reader.GetString(0) == "Id_DatiGenerali_dom" || reader.GetString(0) == "Id_Domanda")
-                        {
-                            continue;
-                        }
-                        columnNames.Add(reader.GetString(0));
-                    }
-                }
-            }
-            return columnNames;
         }
     }
 }

@@ -36,7 +36,7 @@ namespace ProcedureNet7
                 // First query (CON 23/24)
                 DataTable dataTableCon2324 = new DataTable();
                 string queryCon2324 = $@"
-                    SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
+                                       SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
 FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
 inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
                     WHERE        (Domanda.Anno_accademico >= '20232024') AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
@@ -57,24 +57,6 @@ WHERE
     )
     AND sa.cod_status = '01'
     AND sps.Anno_accademico IS NULL
-    AND NOT EXISTS (
-        SELECT 1
-        FROM STATUS_ALLEGATI AS sa2
-        INNER JOIN Specifiche_permesso_soggiorno AS sps2 ON sa2.id_allegato = sps2.id_allegato
-        WHERE
-            sa2.cod_status = '05'
-            AND sps2.Cod_fiscale = sps.Cod_fiscale
-            AND (
-                (sps.Tipo_documento = '02'
-                 AND sps2.Tipo_documento = sps.Tipo_documento
-                 AND sps2.Data_richiesta_rilascio_rinnovo = sps.Data_richiesta_rilascio_rinnovo)
-                OR (sps.Tipo_documento = '03'
-                    AND sps2.Tipo_documento = sps.Tipo_documento
-                    AND sps2.Tipo_permesso = sps.Tipo_permesso
-                    AND sps2.Data_scadenza = sps.Data_scadenza)
-                
-            )
-    )
 )
 and status_compilazione >= '90'
 ORDER BY domanda.Cod_fiscale;
@@ -95,48 +77,30 @@ ORDER BY domanda.Cod_fiscale;
                 // Second query (SENZA 23/24)
                 DataTable dataTableSenza2324 = new DataTable();
                 string querySenza2324 = $@"
-SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
-FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
-inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
-                    WHERE        (Domanda.Anno_accademico = 20242025) AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
-(SELECT DISTINCT 
-    sps.Cod_fiscale
-FROM STATUS_ALLEGATI AS sa
-INNER JOIN Specifiche_permesso_soggiorno AS sps ON sa.id_allegato = sps.id_allegato
-WHERE
-    sa.data_validita = (
-        SELECT MAX(data_validita)
-        FROM STATUS_ALLEGATI AS STA
-        WHERE id_allegato = sa.id_allegato
-    )
-    AND sps.Data_validita = (
-        SELECT MAX(Data_validita)
-        FROM Specifiche_permesso_soggiorno AS br
-        WHERE Num_domanda = sps.Num_domanda AND Cod_fiscale = sps.Cod_fiscale
-    )
-    AND sa.cod_status = '01'
-    AND sps.Anno_accademico IS NULL
-    AND NOT EXISTS (
-        SELECT 1
-        FROM STATUS_ALLEGATI AS sa2
-        INNER JOIN Specifiche_permesso_soggiorno AS sps2 ON sa2.id_allegato = sps2.id_allegato
-        WHERE
-            sa2.cod_status = '05'
-            AND sps2.Cod_fiscale = sps.Cod_fiscale
-            AND (
-                (sps.Tipo_documento = '02'
-                 AND sps2.Tipo_documento = sps.Tipo_documento
-                 AND sps2.Data_richiesta_rilascio_rinnovo = sps.Data_richiesta_rilascio_rinnovo)
-                OR (sps.Tipo_documento = '03'
-                    AND sps2.Tipo_documento = sps.Tipo_documento
-                    AND sps2.Tipo_permesso = sps.Tipo_permesso
-                    AND sps2.Data_scadenza = sps.Data_scadenza)
-                
-            )
-    )
-)
-and status_compilazione >= '90'
-ORDER BY domanda.Cod_fiscale;
+                    SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
+                    FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
+                    inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
+                                        WHERE        (Domanda.Anno_accademico >= '20232024') AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
+                    (SELECT DISTINCT 
+                        sps.Cod_fiscale
+                    FROM STATUS_ALLEGATI AS sa
+                    INNER JOIN Specifiche_permesso_soggiorno AS sps ON sa.id_allegato = sps.id_allegato
+                    WHERE
+                        sa.data_validita = (
+                            SELECT MAX(data_validita)
+                            FROM STATUS_ALLEGATI AS STA
+                            WHERE id_allegato = sa.id_allegato
+                        )
+                        AND sps.Data_validita = (
+                            SELECT MAX(Data_validita)
+                            FROM Specifiche_permesso_soggiorno AS br
+                            WHERE Num_domanda = sps.Num_domanda AND Cod_fiscale = sps.Cod_fiscale
+                        )
+                        AND sa.cod_status = '01'
+                        AND sps.Anno_accademico IS NULL
+                    )
+                    and status_compilazione >= '90'
+                    ORDER BY domanda.Cod_fiscale;
                 ";
 
                 Logger.LogInfo(50, "Executing SQL query for SENZA 23/24.");
@@ -281,7 +245,7 @@ ORDER BY domanda.Cod_fiscale;
                            <p>su richiesta di Rita che legge in copia,</p>
                            <p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere <b>urgentemente</b> validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
                             <p>L'allegato presente in questa mail sostituisce gli allegati già ricevuti in precedenza.</p>
-                            <p>Ti chiedo di suddividere il file e condividere le parti con il personale a te assegnato.</p> 
+                            <p>Ti chiedo di suddividere il file e condividere le parti con il personale a te assegnato, specificando che <b>non devono rimuovere i blocchi</b> poiché è attiva una procedura che li rimuove massivamente ogni 2 ore circa.</p> 
 
                            <p>Grazie e buon lavoro!</p>",
                         IsBodyHtml = true

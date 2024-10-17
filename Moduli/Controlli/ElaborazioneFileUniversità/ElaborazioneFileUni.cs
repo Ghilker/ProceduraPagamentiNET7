@@ -399,6 +399,7 @@ namespace ProcedureNet7
                         break;
                     case "SAPIENZA":
                     case "PANTHEON":
+                    case "ISIA":
                         if (cellToProcess.Contains("TRIENNALE"))
                         {
                             studente.tipoCorsoUni = "3";
@@ -447,7 +448,7 @@ namespace ProcedureNet7
                         {
                             studente.tipoCorsoUni = "4";
                         }
-                        else if (cellToProcess.Contains("MAGISTRALE"))
+                        else if (cellToProcess.Contains("MAGISTRALE") || cellToProcess == "BIENNALE")
                         {
                             studente.tipoCorsoUni = "5";
                         }
@@ -548,6 +549,7 @@ namespace ProcedureNet7
                     case "UNICAS":
                     case "UNIVIT":
                     case "PANTHEON":
+                    case "ISIA":
                         if (cellToProcess == "IC" || cellToProcess == "IN CORSO" || cellToProcess == "C" || cellToProcess == "IMMATRICOLAZIONE")
                         {
                             studente.tipoIscrizioneUni = "IC";
@@ -625,6 +627,7 @@ namespace ProcedureNet7
                     case "ABAFROS":
                     case "MERCATORUM":
                     case "PANTHEON":
+                    case "ISIA":
                         if (cellToProcess == "SI" || cellToProcess == "SÌ" || cellToProcess == "SÍ" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK")
                         {
                             studente.iscrCondizione = true;
@@ -669,6 +672,7 @@ namespace ProcedureNet7
                     case "ABAFROS":
                     case "MERCATORUM":
                     case "PANTHEON":
+                    case "ISIA":
                         studente.descrCorsoUni = cellToProcess;
                         break;
                 }
@@ -853,6 +857,7 @@ namespace ProcedureNet7
                         case "UNICAMILLUS":
                         case "ACCDANZA":
                         case "PANTHEON":
+                        case "ISIA":
                             annoImmatricolazione = cellToProcess;
                             break;
                         case "ABAROMA":
@@ -924,6 +929,7 @@ namespace ProcedureNet7
                         case "ABAFROS":
                         case "MERCATORUM":
                         case "PANTHEON":
+                        case "ISIA":
                             studente.creditiConseguitiUni = int.Parse(cellToProcess);
                             break;
                     }
@@ -974,6 +980,7 @@ namespace ProcedureNet7
                         case "ABAFROS":
                         case "MERCATORUM":
                         case "PANTHEON":
+                        case "ISIA":
                             studente.creditiConvalidatiUni = int.Parse(cellToProcess);
                             break;
                     }
@@ -1016,6 +1023,7 @@ namespace ProcedureNet7
                         case "ABAROMA":
                         case "ABAFROS":
                         case "MERCATORUM":
+                        case "ISIA":
                             if (cellToProcess == "S" || cellToProcess == "SI" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK" || IsDate(cellToProcess))
                             {
                                 studente.tassaRegionalePagata = true;
@@ -1065,6 +1073,7 @@ namespace ProcedureNet7
                         case "ABAFROS":
                         case "MERCATORUM":
                         case "PANTHEON":
+                        case "ISIA":
                             if (cellToProcess == "S" || cellToProcess == "SI" || cellToProcess == "VERO" || cellToProcess == "TRUE" || cellToProcess == "OK")
                             {
                                 studente.titoloAcquisito = true;
