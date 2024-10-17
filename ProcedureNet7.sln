@@ -3,9 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34221.43
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ProceduraPagamentiNET7", "ProceduraPagamentiNET7.csproj", "{69547DDB-E3D0-47C9-B919-1B210078E2DB}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProceduraPagamentiNET7.Tests", "..\ProceduraPagamentiNET7.Tests\ProceduraPagamentiNET7.Tests.csproj", "{C80200D4-F0FF-42A6-8701-EFD1790D5A39}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ProcedureNet7", "ProcedureNet7.csproj", "{69547DDB-E3D0-47C9-B919-1B210078E2DB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,16 +24,6 @@ Global
 		{69547DDB-E3D0-47C9-B919-1B210078E2DB}.VARIE|Any CPU.Build.0 = VARIE|Any CPU
 		{69547DDB-E3D0-47C9-B919-1B210078E2DB}.VERIFICHE|Any CPU.ActiveCfg = VERIFICHE|Any CPU
 		{69547DDB-E3D0-47C9-B919-1B210078E2DB}.VERIFICHE|Any CPU.Build.0 = VERIFICHE|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.PAGAMENTI|Any CPU.ActiveCfg = Debug|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.PAGAMENTI|Any CPU.Build.0 = Debug|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.VARIE|Any CPU.ActiveCfg = Debug|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.VARIE|Any CPU.Build.0 = Debug|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.VERIFICHE|Any CPU.ActiveCfg = Debug|Any CPU
-		{C80200D4-F0FF-42A6-8701-EFD1790D5A39}.VERIFICHE|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
