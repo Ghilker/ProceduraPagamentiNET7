@@ -32,6 +32,7 @@
             runProcedure = new Button();
             label29 = new Label();
             iseeupAABox = new TextBox();
+            usaIncongruenzeCheck = new CheckBox();
             SuspendLayout();
             // 
             // label1
@@ -53,7 +54,7 @@
             runProcedure.TabIndex = 32;
             runProcedure.Text = "AVVIA LA PROCEDURA";
             runProcedure.UseVisualStyleBackColor = true;
-            runProcedure.Click += this.RunProcedureBtnClick;
+            runProcedure.Click += RunProcedureBtnClick;
             // 
             // label29
             // 
@@ -71,12 +72,23 @@
             iseeupAABox.Size = new Size(197, 23);
             iseeupAABox.TabIndex = 34;
             // 
+            // usaIncongruenzeCheck
+            // 
+            usaIncongruenzeCheck.AutoSize = true;
+            usaIncongruenzeCheck.Location = new Point(30, 85);
+            usaIncongruenzeCheck.Name = "usaIncongruenzeCheck";
+            usaIncongruenzeCheck.Size = new Size(120, 19);
+            usaIncongruenzeCheck.TabIndex = 36;
+            usaIncongruenzeCheck.Text = "Usa Incongruenze";
+            usaIncongruenzeCheck.UseVisualStyleBackColor = true;
+            // 
             // FormControlloISEEUP
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
+            Controls.Add(usaIncongruenzeCheck);
             Controls.Add(label29);
             Controls.Add(iseeupAABox);
             Controls.Add(label1);
@@ -94,5 +106,6 @@
         private Button runProcedure;
         private Label label29;
         private TextBox iseeupAABox;
+        private CheckBox usaIncongruenzeCheck;
     }
 }

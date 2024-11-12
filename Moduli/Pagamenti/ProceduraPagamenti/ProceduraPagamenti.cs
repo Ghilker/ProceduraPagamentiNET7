@@ -1,10 +1,9 @@
 ﻿using DocumentFormat.OpenXml;
-using ProcedureNet7.Storni;
+using ProcedureNet7.PagamentiProcessor;
 using System.Collections.Concurrent;
 using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
-using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -60,6 +59,8 @@ namespace ProcedureNet7
         public int studentiProcessatiAmount = 0;
         public Dictionary<string, Dictionary<string, int>> impegnoAmount = new Dictionary<string, Dictionary<string, int>>();
 
+        //#TODO IAcademicYearProcessor? selectedAcademicProcessor;
+
         public ProceduraPagamenti(MasterForm masterForm, SqlConnection mainConnection) : base(masterForm, mainConnection) { }
 
         public override void RunProcedure(ArgsPagamenti args)
@@ -83,6 +84,14 @@ namespace ProcedureNet7
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo InitializeProcedure");
                     return;
                 }
+
+                /*#TODO ProcessorChooser processorChooser = new ProcessorChooser();
+                selectedAcademicProcessor = processorChooser.GetProcessor(selectedAA);
+                if (selectedAcademicProcessor == null)
+                {
+                    Logger.LogDebug(null, "Processor non può essere nullo in questo punto!");
+                    return;
+                }*/
 
                 sqlTransaction = CONNECTION.BeginTransaction();
 
@@ -945,6 +954,13 @@ namespace ProcedureNet7
 
             ControlloPagamenti();
             Logger.LogDebug(30, $"Numero studenti prima della pulizia = {studentiDaPagare.Count}");
+            if (studentiDaPagare.Count == 0)
+            {
+                string dropCFTable = "DROP TABLE #CFEstrazione;";
+                SqlCommand drop = new(dropCFTable, CONNECTION, sqlTransaction);
+                _ = drop.ExecuteNonQuery();
+                return;
+            }
             CheckLiquefazione();
             Logger.LogDebug(30, $"Numero studenti dopo la pulizia = {studentiDaPagare.Count}");
 
@@ -1384,6 +1400,8 @@ namespace ProcedureNet7
             }
             void ControlloProvvedimenti()
             {
+                //#TODO string? sqlProvv = selectedAcademicProcessor.GetProvvedimentiQuery(selectedAA, tipoBeneficio);
+
                 string sqlProvv = $@"
                 select distinct specifiche_impegni.Cod_fiscale, Importo_assegnato, bs.Imp_beneficio from specifiche_impegni 
                 inner join vEsiti_concorsi bs on specifiche_impegni.Anno_accademico = bs.Anno_accademico and specifiche_impegni.Num_domanda = bs.Num_domanda and specifiche_impegni.Cod_beneficio = bs.Cod_beneficio
@@ -1400,6 +1418,7 @@ namespace ProcedureNet7
 
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
+                    //#TODO listaStudentiDaMantenere = selectedAcademicProcessor.ProcessProvvedimentiQuery(reader);
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
@@ -1425,7 +1444,6 @@ namespace ProcedureNet7
                     if (!listaStudentiDaMantenere.Contains(pair.Key))
                     {
                         studentiDaRimuovere.Add(pair.Key);
-
                     }
                 }
 
@@ -1455,6 +1473,7 @@ namespace ProcedureNet7
                         Domanda 
                         INNER JOIN #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale 
                     WHERE
+                        Domanda.anno_accademico = '{selectedAA}' and
                         Domanda.num_domanda in (
                             SELECT DISTINCT Num_domanda
                                 FROM vMotivazioni_blocco_pagamenti
@@ -1466,6 +1485,12 @@ namespace ProcedureNet7
                 sqlKiller += " AND cod_tipologia_blocco in ('BPD', 'BSS', 'BS1')";
             }
             sqlKiller += " )";
+
+            if (tipoBeneficio == "BS")
+            {
+                sqlKiller += " AND Domanda.tipo_bando like 'L%'";
+            }
+
             SqlCommand readData = new(sqlKiller, CONNECTION, sqlTransaction)
             {
                 CommandTimeout = 9000000
@@ -2167,7 +2192,8 @@ namespace ProcedureNet7
                                      double.TryParse(Utilities.SafeGetString(reader, "importo_mensile").Trim(), out double importoMensile) ? importoMensile : 0,
                                      min_data_PA,
                                      max_data_PA,
-                                     studenteFuoriCorso || studenteDisabileFuoriCorso
+                                     studenteFuoriCorso || studenteDisabileFuoriCorso,
+                                     Utilities.SafeGetString(reader, "id_assegnazione_pa")
                                  );
 
                             string message = "";
@@ -2225,29 +2251,13 @@ namespace ProcedureNet7
                         {
                             continue;
                         }
-
-                        bool studenteFuoriCorso = studente.annoCorso == -1 && !studente.disabile;
-                        bool studenteDisabileFuoriCorso = studente.annoCorso == -2 && studente.disabile;
-
-                        _ = studente.AddAssegnazione(
-                            vecchiaAssegnazione.codPensionato,
-                            vecchiaAssegnazione.codStanza,
-                            vecchiaAssegnazione.dataDecorrenza,
-                            max_data_PA,
-                            vecchiaAssegnazione.codFineAssegnazione,
-                            vecchiaAssegnazione.codTipoStanza,
-                            vecchiaAssegnazione.costoMensile,
-                            min_data_PA,
-                            max_data_PA,
-                            studenteFuoriCorso || studenteDisabileFuoriCorso
-                            );
+                        vecchiaAssegnazione.SetAssegnazioneDataCheck(AssegnazioneDataCheck.ErroreControlloData);
                     }
                 }
                 Logger.LogInfo(50, $"UPDATE:Lavorazione studenti - inserimento in assegnazioni - completato");
             }
             void PopulateStudentiImpegni()
             {
-
                 string currentBeneficio = isTR ? "TR" : tipoBeneficio;
 
                 string dataQuery = $@"
@@ -2557,7 +2567,7 @@ namespace ProcedureNet7
                         importoDaPagare = importoMassimo;
                         if (studente.annoCorso == 1)
                         {
-                            if (!studente.superamentoEsami && studente.superamentoEsamiTassaRegionale)
+                            if (!studente.superamentoEsami && studente.superamentoEsamiTassaRegionale && !(studente.tipoCorso == 6 || studente.tipoCorso == 7))
                             {
                                 importoDaPagare = importoMassimo * 0.5;
                                 importoMassimo *= 0.5;
@@ -2565,6 +2575,8 @@ namespace ProcedureNet7
                             else if (!studente.superamentoEsami && !studente.superamentoEsamiTassaRegionale)
                             {
                                 studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
+                                studentiRimossiBag.Add((studente.codFiscale, "Senza superamento esami"));
+
                                 return;
                             }
                         }
@@ -2592,7 +2604,7 @@ namespace ProcedureNet7
                             return;
                         }
 
-                        if (!studente.superamentoEsami && !studente.superamentoEsamiTassaRegionale && studente.annoCorso == 1)
+                        if (studente.annoCorso == 1 && !(studente.superamentoEsami || studente.superamentoEsamiTassaRegionale))
                         {
                             studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
                             return;
@@ -3091,6 +3103,7 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                 DataTable returnDataTable = new();
 
                 _ = returnDataTable.Columns.Add("Progressivo");
+                _ = returnDataTable.Columns.Add("ID Assegnazione");
                 _ = returnDataTable.Columns.Add("Cognome");
                 _ = returnDataTable.Columns.Add("Nome");
                 _ = returnDataTable.Columns.Add("CodFiscale");
@@ -3162,6 +3175,7 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                     {
                         _ = returnDataTable.Rows.Add(
                             progressivo.ToString(),
+                            assegnazione.idAssegnazione,
                             studente.cognome,
                             studente.nome,
                             studente.codFiscale,

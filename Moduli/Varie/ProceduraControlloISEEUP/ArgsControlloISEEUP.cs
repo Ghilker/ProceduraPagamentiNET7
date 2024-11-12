@@ -12,7 +12,7 @@ namespace ProcedureNet7
         [Required(ErrorMessage = "Indicare l'anno accademico di riferimento")]
         [ValidAAFormat(ErrorMessage = "Formato dell'anno accademico non valido, inserire l'anno nel formato xxxxyyyy")]
         public string _annoAccademico { get; set; }
-
+        public bool _usaIncongruenze { get; set; }
         public ArgsControlloISEEUP()
         {
             _annoAccademico = "";

@@ -30,6 +30,8 @@ namespace ProcedureNet7
         public string _capitolo { get; set; }
         public string _esePR { get; set; }
         public string _eseSA { get; set; }
+        public string _importoMensa { get; set; }
+        public string _impegnoMensa { get; set; }
 
         public ArgsSpecificheImpegni()
         {
@@ -46,6 +48,8 @@ namespace ProcedureNet7
             _selectedAA = string.Empty;
             _tipoFondo = string.Empty;
             _selectedDate = string.Empty;
+            _importoMensa = string.Empty;
+            _impegnoMensa = string.Empty;
         }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -80,6 +84,16 @@ namespace ProcedureNet7
             if (string.IsNullOrWhiteSpace(_eseSA))
             {
                 errorMessages.Add("Indicare l'esercizio finanziario del saldo.");
+            }
+
+            if ((!string.IsNullOrWhiteSpace(_importoMensa) && string.IsNullOrWhiteSpace(_impegnoMensa)) || (string.IsNullOrWhiteSpace(_importoMensa) && !string.IsNullOrWhiteSpace(_impegnoMensa)))
+            {
+                errorMessages.Add("Compilare i campi importo mensa e determina mensa.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(_importoMensa) && !double.TryParse(_importoMensa, out var _))
+            {
+                errorMessages.Add("L'importo della mensa deve essere un numero.");
             }
 
             if (errorMessages.Any())

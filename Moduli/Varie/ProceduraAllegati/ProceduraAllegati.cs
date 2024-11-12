@@ -36,7 +36,7 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
         {
             { "BS", "LZ" },
             { "PA", "LZ" },
-            { "CI", "CI" },
+            { "CI", "LZ" },
             { "PL", "PL" },
             { "BL", "BL" }
         };

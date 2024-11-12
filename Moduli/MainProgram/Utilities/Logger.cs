@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Windows.Forms; // Required for working with WinForms UI components
 
 public class Logger : IDisposable
 {
-    private readonly LogLevel logLevelThreshold = LogLevel.INFO;
+    private readonly LogLevel logLevelThreshold;
     private static readonly object lockObject = new();
     private static Logger? instance;
     private readonly AutoResetEvent logSignal = new(false);
@@ -16,13 +18,20 @@ public class Logger : IDisposable
     private readonly System.Timers.Timer uiUpdateTimer;
     private readonly CircularBuffer<(int sequence, LogLevel level, string message, Color? textColor)> logQueue;
     private int logSequence = 0;
+    private readonly bool verbose;
 
-    private Logger(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold)
+    // List to store all log entries for the log dump
+    private readonly List<string> allLogEntries = new List<string>();
+
+    private Logger(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold, bool verbose)
     {
         this.mainForm = mainForm;
         this.progressBar = progressBar;
         this.logTextBox = logTextBox;
-        this.logLevelThreshold = logLevelThreshold;
+        this.verbose = verbose;
+
+        // Set log level threshold based on verbose option
+        this.logLevelThreshold = verbose ? LogLevel.DEBUG : logLevelThreshold;
 
         // Initialize the circular buffer with a size of 1024 (can be adjusted based on performance needs)
         logQueue = new CircularBuffer<(int sequence, LogLevel level, string message, Color? textColor)>(1024);
@@ -33,20 +42,25 @@ public class Logger : IDisposable
 
         logThread = new Thread(LoggingThreadMethod) { IsBackground = true };
         logThread.Start();
+
+        // Subscribe to application exit and unhandled exception events
+        Application.ApplicationExit += Application_ApplicationExit;
+        AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
     }
 
     public void Dispose()
     {
         Stop();
+        WriteLogDump();
     }
 
-    public static Logger GetInstance(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold = LogLevel.INFO)
+    public static Logger GetInstance(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold = LogLevel.INFO, bool verbose = false)
     {
         if (instance == null)
         {
             lock (lockObject)
             {
-                instance ??= new Logger(mainForm, progressBar, logTextBox, logLevelThreshold);
+                instance ??= new Logger(mainForm, progressBar, logTextBox, logLevelThreshold, verbose);
             }
         }
         return instance;
@@ -91,11 +105,19 @@ public class Logger : IDisposable
 
     public void LogInstance(string message, int? progress = null, LogLevel level = LogLevel.INFO, Color? textColor = null)
     {
-        if (level < logLevelThreshold) return;
-
         int currentSequence = Interlocked.Increment(ref logSequence);
         string timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
         string logEntry = $"{timestamp} - {message}";
+
+        // Store all log entries for the log dump
+        lock (allLogEntries)
+        {
+            allLogEntries.Add(logEntry);
+        }
+
+        // Only process log entries above the threshold for UI display
+        if (level < logLevelThreshold) return;
+
         logQueue.Enqueue((currentSequence, level, logEntry, textColor));
 
         if (progress.HasValue)
@@ -231,6 +253,86 @@ public class Logger : IDisposable
         uiUpdateTimer.Dispose();
         FlushLogQueueToUI(); // Flush remaining messages
         logSignal.Dispose();
+    }
+
+    // Event handler for application exit
+    private void Application_ApplicationExit(object sender, EventArgs e)
+    {
+        WriteLogDump();
+    }
+
+    // Event handler for unhandled exceptions
+    private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        WriteLogDump();
+    }
+
+    // Method to write the log dump to a file
+    private void WriteLogDump()
+    {
+        try
+        {
+            // Determine the log file path
+            string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string logFolderPath = Path.Combine(documentsPath, "procedure", "logs");
+            Directory.CreateDirectory(logFolderPath);
+
+            string logFileName = $"log_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+            string logFilePath = Path.Combine(logFolderPath, logFileName);
+
+            // Write all log entries to the file
+            lock (allLogEntries)
+            {
+                File.WriteAllLines(logFilePath, allLogEntries);
+            }
+
+            // Limit the number of log files to a maximum of 10
+            LimitLogFiles(logFolderPath, maxFiles: 10);
+        }
+        catch (Exception ex)
+        {
+            // Handle exceptions if necessary (e.g., log to Event Viewer)
+        }
+    }
+
+    // Helper method to limit the number of log files
+    private void LimitLogFiles(string logFolderPath, int maxFiles)
+    {
+        try
+        {
+            var logFiles = Directory.GetFiles(logFolderPath, "log_*.txt");
+
+            if (logFiles.Length > maxFiles)
+            {
+                // Order files by the timestamp in the filename
+                var orderedFiles = logFiles.OrderBy(f =>
+                {
+                    string fileName = Path.GetFileNameWithoutExtension(f); // e.g., "log_20231017_124500"
+                    string timestampPart = fileName.Substring(4); // Remove "log_"
+                    if (DateTime.TryParseExact(timestampPart, "yyyyMMdd_HHmmss", null, System.Globalization.DateTimeStyles.None, out DateTime timestamp))
+                    {
+                        return timestamp;
+                    }
+                    else
+                    {
+                        // If parsing fails, use file creation time
+                        return File.GetCreationTime(f);
+                    }
+                }).ToList();
+
+                int filesToDelete = orderedFiles.Count - maxFiles;
+
+                // Delete the oldest files
+                for (int i = 0; i < filesToDelete; i++)
+                {
+                    File.Delete(orderedFiles[i]);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle exceptions if necessary
+        }
     }
 }
 

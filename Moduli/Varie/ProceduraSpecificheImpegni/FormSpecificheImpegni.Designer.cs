@@ -58,13 +58,17 @@
             newSpecificaPanel = new Panel();
             openFileDialog = new OpenFileDialog();
             soloAperturaCheck = new CheckBox();
+            specificheImportoMensaTxt = new TextBox();
+            label2 = new Label();
+            specificheImpegnoMensaTxt = new TextBox();
+            label3 = new Label();
             newSpecificaPanel.SuspendLayout();
             SuspendLayout();
             // 
             // label36
             // 
             label36.AutoSize = true;
-            label36.Location = new Point(206, 122);
+            label36.Location = new Point(206, 110);
             label36.Name = "label36";
             label36.Size = new Size(55, 15);
             label36.TabIndex = 49;
@@ -72,7 +76,7 @@
             // 
             // specificheEseSABox
             // 
-            specificheEseSABox.Location = new Point(3, 119);
+            specificheEseSABox.Location = new Point(3, 107);
             specificheEseSABox.Name = "specificheEseSABox";
             specificheEseSABox.Size = new Size(197, 23);
             specificheEseSABox.TabIndex = 48;
@@ -80,7 +84,7 @@
             // label37
             // 
             label37.AutoSize = true;
-            label37.Location = new Point(206, 92);
+            label37.Location = new Point(206, 84);
             label37.Name = "label37";
             label37.Size = new Size(81, 15);
             label37.TabIndex = 47;
@@ -88,7 +92,7 @@
             // 
             // specificheEsePRBox
             // 
-            specificheEsePRBox.Location = new Point(3, 90);
+            specificheEsePRBox.Location = new Point(3, 82);
             specificheEsePRBox.Name = "specificheEsePRBox";
             specificheEsePRBox.Size = new Size(197, 23);
             specificheEsePRBox.TabIndex = 46;
@@ -112,7 +116,7 @@
             // label34
             // 
             label34.AutoSize = true;
-            label34.Location = new Point(206, 151);
+            label34.Location = new Point(206, 135);
             label34.Name = "label34";
             label34.Size = new Size(52, 15);
             label34.TabIndex = 43;
@@ -120,7 +124,7 @@
             // 
             // specificheCapitoloBox
             // 
-            specificheCapitoloBox.Location = new Point(3, 148);
+            specificheCapitoloBox.Location = new Point(3, 132);
             specificheCapitoloBox.Name = "specificheCapitoloBox";
             specificheCapitoloBox.Size = new Size(197, 23);
             specificheCapitoloBox.TabIndex = 42;
@@ -128,7 +132,7 @@
             // label33
             // 
             label33.AutoSize = true;
-            label33.Location = new Point(206, 66);
+            label33.Location = new Point(206, 61);
             label33.Name = "label33";
             label33.Size = new Size(65, 15);
             label33.TabIndex = 41;
@@ -136,7 +140,7 @@
             // 
             // specificheTipoFondoBox
             // 
-            specificheTipoFondoBox.Location = new Point(3, 61);
+            specificheTipoFondoBox.Location = new Point(3, 56);
             specificheTipoFondoBox.Name = "specificheTipoFondoBox";
             specificheTipoFondoBox.Size = new Size(197, 23);
             specificheTipoFondoBox.TabIndex = 40;
@@ -160,7 +164,7 @@
             // specificheNewLineCheck
             // 
             specificheNewLineCheck.AutoSize = true;
-            specificheNewLineCheck.Location = new Point(465, 86);
+            specificheNewLineCheck.Location = new Point(29, 215);
             specificheNewLineCheck.Name = "specificheNewLineCheck";
             specificheNewLineCheck.Size = new Size(157, 19);
             specificheNewLineCheck.TabIndex = 37;
@@ -171,7 +175,7 @@
             // label31
             // 
             label31.AutoSize = true;
-            label31.Location = new Point(206, 38);
+            label31.Location = new Point(206, 37);
             label31.Name = "label31";
             label31.Size = new Size(86, 15);
             label31.TabIndex = 36;
@@ -179,7 +183,7 @@
             // 
             // specificheImpSABox
             // 
-            specificheImpSABox.Location = new Point(3, 32);
+            specificheImpSABox.Location = new Point(3, 31);
             specificheImpSABox.Name = "specificheImpSABox";
             specificheImpSABox.Size = new Size(197, 23);
             specificheImpSABox.TabIndex = 35;
@@ -187,7 +191,7 @@
             // label30
             // 
             label30.AutoSize = true;
-            label30.Location = new Point(206, 6);
+            label30.Location = new Point(206, 9);
             label30.Name = "label30";
             label30.Size = new Size(112, 15);
             label30.TabIndex = 34;
@@ -195,7 +199,7 @@
             // 
             // specificheImpPRBox
             // 
-            specificheImpPRBox.Location = new Point(3, 3);
+            specificheImpPRBox.Location = new Point(3, 6);
             specificheImpPRBox.Name = "specificheImpPRBox";
             specificheImpPRBox.Size = new Size(197, 23);
             specificheImpPRBox.TabIndex = 33;
@@ -282,7 +286,7 @@
             button1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
             button1.Location = new Point(460, 291);
             button1.Name = "button1";
-            button1.Size = new Size(312, 49);
+            button1.Size = new Size(328, 49);
             button1.TabIndex = 50;
             button1.Text = "AVVIA LA PROCEDURA";
             button1.UseVisualStyleBackColor = true;
@@ -292,6 +296,10 @@
             // 
             newSpecificaPanel.BackColor = Color.Silver;
             newSpecificaPanel.BorderStyle = BorderStyle.Fixed3D;
+            newSpecificaPanel.Controls.Add(specificheImpegnoMensaTxt);
+            newSpecificaPanel.Controls.Add(label3);
+            newSpecificaPanel.Controls.Add(specificheImportoMensaTxt);
+            newSpecificaPanel.Controls.Add(label2);
             newSpecificaPanel.Controls.Add(specificheImpPRBox);
             newSpecificaPanel.Controls.Add(label30);
             newSpecificaPanel.Controls.Add(label36);
@@ -304,9 +312,9 @@
             newSpecificaPanel.Controls.Add(label33);
             newSpecificaPanel.Controls.Add(specificheCapitoloBox);
             newSpecificaPanel.Controls.Add(label34);
-            newSpecificaPanel.Location = new Point(460, 111);
+            newSpecificaPanel.Location = new Point(460, 71);
             newSpecificaPanel.Name = "newSpecificaPanel";
-            newSpecificaPanel.Size = new Size(330, 179);
+            newSpecificaPanel.Size = new Size(330, 212);
             newSpecificaPanel.TabIndex = 52;
             // 
             // openFileDialog
@@ -316,12 +324,44 @@
             // soloAperturaCheck
             // 
             soloAperturaCheck.AutoSize = true;
-            soloAperturaCheck.Location = new Point(628, 86);
+            soloAperturaCheck.Location = new Point(192, 215);
             soloAperturaCheck.Name = "soloAperturaCheck";
             soloAperturaCheck.Size = new Size(181, 19);
             soloAperturaCheck.TabIndex = 53;
             soloAperturaCheck.Text = "Solo apertura nuova specifica";
             soloAperturaCheck.UseVisualStyleBackColor = true;
+            // 
+            // specificheImportoMensaTxt
+            // 
+            specificheImportoMensaTxt.Location = new Point(3, 157);
+            specificheImportoMensaTxt.Name = "specificheImportoMensaTxt";
+            specificheImportoMensaTxt.Size = new Size(197, 23);
+            specificheImportoMensaTxt.TabIndex = 50;
+            // 
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Location = new Point(206, 160);
+            label2.Name = "label2";
+            label2.Size = new Size(88, 15);
+            label2.TabIndex = 51;
+            label2.Text = "Importo mensa";
+            // 
+            // specificheImpegnoMensaTxt
+            // 
+            specificheImpegnoMensaTxt.Location = new Point(3, 182);
+            specificheImpegnoMensaTxt.Name = "specificheImpegnoMensaTxt";
+            specificheImpegnoMensaTxt.Size = new Size(197, 23);
+            specificheImpegnoMensaTxt.TabIndex = 52;
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Location = new Point(206, 185);
+            label3.Name = "label3";
+            label3.Size = new Size(93, 15);
+            label3.TabIndex = 53;
+            label3.Text = "Impegno mensa";
             // 
             // FormSpecificheImpegni
             // 
@@ -388,5 +428,9 @@
         private Panel newSpecificaPanel;
         private OpenFileDialog openFileDialog;
         private CheckBox soloAperturaCheck;
+        private TextBox specificheImpegnoMensaTxt;
+        private Label label3;
+        private TextBox specificheImportoMensaTxt;
+        private Label label2;
     }
 }

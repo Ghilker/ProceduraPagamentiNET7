@@ -108,7 +108,8 @@ namespace ProcedureNet7
             double costoMensile,
             DateTime minDate,
             DateTime maxDate,
-            bool fuoriCorso
+            bool fuoriCorso,
+            string idAssegnazione
             )
         {
             Assegnazione nuovaAssegnazione = new Assegnazione();
@@ -124,7 +125,8 @@ namespace ProcedureNet7
                  minDate,
                  maxDate,
                  assegnazioni,
-                 fuoriCorso
+                 fuoriCorso,
+                 idAssegnazione
                  );
 
             if (assegnazioni == null)

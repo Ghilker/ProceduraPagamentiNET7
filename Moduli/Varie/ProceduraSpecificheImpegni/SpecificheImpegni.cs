@@ -27,6 +27,8 @@ namespace ProcedureNet7
         string numDetermina = string.Empty;
         string selectedAA = string.Empty;
         string selectedCodBeneficio = string.Empty;
+        string selectedImportoMensa = string.Empty;
+        string selectedImpegnoMensa = string.Empty;
 
         SqlTransaction? sqlTransaction = null;
         private ManualResetEvent _waitHandle = new ManualResetEvent(false);
@@ -63,6 +65,8 @@ namespace ProcedureNet7
                 numDetermina = args._numDetermina;
                 selectedAA = args._selectedAA;
                 selectedCodBeneficio = args._selectedCodBeneficio;
+                selectedImpegnoMensa = args._impegnoMensa;
+                selectedImportoMensa = args._importoMensa;
                 Panel? specificheImpegniPanel = null;
 
                 _masterForm.Invoke((MethodInvoker)delegate
@@ -123,8 +127,8 @@ namespace ProcedureNet7
                 });
 
                 string sqlInsert = @"
-                    INSERT INTO [specifiche_impegni] ([Anno_accademico], [Num_domanda], [Cod_fiscale], [Cod_beneficio], [Data_validita], [Utente], [Codice_Studente], [Tipo_fondo], [Capitolo], [Importo_assegnato], [Determina_conferimento], [num_impegno_primaRata], [num_impegno_saldo], [esercizio_saldo], [Esercizio_prima_rata], [data_fine_validita], [Num_determina], [data_determina], [descrizione_determina])
-                    SELECT @selectedAA, @numDomanda, Domanda.Cod_fiscale, @selectedCodBeneficio, CURRENT_TIMESTAMP, 'Area4', Studente.Codice_Studente, @tipoFondo, @capitolo, @importo, @numDetermina, @impegnoPR, @impegnoSA, @eseSA, @esePR, NULL, NULL, NULL, NULL
+                    INSERT INTO [specifiche_impegni] ([Anno_accademico], [Num_domanda], [Cod_fiscale], [Cod_beneficio], [Data_validita], [Utente], [Codice_Studente], [Tipo_fondo], [Capitolo], [Importo_assegnato], [Determina_conferimento], [num_impegno_primaRata], [num_impegno_saldo], [esercizio_saldo], [Esercizio_prima_rata], [data_fine_validita], [Num_determina], [data_determina], [descrizione_determina], [monetizzazione_mensa], [importo_monetizzazione], [impegno_monetizzazione])
+                    SELECT @selectedAA, @numDomanda, Domanda.Cod_fiscale, @selectedCodBeneficio, CURRENT_TIMESTAMP, 'Area4', Studente.Codice_Studente, @tipoFondo, @capitolo, @importo, @numDetermina, @impegnoPR, @impegnoSA, @eseSA, @esePR, NULL, NULL, NULL, NULL, @boolMonetizzazione, @importoMonetizzazione, @impegnoMonetizzazione
                     FROM Domanda 
                     INNER JOIN Studente ON Domanda.Cod_fiscale = Studente.Cod_fiscale
                     WHERE Domanda.Anno_accademico = @selectedAA AND Domanda.Num_domanda = @numDomanda
@@ -143,6 +147,9 @@ namespace ProcedureNet7
                 insertCommand.Parameters.Add("@esePR", SqlDbType.VarChar);
                 insertCommand.Parameters.Add("@numDomanda", SqlDbType.VarChar);
                 insertCommand.Parameters.Add("@importo", SqlDbType.Float);
+                insertCommand.Parameters.Add("@boolMonetizzazione", SqlDbType.Int);
+                insertCommand.Parameters.Add("@importoMonetizzazione", SqlDbType.Decimal);
+                insertCommand.Parameters.Add("@impegnoMonetizzazione", SqlDbType.VarChar);
 
                 try
                 {
@@ -157,12 +164,25 @@ namespace ProcedureNet7
                         insertCommand.Parameters["@selectedAA"].Value = selectedAA;
                         insertCommand.Parameters["@selectedCodBeneficio"].Value = selectedCodBeneficio;
                         insertCommand.Parameters["@tipoFondo"].Value = tipoFondo;
-                        insertCommand.Parameters["@capitolo"].Value = soloApertura ? "" : capitolo;
-                        insertCommand.Parameters["@numDetermina"].Value = soloApertura ? "" : $"{numDetermina} del {selectedDate}";
+                        insertCommand.Parameters["@capitolo"].Value = capitolo;
+                        insertCommand.Parameters["@numDetermina"].Value = numDetermina == "" ? "" : $"{numDetermina} del {selectedDate}";
                         insertCommand.Parameters["@impegnoPR"].Value = impegnoPR;
                         insertCommand.Parameters["@impegnoSA"].Value = impegnoSA;
                         insertCommand.Parameters["@eseSA"].Value = eseSA;
                         insertCommand.Parameters["@esePR"].Value = esePR;
+
+                        if (!string.IsNullOrWhiteSpace(selectedImportoMensa))
+                        {
+                            insertCommand.Parameters["@boolMonetizzazione"].Value = 1;
+                            insertCommand.Parameters["@importoMonetizzazione"].Value = selectedImportoMensa;
+                            insertCommand.Parameters["@impegnoMonetizzazione"].Value = selectedImpegnoMensa;
+                        }
+                        else
+                        {
+                            insertCommand.Parameters["@boolMonetizzazione"].Value = 0;
+                            insertCommand.Parameters["@importoMonetizzazione"].Value = DBNull.Value;
+                            insertCommand.Parameters["@impegnoMonetizzazione"].Value = DBNull.Value;
+                        }
 
                         insertCommand.ExecuteNonQuery();
                         counter++;

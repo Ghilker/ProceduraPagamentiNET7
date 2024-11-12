@@ -96,7 +96,7 @@ namespace ProcedureNet7
             }
 
             // Process codFiscale values to remove
-            if (!string.IsNullOrEmpty(data[1].ToString()))
+            if (!string.IsNullOrWhiteSpace(data[1].ToString()))
             {
                 foreach (string block in data[1].ToString().Split(delimiters, StringSplitOptions.RemoveEmptyEntries))
                 {
@@ -112,7 +112,7 @@ namespace ProcedureNet7
             }
 
             // Process codFiscale values to add
-            if (!string.IsNullOrEmpty(data[2].ToString()))
+            if (!string.IsNullOrWhiteSpace(data[2].ToString()))
             {
                 foreach (string block in data[2].ToString().Split(delimiters, StringSplitOptions.RemoveEmptyEntries))
                 {
@@ -133,6 +133,10 @@ namespace ProcedureNet7
         {
             foreach (string block in blocksToRemove.Keys)
             {
+                if (string.IsNullOrWhiteSpace(block))
+                {
+                    continue;
+                }
                 try
                 {
                     BlocksUtil.RemoveBlock(conn, transaction, blocksToRemove[block], block, _blocksYear, _blocksUsername);
@@ -145,6 +149,10 @@ namespace ProcedureNet7
             }
             foreach (string block in blocksToAdd.Keys)
             {
+                if (string.IsNullOrWhiteSpace(block))
+                {
+                    continue;
+                }
                 try
                 {
                     BlocksUtil.AddBlock(conn, transaction, blocksToAdd[block], block, _blocksYear, _blocksUsername);

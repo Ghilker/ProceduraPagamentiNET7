@@ -42,7 +42,8 @@ namespace ProcedureNet7
                 ArgsValidation argsValidation = new ArgsValidation();
                 ArgsControlloISEEUP iseeupArgs = new ArgsControlloISEEUP
                 {
-                    _annoAccademico = iseeupAABox.Text
+                    _annoAccademico = iseeupAABox.Text,
+                    _usaIncongruenze = usaIncongruenzeCheck.Checked,
                 };
                 argsValidation.Validate(iseeupArgs);
                 ProceduraControlloISEEUP proceduraISEEUP = new(_masterForm, mainConnection);

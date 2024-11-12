@@ -63,7 +63,9 @@ namespace ProcedureNet7
                     _impegnoSA = specificheImpSABox.Text,
                     _numDetermina = specificheNumDetBox.Text,
                     _selectedAA = specificheAABox.Text,
-                    _selectedCodBeneficio = specificheCodBeneficioBox.Text
+                    _selectedCodBeneficio = specificheCodBeneficioBox.Text,
+                    _importoMensa = specificheImportoMensaTxt.Text,
+                    _impegnoMensa = specificheImpegnoMensaTxt.Text,
                 };
                 argsValidation.Validate(argsSpecificheImpegni);
                 SpecificheImpegni specificheImpegni = new(_masterForm, mainConnection);

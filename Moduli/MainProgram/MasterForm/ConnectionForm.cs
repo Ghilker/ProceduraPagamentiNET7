@@ -107,8 +107,11 @@ namespace ProcedureNet7
             }
         }
 
-        private void ConnectionButton_Click(object sender, EventArgs e)
+        private async void ConnectionButton_Click(object sender, EventArgs e)
         {
+            // Disable the connection button to prevent multiple clicks
+            connectionButton.Enabled = false;
+
             Dictionary<string, Hashtable> credentials = new();
             Hashtable credential = new();
 
@@ -122,6 +125,7 @@ namespace ProcedureNet7
                 if (nullableCredentials == null)
                 {
                     Logger.LogWarning(null, "No saved credentials found. Please enter the connection details.");
+                    connectionButton.Enabled = true; // Re-enable the button before returning
                     return;
                 }
                 credentials = nullableCredentials;
@@ -144,18 +148,56 @@ namespace ProcedureNet7
             // Construct the connection string
             CONNECTION_STRING = $"Server={credential["serverIP"]};Database={credential["databaseName"]};User Id={credential["userID"]};Password={credential["password"]};";
 
-            // Check if the database can be reached
-            if (!Utilities.CanConnectToDatabase(CONNECTION_STRING, out outConnection))
+            // Attempt to connect up to 3 times
+            int maxAttempts = 3;
+            int attempt = 0;
+            bool isConnected = false;
+
+            while (attempt < maxAttempts && !isConnected)
             {
-                Logger.LogWarning(null, $"Impossibile connettersi al database: {databaseName.Text}");
-                return;
+                attempt++;
+                // Update UI to indicate the attempt
+                connectionLabel.Text = $"Attempting connection ({attempt}/{maxAttempts})...";
+                connectionLabel.ForeColor = Color.Orange;
+                Logger.LogInfo(null, $"Connection attempt {attempt} of {maxAttempts}");
+
+                // Run the connection attempt on a background thread
+                isConnected = await Task.Run(() => TryConnect(CONNECTION_STRING, out outConnection));
+
+                if (!isConnected)
+                {
+                    Logger.LogWarning(null, $"Connection attempt {attempt} failed.");
+                    // Optionally, wait some time before retrying
+                    await Task.Delay(1000); // Wait 1 second before next attempt
+                }
             }
 
-            connectionLabel.Text = $"Connesso {databaseName.Text}";
-            Logger.LogDebug(null, $"Connesso al server {databaseName.Text}");
-            connectionLabel.ForeColor = Color.DarkGreen;
+            if (isConnected)
+            {
+                // Update UI to indicate success
+                connectionLabel.Text = $"Connected to {databaseName.Text}";
+                Logger.LogDebug(null, $"Connected to server {databaseName.Text}");
+                connectionLabel.ForeColor = Color.DarkGreen;
 
-            _masterForm.SetupConnection(outConnection);
+                _masterForm.SetupConnection(outConnection);
+            }
+            else
+            {
+                // Update UI to indicate failure
+                Logger.LogWarning(null, $"Unable to connect to database: {databaseName.Text} after {maxAttempts} attempts");
+                connectionLabel.Text = $"Failed to connect after {maxAttempts} attempts";
+                connectionLabel.ForeColor = Color.Red;
+            }
+
+            // Re-enable the connection button
+            connectionButton.Enabled = true;
         }
+
+        // Helper method to attempt the connection
+        private bool TryConnect(string connectionString, out SqlConnection? connection)
+        {
+            return Utilities.CanConnectToDatabase(connectionString, out connection);
+        }
+
     }
 }

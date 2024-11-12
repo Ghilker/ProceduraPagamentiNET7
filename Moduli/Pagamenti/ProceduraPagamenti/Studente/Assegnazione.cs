@@ -17,6 +17,7 @@ namespace ProcedureNet7
         public double costoTotale { get; private set; }
         public double costoMensile { get; private set; }
         public AssegnazioneDataCheck statoCorrettezzaAssegnazione { get; private set; }
+        public string idAssegnazione { get; private set; }
 
         public Assegnazione()
         {
@@ -37,7 +38,8 @@ namespace ProcedureNet7
                 DateTime minDate,
                 DateTime maxDate,
                 List<Assegnazione> assegnazioni,
-                bool fuoriCorso
+                bool fuoriCorso,
+                string idAssegnazione
             )
         {
             this.codPensionato = codPensionato;
@@ -47,12 +49,18 @@ namespace ProcedureNet7
             this.codFineAssegnazione = codFineAssegnazione;
             this.codTipoStanza = codTipoStanza;
             this.costoMensile = costoMensile;
+            this.idAssegnazione = idAssegnazione;
 
             statoCorrettezzaAssegnazione = AssegnazioneDataCheck.Corretto;
 
             costoTotale = CalculateTotalDailyCost(dataDecorrenza, dataFineAssegnazione, costoMensile, minDate, maxDate, assegnazioni, fuoriCorso);
 
             return statoCorrettezzaAssegnazione;
+        }
+
+        public void SetAssegnazioneDataCheck(AssegnazioneDataCheck toSet)
+        {
+            this.statoCorrettezzaAssegnazione = toSet;
         }
 
         public double CalculateTotalDailyCost(DateTime startDate, DateTime endDate, double monthlyCost, DateTime minDate, DateTime maxDate, List<Assegnazione> assegnazioni, bool fuoriCorso)
@@ -139,6 +147,7 @@ namespace ProcedureNet7
         DataDecorrenzaMinoreDiMin,
         DataFineAssMaggioreMax,
         MancanzaDataFineAssegnazione,
-        UscitaPrecedenteAlLimite
+        UscitaPrecedenteAlLimite,
+        ErroreControlloData
     }
 }

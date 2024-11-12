@@ -30,7 +30,7 @@ namespace ProcedureNet7
 
         public MasterForm(int userID, string userTier)
         {
-            this.userTier = userTier;
+            this.userTier = "Programmatore";
             InitializeComponent();
             Initialize();
             InitializeBackgroundWorker();
@@ -151,9 +151,9 @@ namespace ProcedureNet7
             string[] parts = selectedText.Split(new[] { " - " }, StringSplitOptions.None);
             string category = parts[0];
             string procedureName = parts[1];
-
             _ = Invoke(new MethodInvoker(() =>
             {
+                Logger.LogInfo(null, $"Selezionata la procedura: {procedureName}");
 #if PAGAMENTI || DEBUG
                 if (category == "Pagamenti" && Enum.TryParse(procedureName, out ProcedurePagamenti selectedPagamentiProcedure))
                 {

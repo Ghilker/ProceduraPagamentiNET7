@@ -5,8 +5,6 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace ProcedureNet7
 {
@@ -34,6 +32,14 @@ namespace ProcedureNet7
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+#if PAGAMENTI || VARIE || VERIFICHE
+
+            MessageBox.Show("L'applicazione non è più supportata, usare la versione Debug.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Application.Exit();
+            return;
+
+#endif
 
             bool isFileValid = false;
             bool isUserValid = false;

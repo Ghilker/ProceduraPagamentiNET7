@@ -22,5 +22,8 @@ namespace ProcedureNet7
         public List<string> incongruenzePresenti = new();
         public List<string> incongruenzeDaTogliere = new();
         public List<string> incongruenzeDaMettere = new();
+        public List<string> blocchiPresenti = new();
+        public List<string> blocchiDaTogliere = new();
+        public List<string> blocchiDaMettere = new();
     }
 }

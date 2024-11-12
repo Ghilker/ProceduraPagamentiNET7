@@ -29,7 +29,7 @@ namespace ProcedureNet7
             {
                 string nameAndDate = Path.GetFileNameWithoutExtension(filePath);
                 string[] parts = nameAndDate.Split('-');
-                string uniName = parts[0];
+                string uniName = parts[0].ToUpper().Trim();
                 DataTable initialStudentData = Utilities.ReadExcelToDataTable(filePath);
                 List<StudenteElaborazione> studenteElaborazioneList = new List<StudenteElaborazione>();
                 if (initialStudentData.Rows.Count > 0)
@@ -57,7 +57,7 @@ namespace ProcedureNet7
                         {
                             ProcessTipoCorso(row, studente, uniName);
                         }
-                        if (initialStudentData.Columns.Contains("TIPO_ISCRIZIONE_UNI"))
+                        if (initialStudentData.Columns.Contains("TIPO_ISCR_UNI"))
                         {
                             ProcessTipoIscrizione(row, studente, uniName);
                         }
@@ -75,7 +75,7 @@ namespace ProcedureNet7
                         {
                             ProcessAnnoCorso(row, studente, uniName);
                         }
-                        if (initialStudentData.Columns.Contains("ANNO_IMMATRICOLAZIONE_UNI"))
+                        if (initialStudentData.Columns.Contains("ANNO_IMM_UNI"))
                         {
                             ProcessAnnoImmatricolazione(row, studente, uniName);
                         }
@@ -432,7 +432,7 @@ namespace ProcedureNet7
                         break;
                     case "SANRAF":
                     case "UNIEU":
-                    case "CONSCEC":
+                    case "SCECILIA":
                     case "LUISS":
                     case "RUFA":
                     case "ABAROMA":
@@ -440,7 +440,7 @@ namespace ProcedureNet7
                     case "MERCATORUM":
                     case "UNICAMILLUS":
                     case "ACCDANZA":
-                        if (cellToProcess.Contains("TRIENNALE"))
+                        if (cellToProcess.Contains("TRIENNALE") || cellToProcess.Contains("TRIENNIO"))
                         {
                             studente.tipoCorsoUni = "3";
                         }
@@ -448,7 +448,7 @@ namespace ProcedureNet7
                         {
                             studente.tipoCorsoUni = "4";
                         }
-                        else if (cellToProcess.Contains("MAGISTRALE") || cellToProcess == "BIENNALE")
+                        else if (cellToProcess.Contains("MAGISTRALE") || cellToProcess == "BIENNALE" || cellToProcess.Contains("BIENNIO"))
                         {
                             studente.tipoCorsoUni = "5";
                         }
@@ -523,7 +523,7 @@ namespace ProcedureNet7
             }
             void ProcessTipoIscrizione(DataRow row, StudenteElaborazione studente, string uniType)
             {
-                string cellToProcess = row["TIPO_ISCRIZIONE_UNI"].ToString().ToUpper().Trim();
+                string cellToProcess = row["TIPO_ISCR_UNI"].ToString().ToUpper().Trim();
 
                 if (cellToProcess == "")
                 {
@@ -531,7 +531,7 @@ namespace ProcedureNet7
                     {
                         studente.colErroriElaborazione = new();
                     }
-                    studente.colErroriElaborazione.Add("TIPO_ISCRIZIONE_UNI");
+                    studente.colErroriElaborazione.Add("TIPO_ISCR_UNI");
                     return;
                 }
                 switch (uniType)
@@ -540,7 +540,7 @@ namespace ProcedureNet7
                     case "UNIEU":
                     case "SAPIENZA":
                     case "SANRAF":
-                    case "CONSCEC":
+                    case "SCECILIA":
                     case "LUISS":
                     case "RUFA":
                     case "UNICAMILLUS":
@@ -574,7 +574,7 @@ namespace ProcedureNet7
                             {
                                 studente.colErroriElaborazione = new();
                             }
-                            studente.colErroriElaborazione.Add("TIPO_ISCRIZIONE_UNI");
+                            studente.colErroriElaborazione.Add("TIPO_ISCR_UNI");
                         }
                         break;
 
@@ -596,7 +596,7 @@ namespace ProcedureNet7
                             {
                                 studente.colErroriElaborazione = new();
                             }
-                            studente.colErroriElaborazione.Add("TIPO_ISCRIZIONE_UNI");
+                            studente.colErroriElaborazione.Add("TIPO_ISCR_UNI");
                         }
                         break;
                 }
@@ -614,7 +614,7 @@ namespace ProcedureNet7
                     case "LUMSA":
                     case "UNIEU":
                     case "SANRAF":
-                    case "CONSCEC":
+                    case "SCECILIA":
                     case "LUISS":
                     case "RUFA":
                     case "UNICAMILLUS":
@@ -659,7 +659,7 @@ namespace ProcedureNet7
                     case "UNIEU":
                     case "SAPIENZA":
                     case "SANRAF":
-                    case "CONSCEC":
+                    case "SCECILIA":
                     case "LUISS":
                     case "RUFA":
                     case "UNICAMILLUS":
@@ -786,7 +786,7 @@ namespace ProcedureNet7
                                 studente.annoCorsoUni = int.Parse(cellAnnoFC) * -1;
                                 break;
                             case "SANRAF":
-                            case "CONSCEC":
+                            case "SCECILIA":
                             case "ACCDANZA":
                             case "UNICAMILLUS":
                                 studente.annoCorsoUni = int.Parse(cellToProcess); //COLONNA CON NUMERI IN NEGATIVO MANUALMENTE INSERITI
@@ -828,14 +828,14 @@ namespace ProcedureNet7
             }
             void ProcessAnnoImmatricolazione(DataRow row, StudenteElaborazione studente, string uniType)
             {
-                string cellToProcess = Utilities.RemoveNonNumeric(row["ANNO_IMMATRICOLAZIONE_UNI"].ToString().ToUpper());
+                string cellToProcess = Utilities.RemoveNonNumeric(row["ANNO_IMM_UNI"].ToString().ToUpper());
                 //if (!AcademicYearProcessor.ProcessAcademicYear(cellToProcess, out string annoAccademicoProcessed))
                 //{
                 //    if (studente.colErroriElaborazione == null)
                 //    {
                 //        studente.colErroriElaborazione = new();
                 //    }
-                //    studente.colErroriElaborazione.Add("ANNO_IMMATRICOLAZIONE_UNI");
+                //    studente.colErroriElaborazione.Add("ANNO_IMM_UNI");
                 //}
                 //studente.aaImmatricolazioneUni = annoAccademicoProcessed;
                 try
@@ -850,7 +850,7 @@ namespace ProcedureNet7
                         case "SANRAF":
                         case "TORVERGATA":
                         case "UNIEU":
-                        case "CONSCEC":
+                        case "SCECILIA":
                         case "LUISS":
                         case "ABAFROS":
                         case "RUFA":
@@ -861,7 +861,15 @@ namespace ProcedureNet7
                             annoImmatricolazione = cellToProcess;
                             break;
                         case "ABAROMA":
-                            annoImmatricolazione = "20" + cellToProcess.Substring(0, 2) + "20" + cellToProcess.Substring(2, 2);
+                            int lenght1 = cellToProcess.Length;
+                            if (lenght1 == 8)
+                            {
+                                annoImmatricolazione = cellToProcess;
+                            }
+                            else
+                            {
+                                annoImmatricolazione = "20" + cellToProcess.Substring(0, 2) + "20" + cellToProcess.Substring(2, 2);
+                            }
                             break;
                         case "SAPIENZA":
                             string annoPrecedente = (int.Parse(cellToProcess) - 1).ToString();
@@ -893,7 +901,7 @@ namespace ProcedureNet7
                     {
                         studente.colErroriElaborazione = new();
                     }
-                    studente.colErroriElaborazione.Add("ANNO_IMMATRICOLAZIONE_UNI");
+                    studente.colErroriElaborazione.Add("ANNO_IMM_UNI");
                 }
             }
             void ProcessCrediti(DataRow row, StudenteElaborazione studente, string uniType)
@@ -901,13 +909,13 @@ namespace ProcedureNet7
                 try
                 {
                     string cellToProcess = row["CREDITI_UNI"].ToString().ToUpper();
+                    if (string.IsNullOrWhiteSpace(cellToProcess))
+                    {
+                        cellToProcess = "0";
+                    }
 
                     if (uniType == "TORVERGATA")
                     {
-                        if (string.IsNullOrWhiteSpace(cellToProcess) && studente.annoCorsoUni == 1)
-                        {
-                            cellToProcess = "0";
-                        }
                         cellToProcess = (int.Parse(cellToProcess.Replace(".", "")) * 0.1).ToString();
                     }
                     switch (uniType)
@@ -916,7 +924,7 @@ namespace ProcedureNet7
                         case "UNIEU":
                         case "SAPIENZA":
                         case "SANRAF":
-                        case "CONSCEC":
+                        case "SCECILIA":
                         case "LUISS":
                         case "RUFA":
                         case "UNICAMILLUS":
@@ -967,7 +975,7 @@ namespace ProcedureNet7
                         case "UNIEU":
                         case "SAPIENZA":
                         case "SANRAF":
-                        case "CONSCEC":
+                        case "SCECILIA":
                         case "LUISS":
                         case "RUFA":
                         case "UNICAMILLUS":
@@ -1011,7 +1019,7 @@ namespace ProcedureNet7
                         case "UNIEU":
                         case "SAPIENZA":
                         case "SANRAF":
-                        case "CONSCEC":
+                        case "SCECILIA":
                         case "LUISS":
                         case "RUFA":
                         case "UNICAMILLUS":
@@ -1063,7 +1071,7 @@ namespace ProcedureNet7
                         case "UNIEU":
                         case "SAPIENZA":
                         case "SANRAF":
-                        case "CONSCEC":
+                        case "SCECILIA":
                         case "LUISS":
                         case "RUFA":
                         case "UNICAMILLUS":
@@ -1433,11 +1441,14 @@ namespace ProcedureNet7
                     if (checkStem && studente.sessoDic == "F" && studente.stemDic)
                     {
                         bool isStem = StringSimilarityChecker.AreStringsSimilar(studente.descrCorsoUni, studente.descrCorsoDic);
-                        if (!isStem)
-                        {
-                            studente.blocchiDaMettere.Add("VST");
-                            studente.incongruenzeDaMettere.Add("83");
-                        }
+                        if (studente.descrCorsoDic.Contains("Engineering") ||
+                            studente.descrCorsoDic.Contains("Ingegneria") ||
+                            studente.descrCorsoDic.Contains("Biotec"))
+                            if (!isStem)
+                            {
+                                studente.blocchiDaMettere.Add("VST");
+                                studente.incongruenzeDaMettere.Add("83");
+                            }
                     }
 
 
