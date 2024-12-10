@@ -41,16 +41,19 @@ namespace ProcedureNet7
 
         public override void RunProcedure(ArgsSpecificheImpegni args)
         {
+            bool success = false; // Flag to indicate whether we can commit
             try
             {
-                sqlTransaction = CONNECTION.BeginTransaction();
-
-                if (CONNECTION == null || sqlTransaction == null)
+                if (CONNECTION == null)
                 {
-                    Logger.LogInfo(null, "Uscita anticipata da RunProcedure: connessione o transazione null");
+                    Logger.LogInfo(null, "Connessione assente. Uscita anticipata.");
                     return;
                 }
 
+                sqlTransaction = CONNECTION.BeginTransaction();
+                Logger.LogInfo(10, "Transazione iniziata.");
+
+                // Assign passed arguments
                 selectedFile = args._selectedFile;
                 selectedDate = args._selectedDate;
                 tipoFondo = args._tipoFondo;
@@ -67,6 +70,7 @@ namespace ProcedureNet7
                 selectedCodBeneficio = args._selectedCodBeneficio;
                 selectedImpegnoMensa = args._impegnoMensa;
                 selectedImportoMensa = args._importoMensa;
+
                 Panel? specificheImpegniPanel = null;
 
                 _masterForm.Invoke((MethodInvoker)delegate
@@ -77,6 +81,7 @@ namespace ProcedureNet7
                 Logger.LogInfo(20, "Selezione numeri domanda");
                 DataTable allStudentsData = Utilities.ReadExcelToDataTable(selectedFile);
                 DataGridView numDomandaGridView = Utilities.CreateDataGridView(allStudentsData, _masterForm, specificheImpegniPanel, OnNumDomandaClicked);
+
                 MessageBox.Show("Cliccare sul primo numero domanda", "Selezionare il numero domanda");
                 _waitHandle.Reset();
                 _waitHandle.WaitOne();
@@ -88,32 +93,38 @@ namespace ProcedureNet7
 
                 string numDomandaString = string.Join(", ", _numDomandas.Select(numDom => $"'{numDom}'"));
 
+                // If not just opening, we update old records
                 if (!soloApertura)
                 {
                     string sqlUpdate = $@"
-                UPDATE Specifiche_impegni
-                SET data_fine_validita = '{selectedDate}',
-                    Num_determina = '{numDetermina}',
-                    data_determina = '{selectedDate}',
-                    descrizione_determina = '{descrDetermina}'
-                WHERE
-                    anno_accademico = '{selectedAA}' AND
-                    cod_beneficio = '{selectedCodBeneficio}' AND
-                    num_domanda IN ({numDomandaString}) AND
-                    data_fine_validita IS NULL";
+                        UPDATE Specifiche_impegni
+                        SET data_fine_validita = '{selectedDate}',
+                            Num_determina = '{numDetermina}',
+                            data_determina = '{selectedDate}',
+                            descrizione_determina = '{descrDetermina}'
+                        WHERE
+                            anno_accademico = '{selectedAA}' AND
+                            cod_beneficio = '{selectedCodBeneficio}' AND
+                            num_domanda IN ({numDomandaString}) AND
+                            data_fine_validita IS NULL";
 
                     Logger.LogInfo(30, "Update specifiche impegni con la chiusura delle righe");
+                    using (SqlCommand updateCommand = new SqlCommand(sqlUpdate, CONNECTION, sqlTransaction))
+                    {
+                        updateCommand.ExecuteNonQuery();
+                    }
 
-                    SqlCommand updateCommand = new SqlCommand(sqlUpdate, CONNECTION, sqlTransaction);
-                    updateCommand.ExecuteNonQuery();
+                    // If we do not need to open a new specification
+                    if (!aperturaNuovaSpecifica)
+                    {
+                        // We are done
+                        Logger.LogInfo(40, "Nessuna nuova specifica da aprire. Commit e fine procedura.");
+                        success = true; // Allow commit
+                        return;
+                    }
                 }
-                if (!aperturaNuovaSpecifica)
-                {
-                    sqlTransaction.Commit();
-                    Logger.LogInfo(100, "Fine lavorazione");
-                    _masterForm.inProcedure = false;
-                    return;
-                }
+
+                // If we reach here, we need to open new specifications
                 Logger.LogInfo(60, "Selezione importi attuali");
 
                 DataGridView importiGridView = Utilities.CreateDataGridView(allStudentsData, _masterForm, specificheImpegniPanel, OnImportiClicked);
@@ -126,34 +137,34 @@ namespace ProcedureNet7
                     importiGridView.Dispose();
                 });
 
+                // Build insert command
                 string sqlInsert = @"
-                    INSERT INTO [specifiche_impegni] ([Anno_accademico], [Num_domanda], [Cod_fiscale], [Cod_beneficio], [Data_validita], [Utente], [Codice_Studente], [Tipo_fondo], [Capitolo], [Importo_assegnato], [Determina_conferimento], [num_impegno_primaRata], [num_impegno_saldo], [esercizio_saldo], [Esercizio_prima_rata], [data_fine_validita], [Num_determina], [data_determina], [descrizione_determina], [monetizzazione_mensa], [importo_monetizzazione], [impegno_monetizzazione])
+                    INSERT INTO [specifiche_impegni] ([Anno_accademico], [Num_domanda], [Cod_fiscale], [Cod_beneficio], [Data_validita], [Utente], [Codice_Studente], [Tipo_fondo], [Capitolo], [Importo_assegnato], [Determina_conferimento], [num_impegno_primaRata], [num_impegno_saldo], [esercizio_saldo], [Esercizio_prima_rata], [data_fine_validita], [Num_determina], [data_determina], [descrizione_determina], monetizzazione_concessa, importo_servizio_mensa, impegno_monetizzazione)
                     SELECT @selectedAA, @numDomanda, Domanda.Cod_fiscale, @selectedCodBeneficio, CURRENT_TIMESTAMP, 'Area4', Studente.Codice_Studente, @tipoFondo, @capitolo, @importo, @numDetermina, @impegnoPR, @impegnoSA, @eseSA, @esePR, NULL, NULL, NULL, NULL, @boolMonetizzazione, @importoMonetizzazione, @impegnoMonetizzazione
                     FROM Domanda 
                     INNER JOIN Studente ON Domanda.Cod_fiscale = Studente.Cod_fiscale
                     WHERE Domanda.Anno_accademico = @selectedAA AND Domanda.Num_domanda = @numDomanda
                 ";
 
-                using SqlCommand insertCommand = new SqlCommand(sqlInsert, CONNECTION, sqlTransaction);
-                // Initialize all parameters just once
-                insertCommand.Parameters.Add("@selectedAA", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@selectedCodBeneficio", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@tipoFondo", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@capitolo", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@numDetermina", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@impegnoPR", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@impegnoSA", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@eseSA", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@esePR", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@numDomanda", SqlDbType.VarChar);
-                insertCommand.Parameters.Add("@importo", SqlDbType.Float);
-                insertCommand.Parameters.Add("@boolMonetizzazione", SqlDbType.Int);
-                insertCommand.Parameters.Add("@importoMonetizzazione", SqlDbType.Decimal);
-                insertCommand.Parameters.Add("@impegnoMonetizzazione", SqlDbType.VarChar);
-
-                try
+                using (SqlCommand insertCommand = new SqlCommand(sqlInsert, CONNECTION, sqlTransaction))
                 {
+                    insertCommand.Parameters.Add("@selectedAA", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@selectedCodBeneficio", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@tipoFondo", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@capitolo", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@numDetermina", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@impegnoPR", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@impegnoSA", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@eseSA", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@esePR", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@numDomanda", SqlDbType.VarChar);
+                    insertCommand.Parameters.Add("@importo", SqlDbType.Float);
+                    insertCommand.Parameters.Add("@boolMonetizzazione", SqlDbType.Int);
+                    insertCommand.Parameters.Add("@importoMonetizzazione", SqlDbType.Decimal);
+                    insertCommand.Parameters.Add("@impegnoMonetizzazione", SqlDbType.VarChar);
+
                     int counter = 0;
+
                     foreach (KeyValuePair<string, double> pair in numDomandaImporti)
                     {
                         if (string.IsNullOrWhiteSpace(pair.Key))
@@ -165,7 +176,7 @@ namespace ProcedureNet7
                         insertCommand.Parameters["@selectedCodBeneficio"].Value = selectedCodBeneficio;
                         insertCommand.Parameters["@tipoFondo"].Value = tipoFondo;
                         insertCommand.Parameters["@capitolo"].Value = capitolo;
-                        insertCommand.Parameters["@numDetermina"].Value = numDetermina == "" ? "" : $"{numDetermina} del {selectedDate}";
+                        insertCommand.Parameters["@numDetermina"].Value = string.IsNullOrEmpty(numDetermina) ? "" : $"{numDetermina} del {selectedDate}";
                         insertCommand.Parameters["@impegnoPR"].Value = impegnoPR;
                         insertCommand.Parameters["@impegnoSA"].Value = impegnoSA;
                         insertCommand.Parameters["@eseSA"].Value = eseSA;
@@ -174,7 +185,15 @@ namespace ProcedureNet7
                         if (!string.IsNullOrWhiteSpace(selectedImportoMensa))
                         {
                             insertCommand.Parameters["@boolMonetizzazione"].Value = 1;
-                            insertCommand.Parameters["@importoMonetizzazione"].Value = selectedImportoMensa;
+                            if (decimal.TryParse(selectedImportoMensa, out decimal impMensa))
+                            {
+                                insertCommand.Parameters["@importoMonetizzazione"].Value = impMensa;
+                            }
+                            else
+                            {
+                                // In case parsing fails, handle accordingly
+                                insertCommand.Parameters["@importoMonetizzazione"].Value = 0;
+                            }
                             insertCommand.Parameters["@impegnoMonetizzazione"].Value = selectedImpegnoMensa;
                         }
                         else
@@ -187,27 +206,58 @@ namespace ProcedureNet7
                         insertCommand.ExecuteNonQuery();
                         counter++;
                     }
-                    sqlTransaction.Commit();
-                    Logger.LogInfo(90, $"Inserite {counter} nuove righe in specifiche impegni");
 
+                    Logger.LogInfo(90, $"Inserite {counter} nuove righe in specifiche impegni");
                 }
-                catch
-                {
-                    sqlTransaction.Rollback();
-                    throw;
-                }
-                finally
-                {
-                    Logger.LogInfo(100, "Fine lavorazione");
-                    _masterForm.inProcedure = false;
-                }
+
+                success = true; // If we reach this point, everything worked fine
             }
-            catch
+            catch (Exception ex)
             {
-                sqlTransaction.Rollback();
-                throw;
+                Logger.LogInfo(95, $"Errore durante l'esecuzione: {ex.Message}");
+                // Attempt rollback if the transaction is still valid
+                if (sqlTransaction != null && sqlTransaction.Connection != null)
+                {
+                    try
+                    {
+                        Logger.LogInfo(96, "Eseguo Rollback...");
+                        sqlTransaction.Rollback();
+                        Logger.LogInfo(97, "Rollback eseguito con successo.");
+                    }
+                    catch (Exception rbEx)
+                    {
+                        Logger.LogInfo(98, $"Errore durante il rollback: {rbEx.Message}");
+                    }
+                }
+                throw; // Re-throw the exception after rollback
+            }
+            finally
+            {
+                if (sqlTransaction != null && sqlTransaction.Connection != null)
+                {
+                    if (success)
+                    {
+                        try
+                        {
+                            Logger.LogInfo(99, "Eseguo Commit...");
+                            sqlTransaction.Commit();
+                            Logger.LogInfo(100, "Commit eseguito con successo.");
+                        }
+                        catch (Exception cEx)
+                        {
+                            Logger.LogInfo(100, $"Errore durante il commit: {cEx.Message}");
+                            // If commit fails, nothing we can really do here.
+                            // The transaction might already be broken.
+                        }
+                    }
+                    // Note: If not successful, we did rollback in the catch block.
+                }
+
+                Logger.LogInfo(100, "Fine lavorazione");
+                _masterForm.inProcedure = false;
             }
         }
+
         private void OnNumDomandaClicked(object? sender, DataGridViewCellEventArgs e)
         {
             if (sender is DataGridView dataGridView)

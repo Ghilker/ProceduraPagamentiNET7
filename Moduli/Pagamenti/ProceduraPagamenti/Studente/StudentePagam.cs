@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Newtonsoft.Json.Bson;
+using ProcedureNet7.Verifica;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,11 +18,13 @@ namespace ProcedureNet7
         public string sesso { get; private set; }
         public string codEnte { get; private set; }
         public string codCittadinanza { get; private set; }
+        public string statusSede { get; private set; }
         public Residenza residenza { get; private set; }
+        public Domicilio domicilio { get; private set; }
         public LuogoNascita luogoNascita { get; private set; }
         public bool disabile { get; private set; }
         public double importoBeneficio { get; private set; }
-        public bool vincitorePA { get; private set; }
+        public int esitoPA { get; private set; }
         public bool eraVincitorePA { get; private set; }
         public List<Assegnazione> assegnazioni { get; private set; }
         public int annoCorso { get; private set; }
@@ -45,7 +49,11 @@ namespace ProcedureNet7
         public int numeroComponentiNucleoFamiliare { get; private set; }
         public int numeroComponentiNucleoFamiliareEstero { get; private set; }
         public bool domicilioCheck { get; private set; }
-
+        public bool contrattoValido { get; private set; }
+        public bool prorogaValido { get; private set; }
+        public bool monetizzazioneMensa { get; private set; }
+        public bool rifugiato { get; private set; }
+        public bool pagatoPendolare { get; private set; }
 
         public TipoDocumento tipoDocumento { get; private set; }
         public DateTime scadenzaDocumento { get; private set; }
@@ -63,9 +71,12 @@ namespace ProcedureNet7
             double importoBeneficio,
             int annoCorso,
             int tipoCorso,
-            bool vincitorePA,
+            int esitoPA,
             bool superamentoEsami,
-            bool superamentoEsamiTassaRegionale
+            bool superamentoEsamiTassaRegionale,
+            bool monetizzazioneMensa,
+            string statusSede,
+            bool rifugiato
             )
         {
             this.numDomanda = numDomanda;
@@ -80,10 +91,11 @@ namespace ProcedureNet7
             this.importoBeneficio = importoBeneficio;
             this.annoCorso = annoCorso;
             this.tipoCorso = tipoCorso;
-            this.vincitorePA = vincitorePA;
+            this.esitoPA = esitoPA;
             eraVincitorePA = false;
             this.superamentoEsami = superamentoEsami;
             this.superamentoEsamiTassaRegionale = superamentoEsamiTassaRegionale;
+            this.monetizzazioneMensa = monetizzazioneMensa;
             numeroImpegno = string.Empty;
             assegnazioni = new List<Assegnazione>();
             reversali = new List<Reversale>();
@@ -96,6 +108,8 @@ namespace ProcedureNet7
             residenza = new Residenza();
             luogoNascita = new LuogoNascita();
             tipoDocumento = TipoDocumento.Nessuno;
+            this.statusSede = statusSede;
+            this.rifugiato = rifugiato;
         }
 
         public AssegnazioneDataCheck AddAssegnazione(
@@ -158,6 +172,42 @@ namespace ProcedureNet7
         public void SetResidenza(string indirizzo, string codComune, string provincia, string CAP, string nomeComune)
         {
             residenza = new Residenza(indirizzo, codComune, provincia, CAP, nomeComune);
+        }
+
+        public void SetDomicilio(
+            bool titoloOneroso,
+            string serieContratto,
+            DateTime dataRegistrazione,
+            DateTime dataDecorrenza,
+            DateTime dataScadenza,
+            int durataContratto,
+            bool prorogato,
+            int durataProroga,
+            string serieProroga,
+            bool contrattoValido,
+            bool prorogaValido,
+            bool contrattoEnte,
+            string denominazioneEnte,
+            int durataContrattoEnte,
+            double importoRataEnte
+            )
+        {
+            domicilio = new Domicilio();
+            domicilio.titoloOneroso = titoloOneroso;
+            domicilio.codiceSerieLocazione = serieContratto;
+            domicilio.dataRegistrazioneLocazione = dataRegistrazione;
+            domicilio.dataDecorrenzaLocazione = dataDecorrenza;
+            domicilio.dataScadenzaLocazione = dataScadenza;
+            domicilio.durataMesiLocazione = durataContratto;
+            domicilio.prorogatoLocazione = prorogato;
+            domicilio.durataMesiProrogaLocazione = durataProroga;
+            domicilio.codiceSerieProrogaLocazione = serieProroga;
+            this.contrattoValido = contrattoValido;
+            this.prorogaValido = prorogaValido;
+            domicilio.contrEnte = contrattoEnte;
+            domicilio.denominazioneIstituto = denominazioneEnte;
+            domicilio.durataMesiContrattoIstituto = durataContrattoEnte;
+            domicilio.importoMensileRataIstituto = importoRataEnte;
         }
 
         public void SetImpegno(string impegno)
@@ -261,6 +311,16 @@ namespace ProcedureNet7
         {
             this.tipoDocumento = tipoDocumento;
             this.scadenzaDocumento = scadenzaDocumento;
+        }
+
+        public void SetEsitoPA(int esito)
+        {
+            this.esitoPA = esito;
+        }
+
+        public void SetPagatoPendolare(bool pagatoPendolare)
+        {
+            this.pagatoPendolare = pagatoPendolare;
         }
     }
 

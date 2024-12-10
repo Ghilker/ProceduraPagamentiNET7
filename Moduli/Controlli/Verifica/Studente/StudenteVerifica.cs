@@ -25,8 +25,21 @@ namespace ProcedureNet7.Verifica
     public class StatusDomanda
     {
         public int statusDomanda;
-        public bool DomandaCompleta;
-        public bool DomandaTrasmessa;
+        public bool _domandaCompleta;
+        public bool _domandaTrasmessa;
+
+        public StatusDomanda(int statusDomanda, int statusCompleto = 70, int statusTrasmesso = 90)
+        {
+            this.statusDomanda = statusDomanda;
+            if (statusDomanda >= statusCompleto)
+            {
+                _domandaCompleta = true;
+            }
+            if (statusDomanda >= statusTrasmesso)
+            {
+                _domandaTrasmessa = true;
+            }
+        }
     }
     public class Anagrafica
     {
@@ -34,7 +47,11 @@ namespace ProcedureNet7.Verifica
         public string cognome;
         public DateTime dataNascita;
         public string codComuneNascita;
+        public string codCittadinanza;
         public string sesso;
+        public bool invalido;
+
+        public bool rifugiatoPolitico;
 
         public bool straniero;
         public bool cittadinoUE;
@@ -42,9 +59,9 @@ namespace ProcedureNet7.Verifica
     public class Residenza
     {
         public string codComuneResidenza;
-        public bool oltre50km;
-        public bool tempoPercorrenza120;
 
+        public bool residenzaItaliana;
+        public string codProvinciaResidenzaItaliana;
         public bool residenzaUE;
     }
     public class Domicilio
@@ -88,7 +105,7 @@ namespace ProcedureNet7.Verifica
         public string codTipoCorso;//vIscrizioni
         public string codCorsoLaurea;//vIscrizioni
         public string aaPrimaImmatricolazione;//vMerito
-        public string annoCorso;//vIscrizioni
+        public string annoCorsoDichiarato;//vIscrizioni
 
         public bool matricola;//vIscrizioni vero se anno_corso = 1
 
@@ -143,6 +160,16 @@ namespace ProcedureNet7.Verifica
         public bool richiestaPA;
         public bool richiestaCI;
 
+        public bool beneficiarioAltriEnti;
+        public double importoBeneficiPrecedenti;
+
+        public bool beneficiOspitalitaResidenziale;
+
+        public bool inAttesaCI;
+        public string codNazioneCI;
+        public DateTime dataPartenzaCI;
+        public int durataMesiCI;
+
         public bool vincitoreBS;
         public bool vincitorePA;
         public bool vincitoreCI;
@@ -178,7 +205,7 @@ namespace ProcedureNet7.Verifica
     }
     public class Variazioni
     {
-        public List<Variazione> variazioni;
+        public List<Variazione> variazioni = new();
 
         public class Variazione
         {

@@ -53,14 +53,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ClosedXML" Version="0.104.0-preview2" />
-    <PackageReference Include="DocumentFormat.OpenXml" Version="3.0.1" />
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Update="Moduli\Varie\ProceduraControlloPS\FormProceduraControlloPS.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Moduli\Varie\ProceduraRendicontoMiur\FormRendicontoMiur.cs">
       <SubType>Form</SubType>
     </Compile>
   </ItemGroup>

@@ -12,7 +12,7 @@ namespace ProcedureNet7.PagamentiProcessor
         string IAcademicYearProcessor.GetProvvedimentiQuery(string selectedAA, string tipoBeneficio)
         {
             return $@"
-                select distinct specifiche_impegni.Cod_fiscale, Importo_assegnato, bs.Imp_beneficio, monetizzazione_mensa, COALESCE(importo_monetizzazione,0) as importo_monetizzazione
+                select distinct specifiche_impegni.Cod_fiscale, Importo_assegnato, bs.Imp_beneficio, monetizzazione_concessa, COALESCE(importo_servizio_mensa,0) as importo_servizio_mensa
                 from specifiche_impegni 
                 inner join vEsiti_concorsi bs on specifiche_impegni.Anno_accademico = bs.Anno_accademico and specifiche_impegni.Num_domanda = bs.Num_domanda and specifiche_impegni.Cod_beneficio = bs.Cod_beneficio
                 inner join #CFEstrazione cfe on specifiche_impegni.cod_fiscale = cfe.cod_fiscale

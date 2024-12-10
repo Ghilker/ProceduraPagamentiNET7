@@ -216,6 +216,10 @@ namespace ProcedureNet7
                             FormProceduraControlloPS controlloPS = new FormProceduraControlloPS(this);
                             ShowFormInPanel(controlloPS);
                             break;
+                        case ProcedureVarie.ProceduraRendicontoMiur:
+                            FormRendicontoMiur rendicontoMiur = new FormRendicontoMiur(this);
+                            ShowFormInPanel(rendicontoMiur);
+                            break;
                     }
                 }
 #endif
@@ -317,7 +321,9 @@ namespace ProcedureNet7
             [ProcedureCategory("Varie", "Funzionario")]
             ControlloISEEUP,
             [ProcedureCategory("Varie", "Funzionario")]
-            ProceduraControlloPS
+            ProceduraControlloPS,
+            [ProcedureCategory("Varie", "Funzionario")]
+            ProceduraRendicontoMiur
         }
 
         public enum ProcedureVerifiche

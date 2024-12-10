@@ -146,7 +146,7 @@ namespace ProcedureNet7
             }
 
             // Construct the connection string
-            CONNECTION_STRING = $"Server={credential["serverIP"]};Database={credential["databaseName"]};User Id={credential["userID"]};Password={credential["password"]};";
+            CONNECTION_STRING = $"Server={credential["serverIP"]};Database={credential["databaseName"]};User Id={credential["userID"]};Password={credential["password"]};MultipleActiveResultSets=True";
 
             // Attempt to connect up to 3 times
             int maxAttempts = 3;

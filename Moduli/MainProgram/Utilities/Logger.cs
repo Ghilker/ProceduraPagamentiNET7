@@ -181,6 +181,12 @@ public class Logger : IDisposable
         }
 
         string messageText = logEntry.message;
+
+        if (messageText == null)
+        {
+            return;
+        }
+
         Color textColor = logEntry.textColor ?? GetColorForLogLevel(logEntry.level);
 
         if (messageText.Contains("UPDATE:"))

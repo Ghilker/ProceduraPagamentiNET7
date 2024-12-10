@@ -94,6 +94,32 @@ namespace ProcedureNet7
                 }
 
                 ws.AutoFilterMode = false;
+                Logger.Log(11, $"Cancellazione non borsa", LogLevel.INFO);
+                Excel.Range filterNBRange = ws.Range["H1:H" + lastRow];
+                filterNBRange.AutoFilter(1, "Posti Alloggio", XlAutoFilterOperator.xlFilterValues);
+                Excel.Range? visibleNBCells = null;
+                visibleNBCells = filterNBRange.Offset[1, 0].SpecialCells(XlCellType.xlCellTypeVisible, Type.Missing);
+                visibleNBCells?.EntireRow.Delete(XlDeleteShiftDirection.xlShiftUp);
+
+                ws.AutoFilterMode = false;
+                filterNBRange.AutoFilter(1, "MENSA", XlAutoFilterOperator.xlFilterValues);
+                visibleNBCells = null;
+                visibleNBCells = filterNBRange.Offset[1, 0].SpecialCells(XlCellType.xlCellTypeVisible, Type.Missing);
+                visibleNBCells?.EntireRow.Delete(XlDeleteShiftDirection.xlShiftUp);
+
+                ws.AutoFilterMode = false;
+                filterNBRange.AutoFilter(1, "Contributi Alloggio", XlAutoFilterOperator.xlFilterValues);
+                visibleNBCells = null;
+                visibleNBCells = filterNBRange.Offset[1, 0].SpecialCells(XlCellType.xlCellTypeVisible, Type.Missing);
+                visibleNBCells?.EntireRow.Delete(XlDeleteShiftDirection.xlShiftUp);
+
+                ws.AutoFilterMode = false;
+                filterNBRange.AutoFilter(1, "Accettazione Posto Alloggio", XlAutoFilterOperator.xlFilterValues);
+                visibleNBCells = null;
+                visibleNBCells = filterNBRange.Offset[1, 0].SpecialCells(XlCellType.xlCellTypeVisible, Type.Missing);
+                visibleNBCells?.EntireRow.Delete(XlDeleteShiftDirection.xlShiftUp);
+
+                ws.AutoFilterMode = false;
                 Logger.Log(11, $"Cancellazione in carico", LogLevel.INFO);
                 Excel.Range filterRangeCarico = ws.Range["Q1:Q" + lastRow];
                 filterRangeCarico.AutoFilter(1, "PRESA_IN_CARICO", XlAutoFilterOperator.xlFilterValues);
@@ -174,7 +200,7 @@ namespace ProcedureNet7
 
                 // Rename and move the template file
                 string currentDate = DateTime.Now.ToString("dd-MM-yyyy");
-                string newFileName = $"Ticket aperti-nuovi aa 2324 {currentDate} macro on.xlsm";
+                string newFileName = $"Ticket aperti-nuovi aa 2425 {currentDate} macro on.xlsm";
                 string newFilePath = Path.Combine(@"C:\Users\giacomo_pavone\Desktop\Giacomo\Tickets", newFileName);
 
                 // Save and close the template workbook
@@ -331,7 +357,7 @@ namespace ProcedureNet7
                        vEsiti_concorsiBS.esito_BS, 
                        vEsiti_concorsiPA.esito_PA, 
                        dbo.SlashDescrBlocchi(Domanda.Num_domanda, Domanda.Anno_accademico, 'BS') AS Blocchi, 
-                       Sede_studi.Descrizione as Sede_Università_23_24 
+                       Sede_studi.Descrizione as Sede_Università_24_25 
                 FROM Sede_studi 
                 INNER JOIN vIscrizioni ON Sede_studi.Cod_sede_studi = vIscrizioni.Cod_sede_studi 
                 INNER JOIN Domanda 
@@ -339,7 +365,7 @@ namespace ProcedureNet7
                 ON vIscrizioni.Cod_fiscale = Domanda.Cod_fiscale AND vIscrizioni.Anno_accademico = Domanda.Anno_accademico 
                 LEFT OUTER JOIN vEsiti_concorsiPA ON Domanda.Anno_accademico = vEsiti_concorsiPA.Anno_accademico AND Domanda.Num_domanda = vEsiti_concorsiPA.Num_domanda 
                 INNER JOIN @CFEstrazione f ON Domanda.Cod_fiscale = f.Cod_fiscale 
-                WHERE (Domanda.Anno_accademico = '20232024') AND (Domanda.Tipo_bando in ('LZ', 'L2')) 
+                WHERE (Domanda.Anno_accademico = '20242025') AND (Domanda.Tipo_bando in ('LZ', 'L2')) 
                 ORDER BY Domanda.Cod_fiscale
 
                 ";

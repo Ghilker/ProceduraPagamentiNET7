@@ -18,5 +18,6 @@ namespace ProcedureNet7
 
         public double quotaMensa;
 
+        public bool graduatoriaDefinitiva;
     }
 }

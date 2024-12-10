@@ -405,7 +405,7 @@ namespace ProcedureNet7
                         Logger.LogInfo(null, $"Adding block {blockCode} to {codFiscaliList.Count} students");
 
                         // Use BlocksUtils.AddBlock
-                        BlocksUtil.AddBlock(CONNECTION, sqlTransaction, codFiscaliList, blockCode, selectedAA, "Verif_ISEEUP");
+                        BlocksUtil.AddBlock(CONNECTION, sqlTransaction, codFiscaliList, blockCode, selectedAA, "Verif_ISEEUP", false);
                     }
                 }
 

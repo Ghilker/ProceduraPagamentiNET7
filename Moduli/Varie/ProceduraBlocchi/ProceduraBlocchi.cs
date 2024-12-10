@@ -13,6 +13,8 @@ namespace ProcedureNet7
         private readonly Dictionary<string, List<string>> blocksToRemove = new();
         private readonly Dictionary<string, List<string>> blocksToAdd = new();
 
+        private bool _blocksGiaRimossi;
+
         private List<string> codiciFiscaliTotali = new();
         private List<string> codiciFiscaliConErrori = new();
 
@@ -23,6 +25,7 @@ namespace ProcedureNet7
             string blocksFilePath = args._blocksFilePath;
             _blocksYear = args._blocksYear;
             _blocksUsername = args._blocksUsername;
+            _blocksGiaRimossi = args._blocksGiaRimossi;
 
             _masterForm.inProcedure = true;
             try
@@ -155,7 +158,7 @@ namespace ProcedureNet7
                 }
                 try
                 {
-                    BlocksUtil.AddBlock(conn, transaction, blocksToAdd[block], block, _blocksYear, _blocksUsername);
+                    BlocksUtil.AddBlock(conn, transaction, blocksToAdd[block], block, _blocksYear, _blocksUsername, _blocksGiaRimossi);
                     Logger.LogInfo(75, $"Processato blocco {block} da mettere");
                 }
                 catch (Exception ex)

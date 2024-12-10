@@ -65,6 +65,7 @@ namespace ProcedureNet7
                                 Esiti_concorsi
                             WHERE
 		                            data_validita <= @maxDataValidita
+                                AND Esiti_concorsi.Data_validita > '30/08/2024'
                                 AND Esiti_concorsi.Cod_beneficio = 'PA'
                                 AND Anno_accademico = @annoAccademico
                             GROUP BY
@@ -158,6 +159,8 @@ namespace ProcedureNet7
                                         ,Conferma_PA
                                         ,Superamento_esami
                                         ,Superamento_esami_tassa_reg
+                                        ,RichiestaMensa
+                                        ,Rifug_politico
                                     FROM
                                         DatiGenerali_dom INNER JOIN MaxDatiGeneraliDom ON DatiGenerali_dom.Num_domanda = MaxDatiGeneraliDom.Num_domanda AND DatiGenerali_dom.Anno_accademico = MaxDatiGeneraliDom.Anno_accademico
                                     WHERE DatiGenerali_dom.Data_validita = MaxDatiGeneraliDom.MaxDataValidita AND DatiGenerali_dom.Anno_accademico = @annoAccademico and DatiGenerali_dom.Blocco_pagamento<>1
@@ -219,7 +222,7 @@ namespace ProcedureNet7
                                         ,Esiti_concorsi.Num_domanda
                                     FROM
                                         Esiti_concorsi INNER JOIN MaxEsitiConcorsiPATemp ON Esiti_concorsi.Num_domanda = MaxEsitiConcorsiPATemp.Num_domanda AND Esiti_concorsi.Anno_accademico = MaxEsitiConcorsiPATemp.Anno_accademico
-                                    WHERE Esiti_concorsi.Data_validita = MaxEsitiConcorsiPATemp.MaxDataValidita AND Esiti_concorsi.Anno_accademico = @annoAccademico AND Esiti_concorsi.Cod_beneficio = 'PA' and Cod_tipo_esito = 2
+                                    WHERE Esiti_concorsi.Data_validita = MaxEsitiConcorsiPATemp.MaxDataValidita AND Esiti_concorsi.Anno_accademico = @annoAccademico AND Esiti_concorsi.Cod_beneficio = 'PA'
                                 )
 
                                 ,EsitiTotali
@@ -243,6 +246,8 @@ namespace ProcedureNet7
                                         ,DatiGeneraliDomTotali.Conferma_PA
                                         ,DatiGeneraliDomTotali.Superamento_esami
                                         ,DatiGeneraliDomTotali.Superamento_esami_tassa_reg
+                                        ,DatiGeneraliDomTotali.RichiestaMensa
+                                        ,DatiGeneraliDomTotali.Rifug_politico
                                         ,EsitiPA.Cod_tipo_esito as EsitoPA
                                     FROM
                                         domanda INNER JOIN
@@ -270,9 +275,8 @@ namespace ProcedureNet7
                                 ,StatisticheTotali
                                 AS
                                 (
-                                    SELECT
-                                        DISTINCT
-                                        domanda.anno_accademico
+                                    SELECT DISTINCT
+                                    domanda.anno_accademico
 		                            ,domanda.cod_fiscale
 		                            ,Studente.Cognome
 		                            ,Studente.Nome
@@ -284,7 +288,7 @@ namespace ProcedureNet7
 		                            ,vCittadinanza.Cod_cittadinanza
 		                            ,EsitiTotali.Cod_ente
 		                            ,EsitiTotali.Cod_beneficio
-                                    ,EsitiTotali.EsitoPA
+                                    ,COALESCE(EsitiTotali.EsitoPA, 0) as EsitoPA
 		                            ,EsitiTotali.Anno_corso
 		                            ,invalido AS disabile
 		                            ,imp_beneficio AS imp_beneficio
@@ -297,6 +301,8 @@ namespace ProcedureNet7
 		                            ,IscrizioniTotali.sede_studi
 		                            ,Superamento_esami
 		                            ,Superamento_esami_tassa_reg
+                                    ,COALESCE(RichiestaMensa, 0) as RichiestaMensa
+                                    ,Rifug_politico
 
                                     FROM
                                         Domanda INNER JOIN

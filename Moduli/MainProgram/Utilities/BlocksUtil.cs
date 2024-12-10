@@ -10,7 +10,14 @@ namespace ProcedureNet7
 {
     public static class BlocksUtil
     {
-        public static void AddBlock(SqlConnection conn, SqlTransaction transaction, List<string> codFiscaleCol, string blockCode, string annoAccademico, string utente)
+        public static void AddBlock(
+            SqlConnection conn,
+            SqlTransaction transaction,
+            List<string> codFiscaleCol,
+            string blockCode,
+            string annoAccademico,
+            string utente,
+            bool inserisciGiaRimossi = false)
         {
             // Use temporary table and bulk insert
             CreateAndPopulateTempTable(conn, transaction, codFiscaleCol);
@@ -24,9 +31,9 @@ namespace ProcedureNet7
             // Define the columns that need explicit values
             Dictionary<string, string> explicitValues = new Dictionary<string, string>()
             {
-                { "Data_validita", "CURRENT_TIMESTAMP" }, // SQL expression
-                { "Utente", "@utenteValue" },             // Parameter
-                { "Blocco_pagamento", "1" },              // For AddBlock
+                { "Data_validita", "CURRENT_TIMESTAMP" },
+                { "Utente", "@utenteValue" },
+                { "Blocco_pagamento", "1" },
                 { "Id_domanda", "d.id_domanda" }
             };
 
@@ -55,41 +62,58 @@ namespace ProcedureNet7
             string insertColumnsList = string.Join(", ", insertColumns);
             string selectColumnsList = string.Join(", ", selectColumns);
 
-            string sql = $@"
-                    INSERT INTO dbo.Motivazioni_blocco_pagamenti
-                        (Anno_accademico, Num_domanda, Cod_tipologia_blocco, Blocco_pagamento_attivo,
-                            Data_validita, Utente, Data_fine_validita, Utente_sblocco)
-                    SELECT d.Anno_accademico, d.Num_domanda, @blockCode, '1', 
-                            CURRENT_TIMESTAMP, @utenteValue, NULL, NULL
-                    FROM dbo.Domanda d
-                    INNER JOIN #CodFiscaleTempTable cf ON d.Cod_fiscale = cf.CodFiscale
-                    WHERE d.Anno_accademico = @annoAcademico 
-                        AND d.tipo_bando IN ('lz', 'l2') 
-                        AND d.Num_domanda NOT IN
-                            (SELECT DISTINCT Num_domanda
-                                FROM dbo.Motivazioni_blocco_pagamenti
-                                WHERE Anno_accademico = @annoAcademico 
-                                    AND Cod_tipologia_blocco = @blockCode
-                                    AND Data_fine_validita IS NULL);
+            // Conditionally include the additional WHERE clause
+            string additionalCondition = "";
+            if (!inserisciGiaRimossi)
+            {
+                additionalCondition = @"
+            AND NOT EXISTS (
+                SELECT 1
+                FROM dbo.Motivazioni_blocco_pagamenti mbp
+                INNER JOIN dbo.Domanda dd ON mbp.Num_domanda = dd.Num_domanda
+                WHERE mbp.Anno_accademico = @annoAcademico
+                  AND mbp.Cod_tipologia_blocco = @blockCode
+                  AND dd.Cod_fiscale = d.Cod_fiscale
+                  AND mbp.Data_fine_validita IS NOT NULL
+            )";
+            }
 
-                    INSERT INTO [DatiGenerali_dom] ({insertColumnsList})
-                    SELECT DISTINCT {selectColumnsList}
-                    FROM 
-                        Domanda d
-                        INNER JOIN vDATIGENERALI_dom v ON d.Anno_accademico = v.Anno_accademico AND 
-                                                         d.Num_domanda = v.Num_domanda
-                        INNER JOIN #CodFiscaleTempTable cf ON d.Cod_fiscale = cf.CodFiscale
-                    WHERE 
-                        d.Anno_accademico = @annoAcademico AND
-                        d.tipo_bando IN ('lz', 'l2') AND
-                        d.Num_domanda NOT IN (
-                            SELECT DISTINCT Num_domanda
-                            FROM Motivazioni_blocco_pagamenti
-                            WHERE Anno_accademico = @annoAcademico 
-                                AND Data_fine_validita IS NOT NULL
-                                AND Blocco_pagamento_attivo = 1
-                        );
-                    ";
+            string sql = $@"
+            INSERT INTO dbo.Motivazioni_blocco_pagamenti
+                (Anno_accademico, Num_domanda, Cod_tipologia_blocco, Blocco_pagamento_attivo,
+                    Data_validita, Utente, Data_fine_validita, Utente_sblocco)
+            SELECT d.Anno_accademico, d.Num_domanda, @blockCode, '1', 
+                    CURRENT_TIMESTAMP, @utenteValue, NULL, NULL
+            FROM dbo.Domanda d
+            INNER JOIN #CodFiscaleTempTable cf ON d.Cod_fiscale = cf.CodFiscale
+            WHERE d.Anno_accademico = @annoAcademico 
+                AND d.tipo_bando IN ('lz', 'l2') 
+                AND d.Num_domanda NOT IN
+                    (SELECT DISTINCT Num_domanda
+                        FROM dbo.Motivazioni_blocco_pagamenti
+                        WHERE Anno_accademico = @annoAcademico 
+                            AND Cod_tipologia_blocco = @blockCode
+                            AND Data_fine_validita IS NULL)
+            {additionalCondition};
+
+            INSERT INTO [DatiGenerali_dom] ({insertColumnsList})
+            SELECT DISTINCT {selectColumnsList}
+            FROM 
+                Domanda d
+                INNER JOIN vDATIGENERALI_dom v ON d.Anno_accademico = v.Anno_accademico AND 
+                                                 d.Num_domanda = v.Num_domanda
+                INNER JOIN #CodFiscaleTempTable cf ON d.Cod_fiscale = cf.CodFiscale
+            WHERE 
+                d.Anno_accademico = @annoAcademico AND
+                d.tipo_bando IN ('lz', 'l2') AND
+                d.Num_domanda NOT IN (
+                    SELECT DISTINCT Num_domanda
+                    FROM Motivazioni_blocco_pagamenti
+                    WHERE Anno_accademico = @annoAcademico 
+                        AND Data_fine_validita IS NULL
+                        AND Blocco_pagamento_attivo = 1
+                );
+            ";
 
             using (SqlCommand command = new SqlCommand(sql, conn, transaction))
             {

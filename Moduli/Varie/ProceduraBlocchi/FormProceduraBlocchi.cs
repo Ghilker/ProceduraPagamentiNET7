@@ -52,6 +52,7 @@ namespace ProcedureNet7
                     _blocksFilePath = selectedFilePath,
                     _blocksYear = blocksYear.Text,
                     _blocksUsername = blocksUsername.Text,
+                    _blocksGiaRimossi = blocksGiaRimossi.Checked,
                 };
                 argsValidation.Validate(blocchiArgs);
                 ProceduraBlocchi proceduraBlocchi = new(_masterForm, mainConnection);

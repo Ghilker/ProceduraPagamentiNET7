@@ -17,8 +17,9 @@ namespace ProcedureNet7
         public string _blocksYear { get; set; }
 
         [Required(ErrorMessage = "Inserire l'utente variazione")]
-        [ValidStringLenght(ErrorMessage = "Utenza troppo lunga, usare meno di 20 caratteri")]
+        [ValidStringLenght(ErrorMessage = "Utenza troppo lunga, usare meno di 20 caratteri.")]
         public string _blocksUsername { get; set; }
+        public bool _blocksGiaRimossi { get; set; }
 
         public ArgsProceduraBlocchi()
         {

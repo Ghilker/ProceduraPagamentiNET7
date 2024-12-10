@@ -38,6 +38,7 @@
             button1 = new Button();
             openFileDialog = new OpenFileDialog();
             templateBlocchiDownload = new Button();
+            blocksGiaRimossi = new CheckBox();
             SuspendLayout();
             // 
             // label6
@@ -133,6 +134,16 @@
             templateBlocchiDownload.UseVisualStyleBackColor = true;
             templateBlocchiDownload.Click += TemplateBlocchiDownload_Click;
             // 
+            // blocksGiaRimossi
+            // 
+            blocksGiaRimossi.AutoSize = true;
+            blocksGiaRimossi.Location = new Point(29, 133);
+            blocksGiaRimossi.Name = "blocksGiaRimossi";
+            blocksGiaRimossi.Size = new Size(170, 19);
+            blocksGiaRimossi.TabIndex = 31;
+            blocksGiaRimossi.Text = "Inserisci blocchi già rimossi";
+            blocksGiaRimossi.UseVisualStyleBackColor = true;
+            // 
             // FormProceduraBlocchi
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -140,6 +151,7 @@
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             ControlBox = false;
+            Controls.Add(blocksGiaRimossi);
             Controls.Add(templateBlocchiDownload);
             Controls.Add(label1);
             Controls.Add(button1);
@@ -168,5 +180,6 @@
         private Button button1;
         private OpenFileDialog openFileDialog;
         private Button templateBlocchiDownload;
+        private CheckBox blocksGiaRimossi;
     }
 }

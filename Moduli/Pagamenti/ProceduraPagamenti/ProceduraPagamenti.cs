@@ -51,6 +51,7 @@ namespace ProcedureNet7
         bool usingStringWhere = false;
 
         bool isTR = false;
+        bool isMensa = false;
         bool insertInDatabase = false;
 
         SqlTransaction? sqlTransaction = null;
@@ -59,7 +60,7 @@ namespace ProcedureNet7
         public int studentiProcessatiAmount = 0;
         public Dictionary<string, Dictionary<string, int>> impegnoAmount = new Dictionary<string, Dictionary<string, int>>();
 
-        //#TODO IAcademicYearProcessor? selectedAcademicProcessor;
+        IAcademicYearProcessor? selectedAcademicProcessor;
 
         public ProceduraPagamenti(MasterForm masterForm, SqlConnection mainConnection) : base(masterForm, mainConnection) { }
 
@@ -85,13 +86,13 @@ namespace ProcedureNet7
                     return;
                 }
 
-                /*#TODO ProcessorChooser processorChooser = new ProcessorChooser();
+                ProcessorChooser processorChooser = new ProcessorChooser();
                 selectedAcademicProcessor = processorChooser.GetProcessor(selectedAA);
                 if (selectedAcademicProcessor == null)
                 {
                     Logger.LogDebug(null, "Processor non può essere nullo in questo punto!");
                     return;
-                }*/
+                }
 
                 sqlTransaction = CONNECTION.BeginTransaction();
 
@@ -278,6 +279,12 @@ namespace ProcedureNet7
                 {
                     isTR = true;
                 }
+
+                if ((tipoBeneficio + selectedTipoPagamento).Substring(0, 3) == "BSM")
+                {
+                    isMensa = true;
+                }
+
                 categoriaPagam = selectTipoPagam.SelectedCategoriaBeneficio;
                 codTipoPagamento = tipoBeneficio + selectedTipoPagamento;
             }
@@ -296,7 +303,20 @@ namespace ProcedureNet7
             }
             _ = _masterForm.Invoke((MethodInvoker)delegate
             {
-                string currentBeneficio = isTR ? "TR" : tipoBeneficio;
+                string currentBeneficio;
+
+                if (isMensa)
+                {
+                    currentBeneficio = "ME";
+                }
+                else if (isTR)
+                {
+                    currentBeneficio = "TR";
+                }
+                else
+                {
+                    currentBeneficio = tipoBeneficio;
+                }
                 using SelectPagamentoSettings selectPagamentoSettings = new(CONNECTION, sqlTransaction, selectedAA, currentBeneficio, categoriaPagam);
                 selectPagamentoSettings.StartPosition = FormStartPosition.CenterParent;
                 DialogResult dialogResult = selectPagamentoSettings.ShowDialog(_masterForm);
@@ -327,7 +347,6 @@ namespace ProcedureNet7
                 exitProcedureEarly = true;
                 return;
             }
-            //"#BS#P0#PR#00#2#2#0000"
 
             List<string> parts = massivoString.Split(new[] { '#' }, StringSplitOptions.RemoveEmptyEntries).ToList();
 
@@ -481,6 +500,8 @@ namespace ProcedureNet7
 	                                        sede_studi VARCHAR(3),
 	                                        superamento_esami CHAR(1),
 	                                        superamento_esami_tassa_reg CHAR(1),
+                                            richiesta_mensa CHAR(1),
+                                            Rifug_politico CHAR(1),
                                             liquidabile CHAR(1),
                                             note VARCHAR(MAX),
                                             togliere_loreto VARCHAR(4),
@@ -566,14 +587,25 @@ namespace ProcedureNet7
             }
 
             string sqlQuery = queryBuilder.ToString();
-
-            SqlCommand cmd = new(sqlQuery, CONNECTION, sqlTransaction)
+            try
             {
-                CommandTimeout = 90000000
-            };
-            _ = cmd.ExecuteNonQuery();
-            progressUpdater.StopUpdating();
-            Logger.LogInfo(1, "Fine creazione tabella d'appoggio");
+
+                SqlCommand cmd = new(sqlQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 90000000
+                };
+                _ = cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                progressUpdater.StopUpdating();
+                throw ex;
+            }
+            finally
+            {
+                progressUpdater.StopUpdating();
+                Logger.LogInfo(1, "Fine creazione tabella d'appoggio");
+            }
         }
 
         private void HandleFiltroManuale()
@@ -722,7 +754,6 @@ namespace ProcedureNet7
             }
         }
 
-
         private void GenerateStudentListToPay()
         {
             Logger.LogDebug(null, "Inizio della generazione della lista degli studenti per il pagamento");
@@ -829,14 +860,20 @@ namespace ProcedureNet7
                     _ = int.TryParse(Utilities.SafeGetString(reader, "disabile"), out int disabile);
                     _ = int.TryParse(Utilities.SafeGetString(reader, "Superamento_esami"), out int superamentoEsami);
                     _ = int.TryParse(Utilities.SafeGetString(reader, "Superamento_esami_tassa_reg"), out int superamentoEsamiTassaRegionale);
+                    _ = int.TryParse(Utilities.SafeGetString(reader, "richiesta_mensa"), out int monetizzazioneMensa);
                     _ = int.TryParse(Utilities.SafeGetString(reader, "anno_corso"), out int annoCorso);
-                    bool esitoPA = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "EsitoPA")) == "2";
+                    int esitoPA = Utilities.SafeGetInt(reader, "EsitoPA");
                     string studenteCodEnte = Utilities.SafeGetString(reader, "cod_ente");
 
                     bool skipTipoStudente = false;
                     bool skipCodEnte = false;
 
-                    if (esitoPA == true && (selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
+                    if (isMensa && monetizzazioneMensa == 0)
+                    {
+                        continue;
+                    }
+
+                    if (esitoPA == 2 && (selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
                     {
                         continue;
                     }
@@ -880,7 +917,10 @@ namespace ProcedureNet7
                             int.TryParse(Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "cod_corso")), out int codCorso) ? codCorso : 0,
                             esitoPA,
                             superamentoEsami == 1,
-                            superamentoEsamiTassaRegionale == 1
+                            superamentoEsamiTassaRegionale == 1,
+                            monetizzazioneMensa == 1,
+                            Utilities.SafeGetString(reader, "Status_sede").Trim().ToUpper(),
+                            Utilities.SafeGetInt(reader, "Rifug_politico") == 1
                         );
 
                     studentiDaPagare.Add(studente.codFiscale, studente);
@@ -950,7 +990,6 @@ namespace ProcedureNet7
                 updateStatisticsCmd.ExecuteNonQuery();
             }
             #endregion
-
 
             ControlloPagamenti();
             Logger.LogDebug(30, $"Numero studenti prima della pulizia = {studentiDaPagare.Count}");
@@ -1035,7 +1074,7 @@ namespace ProcedureNet7
 
             FilterPagamenti();
 
-            if (tipoBeneficio == "BS" && !isTR && !studenteForzato)
+            if (tipoBeneficio == "BS" && !isTR && !isMensa && !studenteForzato)
             {
                 ControlloProvvedimenti();
             }
@@ -1141,7 +1180,12 @@ namespace ProcedureNet7
                                     continue;
                                 }
 
-                                if (cod_tipo_pagam.Substring(0, 2) != "BS" && isTR)
+                                if (cod_tipo_pagam.Substring(0, 3) == "BSM" && !isMensa)
+                                {
+                                    continue;
+                                }
+
+                                if (cod_tipo_pagam.Substring(0, 2) != "BS" && (isTR || isMensa))
                                 {
                                     continue;
                                 }
@@ -1164,6 +1208,7 @@ namespace ProcedureNet7
                     StudentePagam studenteDaControllare = pair.Value;
                     bool stessoPagamento = false;
                     bool okTassaRegionale = false;
+                    bool okMensa = false;
 
                     if (studenteDaControllare.pagamentiEffettuati == null || studenteDaControllare.pagamentiEffettuati.Count <= 0)
                     {
@@ -1192,9 +1237,14 @@ namespace ProcedureNet7
                             okTassaRegionale = true;
                         }
 
+                        if (isMensa && (pagamento.codTipoPagam == "BSM0" || pagamento.codTipoPagam == "BSM1" || pagamento.codTipoPagam == "BSM2") && !pagamento.ritiratoAzienda)
+                        {
+                            okMensa = true;
+                        }
+
                         importiPagati += pagamento.importoPagamento;
                     }
-                    if ((stessoPagamento || (isTR && !okTassaRegionale)) && !studentiDaRimuovereHash.Contains(studenteDaControllare.codFiscale))
+                    if ((stessoPagamento || (isTR && !okTassaRegionale) || (isMensa && !okMensa)) && !studentiDaRimuovereHash.Contains(studenteDaControllare.codFiscale))
                     {
                         studentiDaRimuovereHash.Add(studenteDaControllare.codFiscale);
                         continue;
@@ -1203,7 +1253,7 @@ namespace ProcedureNet7
                     Math.Round(importiPagati, 2);
                     studenteDaControllare.SetImportiPagati(importiPagati);
 
-                    if (tipoBeneficio == "BS" && !isTR && Math.Abs(studenteDaControllare.importoBeneficio - studenteDaControllare.importoPagato) < 5)
+                    if (tipoBeneficio == "BS" && !isTR && !isMensa && Math.Abs(studenteDaControllare.importoBeneficio - studenteDaControllare.importoPagato) < 5)
                     {
                         studentiDaRimuovereHash.Add(studenteDaControllare.codFiscale);
                     }
@@ -1400,14 +1450,7 @@ namespace ProcedureNet7
             }
             void ControlloProvvedimenti()
             {
-                //#TODO string? sqlProvv = selectedAcademicProcessor.GetProvvedimentiQuery(selectedAA, tipoBeneficio);
-
-                string sqlProvv = $@"
-                select distinct specifiche_impegni.Cod_fiscale, Importo_assegnato, bs.Imp_beneficio from specifiche_impegni 
-                inner join vEsiti_concorsi bs on specifiche_impegni.Anno_accademico = bs.Anno_accademico and specifiche_impegni.Num_domanda = bs.Num_domanda and specifiche_impegni.Cod_beneficio = bs.Cod_beneficio
-                inner join #CFEstrazione cfe on specifiche_impegni.cod_fiscale = cfe.cod_fiscale
-                where bs.Anno_accademico = '{selectedAA}' and specifiche_impegni.Cod_beneficio = '{tipoBeneficio}' and data_fine_validita is null and Cod_tipo_esito = 2
-                order by Cod_fiscale";
+                string? sqlProvv = selectedAcademicProcessor.GetProvvedimentiQuery(selectedAA, tipoBeneficio);
 
                 SqlCommand readData = new(sqlProvv, CONNECTION, sqlTransaction)
                 {
@@ -1418,23 +1461,7 @@ namespace ProcedureNet7
 
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
-                    //#TODO listaStudentiDaMantenere = selectedAcademicProcessor.ProcessProvvedimentiQuery(reader);
-                    while (reader.Read())
-                    {
-                        string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        if (codFiscale == "BLDLSS00M23E958G")
-                        {
-                            string test = "";
-                        }
-
-                        double importoAttuale = Utilities.SafeGetDouble(reader, "Imp_beneficio");
-                        double importoAssegnato = Utilities.SafeGetDouble(reader, "Importo_assegnato");
-
-                        if (importoAssegnato == importoAttuale)
-                        {
-                            listaStudentiDaMantenere.Add(codFiscale);
-                        }
-                    }
+                    listaStudentiDaMantenere = selectedAcademicProcessor.ProcessProvvedimentiQuery(reader);
                 }
 
                 HashSet<string> studentiDaRimuovere = new();
@@ -1712,6 +1739,7 @@ namespace ProcedureNet7
         {
             PopulateStudentLuogoNascita();
             PopulateStudentResidenza();
+            PopulateStudentDomicilio();
             PopulateStudentPaymentMethod();
             PopulateStudentiVecchioEsitoPA();
             if (tipoBeneficio == "BS" && !isTR)
@@ -1721,7 +1749,6 @@ namespace ProcedureNet7
                 if (!isIntegrazione)
                 {
                     PopulateNucleoFamiliare();
-                    PopulateDomicilioCheck();
                     PopulateStudentiAssegnazioni();
                 }
             }
@@ -1795,6 +1822,275 @@ namespace ProcedureNet7
                 }
                 Logger.LogInfo(35, $"UPDATE:Lavorazione studenti - inserimento in residenza - completato");
             }
+
+            void PopulateStudentDomicilio()
+            {
+                // Parse the selected academic year
+                int startYear = int.Parse(selectedAA.Substring(0, 4));
+                int endYear = int.Parse(selectedAA.Substring(4, 4));
+                DateTime dateRangeStart = new DateTime(startYear, 10, 1);
+                DateTime dateRangeEnd = new DateTime(endYear, 9, 30);
+
+                string dataQuery = $@"
+        SELECT 
+            LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE, 
+            LUOGO_REPERIBILITA_STUDENTE.TITOLO_ONEROSO, 
+            LUOGO_REPERIBILITA_STUDENTE.N_SERIE_CONTRATTO, 
+            LUOGO_REPERIBILITA_STUDENTE.DATA_REG_CONTRATTO,  
+            LUOGO_REPERIBILITA_STUDENTE.DATA_DECORRENZA, 
+            LUOGO_REPERIBILITA_STUDENTE.DATA_SCADENZA, 
+            LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO, 
+            LUOGO_REPERIBILITA_STUDENTE.PROROGA, 
+            LUOGO_REPERIBILITA_STUDENTE.DURATA_PROROGA, 
+            LUOGO_REPERIBILITA_STUDENTE.ESTREMI_PROROGA,
+            LUOGO_REPERIBILITA_STUDENTE.TIPO_CONTRATTO_TITOLO_ONEROSO,
+            LUOGO_REPERIBILITA_STUDENTE.DENOM_ENTE,
+            LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO,
+            LUOGO_REPERIBILITA_STUDENTE.IMPORTO_RATA
+        FROM LUOGO_REPERIBILITA_STUDENTE
+        INNER JOIN Comuni ON LUOGO_REPERIBILITA_STUDENTE.COD_COMUNE = Comuni.Cod_comune
+        INNER JOIN #CFEstrazione cfe ON LUOGO_REPERIBILITA_STUDENTE.Cod_fiscale = cfe.Cod_fiscale 
+        WHERE (LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO = '{selectedAA}') 
+          AND (LUOGO_REPERIBILITA_STUDENTE.TIPO_LUOGO = 'DOM') 
+          AND (LUOGO_REPERIBILITA_STUDENTE.DATA_VALIDITA = (
+                SELECT MAX(DATA_VALIDITA)
+                FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
+                WHERE (COD_FISCALE = LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE) 
+                  AND (ANNO_ACCADEMICO = LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO) 
+                  AND (TIPO_LUOGO = 'DOM')
+              ))
+    ";
+
+                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
+                Logger.LogInfo(35, $"Lavorazione studenti - inserimento in domicilio");
+                using (SqlDataReader reader = readData.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
+
+                        if (studente != null)
+                        {
+                            if (studente.codFiscale == "VLNDNS01T54E885A")
+                            {
+                                string test = "";
+                            }
+                            bool titoloOneroso = Utilities.SafeGetInt(reader, "TITOLO_ONEROSO") == 1;
+                            bool contrattoEnte = Utilities.SafeGetInt(reader, "TIPO_CONTRATTO_TITOLO_ONEROSO") == 1;
+                            string serieContratto = string.Empty;
+                            DateTime dataRegistrazione = DateTime.MinValue;
+                            DateTime dataDecorrenza = DateTime.MinValue;
+                            DateTime dataScadenza = DateTime.MinValue;
+                            int durataContratto = 0;
+                            bool prorogato = false;
+                            int durataProroga = 0;
+                            string serieProroga = string.Empty;
+
+                            string denominazioneEnte = string.Empty;
+                            int durataContrattoEnte = 0;
+                            double importoRataEnte = 0;
+
+                            if (titoloOneroso)
+                            {
+                                serieContratto = Utilities.SafeGetString(reader, "N_SERIE_CONTRATTO");
+                                DateTime.TryParse(Utilities.SafeGetString(reader, "DATA_REG_CONTRATTO"), out dataRegistrazione);
+                                DateTime.TryParse(Utilities.SafeGetString(reader, "DATA_DECORRENZA"), out dataDecorrenza);
+                                DateTime.TryParse(Utilities.SafeGetString(reader, "DATA_SCADENZA"), out dataScadenza);
+                                durataContratto = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO");
+                                prorogato = Utilities.SafeGetInt(reader, "PROROGA") == 1;
+                                if (prorogato)
+                                {
+                                    durataProroga = Utilities.SafeGetInt(reader, "DURATA_PROROGA");
+                                    serieProroga = Utilities.SafeGetString(reader, "ESTREMI_PROROGA");
+                                }
+
+                                // Calculate the overlap between the contract and the academic year period
+                                DateTime effectiveStart = dataDecorrenza > dateRangeStart ? dataDecorrenza : dateRangeStart;
+                                DateTime effectiveEnd = dataScadenza < dateRangeEnd ? dataScadenza : dateRangeEnd;
+
+                                if (effectiveStart <= effectiveEnd)
+                                {
+                                    int monthsCovered = ((effectiveEnd.Year - effectiveStart.Year) * 12) + effectiveEnd.Month - effectiveStart.Month + 1;
+
+                                    // Check if the contract covers at least 10 months
+                                    if (monthsCovered >= 10)
+                                    {
+                                        studente.SetDomicilioCheck(true);
+                                    }
+                                }
+                            }
+
+                            if (contrattoEnte)
+                            {
+                                denominazioneEnte = Utilities.SafeGetString(reader, "DENOM_ENTE");
+                                durataContrattoEnte = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO");
+                                importoRataEnte = Utilities.SafeGetDouble(reader, "IMPORTO_RATA");
+
+                                if (string.IsNullOrWhiteSpace(denominazioneEnte))
+                                {
+                                    studente.SetDomicilioCheck(false);
+                                }
+                                else
+                                {
+                                    if (durataContrattoEnte < 10 || importoRataEnte <= 0)
+                                    {
+                                        studente.SetDomicilioCheck(false);
+                                    }
+                                    else
+                                    {
+                                        studente.SetDomicilioCheck(true);
+                                    }
+                                }
+                            }
+
+                            bool contrattoValido = IsValidSerie(serieContratto);
+                            bool prorogaValido = IsValidSerie(serieProroga);
+                            if (!string.IsNullOrEmpty(serieContratto) && serieProroga.IndexOf(serieContratto, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                prorogaValido = false;
+                            }
+
+                            if (studente.codFiscale == "DRSMLD03A68F443G")
+                            {
+                                string test = "";
+                            }
+
+                            studente.SetDomicilio(
+                                titoloOneroso,
+                                serieContratto,
+                                dataRegistrazione,
+                                dataDecorrenza,
+                                dataScadenza,
+                                durataContratto,
+                                prorogato,
+                                durataProroga,
+                                serieProroga,
+                                contrattoValido,
+                                prorogaValido,
+                                contrattoEnte,
+                                denominazioneEnte,
+                                durataContrattoEnte,
+                                importoRataEnte
+                                );
+                        }
+                    }
+                }
+                Logger.LogInfo(35, $"UPDATE:Lavorazione studenti - inserimento in domicilio - completato");
+
+                bool IsValidSerie(string serie)
+                {
+                    if (string.IsNullOrWhiteSpace(serie))
+                        return false;
+
+                    serie = serie.Trim();
+
+                    // Remove trailing dots
+                    serie = serie.TrimEnd('.');
+
+                    // Use case-insensitive matching
+                    RegexOptions options = RegexOptions.IgnoreCase;
+
+                    // Exclude date-only entries
+                    string dateOnlyPattern1 = @"^\d{1,2}/\d{1,2}/\d{2,4}$"; // e.g., '01/09/2023'
+                    string dateOnlyPattern2 = @"^\d{1,2}/\d{1,2}/\d{2,4}\s*[\-–]\s*\d{1,2}/\d{1,2}/\d{2,4}$"; // e.g., '01/11/2024-31/10/2026'
+                    string dateOnlyPattern3 = @"^dal\s+\d{1,2}/\d{1,2}/\d{2,4}\s+al\s+\d{1,2}/\d{1,2}/\d{2,4}$"; // e.g., 'dal 01/10/2024 al 30/09/2025'
+
+                    // Exclude date-only entries in words
+                    string dateWordsPattern = @"^dal\s+\d{1,2}\s+\w+\s+\d{4}\s+al\s+\d{1,2}\s+\w+\s+\d{4}$"; // e.g., 'dal 1 Aprile 2025 al 30 settembre 2025'
+
+                    if (Regex.IsMatch(serie, dateOnlyPattern1, options) ||
+                        Regex.IsMatch(serie, dateOnlyPattern2, options) ||
+                        Regex.IsMatch(serie, dateOnlyPattern3, options) ||
+                        Regex.IsMatch(serie, dateWordsPattern, options))
+                    {
+                        return false;
+                    }
+                    // Exclude entries that are exactly '3T' or 'serie 3T' (case-insensitive, ignoring spaces)
+                    string serieWithoutSpaces = Regex.Replace(serie, @"\s+", "");
+                    if (string.Equals(serieWithoutSpaces, "3T", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(serieWithoutSpaces, "serie3T", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
+                    // Exclude entries containing 'Foglio', 'part', 'sub', 'Cat', unless they contain a valid code
+                    if (Regex.IsMatch(serie, @"\b(Foglio|part|sub|Cat)\b", options) &&
+                        !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
+                    {
+                        return false;
+                    }
+
+                    // Exclude entries containing 'PRENOTAZIONE', unless they contain a valid code
+                    if (Regex.IsMatch(serie, @"\bPRENOTAZIONE\b", options) &&
+                        !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
+                    {
+                        return false;
+                    }
+
+                    // Exclude strings containing only 'automatico' without a valid code
+                    if (Regex.IsMatch(serie, @"automatico", options) && !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
+                        return false;
+
+                    // Pattern 1: Alphanumeric codes starting with 'T', 'TRF', or 'TEL', optional dot at end
+                    string pattern1 = @"^(T|TRF|TEL)\s?[A-Z0-9]{10,50}\.?$";
+
+                    // Pattern 1b: Contains code starting with 'T', 'TRF', or 'TEL' within the string
+                    string pattern1b = @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b";
+
+                    // Pattern 2: Numeric codes with optional hyphens, slashes, and spaces
+                    string pattern2 = @"^[\d/\s\-]{4,}$";
+
+                    // Pattern 2b: Numeric sequences separated by slashes, spaces, or hyphens
+                    string pattern2b = @"^\d{1,20}([/\s\-]\d{1,20})+$";
+
+                    // Pattern 3: Contains 'serie 3T' and variations, with optional spaces
+                    string pattern3 = @"(?i)^(.*\b(serie\s*3\s*T|serie\s*3T|serie\s*T3|serie\s*T|serie\s*IT|3\s*T|3T|T3|3/T)\b.*)$";
+
+                    // Pattern 4: 'QC' codes with slashes and alphanumeric parts
+                    string pattern4 = @"^QC([\s/]*\w+)+$";
+
+                    // Pattern 5: Contains 'Protocollo', 'Prot.', 'Protocol', 'Protocol-', etc., and numbers
+                    string pattern5 = @"(?i)^(.*\b(Protocollo|PROT\.?|prot\.?n?\.?|Protocol-?)\b.*\d+.*)$";
+
+                    // Pattern 6: Starts with 'RA/', 'RM', 'FC/'
+                    string pattern6 = @"^(RA/|RM|FC/)\s*\S+$";
+
+                    // Updated Pattern 7: Alphanumeric codes with both letters and digits, including hyphens, slashes, and spaces, allowing lowercase letters
+                    string pattern7 = @"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9/\s\-]{5,50}$";
+
+                    // Check against all patterns
+                    if (Regex.IsMatch(serie, pattern1, options))
+                        return true;
+                    if (Regex.IsMatch(serie, pattern1b, options))
+                        return true;
+                    if (Regex.IsMatch(serie, pattern2, options))
+                        return true;
+                    if (Regex.IsMatch(serie, pattern2b, options))
+                        return true;
+                    if (Regex.IsMatch(serie, pattern3, options))
+                        return true;
+                    if (Regex.IsMatch(serie, pattern4, options))
+                        return true;
+                    if (Regex.IsMatch(serie, pattern5, options))
+                        return true;
+                    if (Regex.IsMatch(serie, pattern6, options))
+                        return true;
+                    if (Regex.IsMatch(serie, pattern7))
+                        return true;
+
+                    // If none of the patterns match, it's invalid
+                    return false;
+                }
+
+
+
+            }
+
+
             void PopulateStudentPaymentMethod()
             {
                 string dataQuery = @"
@@ -1961,55 +2257,7 @@ namespace ProcedureNet7
 
                 Logger.LogInfo(40, $"UPDATE:Lavorazione studenti - inserimento nucleo familiare - completato");
             }
-            void PopulateDomicilioCheck()
-            {
-                string dataQuery = $@"
-                    SELECT Domanda.Cod_fiscale
-                    FROM Domanda  
-                    inner join  #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale
-                    INNER JOIN vDomicilio ON Domanda.Anno_accademico = vDomicilio.ANNO_ACCADEMICO AND Domanda.Cod_fiscale = vDomicilio.COD_FISCALE
-                    WHERE Domanda.Anno_accademico = '{selectedAA}'
-                        AND Tipo_bando = 'lz' 
-                        AND TITOLO_ONEROSO = 1 
-                        AND (N_SERIE_CONTRATTO IS NOT NULL AND N_SERIE_CONTRATTO <> '')
-                        -- Ensure that the decorrenza or scadenza dates have at least 10 months within the given range
-                        AND DATEDIFF(MONTH, 
-                            CASE 
-                                -- If DATA_DECORRENZA is before 01/10/2023, consider 01/10/2023 as the start of overlap
-                                WHEN DATA_DECORRENZA < '2023-10-01' THEN '2023-10-01' 
-                                ELSE DATA_DECORRENZA 
-                            END, 
-                            CASE 
-                                -- If DATA_SCADENZA is after 30/09/2024, consider 30/09/2024 as the end of overlap
-                                WHEN DATA_SCADENZA > '2024-09-30' THEN '2024-09-30' 
-                                ELSE DATA_SCADENZA 
-                            END
-                        ) >= 9;
-                    ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
-                {
-                    CommandTimeout = 9000000
-                };
-                Logger.LogInfo(40, $"Lavorazione studenti - inserimento domicilio check");
-                List<string> studentiDaRimuovere = new List<string>();
-                using (SqlDataReader reader = readData.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
-
-
-                        if (studente != null)
-                        {
-                            studente.SetDomicilioCheck(true);
-                        }
-                    }
-                }
-
-                Logger.LogInfo(40, $"UPDATE:Lavorazione studenti - inserimento domicilio check - completato");
-            }
             void PopulateStudentiAssegnazioni()
             {
                 string dateQuery = $@"
@@ -2121,7 +2369,7 @@ namespace ProcedureNet7
 
                         if (categoriaPagam == "PR" && !processedFiscalCodes.Contains(codFiscale))
                         {
-                            if (!studente.vincitorePA)
+                            if (studente.esitoPA != 2)
                             {
                                 continue;
                             }
@@ -2244,7 +2492,7 @@ namespace ProcedureNet7
 
                 foreach (StudentePagam studente in studentiConErroriPA.Keys)
                 {
-                    if (studente.assegnazioni.Count == 1 && studente.vincitorePA)
+                    if (studente.assegnazioni.Count == 1 && studente.esitoPA == 2)
                     {
                         Assegnazione vecchiaAssegnazione = studente.assegnazioni[0];
                         if (vecchiaAssegnazione.statoCorrettezzaAssegnazione != AssegnazioneDataCheck.DataUguale)
@@ -2344,13 +2592,14 @@ namespace ProcedureNet7
                 ConcurrentDictionary<string, bool> studentiDaRimuovereDallaTabella = new();
                 ConcurrentDictionary<string, double> studentiPAnegativo = new();
                 ConcurrentBag<(string CodFiscale, string Motivazione)> studentiRimossiBag = new();
+                ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari = new();
                 ThreadLocal<double> importoTotalePerThread = new(() => 0.0, true);
 
                 Parallel.ForEach(studentiDaPagare, pair =>
                 {
                     StudentePagam studente = pair.Value;
 
-                    if (studente.codFiscale == "PDLMYJ99H67H501P")
+                    if (studente.codFiscale == "NSTVSS98C59G015C")
                     {
                         string stest = "";
                     }
@@ -2358,7 +2607,6 @@ namespace ProcedureNet7
                     {
                         string stest = "";
                     }
-
                     if (studente.codFiscale == "STNRCR01L07D972T")
                     {
                         string stest = "";
@@ -2560,6 +2808,39 @@ namespace ProcedureNet7
                         {
                             importoDaPagare = importoMassimo * 0.5;
                             importoMassimo *= 0.5;
+
+                            bool hasDomicilio = studente.domicilioCheck;
+                            bool isMoreThanHalfAbroad = studente.numeroComponentiNucleoFamiliareEstero >= (studente.numeroComponentiNucleoFamiliare / 2.0);
+
+                            if (!studente.rifugiato && studente.statusSede == "B" && studente.esitoPA == 0 && !isMoreThanHalfAbroad && studente.tipoCorso != 6)
+                            {
+                                if (!hasDomicilio || (hasDomicilio && (!studente.contrattoValido || (studente.domicilio.prorogatoLocazione && !studente.prorogaValido))))
+                                {
+                                    importoDaPagare = importoDaPagare / 3 * 2;
+                                    importoMassimo = importoMassimo / 3 * 2;
+
+                                    string messaggio = string.Empty;
+                                    if (studente.domicilio == null)
+                                    {
+                                        messaggio += "#Nessun domicilio trovato";
+                                    }
+                                    if (!hasDomicilio)
+                                    {
+                                        messaggio += "#Durata contratto minore dieci mesi";
+                                    }
+                                    if (!studente.contrattoValido && studente.domicilio != null)
+                                    {
+                                        messaggio += $"#Serie contratto non valida: {studente.domicilio.codiceSerieLocazione}";
+                                    }
+                                    if (studente.domicilio != null && studente.domicilio.prorogatoLocazione && !studente.prorogaValido)
+                                    {
+                                        messaggio += $"#Serie proroga non valida: Contratto {studente.domicilio.codiceSerieLocazione} - Proroga {studente.domicilio.codiceSerieProrogaLocazione}";
+                                    }
+
+                                    studentiPagatiComePendolari.Add((studente.codFiscale, messaggio));
+                                    studente.SetPagatoPendolare(true);
+                                }
+                            }
                         }
                     }
                     else if (tipoBeneficio == "BS" && !isTR)
@@ -2633,10 +2914,18 @@ namespace ProcedureNet7
                     }
 
                     studente.SetImportoDaPagare(importoDaPagare);
+
                     if (isRiemissione)
                     {
                         studente.SetImportoDaPagareLordo(importoDaPagare);
                         studente.RemoveAllAssegnazioni();
+                    }
+
+                    if (importoDaPagare < 0 && !studentiDaRimuovereDallaTabella.ContainsKey(studente.codFiscale))
+                    {
+                        studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
+                        studentiRimossiBag.Add((studente.codFiscale, "Importo da pagare negativo"));
+                        return;
                     }
                 });
 
@@ -2735,6 +3024,20 @@ namespace ProcedureNet7
                     Utilities.ExportDataTableToExcel(studentiRimossi, selectedSaveFolder, fileName: "Studenti rimossi con motivi");
                 }
 
+                if (studentiPagatiComePendolari.Count > 0)
+                {
+                    DataTable studentiPagatiPendolari = new DataTable();
+                    studentiPagatiPendolari.Columns.Add("CodFiscale");
+                    studentiPagatiPendolari.Columns.Add("Motivazione");
+
+                    foreach (var item in studentiPagatiComePendolari)
+                    {
+                        studentiPagatiPendolari.Rows.Add(item.CodFiscale, item.Motivazione);
+                    }
+
+                    Utilities.ExportDataTableToExcel(studentiPagatiPendolari, selectedSaveFolder, fileName: "Studenti fuori sede pagati come pendolari");
+                }
+
                 Logger.LogInfo(null, $"Rimossi {studentiDaRimuovereDallaTabella.Count} studenti dal pagamento");
 
                 // Remove students from the main collection
@@ -2772,18 +3075,24 @@ namespace ProcedureNet7
 
             bool doAllImpegni = selectedImpegno == "0000";
             IEnumerable<string> impegnoList = doAllImpegni ? impegniList : new List<string> { selectedImpegno };
-
-            foreach (string impegno in impegnoList)
+            try
             {
-                Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno}");
-                string sqlImpegno = $"SELECT Descr FROM Impegni WHERE anno_accademico = '{selectedAA}' AND num_impegno = '{impegno}' AND categoria_pagamento = '{categoriaPagam}'";
-                SqlCommand cmdImpegno = new(sqlImpegno, CONNECTION, sqlTransaction)
+                foreach (string impegno in impegnoList)
                 {
-                    CommandTimeout = 9000000
-                };
-                string impegnoDescrizione = (string)cmdImpegno.ExecuteScalar();
-                string currentFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
-                ProcessImpegno(impegno, currentFolder);
+                    Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno}");
+                    string sqlImpegno = $"SELECT Descr FROM Impegni WHERE anno_accademico = '{selectedAA}' AND num_impegno = '{impegno}' AND categoria_pagamento = '{categoriaPagam}'";
+                    SqlCommand cmdImpegno = new(sqlImpegno, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
+                    string impegnoDescrizione = (string)cmdImpegno.ExecuteScalar();
+                    string currentFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
+                    ProcessImpegno(impegno, currentFolder);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
             }
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Completato");
 
@@ -2997,11 +3306,18 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                         Utilities.ExportDataTableToExcel(dataTableASuccessivi, currentFolder, false, "AnniSuccessivi");
                     }
                 }
-                if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
+                try
                 {
-                    string newFolderPath = Utilities.EnsureDirectory(Path.Combine(currentFolder, "CON DETRAZIONE"));
-                    ProcessStudentsByCodEnte(selectedCodEnte, studentsWithPA, newFolderPath, impegno);
-                    GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
+                    if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
+                    {
+                        string newFolderPath = Utilities.EnsureDirectory(Path.Combine(currentFolder, "CON DETRAZIONE"));
+                        ProcessStudentsByCodEnte(selectedCodEnte, studentsWithPA, newFolderPath, impegno);
+                        GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
                 }
             }
             void ProcessStudentsByAnnoCorso(List<StudentePagam> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio, string codEnteFlusso, string impegnoFlusso)
@@ -3028,39 +3344,74 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                 {
                     return;
                 }
+
                 bool allCodEnte = selectedCodEnte == "00";
-                var codEnteList = allCodEnte ? studentsWithPA.Select(s => s.codEnte).Distinct() : new List<string> { selectedCodEnte };
 
-                foreach (var codEnte in codEnteList)
+                // Create a dictionary to hold the groups
+                Dictionary<string, List<string>> codEnteGroups = new Dictionary<string, List<string>>();
+
+                if (allCodEnte)
                 {
+                    // Define the three main groups
+                    codEnteGroups.Add("02", new List<string> { "02" });
+                    codEnteGroups.Add("05", new List<string> { "05" });
+                    var otherCodEntes = studentsWithPA.Select(s => s.codEnte).Distinct().Where(c => c != "02" && c != "05").ToList();
+                    codEnteGroups.Add("Roma", otherCodEntes);
+                }
+                else
+                {
+                    codEnteGroups.Add(selectedCodEnte, new List<string> { selectedCodEnte });
+                }
 
-                    var studentsInCodEnte = studentsWithPA.Where(s => s.codEnte == codEnte).ToList();
-                    var anniCorsi = studentsInCodEnte.Select(s => s.annoCorso).Distinct();
+                foreach (var group in codEnteGroups)
+                {
+                    string groupName = group.Key;
+                    List<string> groupCodEntes = group.Value;
+
+                    var studentsInGroup = studentsWithPA.Where(s => groupCodEntes.Contains(s.codEnte)).ToList();
+
+                    if (studentsInGroup.Count == 0)
+                    {
+                        continue;
+                    }
 
                     string nomeCodEnte = "";
-                    string sqlCodEnte = $"SELECT Descrizione FROM Enti_di_gestione WHERE cod_ente = '{codEnte}'";
-                    SqlCommand cmdSede = new(sqlCodEnte, CONNECTION, sqlTransaction)
+
+                    if (groupName == "Roma")
                     {
-                        CommandTimeout = 9000000
-                    };
-                    nomeCodEnte = (string)cmdSede.ExecuteScalar();
-                    nomeCodEnte = Utilities.SanitizeColumnName(nomeCodEnte);
+                        nomeCodEnte = "Roma territoriale";
+                    }
+                    else
+                    {
+                        string sqlCodEnte = $"SELECT Descrizione FROM Enti_di_gestione WHERE cod_ente = '{groupName}'";
+                        SqlCommand cmdSede = new(sqlCodEnte, CONNECTION, sqlTransaction)
+                        {
+                            CommandTimeout = 9000000
+                        };
+                        nomeCodEnte = (string)cmdSede.ExecuteScalar();
+                        nomeCodEnte = Utilities.SanitizeColumnName(nomeCodEnte);
+                    }
+
                     Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}");
                     string specificFolderPath = Utilities.EnsureDirectory(Path.Combine(newFolderPath, $"{nomeCodEnte}"));
-                    impegnoAmount[impegno].Add(nomeCodEnte, studentsInCodEnte.Count);
+                    impegnoAmount[impegno].Add(nomeCodEnte, studentsInGroup.Count);
+
                     if (tipoStudente == "2")
                     {
-                        ProcessStudentsByAnnoCorso(studentsInCodEnte, specificFolderPath, processMatricole: true, processAnniSuccessivi: true, "Con Detrazioni_" + nomeCodEnte, codEnte, impegno);
+                        ProcessStudentsByAnnoCorso(studentsInGroup, specificFolderPath, processMatricole: true, processAnniSuccessivi: true, "Con Detrazioni_" + nomeCodEnte, groupName, impegno);
                     }
                     else
                     {
                         bool processMatricole = tipoStudente == "0";
-                        ProcessStudentsByAnnoCorso(studentsInCodEnte, specificFolderPath, processMatricole: processMatricole, processAnniSuccessivi: !processMatricole, "Con Detrazioni_" + nomeCodEnte, codEnte, impegno);
+                        ProcessStudentsByAnnoCorso(studentsInGroup, specificFolderPath, processMatricole: processMatricole, processAnniSuccessivi: !processMatricole, "Con Detrazioni_" + nomeCodEnte, groupName, impegno);
                     }
                 }
-                List<string> sediStudi = codEnteList.ToList();
+
+                // Collect all codEnte codes for the final processing
+                List<string> sediStudi = studentsWithPA.Select(s => s.codEnte).Distinct().ToList();
                 DataTable dataTableMatricole = GenerareExcelDataTableConDetrazioni(studentsWithPA.Where(s => s.annoCorso == 1).ToList(), sediStudi, impegno);
                 DataTable dataTableASuccessivi = GenerareExcelDataTableConDetrazioni(studentsWithPA.Where(s => s.annoCorso != 1).ToList(), sediStudi, impegno);
+
                 if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
                 {
                     Utilities.ExportDataTableToExcel(dataTableMatricole, newFolderPath, false, "Matricole");
@@ -3069,8 +3420,8 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                 {
                     Utilities.ExportDataTableToExcel(dataTableASuccessivi, newFolderPath, false, "AnniSuccessivi");
                 }
-
             }
+
             void ProcessAndWriteStudents(List<StudentePagam> students, string folderPath, string fileName, string codEnteFlusso, string impegnoFlusso)
             {
                 if (students.Any())
@@ -3259,7 +3610,7 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                     string indirizzoResidenza = straniero == 0 ? studente.residenza.indirizzo.Replace("//", "-") : studente.residenza.indirizzo;
                     string capResidenza = straniero == 0 ? "00000" : studente.residenza.CAP;
                     string dataSenzaSlash = studente.dataNascita.Replace("/", "");
-                    bool hasAssegnazione = studente.assegnazioni != null && studente.assegnazioni.Count > 0;
+                    bool hasAssegnazione = (categoriaPagam == "PR" && studente.detrazioni != null && studente.detrazioni.Count > 0 && studente.detrazioni.FirstOrDefault(d => d.codReversale == "01") != null) || (studente.assegnazioni != null && studente.assegnazioni.Count > 0);
 
                     double accontoPA = studente.importoAccontoPA;
                     if (categoriaPagam == "SA")
@@ -3464,16 +3815,25 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                 Dictionary<int, StudentePagam> codMovimentiPerStudente = new();
                 string baseSqlInsert = "INSERT INTO MOVIMENTI_CONTABILI_GENERALI (ID_CAUSALE_MOVIMENTO_GENERALE, IMPORTO_MOVIMENTO, UTENTE_VALIDAZIONE, DATA_VALIDITA_MOVIMENTO_GENERALE, NOTE_VALIDAZIONE_MOVIMENTO, COD_MANDATO) VALUES ";
                 string note = "Inserimento tramite elaborazione file pagamenti";
+                string notaNow = note;
 
                 if (studentiDaProcessare.Any())
                 {
                     StudentePagam firstStudent = studentiDaProcessare.First();
+                    if (firstStudent.pagatoPendolare)
+                    {
+                        notaNow = "Pagamento effettuato come pendolare";
+                    }
+                    else
+                    {
+                        notaNow = note;
+                    }
                     string firstStudentValues = string.Format("('{0}', {1}, '{2}', '{3}', '{4}', '{5}')",
                             codTipoPagamento,
                             firstStudent.importoDaPagare.ToString(CultureInfo.InvariantCulture),
                             "sa",
                             DateTime.Now.ToString("dd/MM/yyyy"),
-                            note,
+                            notaNow,
                             firstStudent.mandatoProvvisorio);
                     string initialInsertQuery = $"{baseSqlInsert} {firstStudentValues};";
                     using (SqlCommand cmd = new(initialInsertQuery, CONNECTION, sqlTransaction)
@@ -3523,12 +3883,20 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
 
                     foreach (StudentePagam studente in batch)
                     {
+                        if (studente.pagatoPendolare)
+                        {
+                            notaNow = "Pagamento effettuato come pendolare";
+                        }
+                        else
+                        {
+                            notaNow = note;
+                        }
                         string studenteValues = string.Format("('{0}', {1}, '{2}', '{3}', '{4}', '{5}')",
                             codTipoPagamento,
                             studente.importoDaPagare.ToString(CultureInfo.InvariantCulture),
                             "sa",
                             DateTime.Now.ToString("dd/MM/yyyy"),
-                            note,
+                            notaNow,
                             studente.mandatoProvvisorio);
 
                         valuesList.Add(studenteValues);

@@ -121,7 +121,7 @@ namespace ProcedureNet7
                     _impegnoPR = specificheImpPRBox.Text,
                     _impegnoSA = specificheImpSABox.Text,
                     _eseSA = specificheEseSABox.Text,
-                    _esePR = specificheImpPRBox.Text,
+                    _esePR = specificheEsePRBox.Text,
                     _capitolo = specificheCapitoloBox.Text,
                     _tipoFondo = specificheTipoFondoBox.Text
                 };
