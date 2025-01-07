@@ -1560,12 +1560,10 @@ namespace ProcedureNet7
             // Check for missing IBAN
             string sqlStudentiSenzaIBAN = $@" 
                 SELECT DISTINCT
-                    vMODALITA_PAGAMENTO.Cod_fiscale
+                    vMODALITA_PAGAMENTO.Cod_fiscale, vMODALITA_PAGAMENTO.IBAN
                 FROM
                     vMODALITA_PAGAMENTO 
                     INNER JOIN #CFEstrazione cfe ON vMODALITA_PAGAMENTO.Cod_fiscale = cfe.Cod_fiscale 
-                WHERE 
-                    IBAN = ''
              ";
             SqlCommand IBANDATA = new(sqlStudentiSenzaIBAN, CONNECTION, sqlTransaction)
             {
@@ -1573,6 +1571,7 @@ namespace ProcedureNet7
             };
             Logger.LogInfo(12, $"Lavorazione studenti - controllo IBAN");
             HashSet<string> listaStudentiDaEliminareIBAN = new();
+            HashSet<string> listaStudentiDaBloccareIBAN = new();
             using (SqlDataReader reader = IBANDATA.ExecuteReader())
             {
                 while (reader.Read())
@@ -1583,27 +1582,56 @@ namespace ProcedureNet7
                         string test = "";
                     }
                     studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
-                    if (studente != null && !listaStudentiDaEliminareIBAN.Contains(studente.codFiscale))
+                    if (studente != null)
                     {
-                        listaStudentiDaEliminareIBAN.Add(studente.codFiscale);
+                        string IBAN = Utilities.SafeGetString(reader, "IBAN").ToUpper();
+                        if (IBAN == string.Empty && !listaStudentiDaEliminareIBAN.Contains(studente.codFiscale))
+                        {
+                            listaStudentiDaEliminareIBAN.Add(studente.codFiscale);
+                        }
+
+                        bool ibanValido = IbanValidatorUtil.ValidateIban(IBAN);
+
+                        if (!ibanValido && !listaStudentiDaBloccareIBAN.Contains(studente.codFiscale))
+                        {
+                            listaStudentiDaBloccareIBAN.Add(studente.codFiscale);
+                        }
                     }
                 }
             }
-            string listaCFIBAN = string.Join(", ", listaStudentiDaEliminareIBAN.Select(cf => $"'{cf}'"));
-            if (!string.IsNullOrWhiteSpace(listaCFIBAN))
+            string listaCFIBANMancante = string.Join(", ", listaStudentiDaEliminareIBAN.Select(cf => $"'{cf}'"));
+            if (!string.IsNullOrWhiteSpace(listaCFIBANMancante))
             {
                 string sqlUpdateIban = $@"
                     UPDATE {dbTableName}
                         SET liquidabile = 0,
                             note = 'Studente senza IBAN valido al momento dell''estrazione'
                     WHERE
-                        cod_fiscale IN ({listaCFIBAN})
+                        cod_fiscale IN ({listaCFIBANMancante})
                     ";
                 SqlCommand ibanUpdate = new(sqlUpdateIban, CONNECTION, sqlTransaction)
                 {
                     CommandTimeout = 9000000
                 };
                 ibanUpdate.ExecuteNonQuery();
+            }
+
+            string listaCFIBANNonValido = string.Join(", ", listaStudentiDaEliminareIBAN.Select(cf => $"'{cf}'"));
+            if (!string.IsNullOrWhiteSpace(listaCFIBANNonValido))
+            {
+                string sqlUpdateIban = $@"
+                    UPDATE {dbTableName}
+                        SET liquidabile = 0,
+                            note = 'Studente con IBAN errato al momento dell''estrazione'
+                    WHERE
+                        cod_fiscale IN ({listaCFIBANNonValido})
+                    ";
+                SqlCommand ibanUpdate = new(sqlUpdateIban, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 9000000
+                };
+                ibanUpdate.ExecuteNonQuery();
+                BlocksUtil.AddBlock(CONNECTION, sqlTransaction, listaStudentiDaEliminareIBAN.ToList<string>(), "BSS", selectedAA, "IBAN_Check", true);
             }
 
             // Check for non-winners
@@ -1713,6 +1741,7 @@ namespace ProcedureNet7
             }
             Logger.LogInfo(12, $"Numero studenti da eliminare per blocchi presenti in domanda = {listaStudentiDaEliminareBlocchi.Count}");
             Logger.LogInfo(12, $"Numero studenti da eliminare per IBAN mancante = {listaStudentiDaEliminareIBAN.Count}");
+            Logger.LogInfo(12, $"Numero studenti bloccati per IBAN non valido = {listaStudentiDaBloccareIBAN.Count}");
             Logger.LogInfo(12, $"Numero studenti da eliminare perché non più vincitori = {listaStudentiDaEliminareNonVincitori.Count}");
             Logger.LogInfo(12, $"Numero studenti da eliminare per PEC mancante = {listaStudentiDaEliminarePEC.Count}");
             foreach (string codFiscale in listaStudentiDaEliminareBlocchi)
@@ -1720,6 +1749,10 @@ namespace ProcedureNet7
                 studentiDaPagare.Remove(codFiscale);
             }
             foreach (string codFiscale in listaStudentiDaEliminareIBAN)
+            {
+                studentiDaPagare.Remove(codFiscale);
+            }
+            foreach (string codFiscale in listaStudentiDaBloccareIBAN)
             {
                 studentiDaPagare.Remove(codFiscale);
             }
@@ -1740,6 +1773,7 @@ namespace ProcedureNet7
             PopulateStudentLuogoNascita();
             PopulateStudentResidenza();
             PopulateStudentDomicilio();
+            PopulateStudentForzature();
             PopulateStudentPaymentMethod();
             PopulateStudentiVecchioEsitoPA();
             if (tipoBeneficio == "BS" && !isTR)
@@ -1822,185 +1856,249 @@ namespace ProcedureNet7
                 }
                 Logger.LogInfo(35, $"UPDATE:Lavorazione studenti - inserimento in residenza - completato");
             }
-
-            void PopulateStudentDomicilio()
+            void PopulateStudentForzature()
             {
-                // Parse the selected academic year
-                int startYear = int.Parse(selectedAA.Substring(0, 4));
-                int endYear = int.Parse(selectedAA.Substring(4, 4));
-                DateTime dateRangeStart = new DateTime(startYear, 10, 1);
-                DateTime dateRangeEnd = new DateTime(endYear, 9, 30);
-
                 string dataQuery = $@"
-        SELECT 
-            LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE, 
-            LUOGO_REPERIBILITA_STUDENTE.TITOLO_ONEROSO, 
-            LUOGO_REPERIBILITA_STUDENTE.N_SERIE_CONTRATTO, 
-            LUOGO_REPERIBILITA_STUDENTE.DATA_REG_CONTRATTO,  
-            LUOGO_REPERIBILITA_STUDENTE.DATA_DECORRENZA, 
-            LUOGO_REPERIBILITA_STUDENTE.DATA_SCADENZA, 
-            LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO, 
-            LUOGO_REPERIBILITA_STUDENTE.PROROGA, 
-            LUOGO_REPERIBILITA_STUDENTE.DURATA_PROROGA, 
-            LUOGO_REPERIBILITA_STUDENTE.ESTREMI_PROROGA,
-            LUOGO_REPERIBILITA_STUDENTE.TIPO_CONTRATTO_TITOLO_ONEROSO,
-            LUOGO_REPERIBILITA_STUDENTE.DENOM_ENTE,
-            LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO,
-            LUOGO_REPERIBILITA_STUDENTE.IMPORTO_RATA
-        FROM LUOGO_REPERIBILITA_STUDENTE
-        INNER JOIN Comuni ON LUOGO_REPERIBILITA_STUDENTE.COD_COMUNE = Comuni.Cod_comune
-        INNER JOIN #CFEstrazione cfe ON LUOGO_REPERIBILITA_STUDENTE.Cod_fiscale = cfe.Cod_fiscale 
-        WHERE (LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO = '{selectedAA}') 
-          AND (LUOGO_REPERIBILITA_STUDENTE.TIPO_LUOGO = 'DOM') 
-          AND (LUOGO_REPERIBILITA_STUDENTE.DATA_VALIDITA = (
-                SELECT MAX(DATA_VALIDITA)
-                FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
-                WHERE (COD_FISCALE = LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE) 
-                  AND (ANNO_ACCADEMICO = LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO) 
-                  AND (TIPO_LUOGO = 'DOM')
-              ))
-    ";
+
+
+                        SELECT forz.cod_fiscale, forz.status_sede
+                        FROM Forzature_StatusSede forz
+                        INNER JOIN #CFEstrazione cfe ON forz.Cod_fiscale = cfe.Cod_fiscale 
+                        where Anno_Accademico = '{selectedAA}' and Data_fine_validita is null
+                             ";
 
                 SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
                 {
                     CommandTimeout = 9000000
                 };
-                Logger.LogInfo(35, $"Lavorazione studenti - inserimento in domicilio");
+                Logger.LogInfo(35, $"Lavorazione studenti - inserimento in forzature");
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
                         studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
+                        string forzatura = Utilities.SafeGetString(reader, "status_sede").ToUpper();
+                        studente?.SetForzatura(forzatura);
+                    }
+                }
+                Logger.LogInfo(35, $"UPDATE:Lavorazione studenti - inserimento in forzatura - completato");
+            }
+            void PopulateStudentDomicilio()
+            {
+                // -----------------------
+                // 0) Parse the academic year
+                // -----------------------
+                int startYear = int.Parse(selectedAA.Substring(0, 4));
+                int endYear = int.Parse(selectedAA.Substring(4, 4));
+                DateTime dateRangeStart = new DateTime(startYear, 10, 1);
+                DateTime dateRangeEnd = new DateTime(endYear, 9, 30);
 
-                        if (studente != null)
+                // -----------------------
+                // 1) Prepare the query
+                // -----------------------
+                string dataQuery = $@"
+                    SELECT 
+                        LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE, 
+                        LUOGO_REPERIBILITA_STUDENTE.TITOLO_ONEROSO, 
+                        LUOGO_REPERIBILITA_STUDENTE.N_SERIE_CONTRATTO, 
+                        LUOGO_REPERIBILITA_STUDENTE.DATA_REG_CONTRATTO,  
+                        LUOGO_REPERIBILITA_STUDENTE.DATA_DECORRENZA, 
+                        LUOGO_REPERIBILITA_STUDENTE.DATA_SCADENZA, 
+                        LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO, 
+                        LUOGO_REPERIBILITA_STUDENTE.PROROGA, 
+                        LUOGO_REPERIBILITA_STUDENTE.DURATA_PROROGA, 
+                        LUOGO_REPERIBILITA_STUDENTE.ESTREMI_PROROGA,
+                        LUOGO_REPERIBILITA_STUDENTE.TIPO_CONTRATTO_TITOLO_ONEROSO,
+                        LUOGO_REPERIBILITA_STUDENTE.DENOM_ENTE,
+                        LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO,
+                        LUOGO_REPERIBILITA_STUDENTE.IMPORTO_RATA
+                    FROM LUOGO_REPERIBILITA_STUDENTE
+                    INNER JOIN Comuni ON LUOGO_REPERIBILITA_STUDENTE.COD_COMUNE = Comuni.Cod_comune
+                    INNER JOIN #CFEstrazione cfe ON LUOGO_REPERIBILITA_STUDENTE.Cod_fiscale = cfe.Cod_fiscale 
+                    WHERE 
+                        (LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO = '{selectedAA}') 
+                        AND (LUOGO_REPERIBILITA_STUDENTE.TIPO_LUOGO   = 'DOM') 
+                        AND (LUOGO_REPERIBILITA_STUDENTE.DATA_VALIDITA = (
+                            SELECT MAX(DATA_VALIDITA)
+                            FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
+                            WHERE 
+                                (COD_FISCALE    = LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE) 
+                                AND (ANNO_ACCADEMICO = LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO) 
+                                AND (TIPO_LUOGO     = 'DOM')
+                        ))
+                ";
+
+                // -----------------------
+                // 2) Read data into DTOs
+                // -----------------------
+                var domicilioRows = new List<StudentiDomicilioDTO>();
+                Logger.LogInfo(35, "Lavorazione studenti - inserimento in domicilio");
+
+                using (SqlCommand readData = new SqlCommand(dataQuery, CONNECTION, sqlTransaction))
+                {
+                    readData.CommandTimeout = 9000000;
+
+                    using (SqlDataReader reader = readData.ExecuteReader())
+                    {
+                        while (reader.Read())
                         {
-                            if (studente.codFiscale == "VLNDNS01T54E885A")
+                            var codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+
+                            domicilioRows.Add(new StudentiDomicilioDTO
                             {
-                                string test = "";
-                            }
-                            bool titoloOneroso = Utilities.SafeGetInt(reader, "TITOLO_ONEROSO") == 1;
-                            bool contrattoEnte = Utilities.SafeGetInt(reader, "TIPO_CONTRATTO_TITOLO_ONEROSO") == 1;
-                            string serieContratto = string.Empty;
-                            DateTime dataRegistrazione = DateTime.MinValue;
-                            DateTime dataDecorrenza = DateTime.MinValue;
-                            DateTime dataScadenza = DateTime.MinValue;
-                            int durataContratto = 0;
-                            bool prorogato = false;
-                            int durataProroga = 0;
-                            string serieProroga = string.Empty;
-
-                            string denominazioneEnte = string.Empty;
-                            int durataContrattoEnte = 0;
-                            double importoRataEnte = 0;
-
-                            if (titoloOneroso)
-                            {
-                                serieContratto = Utilities.SafeGetString(reader, "N_SERIE_CONTRATTO");
-                                DateTime.TryParse(Utilities.SafeGetString(reader, "DATA_REG_CONTRATTO"), out dataRegistrazione);
-                                DateTime.TryParse(Utilities.SafeGetString(reader, "DATA_DECORRENZA"), out dataDecorrenza);
-                                DateTime.TryParse(Utilities.SafeGetString(reader, "DATA_SCADENZA"), out dataScadenza);
-                                durataContratto = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO");
-                                prorogato = Utilities.SafeGetInt(reader, "PROROGA") == 1;
-                                if (prorogato)
-                                {
-                                    durataProroga = Utilities.SafeGetInt(reader, "DURATA_PROROGA");
-                                    serieProroga = Utilities.SafeGetString(reader, "ESTREMI_PROROGA");
-                                }
-
-                                // Calculate the overlap between the contract and the academic year period
-                                DateTime effectiveStart = dataDecorrenza > dateRangeStart ? dataDecorrenza : dateRangeStart;
-                                DateTime effectiveEnd = dataScadenza < dateRangeEnd ? dataScadenza : dateRangeEnd;
-
-                                if (effectiveStart <= effectiveEnd)
-                                {
-                                    int monthsCovered = ((effectiveEnd.Year - effectiveStart.Year) * 12) + effectiveEnd.Month - effectiveStart.Month + 1;
-
-                                    // Check if the contract covers at least 10 months
-                                    if (monthsCovered >= 10)
-                                    {
-                                        studente.SetDomicilioCheck(true);
-                                    }
-                                }
-                            }
-
-                            if (contrattoEnte)
-                            {
-                                denominazioneEnte = Utilities.SafeGetString(reader, "DENOM_ENTE");
-                                durataContrattoEnte = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO");
-                                importoRataEnte = Utilities.SafeGetDouble(reader, "IMPORTO_RATA");
-
-                                if (string.IsNullOrWhiteSpace(denominazioneEnte))
-                                {
-                                    studente.SetDomicilioCheck(false);
-                                }
-                                else
-                                {
-                                    if (durataContrattoEnte < 10 || importoRataEnte <= 0)
-                                    {
-                                        studente.SetDomicilioCheck(false);
-                                    }
-                                    else
-                                    {
-                                        studente.SetDomicilioCheck(true);
-                                    }
-                                }
-                            }
-
-                            bool contrattoValido = IsValidSerie(serieContratto);
-                            bool prorogaValido = IsValidSerie(serieProroga);
-                            if (!string.IsNullOrEmpty(serieContratto) && serieProroga.IndexOf(serieContratto, StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                prorogaValido = false;
-                            }
-
-                            if (studente.codFiscale == "DRSMLD03A68F443G")
-                            {
-                                string test = "";
-                            }
-
-                            studente.SetDomicilio(
-                                titoloOneroso,
-                                serieContratto,
-                                dataRegistrazione,
-                                dataDecorrenza,
-                                dataScadenza,
-                                durataContratto,
-                                prorogato,
-                                durataProroga,
-                                serieProroga,
-                                contrattoValido,
-                                prorogaValido,
-                                contrattoEnte,
-                                denominazioneEnte,
-                                durataContrattoEnte,
-                                importoRataEnte
-                                );
+                                CodFiscale = codFiscale,
+                                TitoloOneroso = (Utilities.SafeGetInt(reader, "TITOLO_ONEROSO") == 1),
+                                ContrattoEnte = (Utilities.SafeGetInt(reader, "TIPO_CONTRATTO_TITOLO_ONEROSO") == 1),
+                                SerieContratto = Utilities.SafeGetString(reader, "N_SERIE_CONTRATTO"),
+                                DataRegistrazioneString = Utilities.SafeGetString(reader, "DATA_REG_CONTRATTO"),
+                                DataDecorrenzaString = Utilities.SafeGetString(reader, "DATA_DECORRENZA"),
+                                DataScadenzaString = Utilities.SafeGetString(reader, "DATA_SCADENZA"),
+                                DurataContratto = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO"),
+                                Prorogato = (Utilities.SafeGetInt(reader, "PROROGA") == 1),
+                                DurataProroga = Utilities.SafeGetInt(reader, "DURATA_PROROGA"),
+                                SerieProroga = Utilities.SafeGetString(reader, "ESTREMI_PROROGA"),
+                                DenominazioneEnte = Utilities.SafeGetString(reader, "DENOM_ENTE"),
+                                DurataContrattoEnte = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO"),
+                                ImportoRataEnte = Utilities.SafeGetDouble(reader, "IMPORTO_RATA")
+                            });
                         }
                     }
                 }
-                Logger.LogInfo(35, $"UPDATE:Lavorazione studenti - inserimento in domicilio - completato");
 
+                // -----------------------
+                // 3) Process the rows
+                // -----------------------
+                foreach (var row in domicilioRows)
+                {
+                    if (!studentiDaPagare.TryGetValue(row.CodFiscale, out StudentePagam? studente))
+                        continue;
+                    if (studente == null)
+                        continue;
+
+                    // Debug check
+                    if (studente.codFiscale == "VLNDNS01T54E885A")
+                    {
+                        string test = ""; // Just to set a breakpoint, presumably
+                    }
+
+                    // ----- TITOLO ONEROSO -----
+                    bool titoloOneroso = row.TitoloOneroso;
+                    DateTime.TryParse(row.DataRegistrazioneString, out DateTime dataRegistrazione);
+                    DateTime.TryParse(row.DataDecorrenzaString, out DateTime dataDecorrenza);
+                    DateTime.TryParse(row.DataScadenzaString, out DateTime dataScadenza);
+
+                    // Only if there's a real contract
+                    if (titoloOneroso)
+                    {
+                        // Calculate the overlap between the contract and the academic year period
+                        DateTime effectiveStart = (dataDecorrenza > dateRangeStart) ? dataDecorrenza : dateRangeStart;
+                        DateTime effectiveEnd = (dataScadenza < dateRangeEnd) ? dataScadenza : dateRangeEnd;
+
+                        if (effectiveStart <= effectiveEnd)
+                        {
+                            int monthsCovered = ((effectiveEnd.Year - effectiveStart.Year) * 12)
+                                              + (effectiveEnd.Month - effectiveStart.Month + 1);
+                            if (monthsCovered >= 10)
+                            {
+                                // Mark the student as having a valid domicile for >=10 months
+                                studente.SetDomicilioCheck(true);
+                            }
+                        }
+                    }
+
+                    // ----- CONTRATTO ENTE -----
+                    bool contrattoEnte = row.ContrattoEnte;
+                    string denominazioneEnte = row.DenominazioneEnte;
+                    int durataContrattoEnte = row.DurataContrattoEnte;
+                    double importoRataEnte = row.ImportoRataEnte;
+                    bool contrattoEnteValido = false;
+
+                    if (contrattoEnte)
+                    {
+                        if (string.IsNullOrWhiteSpace(denominazioneEnte))
+                        {
+                            // If there's no "Ente" name, consider invalid
+                            studente.SetDomicilioCheck(false);
+                        }
+                        else
+                        {
+                            // Must have at least 10 months and a rate > 0
+                            if (durataContrattoEnte < 10 || importoRataEnte <= 0)
+                            {
+                                studente.SetDomicilioCheck(false);
+                            }
+                            else
+                            {
+                                studente.SetDomicilioCheck(true);
+                                contrattoEnteValido = true;
+                            }
+                        }
+                    }
+
+                    // ----- Serie Contratto & Serie Proroga -----
+                    string serieContratto = row.SerieContratto;
+                    string serieProroga = row.SerieProroga;
+
+                    bool contrattoValido = contrattoEnteValido || IsValidSerie(serieContratto);
+                    bool prorogaValido = IsValidSerie(serieProroga);
+
+                    // If the proroga contains the same base as the contract, we consider that invalid
+                    if (!string.IsNullOrEmpty(serieContratto)
+                        && !string.IsNullOrEmpty(serieProroga)
+                        && serieProroga.IndexOf(serieContratto, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        prorogaValido = false;
+                    }
+
+                    // Debug check
+                    if (studente.codFiscale == "DRSMLD03A68F443G")
+                    {
+                        string test = ""; // Another debugging breakpoint
+                    }
+
+                    // Finally, store all the domicile info into the Studente object
+                    studente.SetDomicilio(
+                        titoloOneroso,
+                        serieContratto,
+                        dataRegistrazione,
+                        dataDecorrenza,
+                        dataScadenza,
+                        row.DurataContratto,
+                        row.Prorogato,
+                        row.DurataProroga,
+                        serieProroga,
+                        contrattoValido,
+                        prorogaValido,
+                        contrattoEnte,
+                        denominazioneEnte,
+                        durataContrattoEnte,
+                        importoRataEnte
+                    );
+                }
+
+                Logger.LogInfo(35, "UPDATE:Lavorazione studenti - inserimento in domicilio - completato");
+
+                // -----------------------
+                // Local helper method
+                // -----------------------
                 bool IsValidSerie(string serie)
                 {
                     if (string.IsNullOrWhiteSpace(serie))
                         return false;
 
                     serie = serie.Trim();
-
                     // Remove trailing dots
                     serie = serie.TrimEnd('.');
 
-                    // Use case-insensitive matching
+                    // Case-insensitive matching
                     RegexOptions options = RegexOptions.IgnoreCase;
 
-                    // Exclude date-only entries
-                    string dateOnlyPattern1 = @"^\d{1,2}/\d{1,2}/\d{2,4}$"; // e.g., '01/09/2023'
-                    string dateOnlyPattern2 = @"^\d{1,2}/\d{1,2}/\d{2,4}\s*[\-–]\s*\d{1,2}/\d{1,2}/\d{2,4}$"; // e.g., '01/11/2024-31/10/2026'
-                    string dateOnlyPattern3 = @"^dal\s+\d{1,2}/\d{1,2}/\d{2,4}\s+al\s+\d{1,2}/\d{1,2}/\d{2,4}$"; // e.g., 'dal 01/10/2024 al 30/09/2025'
-
-                    // Exclude date-only entries in words
-                    string dateWordsPattern = @"^dal\s+\d{1,2}\s+\w+\s+\d{4}\s+al\s+\d{1,2}\s+\w+\s+\d{4}$"; // e.g., 'dal 1 Aprile 2025 al 30 settembre 2025'
+                    // Exclude date-only entries or date ranges
+                    string dateOnlyPattern1 = @"^\d{1,2}/\d{1,2}/\d{2,4}$";
+                    string dateOnlyPattern2 = @"^\d{1,2}/\d{1,2}/\d{2,4}\s*[\-–]\s*\d{1,2}/\d{1,2}/\d{2,4}$";
+                    string dateOnlyPattern3 = @"^dal\s+\d{1,2}/\d{1,2}/\d{2,4}\s+al\s+\d{1,2}/\d{1,2}/\d{2,4}$";
+                    string dateWordsPattern = @"^dal\s+\d{1,2}\s+\w+\s+\d{4}\s+al\s+\d{1,2}\s+\w+\s+\d{4}$";
 
                     if (Regex.IsMatch(serie, dateOnlyPattern1, options) ||
                         Regex.IsMatch(serie, dateOnlyPattern2, options) ||
@@ -2009,7 +2107,8 @@ namespace ProcedureNet7
                     {
                         return false;
                     }
-                    // Exclude entries that are exactly '3T' or 'serie 3T' (case-insensitive, ignoring spaces)
+
+                    // Exclude '3T' or 'serie 3T' alone
                     string serieWithoutSpaces = Regex.Replace(serie, @"\s+", "");
                     if (string.Equals(serieWithoutSpaces, "3T", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(serieWithoutSpaces, "serie3T", StringComparison.OrdinalIgnoreCase))
@@ -2017,80 +2116,54 @@ namespace ProcedureNet7
                         return false;
                     }
 
-                    // Exclude entries containing 'Foglio', 'part', 'sub', 'Cat', unless they contain a valid code
+                    // Exclude 'Foglio/part/sub/Cat' patterns unless they match a valid code
                     if (Regex.IsMatch(serie, @"\b(Foglio|part|sub|Cat)\b", options) &&
                         !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
                     {
                         return false;
                     }
 
-                    // Exclude entries containing 'PRENOTAZIONE', unless they contain a valid code
+                    // Exclude 'PRENOTAZIONE' unless there's a valid code
                     if (Regex.IsMatch(serie, @"\bPRENOTAZIONE\b", options) &&
                         !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
                     {
                         return false;
                     }
 
-                    // Exclude strings containing only 'automatico' without a valid code
-                    if (Regex.IsMatch(serie, @"automatico", options) && !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
+                    // Exclude 'automatico' unless there's a valid code
+                    if (Regex.IsMatch(serie, @"automatico", options) &&
+                        !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
+                    {
                         return false;
+                    }
 
-                    // Pattern 1: Alphanumeric codes starting with 'T', 'TRF', or 'TEL', optional dot at end
+                    // Patterns for valid codes
                     string pattern1 = @"^(T|TRF|TEL)\s?[A-Z0-9]{10,50}\.?$";
-
-                    // Pattern 1b: Contains code starting with 'T', 'TRF', or 'TEL' within the string
                     string pattern1b = @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b";
-
-                    // Pattern 2: Numeric codes with optional hyphens, slashes, and spaces
                     string pattern2 = @"^[\d/\s\-]{4,}$";
-
-                    // Pattern 2b: Numeric sequences separated by slashes, spaces, or hyphens
                     string pattern2b = @"^\d{1,20}([/\s\-]\d{1,20})+$";
-
-                    // Pattern 3: Contains 'serie 3T' and variations, with optional spaces
                     string pattern3 = @"(?i)^(.*\b(serie\s*3\s*T|serie\s*3T|serie\s*T3|serie\s*T|serie\s*IT|3\s*T|3T|T3|3/T)\b.*)$";
-
-                    // Pattern 4: 'QC' codes with slashes and alphanumeric parts
                     string pattern4 = @"^QC([\s/]*\w+)+$";
-
-                    // Pattern 5: Contains 'Protocollo', 'Prot.', 'Protocol', 'Protocol-', etc., and numbers
                     string pattern5 = @"(?i)^(.*\b(Protocollo|PROT\.?|prot\.?n?\.?|Protocol-?)\b.*\d+.*)$";
-
-                    // Pattern 6: Starts with 'RA/', 'RM', 'FC/'
                     string pattern6 = @"^(RA/|RM|FC/)\s*\S+$";
-
-                    // Updated Pattern 7: Alphanumeric codes with both letters and digits, including hyphens, slashes, and spaces, allowing lowercase letters
+                    // At least one digit, one letter, can include slash/hyphen/spaces, 5-50 in length
                     string pattern7 = @"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9/\s\-]{5,50}$";
 
-                    // Check against all patterns
-                    if (Regex.IsMatch(serie, pattern1, options))
-                        return true;
-                    if (Regex.IsMatch(serie, pattern1b, options))
-                        return true;
-                    if (Regex.IsMatch(serie, pattern2, options))
-                        return true;
-                    if (Regex.IsMatch(serie, pattern2b, options))
-                        return true;
-                    if (Regex.IsMatch(serie, pattern3, options))
-                        return true;
-                    if (Regex.IsMatch(serie, pattern4, options))
-                        return true;
-                    if (Regex.IsMatch(serie, pattern5, options))
-                        return true;
-                    if (Regex.IsMatch(serie, pattern6, options))
-                        return true;
-                    if (Regex.IsMatch(serie, pattern7))
-                        return true;
+                    // Check them in sequence
+                    if (Regex.IsMatch(serie, pattern1, options)) return true;
+                    if (Regex.IsMatch(serie, pattern1b, options)) return true;
+                    if (Regex.IsMatch(serie, pattern2, options)) return true;
+                    if (Regex.IsMatch(serie, pattern2b, options)) return true;
+                    if (Regex.IsMatch(serie, pattern3, options)) return true;
+                    if (Regex.IsMatch(serie, pattern4, options)) return true;
+                    if (Regex.IsMatch(serie, pattern5, options)) return true;
+                    if (Regex.IsMatch(serie, pattern6, options)) return true;
+                    if (Regex.IsMatch(serie, pattern7)) return true;
 
-                    // If none of the patterns match, it's invalid
+                    // If none match, it's invalid
                     return false;
                 }
-
-
-
             }
-
-
             void PopulateStudentPaymentMethod()
             {
                 string dataQuery = @"
@@ -2257,9 +2330,11 @@ namespace ProcedureNet7
 
                 Logger.LogInfo(40, $"UPDATE:Lavorazione studenti - inserimento nucleo familiare - completato");
             }
-
             void PopulateStudentiAssegnazioni()
             {
+                // ---------------------------
+                // 1) Get "date info" FIRST
+                // ---------------------------
                 string dateQuery = $@"
                     SELECT 
                         FORMAT(min_data_PA, 'dd/MM/yyyy') AS min_data_PA, 
@@ -2270,45 +2345,51 @@ namespace ProcedureNet7
                     WHERE Anno_accademico = '{selectedAA}'
                 ";
 
+                // Local variables to store data from the first query
                 DateTime min_data_PA = new(1990, 01, 01);
                 DateTime max_data_PA = new(2999, 01, 01);
                 double detrazione_PA = 0;
                 double detrazione_PA_fuori_corso = 0;
 
-                SqlCommand readDate = new(dateQuery, CONNECTION, sqlTransaction)
+                // Read the single row from DatiGenerali_con (if any)
+                using (SqlCommand readDate = new(dateQuery, CONNECTION, sqlTransaction))
                 {
-                    CommandTimeout = 9000000
-                };
-                using (SqlDataReader reader = readDate.ExecuteReader())
-                {
-                    while (reader.Read())
+                    readDate.CommandTimeout = 9000000;
+
+                    using (SqlDataReader reader = readDate.ExecuteReader())
                     {
-                        string minDataPAStr = Utilities.SafeGetString(reader, "min_data_PA");
-                        string maxDataPAStr = Utilities.SafeGetString(reader, "max_data_PA");
-                        string detrazionePAStr = Utilities.SafeGetString(reader, "detrazione_PA");
-                        string detrazionePAFuoriCorsoStr = Utilities.SafeGetString(reader, "detrazione_PA_fuori_corso");
-
-                        if (!DateTime.TryParse(minDataPAStr, out min_data_PA))
+                        while (reader.Read())
                         {
-                            Logger.LogError(null, $"Errore nella data minima per Assegnazione PA");
-                        }
+                            string minDataPAStr = Utilities.SafeGetString(reader, "min_data_PA");
+                            string maxDataPAStr = Utilities.SafeGetString(reader, "max_data_PA");
+                            string detrazionePAStr = Utilities.SafeGetString(reader, "detrazione_PA");
+                            string detrazionePAFuoriCorsoStr = Utilities.SafeGetString(reader, "detrazione_PA_fuori_corso");
 
-                        if (!DateTime.TryParse(maxDataPAStr, out max_data_PA))
-                        {
-                            Logger.LogError(null, $"Errore nella data massima per Assegnazione PA");
-                        }
-
-                        if (!double.TryParse(detrazionePAStr, out detrazione_PA))
-                        {
-                            Logger.LogError(null, $"Errore nella detrazione PA");
-                        }
-
-                        if (!double.TryParse(detrazionePAFuoriCorsoStr, out detrazione_PA_fuori_corso))
-                        {
-                            Logger.LogError(null, $"Errore nella detrazione PA per i fuori corso");
+                            if (!DateTime.TryParse(minDataPAStr, out min_data_PA))
+                            {
+                                Logger.LogError(null, "Errore nella data minima per Assegnazione PA");
+                            }
+                            if (!DateTime.TryParse(maxDataPAStr, out max_data_PA))
+                            {
+                                Logger.LogError(null, "Errore nella data massima per Assegnazione PA");
+                            }
+                            if (!double.TryParse(detrazionePAStr, out detrazione_PA))
+                            {
+                                Logger.LogError(null, "Errore nella detrazione PA");
+                            }
+                            if (!double.TryParse(detrazionePAFuoriCorsoStr, out detrazione_PA_fuori_corso))
+                            {
+                                Logger.LogError(null, "Errore nella detrazione PA per i fuori corso");
+                            }
                         }
                     }
                 }
+
+                // ---------------------------
+                // 2) Read "assegnazioni"
+                // ---------------------------
+                // We'll store rows in a simple in-memory list, then close the reader
+                var assegnazioniList = new List<AssegnazionePaDto>();
 
                 string dataQuery = $@"
                     SELECT DISTINCT     
@@ -2320,270 +2401,341 @@ namespace ProcedureNet7
                         Assegnazione_PA.Cod_Fine_Assegnazione,
                         Costo_Servizio.Tipo_stanza, 
                         Costo_Servizio.Importo as importo_mensile,
-	                    Assegnazione_PA.id_assegnazione_pa
+                        Assegnazione_PA.id_assegnazione_pa
                     FROM            
-	                    Assegnazione_PA INNER JOIN
-	                    vStanza ON Assegnazione_PA.Cod_Stanza = vStanza.Cod_Stanza AND Assegnazione_PA.Cod_Pensionato = vStanza.Cod_Pensionato INNER JOIN
-	                    Costo_Servizio ON vStanza.Tipo_costo_Stanza = Costo_Servizio.Tipo_stanza AND Assegnazione_PA.Anno_Accademico = Costo_Servizio.Anno_accademico AND Assegnazione_PA.Cod_Pensionato = Costo_Servizio.Cod_pensionato
-                        INNER JOIN #CFEstrazione cfe ON Assegnazione_PA.Cod_fiscale = cfe.Cod_fiscale 
+                        Assegnazione_PA 
+                        INNER JOIN vStanza 
+                            ON Assegnazione_PA.Cod_Stanza = vStanza.Cod_Stanza 
+                            AND Assegnazione_PA.Cod_Pensionato = vStanza.Cod_Pensionato 
+                        INNER JOIN Costo_Servizio 
+                            ON vStanza.Tipo_costo_Stanza = Costo_Servizio.Tipo_stanza 
+                            AND Assegnazione_PA.Anno_Accademico = Costo_Servizio.Anno_accademico 
+                            AND Assegnazione_PA.Cod_Pensionato = Costo_Servizio.Cod_pensionato
+                        INNER JOIN #CFEstrazione cfe 
+                            ON Assegnazione_PA.Cod_fiscale = cfe.Cod_fiscale 
                     WHERE        
-	                    (Assegnazione_PA.Anno_Accademico = '{selectedAA}') AND 
-	                    (Assegnazione_PA.Cod_movimento = '01') AND 
-	                    (Assegnazione_PA.Ind_Assegnazione = 1) AND 
-	                    (Assegnazione_PA.Status_Assegnazione = 0) AND
-	                    Costo_Servizio.Cod_periodo = 'M' AND 
+                        (Assegnazione_PA.Anno_Accademico = '{selectedAA}') AND 
+                        (Assegnazione_PA.Cod_movimento = '01') AND 
+                        (Assegnazione_PA.Ind_Assegnazione = 1) AND 
+                        (Assegnazione_PA.Status_Assegnazione = 0) AND
+                        Costo_Servizio.Cod_periodo = 'M' AND 
                         Assegnazione_PA.Data_Accettazione IS NOT NULL
                     ORDER BY Assegnazione_PA.id_assegnazione_pa
-                    ";
+                ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
-                {
-                    CommandTimeout = 9000000
-                };
-                Logger.LogInfo(50, $"Lavorazione studenti - inserimento in assegnazioni");
+                Logger.LogInfo(50, "Lavorazione studenti - inserimento in assegnazioni");
                 HashSet<string> processedFiscalCodes = new();
                 HashSet<string> studentiDaRimuovere = new();
-                using (SqlDataReader reader = readData.ExecuteReader())
+
+                using (SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction))
                 {
-                    while (reader.Read())
+                    readData.CommandTimeout = 9000000;
+
+                    using (SqlDataReader reader = readData.ExecuteReader())
                     {
-                        string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
-                        if (codFiscale == "DGLFPP01H27H501U")
+                        while (reader.Read())
                         {
-                            string test = "Hello";
+                            assegnazioniList.Add(new AssegnazionePaDto
+                            {
+                                CodFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper()),
+                                CodPensionato = Utilities.SafeGetString(reader, "Cod_Pensionato"),
+                                CodStanza = Utilities.SafeGetString(reader, "Cod_Stanza"),
+                                DataDecorrenza = Utilities.SafeGetString(reader, "Data_Decorrenza"),
+                                DataFineAssegnazione = Utilities.SafeGetString(reader, "Data_Fine_Assegnazione"),
+                                CodFineAssegnazione = Utilities.SafeGetString(reader, "Cod_Fine_Assegnazione"),
+                                TipoStanza = Utilities.SafeGetString(reader, "Tipo_stanza"),
+                                ImportoMensileStr = Utilities.SafeGetString(reader, "importo_mensile"),
+                                IdAssegnazionePa = Utilities.SafeGetString(reader, "id_assegnazione_pa")
+                            });
                         }
-                        if (studente == null || Utilities.SafeGetString(reader, "Cod_Stanza") == "XXX")
+                    }
+                }
+
+                // ---------------------------
+                // 3) Process data OFFLINE
+                // ---------------------------
+                // Now we do the "business logic" with the results in memory.
+
+                foreach (var assegnazione in assegnazioniList)
+                {
+                    // For convenience
+                    string codFiscale = assegnazione.CodFiscale;
+                    if (!studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente))
+                    {
+                        // Studente not found in our dictionary
+                        continue;
+                    }
+
+                    // If stanza is 'XXX' or studente is null, just skip it
+                    if (studente == null || assegnazione.CodStanza == "XXX")
+                    {
+                        continue;
+                    }
+
+                    // If selectedRichiestoPA is 0 or 3 => remove the student
+                    if (selectedRichiestoPA == "0" || selectedRichiestoPA == "3")
+                    {
+                        studentiDaRimuovere.Add(studente.codFiscale);
+                        continue;
+                    }
+
+                    bool studenteFuoriCorso = (studente.annoCorso == -1 && !studente.disabile);
+                    bool studenteDisabileFuoriCorso = (studente.annoCorso == -2 && studente.disabile);
+
+                    // ---------------------
+                    //    PAGAMENTO = PR
+                    // ---------------------
+                    if (categoriaPagam == "PR" && !processedFiscalCodes.Contains(codFiscale))
+                    {
+                        if (studente.esitoPA != 2)
                         {
                             continue;
                         }
 
-                        if (selectedRichiestoPA == "0" || selectedRichiestoPA == "3")
+                        // Check detrazioni or reversali
+                        bool detrazioneAcconto = false;
+                        if (studente.detrazioni != null && studente.detrazioni.Count > 0)
                         {
-                            studentiDaRimuovere.Add(studente.codFiscale);
+                            foreach (Detrazione detrazione in studente.detrazioni)
+                            {
+                                if (detrazione.codReversale == "01")
+                                {
+                                    detrazioneAcconto = true;
+                                    break;
+                                }
+                            }
+                            if (detrazioneAcconto) continue;
+                        }
+                        else if (studente.reversali != null && studente.reversali.Count > 0)
+                        {
+                            foreach (Reversale reversale in studente.reversali)
+                            {
+                                if (reversale.codReversale == "01")
+                                {
+                                    detrazioneAcconto = true;
+                                    break;
+                                }
+                            }
+                            if (detrazioneAcconto) continue;
+                        }
+                        else if (isRiemissione)
+                        {
+                            // If is a re-issue, skip again
                             continue;
                         }
 
-                        bool studenteFuoriCorso = studente.annoCorso == -1 && !studente.disabile;
-                        bool studenteDisabileFuoriCorso = studente.annoCorso == -2 && studente.disabile;
-
-                        if (categoriaPagam == "PR" && !processedFiscalCodes.Contains(codFiscale))
+                        // Add Detrazione logic
+                        if (!studenteFuoriCorso && !studenteDisabileFuoriCorso)
                         {
-                            if (studente.esitoPA != 2)
-                            {
-                                continue;
-                            }
-
-                            if (studente.detrazioni != null && studente.detrazioni.Count > 0)
-                            {
-                                bool detrazioneAcconto = false;
-                                foreach (Detrazione detrazione in studente.detrazioni)
-                                {
-                                    if (detrazione.codReversale == "01")
-                                    {
-                                        detrazioneAcconto = true;
-                                    }
-                                }
-
-                                if (detrazioneAcconto)
-                                {
-                                    continue;
-                                }
-                            }
-                            else if (studente.reversali != null && studente.reversali.Count > 0)
-                            {
-                                bool detrazioneAcconto = false;
-                                foreach (Reversale reversale in studente.reversali)
-                                {
-                                    if (reversale.codReversale == "01")
-                                    {
-                                        detrazioneAcconto = true;
-                                    }
-                                }
-
-                                if (detrazioneAcconto)
-                                {
-                                    continue;
-                                }
-                            }
-                            else if (isRiemissione)
-                            {
-                                continue;
-                            }
-
-                            if (!studenteFuoriCorso && !studenteDisabileFuoriCorso)
-                            {
-                                studente.AddDetrazione("01", detrazione_PA, "Detrazione acconto PA");
-                            }
-                            else if (studenteFuoriCorso || studenteDisabileFuoriCorso)
-                            {
-                                studente.AddDetrazione("01", detrazione_PA_fuori_corso, "Detrazione acconto PA");
-                            }
-                            _ = processedFiscalCodes.Add(codFiscale);
-
+                            studente.AddDetrazione("01", detrazione_PA, "Detrazione acconto PA");
                         }
-                        else if (categoriaPagam == "SA")
+                        else
                         {
-                            if (!DateTime.TryParse(Utilities.SafeGetString(reader, "data_fine_assegnazione").Trim(), out DateTime endDate))
-                            {
-                                endDate = DateTime.MaxValue;
-                            }
+                            studente.AddDetrazione("01", detrazione_PA_fuori_corso, "Detrazione acconto PA");
+                        }
+                        processedFiscalCodes.Add(codFiscale);
+                    }
+                    // ---------------------
+                    //   PAGAMENTO = SA
+                    // ---------------------
+                    else if (categoriaPagam == "SA")
+                    {
+                        if (!DateTime.TryParse(assegnazione.DataFineAssegnazione?.Trim(), out DateTime endDate))
+                        {
+                            endDate = DateTime.MaxValue;
+                        }
 
+                        // Parse the importo mensile
+                        double importoMensile = 0;
+                        _ = double.TryParse(assegnazione.ImportoMensileStr?.Trim(), out importoMensile);
 
-                            AssegnazioneDataCheck result = studente.AddAssegnazione(
-                                     Utilities.SafeGetString(reader, "cod_pensionato").Trim(),
-                                     Utilities.SafeGetString(reader, "Cod_Stanza").Trim(),
-                                     DateTime.Parse(Utilities.SafeGetString(reader, "data_decorrenza").Trim()),
-                                     endDate,
-                                     Utilities.SafeGetString(reader, "Cod_fine_assegnazione").Trim(),
-                                     Utilities.SafeGetString(reader, "tipo_stanza").Trim(),
-                                     double.TryParse(Utilities.SafeGetString(reader, "importo_mensile").Trim(), out double importoMensile) ? importoMensile : 0,
-                                     min_data_PA,
-                                     max_data_PA,
-                                     studenteFuoriCorso || studenteDisabileFuoriCorso,
-                                     Utilities.SafeGetString(reader, "id_assegnazione_pa")
-                                 );
+                        // Actually add the assegnazione
+                        AssegnazioneDataCheck result = studente.AddAssegnazione(
+                            assegnazione.CodPensionato?.Trim() ?? "",
+                            assegnazione.CodStanza?.Trim() ?? "",
+                            DateTime.Parse(assegnazione.DataDecorrenza?.Trim() ?? "01/01/0001"),
+                            endDate,
+                            assegnazione.CodFineAssegnazione?.Trim() ?? "",
+                            assegnazione.TipoStanza?.Trim() ?? "",
+                            importoMensile,
+                            min_data_PA,
+                            max_data_PA,
+                            studenteFuoriCorso || studenteDisabileFuoriCorso,
+                            assegnazione.IdAssegnazionePa
+                        );
 
-                            string message = "";
-                            switch (result)
+                        // Check if we had any error from AddAssegnazione
+                        if (result != AssegnazioneDataCheck.Corretto)
+                        {
+                            Logger.LogDebug(null,
+                                $"Errore nell'assegnazione dello studente {codFiscale}: {result}");
+
+                            string message = result switch
                             {
-                                case AssegnazioneDataCheck.Eccessivo:
-                                    message = "Assegnazione posto alloggio superiore alle mensilità possibili (10 mesi)";
-                                    break;
-                                case AssegnazioneDataCheck.Incorretto:
-                                    message = "Assegnazione posto alloggio con data fine decorrenza minore della data di entrata";
-                                    break;
-                                case AssegnazioneDataCheck.DataUguale:
-                                    message = "Assegnazione posto alloggio con data decorrenza e fine assegnazione uguali";
-                                    break;
-                                case AssegnazioneDataCheck.DataDecorrenzaMinoreDiMin:
-                                    message = "Assegnazione posto alloggio con data decorrenza minore del minimo previsto dal bando";
-                                    break;
-                                case AssegnazioneDataCheck.DataFineAssMaggioreMax:
-                                    message = "Assegnazione posto alloggio con data fine assegnazione maggiore del massimo previsto dal bando";
-                                    break;
-                                case AssegnazioneDataCheck.MancanzaDataFineAssegnazione:
-                                    message = "Assegnazione posto alloggio senza data fine";
-                                    break;
-                            }
-                            if (result == AssegnazioneDataCheck.Corretto)
-                            {
-                                continue;
-                            }
-                            else
-                            {
-                                Logger.LogDebug(null, $"Errore nell'assegnazione dello studente {codFiscale}: {result}");
-                            }
+                                AssegnazioneDataCheck.Eccessivo =>
+                                    "Assegnazione posto alloggio superiore alle mensilità possibili (10 mesi)",
+                                AssegnazioneDataCheck.Incorretto =>
+                                    "Assegnazione posto alloggio con data fine minore della data di entrata",
+                                AssegnazioneDataCheck.DataUguale =>
+                                    "Assegnazione posto alloggio con data decorrenza e fine uguali",
+                                AssegnazioneDataCheck.DataDecorrenzaMinoreDiMin =>
+                                    "Assegnazione posto alloggio con data decorrenza minore del minimo previsto dal bando",
+                                AssegnazioneDataCheck.DataFineAssMaggioreMax =>
+                                    "Assegnazione posto alloggio con data fine maggiore del massimo previsto dal bando",
+                                AssegnazioneDataCheck.MancanzaDataFineAssegnazione =>
+                                    "Assegnazione posto alloggio senza data fine",
+                                // Fallback
+                                _ => "Errore sconosciuto"
+                            };
+
                             if (!studentiConErroriPA.TryGetValue(studente, out List<string>? value))
                             {
                                 value = new List<string>();
                                 studentiConErroriPA.Add(studente, value);
                             }
-
                             value.Add(message);
                         }
                     }
                 }
 
+                // -----------------------------
+                // Clean-up or post-processing
+                // -----------------------------
+                // Remove the students we flagged
                 foreach (string codFiscale in studentiDaRimuovere)
                 {
                     studentiDaPagare.Remove(codFiscale);
                 }
 
+                // Additional fixes for students with errors
                 foreach (StudentePagam studente in studentiConErroriPA.Keys)
                 {
                     if (studente.assegnazioni.Count == 1 && studente.esitoPA == 2)
                     {
                         Assegnazione vecchiaAssegnazione = studente.assegnazioni[0];
-                        if (vecchiaAssegnazione.statoCorrettezzaAssegnazione != AssegnazioneDataCheck.DataUguale)
+                        if (vecchiaAssegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.DataUguale)
                         {
-                            continue;
+                            // Mark the data check differently if needed
+                            vecchiaAssegnazione.SetAssegnazioneDataCheck(AssegnazioneDataCheck.ErroreControlloData);
                         }
-                        vecchiaAssegnazione.SetAssegnazioneDataCheck(AssegnazioneDataCheck.ErroreControlloData);
                     }
                 }
-                Logger.LogInfo(50, $"UPDATE:Lavorazione studenti - inserimento in assegnazioni - completato");
+
+                Logger.LogInfo(50, "UPDATE:Lavorazione studenti - inserimento in assegnazioni - completato");
             }
             void PopulateStudentiImpegni()
             {
                 string currentBeneficio = isTR ? "TR" : tipoBeneficio;
 
                 string dataQuery = $@"
-                    SELECT Specifiche_impegni.Cod_fiscale, num_impegno_primaRata, num_impegno_saldo, importo_assegnato
+                    SELECT 
+                        Specifiche_impegni.Cod_fiscale, 
+                        num_impegno_primaRata, 
+                        num_impegno_saldo, 
+                        importo_assegnato
                     FROM Specifiche_impegni
-                        INNER JOIN #CFEstrazione cfe ON Specifiche_impegni.Cod_fiscale = cfe.Cod_fiscale 
+                    INNER JOIN #CFEstrazione cfe ON Specifiche_impegni.Cod_fiscale = cfe.Cod_fiscale 
                     WHERE 
-                        Cod_beneficio = '{currentBeneficio}' AND
-                        Anno_accademico = '{selectedAA}' AND
-                        Data_fine_validita IS NULL
-                    ";
+                        Cod_beneficio = '{currentBeneficio}' 
+                        AND Anno_accademico = '{selectedAA}' 
+                        AND Data_fine_validita IS NULL
+                ";
 
-                SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction)
-                {
-                    CommandTimeout = 9000000
-                };
+                var studentiSenzaImpegno = new HashSet<string>();
+                var studentiDaRimuovereIntegrazione = new HashSet<string>();
+
+                // Step 1: Read all data from the DB into an in-memory list
+                List<PopulateStudentiImpegniDTO> rows = new();
+
                 Logger.LogInfo(45, $"Lavorazione studenti - inserimento impegni");
-                HashSet<string> studentiSenzaImpegno = new();
-                HashSet<string> studentiDaRimuovereIntegrazione = new();
 
-                using (SqlDataReader reader = readData.ExecuteReader())
+                using (SqlCommand readData = new SqlCommand(dataQuery, CONNECTION, sqlTransaction))
                 {
-                    while (reader.Read())
+                    readData.CommandTimeout = 9000000;
+
+                    using (SqlDataReader reader = readData.ExecuteReader())
                     {
-                        string impegnoToSet;
-                        string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
-                        if (studente != null)
+                        while (reader.Read())
                         {
-                            if (isIntegrazione)
-                            {
-                                double.TryParse(Utilities.SafeGetString(reader, "importo_assegnato"), out double importoImpegno);
-                                if (studente.importoBeneficio != importoImpegno)
-                                {
-                                    studentiDaRimuovereIntegrazione.Add(studente.codFiscale);
-                                    continue;
-                                }
-                            }
+                            var codFiscale = Utilities.RemoveAllSpaces(
+                                                   Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+                            var impegnoPrimaRata = Utilities.SafeGetString(reader, "num_impegno_primaRata");
+                            var impegnoSaldo = Utilities.SafeGetString(reader, "num_impegno_saldo");
+                            double.TryParse(Utilities.SafeGetString(reader, "importo_assegnato"),
+                                            out double importoAssegnato);
 
-                            if (categoriaPagam == "PR")
+                            rows.Add(new PopulateStudentiImpegniDTO
                             {
-                                impegnoToSet = Utilities.SafeGetString(reader, "num_impegno_primaRata");
-                            }
-                            else
-                            {
-                                impegnoToSet = Utilities.SafeGetString(reader, "num_impegno_saldo");
-                            }
-
-                            if (string.IsNullOrWhiteSpace(impegnoToSet))
-                            {
-                                studentiSenzaImpegno.Add(studente.codFiscale);
-                                continue;
-                            }
-
-                            studente.SetImpegno(impegnoToSet);
+                                CodFiscale = codFiscale,
+                                ImpegnoPrimaRata = impegnoPrimaRata,
+                                ImpegnoSaldo = impegnoSaldo,
+                                ImportoAssegnato = importoAssegnato
+                            });
                         }
                     }
                 }
+
+                // Step 2: Process in-memory
+                foreach (var row in rows)
+                {
+                    if (studentiDaPagare.TryGetValue(row.CodFiscale, out StudentePagam? studente))
+                    {
+                        if (studente is null) continue;
+
+                        // Integrations check
+                        if (isIntegrazione)
+                        {
+                            if (studente.importoBeneficio != row.ImportoAssegnato)
+                            {
+                                studentiDaRimuovereIntegrazione.Add(studente.codFiscale);
+                                continue;
+                            }
+                        }
+
+                        // Decide which impegno to use
+                        string impegnoToSet = (categoriaPagam == "PR")
+                            ? row.ImpegnoPrimaRata
+                            : row.ImpegnoSaldo;
+
+                        if (string.IsNullOrWhiteSpace(impegnoToSet))
+                        {
+                            studentiSenzaImpegno.Add(studente.codFiscale);
+                            continue;
+                        }
+
+                        // Finally set the impegno
+                        studente.SetImpegno(impegnoToSet);
+                    }
+                }
+
+                // Clean up
                 if (studentiSenzaImpegno.Any())
                 {
-                    Logger.LogWarning(null, $"Trovati {studentiSenzaImpegno.Count} studenti senza impegno");
+                    Logger.LogWarning(null,
+                        $"Trovati {studentiSenzaImpegno.Count} studenti senza impegno");
                 }
                 if (studentiDaRimuovereIntegrazione.Any())
                 {
-                    Logger.LogWarning(null, $"Trovati {studentiDaRimuovereIntegrazione.Count} studenti con importo borsa diverso da quello assegnato");
+                    Logger.LogWarning(null,
+                        $"Trovati {studentiDaRimuovereIntegrazione.Count} studenti " +
+                        $"con importo borsa diverso da quello assegnato");
                 }
+
                 foreach (string codFiscale in studentiSenzaImpegno)
                 {
                     studentiDaPagare.Remove(codFiscale);
                 }
                 foreach (string codFiscale in studentiDaRimuovereIntegrazione)
                 {
-                    Logger.LogDebug(null, $"Rimosso cf: {codFiscale} per assenza provvedimento per integrazione importi");
+                    Logger.LogDebug(null,
+                        $"Rimosso cf: {codFiscale} per assenza provvedimento per integrazione importi");
                     studentiDaPagare.Remove(codFiscale);
                 }
 
-                Logger.LogInfo(45, $"UPDATE:Lavorazione studenti - inserimento impegni - completato");
+                Logger.LogInfo(45,
+                    "UPDATE:Lavorazione studenti - inserimento impegni - completato");
             }
+
             void PopulateImportoDaPagare()
             {
                 Logger.LogInfo(55, $"Lavorazione studenti - Calcolo importi");
@@ -2811,34 +2963,36 @@ namespace ProcedureNet7
 
                             bool hasDomicilio = studente.domicilioCheck;
                             bool isMoreThanHalfAbroad = studente.numeroComponentiNucleoFamiliareEstero >= (studente.numeroComponentiNucleoFamiliare / 2.0);
-
-                            if (!studente.rifugiato && studente.statusSede == "B" && studente.esitoPA == 0 && !isMoreThanHalfAbroad && studente.tipoCorso != 6)
+                            if (studente.statusSede == "B" && studente.forzaturaStatusSede != "B")
                             {
-                                if (!hasDomicilio || (hasDomicilio && (!studente.contrattoValido || (studente.domicilio.prorogatoLocazione && !studente.prorogaValido))))
+                                if (!studente.rifugiato && studente.esitoPA == 0 && !isMoreThanHalfAbroad && studente.tipoCorso != 6)
                                 {
-                                    importoDaPagare = importoDaPagare / 3 * 2;
-                                    importoMassimo = importoMassimo / 3 * 2;
+                                    if (!hasDomicilio || (hasDomicilio && (!studente.contrattoValido || (studente.domicilio.prorogatoLocazione && !studente.prorogaValido))))
+                                    {
+                                        importoDaPagare = importoDaPagare / 3 * 2;
+                                        importoMassimo = importoMassimo / 3 * 2;
 
-                                    string messaggio = string.Empty;
-                                    if (studente.domicilio == null)
-                                    {
-                                        messaggio += "#Nessun domicilio trovato";
-                                    }
-                                    if (!hasDomicilio)
-                                    {
-                                        messaggio += "#Durata contratto minore dieci mesi";
-                                    }
-                                    if (!studente.contrattoValido && studente.domicilio != null)
-                                    {
-                                        messaggio += $"#Serie contratto non valida: {studente.domicilio.codiceSerieLocazione}";
-                                    }
-                                    if (studente.domicilio != null && studente.domicilio.prorogatoLocazione && !studente.prorogaValido)
-                                    {
-                                        messaggio += $"#Serie proroga non valida: Contratto {studente.domicilio.codiceSerieLocazione} - Proroga {studente.domicilio.codiceSerieProrogaLocazione}";
-                                    }
+                                        string messaggio = string.Empty;
+                                        if (studente.domicilio == null)
+                                        {
+                                            messaggio += "#Nessun domicilio trovato";
+                                        }
+                                        if (!hasDomicilio)
+                                        {
+                                            messaggio += "#Durata contratto minore dieci mesi";
+                                        }
+                                        if (!studente.contrattoValido && studente.domicilio != null)
+                                        {
+                                            messaggio += $"#Serie contratto non valida: {studente.domicilio.codiceSerieLocazione}";
+                                        }
+                                        if (studente.domicilio != null && studente.domicilio.prorogatoLocazione && !studente.prorogaValido)
+                                        {
+                                            messaggio += $"#Serie proroga non valida: Contratto {studente.domicilio.codiceSerieLocazione} - Proroga {studente.domicilio.codiceSerieProrogaLocazione}";
+                                        }
 
-                                    studentiPagatiComePendolari.Add((studente.codFiscale, messaggio));
-                                    studente.SetPagatoPendolare(true);
+                                        studentiPagatiComePendolari.Add((studente.codFiscale, messaggio));
+                                        studente.SetPagatoPendolare(true);
+                                    }
                                 }
                             }
                         }
@@ -3145,118 +3299,6 @@ namespace ProcedureNet7
 
             Logger.LogInfo(10, "Index and statistics optimization complete.");
         }
-
-        private void EstrazioneDatiBanca(string beneficioFolderPath)
-        {
-            List<StudentePagam> studentiDaControllareBanca = new();
-            List<string> studentiBancaCF = new();
-            Dictionary<string, string> codiciCittadinanza = new()
-            {
-                { "Z224", "IRANIANA"},
-            };
-
-
-            foreach (KeyValuePair<string, StudentePagam> entry in studentiDaPagare)
-            {
-                StudentePagam studente = entry.Value;
-                if (!codiciCittadinanza.ContainsKey(studente.codCittadinanza))
-                {
-                    continue;
-                }
-
-                if (studente.IBAN.Substring(0, 2).ToUpper() != "LT")
-                {
-                    continue;
-                }
-
-                if (studente.swift.Substring(0, 8).ToUpper() != "REVOLT21")
-                {
-                    continue;
-                }
-
-                studentiDaControllareBanca.Add(studente);
-                studentiBancaCF.Add(studente.codFiscale);
-            }
-
-            #region CF TABLE INIZIALE
-            Logger.LogInfo(30, "Lavorazione studenti");
-
-            Logger.LogDebug(null, "Pulizia tabella CF");
-            string createTempTable = "TRUNCATE TABLE #CFEstrazione;";
-            using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            })
-            {
-                createCmd.ExecuteNonQuery();
-            }
-
-            Logger.LogDebug(null, "Inserimento in tabella CF dei codici fiscali");
-            Logger.LogInfo(30, "Lavorazione studenti - creazione tabella codici fiscali");
-
-            // Create a DataTable to hold the fiscal codes
-            using (DataTable cfTable = new DataTable())
-            {
-                cfTable.Columns.Add("Cod_fiscale", typeof(string));
-
-                foreach (var cf in studentiBancaCF)
-                {
-                    cfTable.Rows.Add(cf);
-                }
-
-                // Use SqlBulkCopy to efficiently insert the data into the temporary table
-                using SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction);
-                bulkCopy.DestinationTableName = "#CFEstrazione";
-                bulkCopy.WriteToServer(cfTable);
-            }
-
-            Logger.LogDebug(null, "Creazione index della tabella CF");
-            string indexingCFTable = "CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale)";
-            using (SqlCommand indexingCFTableCmd = new SqlCommand(indexingCFTable, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            })
-            {
-                indexingCFTableCmd.ExecuteNonQuery();
-            }
-
-            Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
-            string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
-            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            })
-            {
-                updateStatisticsCmd.ExecuteNonQuery();
-            }
-            #endregion
-
-            string queryIniziale = $@"
-SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale WHERE anno_accademico = '{selectedAA}' and tipo_bando = 'lz'
-   
-   and domanda.cod_fiscale in (SELECT distinct cod_fiscale
-        FROM vSpecifiche_permesso_soggiorno 
-        INNER JOIN VStatus_Allegati ON vSpecifiche_permesso_soggiorno.id_allegato = VStatus_Allegati.id_allegato
-        WHERE 
-        vSpecifiche_permesso_soggiorno.Tipo_documento = '03' 
-        AND ((vSpecifiche_permesso_soggiorno.Tipo_permesso = '01' AND vSpecifiche_permesso_soggiorno.Data_scadenza >= GETDATE()) OR vSpecifiche_permesso_soggiorno.Tipo_permesso = '02' OR vSpecifiche_permesso_soggiorno.Tipo_permesso = '03')
-        AND cod_status = '05' 
-        AND (Anno_accademico IS NULL OR Anno_accademico = '20232024'))
-	)
-                ";
-
-            DataTable studentiBanca = new();
-            studentiBanca.Columns.Add("CodFiscale");
-            studentiBanca.Columns.Add("Nome");
-            studentiBanca.Columns.Add("Cognome");
-            studentiBanca.Columns.Add("Data nascita");
-            studentiBanca.Columns.Add("IBAN");
-            studentiBanca.Columns.Add("Cittadinanza");
-            studentiBanca.Columns.Add("Tipo documento");
-            studentiBanca.Columns.Add("Data scadenza");
-
-        }
-
         private void ProcessImpegno(string impegno, string currentFolder)
         {
             var groupedStudents = studentiDaPagare.Values
@@ -3788,7 +3830,6 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                 return studentsData;
             }
         }
-
         private void InsertIntoMovimentazioni(List<StudentePagam> studentiDaProcessare, string impegno)
         {
             List<StudentePagam> studentiSenzaImpegno = new();
@@ -4258,6 +4299,116 @@ SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.
                     throw;
                 }
             }
+        }
+        private void EstrazioneDatiBanca(string beneficioFolderPath)
+        {
+            List<StudentePagam> studentiDaControllareBanca = new();
+            List<string> studentiBancaCF = new();
+            Dictionary<string, string> codiciCittadinanza = new()
+            {
+                { "Z224", "IRANIANA"},
+            };
+
+
+            foreach (KeyValuePair<string, StudentePagam> entry in studentiDaPagare)
+            {
+                StudentePagam studente = entry.Value;
+                if (!codiciCittadinanza.ContainsKey(studente.codCittadinanza))
+                {
+                    continue;
+                }
+
+                if (studente.IBAN.Substring(0, 2).ToUpper() != "LT")
+                {
+                    continue;
+                }
+
+                if (studente.swift.Substring(0, 8).ToUpper() != "REVOLT21")
+                {
+                    continue;
+                }
+
+                studentiDaControllareBanca.Add(studente);
+                studentiBancaCF.Add(studente.codFiscale);
+            }
+
+            #region CF TABLE INIZIALE
+            Logger.LogInfo(30, "Lavorazione studenti");
+
+            Logger.LogDebug(null, "Pulizia tabella CF");
+            string createTempTable = "TRUNCATE TABLE #CFEstrazione;";
+            using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                createCmd.ExecuteNonQuery();
+            }
+
+            Logger.LogDebug(null, "Inserimento in tabella CF dei codici fiscali");
+            Logger.LogInfo(30, "Lavorazione studenti - creazione tabella codici fiscali");
+
+            // Create a DataTable to hold the fiscal codes
+            using (DataTable cfTable = new DataTable())
+            {
+                cfTable.Columns.Add("Cod_fiscale", typeof(string));
+
+                foreach (var cf in studentiBancaCF)
+                {
+                    cfTable.Rows.Add(cf);
+                }
+
+                // Use SqlBulkCopy to efficiently insert the data into the temporary table
+                using SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction);
+                bulkCopy.DestinationTableName = "#CFEstrazione";
+                bulkCopy.WriteToServer(cfTable);
+            }
+
+            Logger.LogDebug(null, "Creazione index della tabella CF");
+            string indexingCFTable = "CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale)";
+            using (SqlCommand indexingCFTableCmd = new SqlCommand(indexingCFTable, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                indexingCFTableCmd.ExecuteNonQuery();
+            }
+
+            Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
+            string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
+            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                updateStatisticsCmd.ExecuteNonQuery();
+            }
+            #endregion
+
+            string queryIniziale = $@"
+SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale WHERE anno_accademico = '{selectedAA}' and tipo_bando = 'lz'
+   
+   and domanda.cod_fiscale in (SELECT distinct cod_fiscale
+        FROM vSpecifiche_permesso_soggiorno 
+        INNER JOIN VStatus_Allegati ON vSpecifiche_permesso_soggiorno.id_allegato = VStatus_Allegati.id_allegato
+        WHERE 
+        vSpecifiche_permesso_soggiorno.Tipo_documento = '03' 
+        AND ((vSpecifiche_permesso_soggiorno.Tipo_permesso = '01' AND vSpecifiche_permesso_soggiorno.Data_scadenza >= GETDATE()) OR vSpecifiche_permesso_soggiorno.Tipo_permesso = '02' OR vSpecifiche_permesso_soggiorno.Tipo_permesso = '03')
+        AND cod_status = '05' 
+        AND (Anno_accademico IS NULL OR Anno_accademico = '20232024'))
+	)
+                ";
+
+            DataTable studentiBanca = new();
+            studentiBanca.Columns.Add("CodFiscale");
+            studentiBanca.Columns.Add("Nome");
+            studentiBanca.Columns.Add("Cognome");
+            studentiBanca.Columns.Add("Data nascita");
+            studentiBanca.Columns.Add("IBAN");
+            studentiBanca.Columns.Add("Cittadinanza");
+            studentiBanca.Columns.Add("Tipo documento");
+            studentiBanca.Columns.Add("Data scadenza");
+
         }
     }
 }

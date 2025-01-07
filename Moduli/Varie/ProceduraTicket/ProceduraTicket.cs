@@ -95,6 +95,7 @@ namespace ProcedureNet7
 
                 ws.AutoFilterMode = false;
                 Logger.Log(11, $"Cancellazione non borsa", LogLevel.INFO);
+                lastRow = ws.Cells[ws.Rows.Count, "E"].End(XlDirection.xlUp).Row;
                 Excel.Range filterNBRange = ws.Range["H1:H" + lastRow];
                 filterNBRange.AutoFilter(1, "Posti Alloggio", XlAutoFilterOperator.xlFilterValues);
                 Excel.Range? visibleNBCells = null;
@@ -102,24 +103,32 @@ namespace ProcedureNet7
                 visibleNBCells?.EntireRow.Delete(XlDeleteShiftDirection.xlShiftUp);
 
                 ws.AutoFilterMode = false;
+                lastRow = ws.Cells[ws.Rows.Count, "E"].End(XlDirection.xlUp).Row;
+                filterNBRange = ws.Range["H1:H" + lastRow];
                 filterNBRange.AutoFilter(1, "MENSA", XlAutoFilterOperator.xlFilterValues);
                 visibleNBCells = null;
                 visibleNBCells = filterNBRange.Offset[1, 0].SpecialCells(XlCellType.xlCellTypeVisible, Type.Missing);
                 visibleNBCells?.EntireRow.Delete(XlDeleteShiftDirection.xlShiftUp);
 
                 ws.AutoFilterMode = false;
+                lastRow = ws.Cells[ws.Rows.Count, "E"].End(XlDirection.xlUp).Row;
+                filterNBRange = ws.Range["H1:H" + lastRow];
                 filterNBRange.AutoFilter(1, "Contributi Alloggio", XlAutoFilterOperator.xlFilterValues);
                 visibleNBCells = null;
                 visibleNBCells = filterNBRange.Offset[1, 0].SpecialCells(XlCellType.xlCellTypeVisible, Type.Missing);
                 visibleNBCells?.EntireRow.Delete(XlDeleteShiftDirection.xlShiftUp);
 
                 ws.AutoFilterMode = false;
+                lastRow = ws.Cells[ws.Rows.Count, "E"].End(XlDirection.xlUp).Row;
+                filterNBRange = ws.Range["H1:H" + lastRow];
                 filterNBRange.AutoFilter(1, "Accettazione Posto Alloggio", XlAutoFilterOperator.xlFilterValues);
                 visibleNBCells = null;
                 visibleNBCells = filterNBRange.Offset[1, 0].SpecialCells(XlCellType.xlCellTypeVisible, Type.Missing);
                 visibleNBCells?.EntireRow.Delete(XlDeleteShiftDirection.xlShiftUp);
 
                 ws.AutoFilterMode = false;
+                lastRow = ws.Cells[ws.Rows.Count, "E"].End(XlDirection.xlUp).Row;
+                filterNBRange = ws.Range["H1:H" + lastRow];
                 Logger.Log(11, $"Cancellazione in carico", LogLevel.INFO);
                 Excel.Range filterRangeCarico = ws.Range["Q1:Q" + lastRow];
                 filterRangeCarico.AutoFilter(1, "PRESA_IN_CARICO", XlAutoFilterOperator.xlFilterValues);
@@ -251,7 +260,7 @@ namespace ProcedureNet7
                         From = new MailAddress("giacomo.pavone@laziodisco.it"),
                         Subject = $"Estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
                         Body = @"<p>Buongiorno,</p>
-                             <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/07/2024 con gli esiti di borsa e i blocchi presenti, integrato con le università di appartenenza dello studente.</p>
+                             <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/08/2024 con gli esiti di borsa e i blocchi presenti, integrato con le università di appartenenza dello studente.</p>
                              <p><strong>Attenzione</strong>, è stata modificata l'estrazione in modo tale da comprendere anche i ticket di studenti che hanno presentato domanda per gli anni accademici precedenti; questi risulteranno senza numero domanda, esiti BS o PA o blocchi.</p>
                              <p>Una volta aperto il file dovete <strong>abilitare la modifica e le macro</strong>, altrimenti le funzioni di ricerca e riordino non funzioneranno.</p>
                              <ul>

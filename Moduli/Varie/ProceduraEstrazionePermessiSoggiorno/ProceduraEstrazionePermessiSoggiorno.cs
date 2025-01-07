@@ -39,7 +39,7 @@ namespace ProcedureNet7
 SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
 FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
 inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
-                    WHERE        (Domanda.Anno_accademico >= '20232024') AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
+                    WHERE        (Domanda.Anno_accademico = 20242025) AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
 (SELECT DISTINCT 
     sps.Cod_fiscale
 FROM STATUS_ALLEGATI AS sa
@@ -53,7 +53,7 @@ WHERE
     AND sps.Data_validita = (
         SELECT MAX(Data_validita)
         FROM Specifiche_permesso_soggiorno AS br
-        WHERE Num_domanda = sps.Num_domanda AND Cod_fiscale = sps.Cod_fiscale
+        WHERE Num_domanda = sps.Num_domanda AND Cod_fiscale = sps.Cod_fiscale and sps.Data_validita < '11/12/2024'
     )
     AND sa.cod_status = '01'
     AND sps.Anno_accademico IS NULL
@@ -76,6 +76,8 @@ WHERE
     )
 )
 and status_compilazione >= '90'
+and Domanda.Num_domanda in (select num_domanda from vEsiti_concorsiPA where anno_accademico = 20242025 and Cod_tipo_esito <> 0)
+and Domanda.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico = 20242025)
 ORDER BY domanda.Cod_fiscale;
                 ";
 

@@ -31,6 +31,7 @@ namespace ProcedureNet7
         string selectedImpegnoMensa = string.Empty;
 
         SqlTransaction? sqlTransaction = null;
+        bool isProvvedimentoAdded = false;
         private ManualResetEvent _waitHandle = new ManualResetEvent(false);
 
         private List<string> _numDomandas = new List<string>();
@@ -50,7 +51,7 @@ namespace ProcedureNet7
                     return;
                 }
 
-                sqlTransaction = CONNECTION.BeginTransaction();
+
                 Logger.LogInfo(10, "Transazione iniziata.");
 
                 // Assign passed arguments
@@ -70,9 +71,14 @@ namespace ProcedureNet7
                 selectedCodBeneficio = args._selectedCodBeneficio;
                 selectedImpegnoMensa = args._impegnoMensa;
                 selectedImportoMensa = args._importoMensa;
+                sqlTransaction = args._sqlTransaction;
+                isProvvedimentoAdded = args._isProvvedimentoAdded;
 
                 Panel? specificheImpegniPanel = null;
-
+                if (!isProvvedimentoAdded)
+                {
+                    sqlTransaction = CONNECTION.BeginTransaction();
+                }
                 _masterForm.Invoke((MethodInvoker)delegate
                 {
                     specificheImpegniPanel = _masterForm.GetProcedurePanel();
@@ -221,7 +227,10 @@ namespace ProcedureNet7
                     try
                     {
                         Logger.LogInfo(96, "Eseguo Rollback...");
-                        sqlTransaction.Rollback();
+                        if (!isProvvedimentoAdded)
+                        {
+                            sqlTransaction.Rollback();
+                        }
                         Logger.LogInfo(97, "Rollback eseguito con successo.");
                     }
                     catch (Exception rbEx)
@@ -239,9 +248,13 @@ namespace ProcedureNet7
                     {
                         try
                         {
-                            Logger.LogInfo(99, "Eseguo Commit...");
-                            sqlTransaction.Commit();
-                            Logger.LogInfo(100, "Commit eseguito con successo.");
+                            if (!isProvvedimentoAdded)
+                            {
+                                Logger.LogInfo(99, "Eseguo Commit...");
+
+                                sqlTransaction.Commit();
+                                Logger.LogInfo(100, "Commit eseguito con successo.");
+                            }
                         }
                         catch (Exception cEx)
                         {

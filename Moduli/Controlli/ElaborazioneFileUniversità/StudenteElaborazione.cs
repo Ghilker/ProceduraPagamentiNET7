@@ -50,6 +50,7 @@ namespace ProcedureNet7
         public Dictionary<string, string> blocchiPresenti = new();
         public List<string> blocchiDaTogliere = new();
         public List<string> blocchiDaMettere = new();
+        public Dictionary<string, string> motivazioniBlocchiInseriti = new();
 
         public Dictionary<string, string> incongruenzePresenti = new();
         public List<string> incongruenzeDaTogliere = new();

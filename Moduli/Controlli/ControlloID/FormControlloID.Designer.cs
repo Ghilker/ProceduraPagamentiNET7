@@ -1,6 +1,6 @@
 ﻿namespace ProcedureNet7
 { 
-    partial class FormProceduraControlloPS
+    partial class FormControlloID
     {
         /// <summary>
         /// Required designer variable.
@@ -38,14 +38,14 @@
             label1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
             label1.Location = new Point(29, 11);
             label1.Name = "label1";
-            label1.Size = new Size(267, 28);
+            label1.Size = new Size(264, 28);
             label1.TabIndex = 33;
-            label1.Text = "PROCEDURA CONTROLLO PS";
+            label1.Text = "PROCEDURA CONTROLLO ID";
             // 
             // button1
             // 
             button1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
-            button1.Location = new Point(460, 291);
+            button1.Location = new Point(476, 289);
             button1.Name = "button1";
             button1.Size = new Size(312, 49);
             button1.TabIndex = 32;
@@ -53,7 +53,7 @@
             button1.UseVisualStyleBackColor = true;
             button1.Click += RunProcedureBtnClick;
             // 
-            // FormProceduraControlloPS
+            // FormControlloID
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
@@ -62,8 +62,8 @@
             Controls.Add(label1);
             Controls.Add(button1);
             FormBorderStyle = FormBorderStyle.None;
-            Name = "FormProceduraControlloPS";
-            Text = "FormControlloIBAN";
+            Name = "FormControlloID";
+            Text = "FormControlloID";
             ResumeLayout(false);
             PerformLayout();
         }

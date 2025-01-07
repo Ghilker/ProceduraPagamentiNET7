@@ -78,7 +78,7 @@ namespace ProcedureNet7
                     _elaborazioneMassivaCheck = lavorazioneMassivaCheck.Checked,
                     _elaborazioneMassivaString = pagamentiElaborazioneMassiva,
                     _forzareStudenteCheck = forzareStudenteCheck.Checked,
-                    _forzareStudenteString = forzareStudenteTxt.Text,
+                    _forzareStudenteString = forzareStudenteTxt.Text
                 };
                 argsValidation.Validate(argsPagamenti);
                 using ProceduraPagamenti pagamenti = new(_masterForm, mainConnection);

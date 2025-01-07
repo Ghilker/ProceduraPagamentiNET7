@@ -114,6 +114,8 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
             switch (selectedTipoAllegato)
             {
                 case "01"://Riammissione a vincitore
+                    newTable = RiammissioneVincitore();
+                    break;
                 case "02"://Riammissione a idoneo
                     newTable = AddSoloImporto();
                     newValueColumns = 1;
@@ -202,36 +204,6 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
                         ((Excel.Range)worksheet.Cells[lastRow, col]).EntireColumn.AutoFit();
                     }
                 }
-
-                // Prompt the user to enter a name
-                string enteredName = PromptUserForName();
-                int newColumnNumber = lastColumnNumber + 1;
-                string newColumnLetter = ConvertColumnNumberToLetter(newColumnNumber);
-
-                // Add a new column with the header "HEADER"
-                worksheet.Cells[3, lastColumnNumber + 1].Value = "Responsabile della trasparenza";
-
-                // Fill the new column with the entered name from row 3 to the last row
-                for (int row = 4; row < lastRow; row++)
-                {
-                    worksheet.Cells[row, lastColumnNumber + 1].Value = enteredName;
-                }
-
-                Excel.Range dataRange = worksheet.Range[newColumnLetter + "3", $"{newColumnLetter}{lastRow}"];
-                ModifyColumnWidth(dataRange);
-                Excel.Range thirdRow = worksheet.Rows[3];
-
-                thirdRow.WrapText = true;
-                thirdRow.AutoFit();
-
-                // Apply borders and color to the header cell
-                Excel.Range range2 = worksheet.Range[$"{newColumnLetter}3", $"{newColumnLetter}3"];
-                ApplyBorders(range2.Borders, true);
-                range2.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.FromArgb(70, 115, 200));
-
-                // Apply borders to the cells below the header
-                Excel.Range range1 = worksheet.Range[$"{newColumnLetter}4", $"{newColumnLetter}{lastRow - 1}"];
-                ApplyBorders(range1.Borders);
 
                 // Report progress: Saving Excel file
                 Logger.Log(90, "Saving Excel file", LogLevel.INFO);
@@ -512,6 +484,21 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
                     borders[Excel.XlBordersIndex.xlInsideHorizontal].Weight = Excel.XlBorderWeight.xlMedium;
                 }
             }
+        }
+
+        private DataTable RiammissioneVincitore()
+        {
+            DataTable table = new DataTable();
+            List<string> fiscalCodesList = new List<string>();
+            foreach (Studente studente in studenti)
+            {
+                fiscalCodesList.Add(studente.codFiscale);
+            }
+            string fiscalCodes = string.Join(", ", fiscalCodesList.Select(cf => $"'{cf}'"));
+
+
+
+            return table;
         }
 
         private System.Data.DataTable AddDaIdoneoVincitore()

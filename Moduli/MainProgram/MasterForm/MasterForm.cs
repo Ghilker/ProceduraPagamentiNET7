@@ -240,6 +240,14 @@ namespace ProcedureNet7
                             FormElaborazioneFileUni formElaborazioneFileUni = new FormElaborazioneFileUni(this);
                             ShowFormInPanel(formElaborazioneFileUni);
                             break;
+                        case ProcedureVerifiche.ControlloID:
+                            FormControlloID controlloID = new FormControlloID(this);
+                            ShowFormInPanel(controlloID);
+                            break;
+                        case ProcedureVerifiche.ControlloIBAN:
+                            FormControlloIBAN controlloIBAN = new FormControlloIBAN(this);
+                            ShowFormInPanel(controlloIBAN);
+                            break;
                     }
                 }
 #endif
@@ -333,7 +341,11 @@ namespace ProcedureNet7
             [ProcedureCategory("Verifiche", "Programmatore")]
             Verifica,
             [ProcedureCategory("Verifiche", "Programmatore")]
-            ElaborazioneFileUni
+            ElaborazioneFileUni,
+            [ProcedureCategory("Verifiche", "Programmatore")]
+            ControlloID,
+            [ProcedureCategory("Verifiche", "Programmatore")]
+            ControlloIBAN,
         }
 
     }

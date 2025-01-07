@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -32,6 +33,8 @@ namespace ProcedureNet7
         public string _eseSA { get; set; }
         public string _importoMensa { get; set; }
         public string _impegnoMensa { get; set; }
+        public SqlTransaction? _sqlTransaction { get; set; }
+        public bool _isProvvedimentoAdded { get; set; }
 
         public ArgsSpecificheImpegni()
         {
@@ -50,6 +53,7 @@ namespace ProcedureNet7
             _selectedDate = string.Empty;
             _importoMensa = string.Empty;
             _impegnoMensa = string.Empty;
+            _sqlTransaction = null;
         }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

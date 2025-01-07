@@ -1,6 +1,6 @@
 ﻿namespace ProcedureNet7
 { 
-    partial class FormProceduraControlloPS
+    partial class FormControlloIBAN
     {
         /// <summary>
         /// Required designer variable.
@@ -30,6 +30,8 @@
         {
             label1 = new Label();
             button1 = new Button();
+            label2 = new Label();
+            textBox1 = new TextBox();
             SuspendLayout();
             // 
             // label1
@@ -38,9 +40,9 @@
             label1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
             label1.Location = new Point(29, 11);
             label1.Name = "label1";
-            label1.Size = new Size(267, 28);
+            label1.Size = new Size(289, 28);
             label1.TabIndex = 33;
-            label1.Text = "PROCEDURA CONTROLLO PS";
+            label1.Text = "PROCEDURA CONTROLLO IBAN";
             // 
             // button1
             // 
@@ -53,16 +55,34 @@
             button1.UseVisualStyleBackColor = true;
             button1.Click += RunProcedureBtnClick;
             // 
-            // FormProceduraControlloPS
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Location = new Point(135, 71);
+            label2.Name = "label2";
+            label2.Size = new Size(103, 15);
+            label2.TabIndex = 34;
+            label2.Text = "Anno accademico";
+            // 
+            // textBox1
+            // 
+            textBox1.Location = new Point(29, 63);
+            textBox1.Name = "textBox1";
+            textBox1.Size = new Size(100, 23);
+            textBox1.TabIndex = 35;
+            // 
+            // FormControlloIBAN
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
+            Controls.Add(textBox1);
+            Controls.Add(label2);
             Controls.Add(label1);
             Controls.Add(button1);
             FormBorderStyle = FormBorderStyle.None;
-            Name = "FormProceduraControlloPS";
+            Name = "FormControlloIBAN";
             Text = "FormControlloIBAN";
             ResumeLayout(false);
             PerformLayout();
@@ -72,5 +92,7 @@
 
         private Label label1;
         private Button button1;
+        private Label label2;
+        private TextBox textBox1;
     }
 }

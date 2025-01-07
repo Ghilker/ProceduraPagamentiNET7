@@ -18,6 +18,7 @@ namespace ProcedureNet7
         MasterForm? _masterForm;
         string selectedFilePath = string.Empty;
         string selectedFolderPath = string.Empty;
+        ContextMenuStrip selectedBeneficiStrip;
 
         private readonly Dictionary<string, string> proceduraAllegatiBeneficiItems = new()
         {
@@ -63,14 +64,7 @@ namespace ProcedureNet7
             proceduraAllegatiTipoCombo.DisplayMember = "Text";
             proceduraAllegatiTipoCombo.ValueMember = "Value";
 
-            proceduraAllegatiTipoBeneficioCombo.Items.Clear();
-            foreach (KeyValuePair<string, string> item in proceduraAllegatiBeneficiItems)
-            {
-                _ = proceduraAllegatiTipoBeneficioCombo.Items.Add(new { Text = item.Value, Value = item.Key });
-            }
-
-            proceduraAllegatiTipoBeneficioCombo.DisplayMember = "Text";
-            proceduraAllegatiTipoBeneficioCombo.ValueMember = "Value";
+            Utilities.CreateDropDownMenu(ref filtroBeneficioBTN, ref selectedBeneficiStrip, proceduraAllegatiBeneficiItems);
         }
 
         private void RunProcedureBtnClick(object sender, EventArgs e)
@@ -109,8 +103,8 @@ namespace ProcedureNet7
                 string selectedTipoBeneficioValue = "";
                 _ = Invoke(new MethodInvoker(() =>
                 {
-                    dynamic selectedItem = proceduraAllegatiTipoBeneficioCombo.SelectedItem;
-                    selectedTipoBeneficioValue = selectedItem?.Value ?? "";
+                    dynamic selectedItem = Utilities.GetCheckBoxSelectedCodes(selectedBeneficiStrip?.Items);
+                    selectedTipoBeneficioValue = selectedItem ?? "";
                 }));
                 ArgsProceduraAllegati argsProceduraAllegati = new()
                 {

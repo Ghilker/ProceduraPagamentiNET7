@@ -96,7 +96,7 @@ namespace ProcedureNet7
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure: connessione o transazione null");
                     return;
                 }
-
+                sqlTransaction = CONNECTION.BeginTransaction();
                 selectedFolderPath = args._selectedFolderPath;
                 numProvvedimento = args._numProvvedimento;
                 aaProvvedimento = args._aaProvvedimento;
@@ -187,7 +187,7 @@ namespace ProcedureNet7
                         HandleSpecificheImpegni(excelFilePath);
                     }
                 }
-
+                sqlTransaction.Commit();
                 Logger.Log(100, "Fine lavorazione", LogLevel.INFO);
                 _masterForm.inProcedure = false;
             }
@@ -250,76 +250,164 @@ namespace ProcedureNet7
             _waitHandle.Set();
         }
 
-        private void HandleProvvedimenti(string numProvvedimento, string aaProvvedimento, string dataProvvedimento, string provvedimentoSelezionato, string notaProvvedimento)
+        private void HandleProvvedimenti(
+            string numProvvedimento,
+            string aaProvvedimento,
+            string dataProvvedimento,
+            string provvedimentoSelezionato,
+            string notaProvvedimento
+        )
         {
             try
             {
-                sqlTransaction = CONNECTION.BeginTransaction();
-                List<string> localStudentInfo = _studentInformation;
 
-                if (beneficioProvvedimento != "BS" && beneficioProvvedimento != "CI")
-                {
-                    localStudentInfo = new List<string>();
-                    string fiscalCodesParamList = string.Join(", ", _studentInformation.Select((fiscalCode, index) => $"@fiscalCode{index}"));
-                    string retrieveNumDomandaQuery = $@"
-                        SELECT Domanda.num_domanda
-                        FROM Domanda
-                        WHERE Cod_fiscale IN ({fiscalCodesParamList}) 
-                        AND Anno_accademico = @aaProvvedimento
-                        AND Tipo_bando = 'LZ'
+                // 1) Create temporary table(s) for storing the codes
+                //    Here we assume one for fiscal codes and one for num_domanda, 
+                //    but you might only need one, depending on your logic.
+                string createTempFiscalTable = @"
+                        IF OBJECT_ID('tempdb..#TempFiscalCodes') IS NOT NULL
+                            DROP TABLE #TempFiscalCodes;
+
+                        CREATE TABLE #TempFiscalCodes (
+                            FiscalCode VARCHAR(50) NOT NULL
+                        );
                     ";
 
-                    using (SqlCommand command = new SqlCommand(retrieveNumDomandaQuery, CONNECTION, sqlTransaction))
-                    {
-                        for (int i = 0; i < _studentInformation.Count; i++)
-                        {
-                            command.Parameters.AddWithValue($"@fiscalCode{i}", _studentInformation[i]);
-                        }
-                        command.Parameters.AddWithValue("@aaProvvedimento", aaProvvedimento);
+                string createTempNumDomandaTable = @"
+                        IF OBJECT_ID('tempdb..#TempNumDom') IS NOT NULL
+                            DROP TABLE #TempNumDom;
 
-                        using SqlDataReader reader = command.ExecuteReader();
-                        while (reader.Read())
+                        CREATE TABLE #TempNumDom (
+                            NumDomanda VARCHAR(50) NOT NULL
+                        );
+                    ";
+
+                using (var cmd = new SqlCommand(createTempFiscalTable, CONNECTION, sqlTransaction))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+                using (var cmd = new SqlCommand(createTempNumDomandaTable, CONNECTION, sqlTransaction))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
+                // 2) Bulk insert the data into #TempFiscalCodes (if needed)
+                //    In your scenario, you have _studentInformation which might contain either
+                //    fiscal codes or num_domanda. We'll assume they're fiscal codes for now.
+                //    If they are sometimes one or the other, adapt accordingly.
+                using (var bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction))
+                {
+                    bulkCopy.DestinationTableName = "#TempFiscalCodes";
+
+                    // Construct a DataTable with one column named "FiscalCode"
+                    DataTable dtFiscalCodes = new DataTable();
+                    dtFiscalCodes.Columns.Add("FiscalCode", typeof(string));
+
+                    foreach (string code in _studentInformation)
+                    {
+                        dtFiscalCodes.Rows.Add(code);
+                    }
+
+                    bulkCopy.WriteToServer(dtFiscalCodes);
+                }
+
+                // 3) Depending on your requirement, retrieve num_domanda for codes that are not "BS" or "CI"
+                //    Instead of building an IN(...) query, do a JOIN from #TempFiscalCodes to Domanda
+                //    and store results in #TempNumDom. This is effectively your localStudentInfo step.
+                if (beneficioProvvedimento != "BS" && beneficioProvvedimento != "CI")
+                {
+                    // Retrieve corresponding num_domanda for the given codes
+                    string fillTempNumDomanda = @"
+                            INSERT INTO #TempNumDom (NumDomanda)
+                            SELECT d.num_domanda
+                            FROM Domanda d
+                            INNER JOIN #TempFiscalCodes t
+                                ON d.Cod_fiscale = t.FiscalCode
+                            WHERE d.Anno_accademico = @aaProvvedimento
+                              AND d.Tipo_bando = 'LZ'
+                        ";
+
+                    using (var cmd = new SqlCommand(fillTempNumDomanda, CONNECTION, sqlTransaction))
+                    {
+                        cmd.Parameters.AddWithValue("@aaProvvedimento", aaProvvedimento);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                else
+                {
+                    // If "BS" or "CI", we assume the _studentInformation already contains num_domanda?
+                    // Then just bulk-insert those num_domandas in #TempNumDom
+                    using (var bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction))
+                    {
+                        bulkCopy.DestinationTableName = "#TempNumDom";
+
+                        DataTable dtNumDom = new DataTable();
+                        dtNumDom.Columns.Add("NumDomanda", typeof(string));
+
+                        foreach (string code in _studentInformation)
                         {
-                            localStudentInfo.Add(reader["num_domanda"].ToString());
+                            dtNumDom.Rows.Add(code);
                         }
+
+                        bulkCopy.WriteToServer(dtNumDom);
                     }
                 }
 
-                // Convert the list of Num_domanda to parameterized query
-                List<string> numDomandaParamList = localStudentInfo.Select((numDom, index) => $"@numDom{index}").ToList();
+                // 4) Now, #TempNumDom contains all of the NumDomanda we need to process.
+                //    We'll see which ones are already in PROVVEDIMENTI:
+                string createTempCommonTable = @"
+                        IF OBJECT_ID('tempdb..#TempCommonCodes') IS NOT NULL
+                            DROP TABLE #TempCommonCodes;
 
-                string retrieveQuery = $@"
-                    SELECT Domanda.Num_domanda
-                    FROM Domanda INNER JOIN
-                         PROVVEDIMENTI ON Domanda.Num_domanda = PROVVEDIMENTI.Num_domanda AND Domanda.Anno_accademico = PROVVEDIMENTI.Anno_accademico
-                    WHERE Domanda.Anno_accademico = @aaProvvedimento 
-                          AND PROVVEDIMENTI.Anno_accademico = @aaProvvedimento
-                          AND num_provvedimento = @numProvvedimento
-                          AND Domanda.Tipo_bando = 'lz'
-                          AND Domanda.Num_domanda IN ({string.Join(", ", numDomandaParamList)})
-                ";
-
-                List<string> retrievedNumDomandas = new List<string>();
-
-                using (SqlCommand command = new SqlCommand(retrieveQuery, CONNECTION, sqlTransaction))
+                        CREATE TABLE #TempCommonCodes (
+                            NumDomanda VARCHAR(50) NOT NULL
+                        );
+                    ";
+                using (var cmd = new SqlCommand(createTempCommonTable, CONNECTION, sqlTransaction))
                 {
-                    command.Parameters.AddWithValue("@aaProvvedimento", aaProvvedimento);
-                    command.Parameters.AddWithValue("@numProvvedimento", numProvvedimento);
+                    cmd.ExecuteNonQuery();
+                }
 
-                    for (int i = 0; i < localStudentInfo.Count; i++)
-                    {
-                        command.Parameters.AddWithValue($"@numDom{i}", localStudentInfo[i]);
-                    }
+                // Insert into #TempCommonCodes all those that already exist in PROVVEDIMENTI
+                string fillTempCommonCodes = @"
+                        INSERT INTO #TempCommonCodes (NumDomanda)
+                        SELECT d.Num_domanda
+                        FROM Domanda d
+                        INNER JOIN PROVVEDIMENTI p
+                            ON d.Num_domanda = p.Num_domanda
+                            AND d.Anno_accademico = p.Anno_accademico
+                        INNER JOIN #TempNumDom t
+                            ON d.Num_domanda = t.NumDomanda
+                        WHERE d.Anno_accademico = @aaProvvedimento
+                            AND p.Anno_accademico = @aaProvvedimento
+                            AND p.num_provvedimento = @numProvvedimento
+                            AND d.Tipo_bando = 'lz'
+                    ";
 
-                    using SqlDataReader reader = command.ExecuteReader();
+                using (var cmd = new SqlCommand(fillTempCommonCodes, CONNECTION, sqlTransaction))
+                {
+                    cmd.Parameters.AddWithValue("@aaProvvedimento", aaProvvedimento);
+                    cmd.Parameters.AddWithValue("@numProvvedimento", numProvvedimento);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // 5) If we want to list out common codes, we can select them from #TempCommonCodes
+                //    This replaces the localStudentInfo.Intersect(retrievedNumDomandas) logic.
+                List<string> commonCodes = new List<string>();
+                string getCommonCodesSql = @"
+                        SELECT NumDomanda 
+                        FROM #TempCommonCodes
+                    ";
+                using (var cmd = new SqlCommand(getCommonCodesSql, CONNECTION, sqlTransaction))
+                using (var reader = cmd.ExecuteReader())
+                {
                     while (reader.Read())
                     {
-                        retrievedNumDomandas.Add(reader["Num_domanda"].ToString());
+                        commonCodes.Add(reader["NumDomanda"].ToString());
                     }
                 }
 
-                // Reporting the codes that are in both lists
-                List<string> commonCodes = localStudentInfo.Intersect(retrievedNumDomandas).ToList();
+                // Log the common ones
                 foreach (string code in commonCodes)
                 {
                     Logger.Log(30, code + " - Provvedimento #" + numProvvedimento + " già aggiunto", LogLevel.INFO);
@@ -327,62 +415,90 @@ namespace ProcedureNet7
 
                 if (commonCodes.Count > 0 && (provvedimentoSelezionato == "01" || provvedimentoSelezionato == "02"))
                 {
-                    // Remove block for common codes and update DatiGenerali_dom
+                    // If needed, remove block for these codes and update DatiGenerali_dom
                     UpdateDatiGeneraliDom(commonCodes, aaProvvedimento, "Area4", 0);
                 }
 
-                // Using the remaining codes in the second query
-                List<string> remainingCodes = localStudentInfo.Except(commonCodes).ToList();
-
-                if (remainingCodes.Any())
-                {
-                    // Insert into PROVVEDIMENTI
-                    string insertQuery = $@"
-                        INSERT INTO [dbo].[PROVVEDIMENTI]
-                                   ([Num_domanda], [tipo_provvedimento], [data_provvedimento], [Anno_accademico], [note], [num_provvedimento], [riga_valida], [data_validita])
-                        SELECT 
-                            domanda.num_domanda, 
-                            @provvedimentoSelezionato, 
-                            @dataProvvedimento, 
-                            @aaProvvedimento, 
-                            @notaProvvedimento, 
-                            @numProvvedimento, 
-                            1, 
-                            CURRENT_TIMESTAMP 
-                        FROM Domanda
-                        WHERE Domanda.Anno_accademico = @aaProvvedimento
-                            AND Domanda.Tipo_bando = 'lz' 
-                            AND Domanda.Num_domanda IN ({string.Join(", ", remainingCodes.Select((numDom, index) => $"@remainingNumDom{index}"))})
+                // 6) Now find the remaining codes that are not in #TempCommonCodes
+                //    We'll do a single INSERT for those new records in PROVVEDIMENTI
+                //    We can do this in a single statement with a LEFT JOIN filter, or by
+                //    using a NOT EXISTS sub-select. For example:
+                string insertNewProvvedimenti = @"
+                        INSERT INTO [dbo].[PROVVEDIMENTI] (
+                            [Num_domanda],
+                            [tipo_provvedimento],
+                            [data_provvedimento],
+                            [Anno_accademico],
+                            [note],
+                            [num_provvedimento],
+                            [riga_valida],
+                            [data_validita]
+                        )
+                        SELECT d.num_domanda,
+                               @provvedimentoSelezionato,
+                               @dataProvvedimento,
+                               @aaProvvedimento,
+                               @notaProvvedimento,
+                               @numProvvedimento,
+                               1,
+                               CURRENT_TIMESTAMP
+                        FROM Domanda d
+                        INNER JOIN #TempNumDom t
+                            ON d.Num_domanda = t.NumDomanda
+                        WHERE d.Anno_accademico = @aaProvvedimento
+                          AND d.Tipo_bando = 'lz'
+                          AND NOT EXISTS (
+                              SELECT 1 FROM #TempCommonCodes c
+                              WHERE c.NumDomanda = d.Num_domanda
+                          )
                     ";
 
-                    using (SqlCommand command = new SqlCommand(insertQuery, CONNECTION, sqlTransaction))
+                int affectedRows;
+                using (var cmd = new SqlCommand(insertNewProvvedimenti, CONNECTION, sqlTransaction))
+                {
+                    cmd.Parameters.AddWithValue("@provvedimentoSelezionato", provvedimentoSelezionato);
+                    cmd.Parameters.AddWithValue("@dataProvvedimento", dataProvvedimento);
+                    cmd.Parameters.AddWithValue("@aaProvvedimento", aaProvvedimento);
+                    cmd.Parameters.AddWithValue("@notaProvvedimento", notaProvvedimento);
+                    cmd.Parameters.AddWithValue("@numProvvedimento", numProvvedimento);
+
+                    affectedRows = cmd.ExecuteNonQuery();
+                }
+
+                if (affectedRows > 0)
+                {
+                    Logger.Log(60, $"Modificati: {affectedRows} studenti", LogLevel.INFO);
+
+                    // If you want to list them, you can SELECT them right back out:
+                    var newCodes = new List<string>();
+                    string selectNewlyInserted = @"
+                            SELECT t.NumDomanda
+                            FROM #TempNumDom t
+                            WHERE NOT EXISTS (
+                                SELECT 1 FROM #TempCommonCodes c
+                                WHERE c.NumDomanda = t.NumDomanda
+                            )
+                        ";
+
+                    using (var cmd = new SqlCommand(selectNewlyInserted, CONNECTION, sqlTransaction))
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        command.Parameters.AddWithValue("@provvedimentoSelezionato", provvedimentoSelezionato);
-                        command.Parameters.AddWithValue("@dataProvvedimento", dataProvvedimento);
-                        command.Parameters.AddWithValue("@aaProvvedimento", aaProvvedimento);
-                        command.Parameters.AddWithValue("@notaProvvedimento", notaProvvedimento);
-                        command.Parameters.AddWithValue("@numProvvedimento", numProvvedimento);
-
-                        for (int i = 0; i < remainingCodes.Count; i++)
+                        while (reader.Read())
                         {
-                            command.Parameters.AddWithValue($"@remainingNumDom{i}", remainingCodes[i]);
+                            newCodes.Add(reader["NumDomanda"].ToString());
                         }
-
-                        int affectedRows = command.ExecuteNonQuery();
-
-                        // Report the number of affected rows
-                        Logger.Log(60, $"Modificati: {affectedRows} studenti", LogLevel.INFO);
                     }
 
-                    foreach (string code in remainingCodes)
+                    // Log the newly inserted
+                    foreach (string code in newCodes)
                     {
                         Logger.Log(40, code + ": aggiunto provvedimento #" + numProvvedimento, LogLevel.INFO);
                     }
 
+                    // If needed, also update DatiGeneraliDom for these newly inserted codes
                     if (provvedimentoSelezionato == "01" || provvedimentoSelezionato == "02")
                     {
-                        // Remove block for remaining codes and update DatiGenerali_dom
-                        UpdateDatiGeneraliDom(remainingCodes, aaProvvedimento, "Area4", 0);
+                        UpdateDatiGeneraliDom(newCodes, aaProvvedimento, "Area4", 0);
                     }
                 }
                 else
@@ -390,15 +506,19 @@ namespace ProcedureNet7
                     Logger.Log(100, "Nessun provvedimento da aggiungere", LogLevel.INFO);
                 }
 
+                // 7) Log the total number of students in the original file
                 Logger.Log(80, "Studenti nel file: " + _studentInformation.Count.ToString(), LogLevel.INFO);
-                sqlTransaction.Commit();
+
+
             }
             catch
             {
-                sqlTransaction.Rollback();
+                // In case of exceptions, roll back
+                sqlTransaction?.Rollback();
                 throw;
             }
         }
+
 
         // Helper method to update DatiGenerali_dom dynamically
         private void UpdateDatiGeneraliDom(List<string> numDomandas, string aaProvvedimento, string utenteSblocco, int bloccoPagamento)
@@ -583,7 +703,9 @@ namespace ProcedureNet7
                 _impegnoSA = impegnoSA,
                 _numDetermina = numProvvedimento,
                 _selectedAA = aaProvvedimento,
-                _selectedCodBeneficio = beneficioProvvedimento
+                _selectedCodBeneficio = beneficioProvvedimento,
+                _sqlTransaction = sqlTransaction,
+                _isProvvedimentoAdded = true
             };
             SpecificheImpegni specificheImpegni = new(_masterForm, CONNECTION);
             specificheImpegni.RunProcedure(argsSpecificheImpegni);

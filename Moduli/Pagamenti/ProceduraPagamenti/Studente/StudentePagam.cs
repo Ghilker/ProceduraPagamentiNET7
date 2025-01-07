@@ -55,6 +55,8 @@ namespace ProcedureNet7
         public bool rifugiato { get; private set; }
         public bool pagatoPendolare { get; private set; }
 
+        public string forzaturaStatusSede { get; private set; }
+
         public TipoDocumento tipoDocumento { get; private set; }
         public DateTime scadenzaDocumento { get; private set; }
 
@@ -110,6 +112,7 @@ namespace ProcedureNet7
             tipoDocumento = TipoDocumento.Nessuno;
             this.statusSede = statusSede;
             this.rifugiato = rifugiato;
+            this.forzaturaStatusSede = string.Empty;
         }
 
         public AssegnazioneDataCheck AddAssegnazione(
@@ -172,6 +175,11 @@ namespace ProcedureNet7
         public void SetResidenza(string indirizzo, string codComune, string provincia, string CAP, string nomeComune)
         {
             residenza = new Residenza(indirizzo, codComune, provincia, CAP, nomeComune);
+        }
+
+        public void SetForzatura(string forzaturaStatusSede)
+        {
+            this.forzaturaStatusSede = forzaturaStatusSede;
         }
 
         public void SetDomicilio(

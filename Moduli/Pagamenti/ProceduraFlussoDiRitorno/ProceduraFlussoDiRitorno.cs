@@ -47,6 +47,9 @@ namespace ProcedureNet7
                 InsertIntoReversali(CONNECTION, sqlTransaction);
                 Logger.LogInfo(77, $"Aggiornamento mandati");
                 UpdateMandato(CONNECTION, sqlTransaction);
+
+                InsertMessaggio(CONNECTION, sqlTransaction);
+
                 Logger.LogInfo(88, $"Annullamento pagamenti scartati");
                 Scartati(CONNECTION, sqlTransaction);
                 _ = _masterForm.Invoke((MethodInvoker)delegate
@@ -398,6 +401,64 @@ namespace ProcedureNet7
                 throw;
             }
         }
+
+        private void InsertMessaggio(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
+        {
+            try
+            {
+                string createTempTable = @"
+                        CREATE TABLE #TempMessaggio
+                        (
+                            CodFiscale CHAR(16)
+                        );
+                        ";
+                SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
+                createCmd.ExecuteNonQuery();
+
+                DataTable messaggioTable = MessaggioTable(studenteRitornoList);
+                BulkInsertIntoSqlTable(CONNECTION, messaggioTable, "#TempMessaggio", sqlTransaction);
+
+                string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{selectedOldMandato.Substring(0, 4)}'";
+                SqlCommand cmd1 = new(sqlTipoPagam, CONNECTION, sqlTransaction);
+                string pagamentoDescrizione = (string)cmd1.ExecuteScalar();
+
+                string messaggio = @$"Gentile studente/ssa, il pagamento riguardante ''{pagamentoDescrizione}'' è avvenuto con successo. <br>Puoi trovare il dettaglio nella sezione storico esiti pagamenti della tua area riservata";
+
+                string sqlInsertPagam = $@"
+                       INSERT INTO [dbo].[MESSAGGI_STUDENTE]
+                                   ([COD_FISCALE]
+                                   ,[DATA_INSERIMENTO_MESSAGGIO]
+                                   ,[MESSAGGIO]
+                                   ,[LETTO]
+                                   ,[DATA_LETTURA]
+                                   ,[UTENTE])
+                         SELECT
+                                   tm.CodFiscale
+		                           ,CURRENT_TIMESTAMP
+                                   ,'{messaggio}'
+                                   ,0
+                                   ,NULL
+                                   ,'Area4_pagam'
+
+                        from #TempMessaggio as tm
+
+                        ";
+
+                using (SqlCommand cmd = new SqlCommand(sqlInsertPagam, CONNECTION, sqlTransaction))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
+                string dropTable = "DROP TABLE #TempMessaggio";
+                SqlCommand dropTableCmd = new(dropTable, CONNECTION, sqlTransaction);
+                dropTableCmd.ExecuteNonQuery();
+            }
+            catch
+            {
+                throw;
+            }
+        }
+
         private void Scartati(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             try
@@ -477,6 +538,30 @@ namespace ProcedureNet7
                     continue;
                 }
                 table.Rows.Add(studente.codFiscale, studente.dataPagamento, studente.codMovimentoGenerale, studente.numMandatoFlusso);
+            }
+
+            return table;
+        }
+
+        DataTable MessaggioTable(IEnumerable<StudenteRitorno> studenteRitornoList)
+        {
+            DataTable table = new DataTable();
+            table.Columns.Add("CodFiscale", typeof(string));
+
+            foreach (var studente in studenteRitornoList)
+            {
+                if (string.IsNullOrWhiteSpace(studente.codMovimentoGenerale))
+                {
+                    Logger.LogWarning(null, $"Studente {studente.codFiscale} ha il codice movimento vuoto/nullo!");
+                    continue;
+                }
+
+                if (studente.pagamentoScartato)
+                {
+                    continue;
+                }
+
+                table.Rows.Add(studente.codFiscale);
             }
 
             return table;

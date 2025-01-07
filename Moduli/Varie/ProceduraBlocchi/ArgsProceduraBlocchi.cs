@@ -20,6 +20,7 @@ namespace ProcedureNet7
         [ValidStringLenght(ErrorMessage = "Utenza troppo lunga, usare meno di 20 caratteri.")]
         public string _blocksUsername { get; set; }
         public bool _blocksGiaRimossi { get; set; }
+        public bool _blocksInsertMessaggio { get; set; }
 
         public ArgsProceduraBlocchi()
         {

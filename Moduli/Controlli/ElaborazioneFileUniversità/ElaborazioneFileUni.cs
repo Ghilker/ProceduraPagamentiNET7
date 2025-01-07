@@ -1394,6 +1394,7 @@ namespace ProcedureNet7
                     if (studente.tipoIscrizioneUni == "RI")
                     {
                         studente.blocchiDaMettere.Add("RIB");
+                        studente.motivazioniBlocchiInseriti.Add("RIB", "Riscontrata ripetenza in carriera");
                     }
 
                     if (studente.seAnno && studente.seTitpo && studente.seCFU)
@@ -1423,11 +1424,23 @@ namespace ProcedureNet7
                         if (studente.tipoCorsoUni == "-1")
                         {
                             studente.blocchiDaMettere.Add("VCS");
+                            studente.motivazioniBlocchiInseriti.Add("VCS", "Corso frequentato di tipo MASTER");
                             studente.incongruenzeDaMettere.Add("48");
                         }
                         else
                         {
                             studente.blocchiDaMettere.Add("ITD");
+
+                            Dictionary<string, string> decodTipoCorso = new()
+                            {
+                                {"3", "triennale" },
+                                {"4", "ciclo unico" },
+                                {"5", "magistrale" },
+                                {"6", "dottorato" },
+                                {"7", "specializzazione" },
+                            };
+
+                            studente.motivazioniBlocchiInseriti.Add("ITD", $"Tipo corso riscontrato {decodTipoCorso[studente.tipoCorsoUni]} -  Tipo corso dichiarato {decodTipoCorso[studente.tipoCorsoDic]}");
                             studente.incongruenzeDaMettere.Add("64");
                         }
                     }
@@ -1443,6 +1456,7 @@ namespace ProcedureNet7
                         {
                             studente.blocchiDaTogliere.Add("VAI");
                         }
+                        studente.motivazioniBlocchiInseriti.Add("VAI", $"Anno corso riscontrato {studente.annoCorsoUni} -  Anno corso dichiarato {studente.annoCorsoUni}");
                         studente.blocchiDaMettere.Add("IAD");
                         studente.incongruenzeDaMettere.Add("63");
                     }
@@ -1460,11 +1474,13 @@ namespace ProcedureNet7
                         if (studente.creditiConseguitiUni < studente.creditiRichiestiDB)
                         {
                             studente.blocchiDaMettere.Add("BMI");
+                            studente.motivazioniBlocchiInseriti.Add("BMI", $"CFU riscontrati {studente.creditiConseguitiUni} -  CFU dichiarati {studente.creditiConseguitiDic}");
                             studente.incongruenzeDaMettere.Add("25");
                         }
                         else
                         {
                             studente.blocchiDaMettere.Add("IMD");
+                            studente.motivazioniBlocchiInseriti.Add("IMD", $"CFU riscontrati {studente.creditiConseguitiUni} -  CFU dichiarati {studente.creditiConseguitiDic}");
                             studente.incongruenzeDaMettere.Add("75");
                         }
                     }
@@ -1478,6 +1494,7 @@ namespace ProcedureNet7
                     {
                         if (!studente.blocchiPresenti.ContainsKey("IAD") && !studente.blocchiDaMettere.Contains("IAD"))
                         {
+                            studente.motivazioniBlocchiInseriti.Add("IAD", $"Anno prima immatricolazione riscontrato {studente.aaImmatricolazioneUni}");
                             studente.blocchiDaMettere.Add("VAI");
                         }
                         studente.incongruenzeDaMettere.Add("85");
@@ -1500,6 +1517,7 @@ namespace ProcedureNet7
                     if (checkCondizione && studente.iscrCondizione)
                     {
                         studente.blocchiDaMettere.Add("IMR");
+                        studente.motivazioniBlocchiInseriti.Add("IMR", $"Iscrizione non perfezionata");
                         studente.incongruenzeDaMettere.Add("65");
                     }
                     else
@@ -1511,6 +1529,7 @@ namespace ProcedureNet7
                     if (studente.creditiDaRinunciaDic == 0 && studente.creditiConvalidatiUni > 0)
                     {
                         studente.blocchiDaMettere.Add("CRC");
+                        studente.motivazioniBlocchiInseriti.Add("CRC", $"CFU convalidati riscontrati {studente.creditiConvalidatiUni} -  CFU convalidati dichiarati {studente.creditiDaRinunciaDic}");
                     }
 
                     if (checkStem && studente.sessoDic == "F" && studente.stemDic)
@@ -1522,6 +1541,7 @@ namespace ProcedureNet7
                             if (!isStem)
                             {
                                 studente.blocchiDaMettere.Add("VST");
+                                studente.motivazioniBlocchiInseriti.Add("VST", $"Verificare iscrizione a corso STEM");
                                 studente.incongruenzeDaMettere.Add("83");
                             }
                     }
@@ -1586,6 +1606,7 @@ namespace ProcedureNet7
                 producedTable.Columns.Add("Cod blocchi presenti");
                 producedTable.Columns.Add("Blocchi da TOGLIERE");
                 producedTable.Columns.Add("Blocchi da METTERE");
+                producedTable.Columns.Add("Motivazioni Blocchi da METTERE");
                 producedTable.Columns.Add("Descrizione incongruenze");
                 producedTable.Columns.Add("Cod incongruenze presenti");
                 producedTable.Columns.Add("Incongruenze da TOGLIERE");
@@ -1597,6 +1618,23 @@ namespace ProcedureNet7
                     string codBlocchi = studente.blocchiPresenti.Keys.Count > 0 ? "#" + string.Join("#", studente.blocchiPresenti.Keys) : " ";
                     string blocchiDaTogliere = studente.blocchiDaTogliere.Count > 0 ? "/" + string.Join("/", studente.blocchiDaTogliere) : " ";
                     string blocchiDaMettere = studente.blocchiDaMettere.Count > 0 ? "/" + string.Join("/", studente.blocchiDaMettere) : " ";
+                    // We loop through the codes in the same order as in blocchiDaMettere
+                    List<string> motivazioni = new List<string>();
+
+                    foreach (var code in studente.blocchiDaMettere)
+                    {
+                        // Make sure the dictionary contains the key to avoid an exception
+                        if (studente.motivazioniBlocchiInseriti.ContainsKey(code))
+                        {
+                            motivazioni.Add(studente.motivazioniBlocchiInseriti[code]);
+                        }
+                        else
+                        {
+                            motivazioni.Add("MOTIVAZIONE_MANCANTE");
+                        }
+                    }
+                    string motivazioniBlocchi = motivazioni.Count > 0 ? "#" + string.Join("#", motivazioni) : " ";
+
 
                     string descrIncongruenze = studente.incongruenzePresenti.Values.Count > 0 ? "#" + string.Join("#", studente.incongruenzePresenti.Values) : " ";
                     string codIncongruenze = studente.incongruenzePresenti.Keys.Count > 0 ? "#" + string.Join("#", studente.incongruenzePresenti.Keys) : " ";
@@ -1641,6 +1679,7 @@ namespace ProcedureNet7
                         codBlocchi,
                         blocchiDaTogliere,
                         blocchiDaMettere,
+                        motivazioniBlocchi,
                         descrIncongruenze,
                         codIncongruenze,
                         incongruenzeDaTogliere,

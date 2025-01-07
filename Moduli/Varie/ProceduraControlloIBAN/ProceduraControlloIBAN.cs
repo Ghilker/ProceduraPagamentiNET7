@@ -1,4 +1,5 @@
-﻿using System;
+﻿using IbanNet;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -19,65 +20,68 @@ namespace ProcedureNet7
         {
             selectedAA = args._annoAccademico;
 
+            Logger.LogInfo(null, $"Inizio procedura controllo IBAN.");
             sqlTransaction = CONNECTION.BeginTransaction();
             try
             {
                 string sqlQuery = $@"
-                    SELECT 
+                    SELECT distinct
                         domanda.Cod_fiscale, 
-                        pagamenti.iban_storno, 
                         vMODALITA_PAGAMENTO.IBAN
                     FROM 
-                        vMotivazioni_blocco_pagamenti AS mot 
-                    INNER JOIN 
-                        Domanda ON mot.Anno_accademico = Domanda.Anno_accademico AND mot.Num_domanda = Domanda.Num_domanda 
+                        Domanda 
                     INNER JOIN 
                         vMODALITA_PAGAMENTO ON Domanda.Cod_fiscale = vMODALITA_PAGAMENTO.Cod_fiscale 
                     INNER JOIN 
-                        Pagamenti ON Domanda.Anno_accademico = Pagamenti.Anno_accademico AND Domanda.Num_domanda = Pagamenti.Num_domanda
+	                    vEsiti_concorsiBS vb on Domanda.Anno_accademico = vb.Anno_accademico and Domanda.Num_domanda = vb.Num_domanda
                     WHERE 
-                        Domanda.Anno_accademico = '{selectedAA}' 
-                        AND Cod_tipologia_blocco = 'BSS' 
-                        AND Pagamenti.Ritirato_azienda = 1
-                        AND Pagamenti.Data_validita = (
-                            SELECT MAX(Data_validita)
-                            FROM Pagamenti AS p2
-                            WHERE p2.Anno_accademico = Pagamenti.Anno_accademico
-                              AND p2.Num_domanda = Pagamenti.Num_domanda
-                              AND p2.Ritirato_azienda = Pagamenti.Ritirato_azienda
-                        )
-                        AND IBAN_storno IS NOT NULL
+                        Domanda.Anno_accademico >= '{selectedAA}' and Domanda.Tipo_bando = 'lz' and vb.Cod_tipo_esito <> 0
+
                     order by domanda.cod_fiscale
                     ";
 
-                List<string> studentiDaSbloccare = new List<string>();
+                List<string> studentiDaBloccare = new List<string>();
                 SqlCommand readData = new(sqlQuery, CONNECTION, sqlTransaction);
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
                     while (reader.Read())
                     {
                         string codFiscale = Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper().Trim();
-                        string IBAN_Storno = Utilities.SafeGetString(reader, "IBAN_storno").ToUpper().Trim();
-                        string IBAN_attuale = Utilities.SafeGetString(reader, "IBAN").ToUpper().Trim();
+                        string IBAN = Utilities.SafeGetString(reader, "IBAN").ToUpper().Trim();
 
-                        if (string.IsNullOrWhiteSpace(IBAN_attuale) || string.IsNullOrWhiteSpace(IBAN_Storno))
+                        bool ibanValido = IbanValidatorUtil.ValidateIban(IBAN);
+
+                        if (ibanValido)
                         {
                             continue;
                         }
 
-                        if (IBAN_attuale != IBAN_Storno)
-                        {
-                            studentiDaSbloccare.Add(codFiscale);
-                        }
+                        studentiDaBloccare.Add(codFiscale);
                     }
                 }
 
-                if (studentiDaSbloccare.Any())
-                {
-                    BlocksUtil.RemoveBlock(CONNECTION, sqlTransaction, studentiDaSbloccare, "BSS", selectedAA, "Verif_IBAN");
-                }
+                Logger.LogInfo(null, $"Trovati {studentiDaBloccare.Count} studenti con errori IBAN nel {selectedAA}.");
+                string messaggio = "Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
 
-                sqlTransaction.Commit();
+                BlocksUtil.AddBlock(CONNECTION, sqlTransaction, studentiDaBloccare, "BSS", "20232024", "Area4_IbanCheck", true);
+                BlocksUtil.AddBlock(CONNECTION, sqlTransaction, studentiDaBloccare, "BSS", "20242025", "Area4_IbanCheck", true);
+                MessageUtils.InsertMessages(CONNECTION, sqlTransaction, studentiDaBloccare, messaggio, "Area4_IbanCheck");
+
+                _ = _masterForm.Invoke((MethodInvoker)delegate
+                {
+                    DialogResult result = MessageBox.Show(_masterForm, "Completare procedura?", "Attenzione", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+                    {
+                        if (result == DialogResult.OK)
+                        {
+                            sqlTransaction?.Commit();
+                        }
+                        else
+                        {
+                            Logger.LogInfo(null, $"Procedura chiusa dall'utente");
+                            sqlTransaction?.Rollback();
+                        }
+                    }
+                });
             }
             catch (Exception ex)
             {

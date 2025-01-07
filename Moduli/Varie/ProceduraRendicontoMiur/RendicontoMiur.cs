@@ -163,6 +163,7 @@ namespace ProcedureNet7
                 Task idoneiBSTask = Task.Run(() => IdoneiBorsaS(excelWorksheet, code, folderName));
                 Task domandeCITotTask = Task.Run(() => DomandeCITotali(excelWorksheet, code, folderName));
                 Task mediaMesiMobilTask = Task.Run(() => MediaMesiMobilità(excelWorksheet, code, folderName));
+                Task totaleBuoniLibroTask = Task.Run(() => TotaleBuoniLibro(excelWorksheet, code, folderName));
                 Task domandeCIVincitoTask = Task.Run(() => DomandeCIVincitori(excelWorksheet, code, folderName));
                 Task totalePostoAlloggioTask = Task.Run(() => TotalePostoAlloggio(excelWorksheet, code, folderName));
                 Task totalePremiDiLaureaPLTask = Task.Run(() => TotalePremiDiLaurea(excelWorksheet, code, folderName));
@@ -177,7 +178,7 @@ namespace ProcedureNet7
                     totalBSTask, idoneiBSTask, domandeCITotTask, domandeCIVincitoTask, mediaMesiMobilTask,
                     totalePostoAlloggioTask, vincitoriPostoAlloggioTask, vincitoriPostoAlloggioConBorsaTask,
                     totaleContributoAlloggioTask, vincitoriContributoAlloggioTask, totaleContributoAlloggioConBorsaTask,
-                    totalePremiDiLaureaPLTask);
+                    totalePremiDiLaureaPLTask, totaleBuoniLibroTask);
 
                 excelWorkbook.Save();
             }
@@ -195,6 +196,7 @@ namespace ProcedureNet7
                 Task totalSpendingCA = Task.Run(() => TotalSpendingCA(excelWorksheet, code, folderName));
                 Task totalSpendingCaConBorsa = Task.Run(() => TotalSpendingCaConBorsa(excelWorksheet, code, folderName));
                 Task totalSpendingPL = Task.Run(() => TotalSpendingPL(excelWorksheet, code, folderName));
+                Task totalSpendingBL = Task.Run(() => TotalSpendingBL(excelWorksheet, code, folderName));
 
                 // Wait for all tasks to complete
                 await Task.WhenAll(
@@ -247,7 +249,7 @@ namespace ProcedureNet7
                                 Cittadinanza AS ct
                             WHERE        
                                 (cittadinanza.cod_fiscale = Cod_fiscale) AND 
-                                (Data_validita < '01/11/2024'))
+                                (Data_validita <= '01/11/2024'))
                         ) 
                     and Graduatorie.Cod_fiscale <> '0000000000000001'
                     ";
@@ -321,21 +323,21 @@ namespace ProcedureNet7
 	                    (EC.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Esiti_concorsi
-			                    WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita < '01/11/2024'))) AND 
+			                    WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita <= '01/11/2024'))) AND 
 	                    (i.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Iscrizioni
-			                    WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita < '01/11/2024'))) AND (c.Data_validita =
+			                    WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (c.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Cittadinanza
-			                    WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita < '01/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
+			                    WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Benefici_richiesti AS br
 			                    WHERE (Benefici_richiesti.num_domanda = Num_domanda) AND (Benefici_richiesti.anno_accademico = Anno_accademico) AND (Benefici_richiesti.cod_beneficio = Cod_beneficio) AND 
-							                    (Cod_beneficio = 'BS') AND (Data_validita < '01/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
+							                    (Cod_beneficio = 'BS') AND (Data_validita <= '01/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Valori_calcolati AS vc
-			                    WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita < '01/11/2024')))
+			                    WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita <= '01/11/2024')))
                     ";
             // Execute SQL Query and get results
             DataTable queryResults = ExecuteSqlQuery(query, CONNECTION);
@@ -462,7 +464,7 @@ namespace ProcedureNet7
                             (dbo.Cittadinanza.Data_validita =
                             (SELECT     MAX(Data_validita) AS Expr1
                             FROM          dbo.Cittadinanza AS ct
-                            WHERE      (cittadinanza.cod_fiscale = Cod_fiscale) AND (Data_validita < '01/11/2024')))
+                            WHERE      (cittadinanza.cod_fiscale = Cod_fiscale) AND (Data_validita <= '01/11/2024')))
                 ";
             // Execute SQL Query and get results
             DataTable queryResults = ExecuteSqlQuery(query, CONNECTION);
@@ -515,21 +517,21 @@ namespace ProcedureNet7
                     WHERE (d.Anno_accademico = '20232024') AND (EC.Cod_beneficio = 'ci') AND ( i.Cod_sede_studi in ('{code}')) AND (EC.Cod_tipo_esito = 2) AND (d.Tipo_bando = 'lz') AND (EC.Data_validita =
                     (SELECT MAX(Data_validita) AS Expr1
                      FROM    dbo.Esiti_concorsi
-                     WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita < '30/11/2024'))) AND 
+                     WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita <= '01/11/2024'))) AND 
                     (i.Data_validita =
                     (SELECT MAX(Data_validita) AS Expr1
                      FROM    dbo.Iscrizioni
-                     WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita < '30/11/2024'))) AND (c.Data_validita =
+                     WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (c.Data_validita =
                     (SELECT MAX(Data_validita) AS Expr1
                      FROM    dbo.Cittadinanza
-                     WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita < '30/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
+                     WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
                     (SELECT MAX(Data_validita) AS Expr1
                      FROM    dbo.Benefici_richiesti AS br
                      WHERE (Benefici_richiesti.num_domanda = Num_domanda) AND (Benefici_richiesti.anno_accademico = Anno_accademico) AND (Benefici_richiesti.cod_beneficio = Cod_beneficio) AND 
-                                     (Cod_beneficio = 'CI') AND (Data_validita < '30/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
+                                     (Cod_beneficio = 'CI') AND (Data_validita <= '01/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
                     (SELECT MAX(Data_validita) AS Expr1
                      FROM    dbo.Valori_calcolati AS vc
-                     WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita < '30/11/2024')))
+                     WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita <= '01/11/2024')))
                 ";
             // Execute SQL Query and get results
             DataTable queryResults = ExecuteSqlQuery(query, CONNECTION);
@@ -606,21 +608,21 @@ namespace ProcedureNet7
                             (EC.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Esiti_concorsi
-                                    WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita < '30/11/2024'))) AND 
+                                    WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita <= '01/11/2024'))) AND 
                             (i.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Iscrizioni
-                                    WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita < '30/11/2024'))) AND (c.Data_validita =
+                                    WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (c.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Cittadinanza
-                                    WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita < '30/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
+                                    WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Benefici_richiesti AS br
                                     WHERE (Benefici_richiesti.num_domanda = Num_domanda) AND (Benefici_richiesti.anno_accademico = Anno_accademico) AND (Benefici_richiesti.cod_beneficio = Cod_beneficio) AND 
-					                                            (Cod_beneficio = 'CI') AND (Data_validita < '30/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
+					                                            (Cod_beneficio = 'CI') AND (Data_validita <= '01/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Valori_calcolati AS vc
-                                    WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita < '30/11/2024')))
+                                    WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita <= '01/11/2024')))
                     ) and data_fine_validita is null";
             // Execute SQL Query and get results
             DataTable queryResults = ExecuteSqlQuery(query, CONNECTION);
@@ -696,7 +698,7 @@ namespace ProcedureNet7
                                           (dbo.Cittadinanza.Data_validita =
                                               (SELECT     MAX(Data_validita) AS Expr1
                                                 FROM          dbo.Cittadinanza AS ct
-                                                WHERE      (cittadinanza.cod_fiscale = Cod_fiscale) AND (Data_validita < '01/11/2024'))) 
+                                                WHERE      (cittadinanza.cod_fiscale = Cod_fiscale) AND (Data_validita <= '01/11/2024'))) 
                 ";
 
             // Execute SQL Query and get results
@@ -1077,7 +1079,7 @@ namespace ProcedureNet7
 			                    (Anno_accademico = EC.Anno_accademico) AND 
 			                    (Num_domanda = EC.Num_domanda) AND 
 			                    (Cod_beneficio = EC.Cod_beneficio) AND 
-			                    (Data_validita < '01/11/2024'))) and 
+			                    (Data_validita <= '01/11/2024'))) and 
 	                    Iscrizioni.Data_validita = 
 		                    (Select max(data_validita) as expr1
 		                    from
@@ -1085,14 +1087,14 @@ namespace ProcedureNet7
 		                    where
 			                    Iscrizioni.Anno_accademico = i.Anno_accademico and 
 			                    Iscrizioni.Cod_fiscale = i.Cod_fiscale and
-			                    Data_validita < '01/11/2024') and 
+			                    Data_validita <= '01/11/2024') and 
 	                    Cittadinanza.Data_validita = 
 		                    (Select max(data_validita) as expr1
 		                    from
 			                    Cittadinanza c
 		                    where
 			                    Cittadinanza.Cod_fiscale = c.Cod_fiscale and
-			                    Data_validita < '01/11/2024') and 
+			                    Data_validita <= '01/11/2024') and 
 	                    d.cod_fiscale in (
 			
 			                    SELECT        d.Cod_fiscale
@@ -1180,11 +1182,9 @@ namespace ProcedureNet7
                                                         )
                                                     OR cod_tipo_pagam IN ('34')
                                                     ) and Anno_accademico='20212022') 
-
-
 as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_accademico
 
-                    WHERE        (d.Anno_accademico = '20202021') and i.Cod_sede_studi in ('{code}')
+                    WHERE        (d.Anno_accademico = '20212022') and i.Cod_sede_studi in ('{code}')
                      AND (i.Data_validita =
                                                  (SELECT        MAX(Data_validita) AS Expr1
                                                    FROM            dbo.Iscrizioni
@@ -1228,6 +1228,77 @@ as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_
             Logger.Log(99, folderName + ": Premi di laurea", LogLevel.INFO);
         }
 
+        private void TotaleBuoniLibro(IXLWorksheet excelWorksheet, string code, string folderName)
+        {
+            string query = $@"
+                                        SELECT        a.Cod_ente, dbo.Sede_studi.Descrizione, i.Cod_tipologia_studi, d.Cod_fiscale, CASE WHEN c.cod_cittadinanza IN ('Z102', 'Z103', 'Z107', 'Z131', 'Z109', 'Z110', 'Z112', 'Z111', 'Z115', 'Z116', 'Z120', 
+                                             'Z126', 'Z128', 'Z114', 'Z132', 'Z000', 'Z144', 'Z145', 'Z146', 'Z156', 'Z155', 'Z150', 'Z104', 'Z211', 'Z121', 'Z127', 'Z129', 'Z134', 'z149', 'Z105', 'Z146') THEN 'UE' ELSE 'NOTUE' END AS codeu, 
+                                             dbo.Tipologie_studi.Descrizione AS Expr1, dbo.Decod_cittadinanza.Descrizione AS Expr3, vEsiti_concorsiBL.Cod_tipo_esito, vEsiti_concorsiBL.Imp_beneficio
+						                     , pagato.Imp_pagato
+                    FROM            dbo.Domanda AS d INNER JOIN
+                                             dbo.Appartenenza AS a ON d.Anno_accademico = a.Anno_accademico AND d.Cod_fiscale = a.Cod_fiscale INNER JOIN
+                                             dbo.Sede_studi ON a.Cod_sede_studi = dbo.Sede_studi.Cod_sede_studi INNER JOIN
+                                             dbo.Iscrizioni AS i ON d.Anno_accademico = i.Anno_accademico AND d.Cod_fiscale = i.Cod_fiscale INNER JOIN
+                                             dbo.Tipologie_studi ON i.Cod_tipologia_studi = dbo.Tipologie_studi.Cod_tipologia_studi INNER JOIN
+                                             dbo.Cittadinanza AS c ON d.Cod_fiscale = c.Cod_fiscale INNER JOIN
+                                             dbo.Decod_cittadinanza ON c.Cod_cittadinanza = dbo.Decod_cittadinanza.Cod_cittadinanza INNER JOIN
+                                             dbo.vEsiti_concorsiBL AS vEsiti_concorsiBL ON d.Num_domanda = vEsiti_concorsiBL.Num_domanda AND d.Anno_accademico = vEsiti_concorsiBL.Anno_accademico
+						                     left outer join (SELECT Num_domanda, Imp_pagato , Anno_accademico     
+                      FROM    Pagamenti
+                                         WHERE (Anno_accademico IN ('20232024')) AND (
+                                                    cod_tipo_pagam in (
+                                                            SELECT Cod_tipo_pagam_new FROM Decod_pagam_new WHERE Cod_tipo_pagam_old IN ('B2','BL','RB')
+                                                        )
+                                                    OR cod_tipo_pagam IN ('B2','BL','RB')
+                                                    ) and Anno_accademico='20232024') 
+
+
+as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_accademico
+
+                    WHERE        (d.Anno_accademico = '20232024') and i.Cod_sede_studi in ('{code}')
+                     AND (i.Data_validita =
+                                                 (SELECT        MAX(Data_validita) AS Expr1
+                                                   FROM            dbo.Iscrizioni
+                                                   WHERE        (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita <= '31/10/2024'))) AND (a.Data_validita =
+                                                 (SELECT        MAX(Data_validita) AS Expr1
+                                                   FROM            dbo.Appartenenza
+                                                   WHERE        (Anno_accademico = a.Anno_accademico) AND (Cod_fiscale = a.Cod_fiscale) AND (Data_validita <= '31/10/2024'))) AND (c.Data_validita =
+                                                 (SELECT        MAX(Data_validita) AS Expr1
+                                                   FROM            dbo.Cittadinanza
+                                                   WHERE        (Cod_fiscale = c.Cod_fiscale) AND (Data_validita <= '31/10/2024'))) and Cod_tipo_esito=2
+                
+                ";
+
+            // Execute SQL Query and get results
+            DataTable queryResults = ExecuteSqlQuery(query, CONNECTION);
+
+            // Count cod_tipologia_studi = 3, 4, and 5
+            int countWithoutEsitoCondition = queryResults.AsEnumerable()
+                .Count(row => new[] { "3", "4", "5" }.Contains(row["Cod_tipologia_studi"].ToString()));
+            excelWorksheet.Cell(29, 3).Value = countWithoutEsitoCondition;
+
+
+            // Count NOTUE and also check for cod_tipologia_studi = 3, 4, and 5
+            int notUECountWithoutEsito = queryResults.AsEnumerable()
+                .Count(row => row["codeu"].ToString() == "NOTUE" &&
+                                new[] { "3", "4", "5" }.Contains(row["Cod_tipologia_studi"].ToString()));
+            excelWorksheet.Cell(29, 4).Value = notUECountWithoutEsito;
+
+
+            // Count cod_tipologia_studi = 6
+            int codTipoStudi6CountWithoutEsito = queryResults.AsEnumerable()
+                .Count(row => row["Cod_tipologia_studi"].ToString() == "6");
+            excelWorksheet.Cell(29, 5).Value = codTipoStudi6CountWithoutEsito;
+
+
+            // Count cod_tipologia_studi = 7
+            int codTipoStudi7CountWithoutEsito = queryResults.AsEnumerable()
+                .Count(row => row["Cod_tipologia_studi"].ToString() == "7");
+            excelWorksheet.Cell(29, 6).Value = codTipoStudi7CountWithoutEsito;
+
+            Logger.Log(99, folderName + ": Buoni libro", LogLevel.INFO);
+        }
+
         private void TotalSpendingBS(IXLWorksheet excelWorksheet, string code, string folderName)
         {
             string query = $@"
@@ -1263,21 +1334,21 @@ as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_
 	                    (EC.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Esiti_concorsi
-			                    WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita < '01/11/2024'))) AND 
+			                    WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita <= '01/11/2024'))) AND 
 	                    (i.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Iscrizioni
-			                    WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita < '01/11/2024'))) AND (c.Data_validita =
+			                    WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (c.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Cittadinanza
-			                    WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita < '01/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
+			                    WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Benefici_richiesti AS br
 			                    WHERE (Benefici_richiesti.num_domanda = Num_domanda) AND (Benefici_richiesti.anno_accademico = Anno_accademico) AND (Benefici_richiesti.cod_beneficio = Cod_beneficio) AND 
-							                    (Cod_beneficio = 'BS') AND (Data_validita < '01/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
+							                    (Cod_beneficio = 'BS') AND (Data_validita <= '01/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
 		                    (SELECT MAX(Data_validita) AS Expr1
 			                    FROM    dbo.Valori_calcolati AS vc
-			                    WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita < '01/11/2024')))
+			                    WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita <= '01/11/2024')))
                     ";
             // Execute SQL Query and get results
             DataTable queryResults = ExecuteSqlQuery(query, CONNECTION);
@@ -1367,21 +1438,21 @@ as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_
                             (EC.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Esiti_concorsi
-                                    WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita < '30/11/2024'))) AND 
+                                    WHERE (Anno_accademico = EC.Anno_accademico) AND (Num_domanda = EC.Num_domanda) AND (Cod_beneficio = EC.Cod_beneficio) AND (Data_validita <= '01/11/2024'))) AND 
                             (i.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Iscrizioni
-                                    WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita < '30/11/2024'))) AND (c.Data_validita =
+                                    WHERE (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (c.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Cittadinanza
-                                    WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita < '30/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
+                                    WHERE (Cod_fiscale = c.Cod_fiscale) AND (Data_validita <= '01/11/2024'))) AND (dbo.Benefici_richiesti.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Benefici_richiesti AS br
                                     WHERE (Benefici_richiesti.num_domanda = Num_domanda) AND (Benefici_richiesti.anno_accademico = Anno_accademico) AND (Benefici_richiesti.cod_beneficio = Cod_beneficio) AND 
-					                                            (Cod_beneficio = 'CI') AND (Data_validita < '30/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
+					                                            (Cod_beneficio = 'CI') AND (Data_validita <= '01/11/2024') AND (Data_fine_validita IS NULL))) AND (dbo.Valori_calcolati.Data_validita =
                                 (SELECT MAX(Data_validita) AS Expr1
                                     FROM    dbo.Valori_calcolati AS vc
-                                    WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita < '30/11/2024')))
+                                    WHERE (Anno_accademico = Valori_calcolati.Anno_accademico) AND (Num_domanda = Valori_calcolati.Num_domanda) AND (Data_validita <= '01/11/2024')))
                     ) and data_fine_validita is null";
 
             DataTable queryResults = ExecuteSqlQuery(query, CONNECTION);
@@ -1608,7 +1679,7 @@ as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_
 							                    (Anno_accademico = EC.Anno_accademico) AND 
 							                    (Num_domanda = EC.Num_domanda) AND 
 							                    (Cod_beneficio = EC.Cod_beneficio) AND 
-							                    (Data_validita < '01/11/2024'))) and 
+							                    (Data_validita <= '01/11/2024'))) and 
 					                    Iscrizioni.Data_validita = 
 						                    (Select max(data_validita) as expr1
 						                    from
@@ -1616,14 +1687,14 @@ as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_
 						                    where
 							                    Iscrizioni.Anno_accademico = i.Anno_accademico and 
 							                    Iscrizioni.Cod_fiscale = i.Cod_fiscale and
-							                    Data_validita < '01/11/2024') and 
+							                    Data_validita <= '01/11/2024') and 
 					                    Cittadinanza.Data_validita = 
 						                    (Select max(data_validita) as expr1
 						                    from
 							                    Cittadinanza c
 						                    where
 							                    Cittadinanza.Cod_fiscale = c.Cod_fiscale and
-							                    Data_validita < '01/11/2024')
+							                    Data_validita <= '01/11/2024')
 		                    )
 
                 ";
@@ -1674,7 +1745,7 @@ as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_
 	                    dbo.Decod_cittadinanza ON c.Cod_cittadinanza = dbo.Decod_cittadinanza.Cod_cittadinanza INNER JOIN
 	                    dbo.vEsiti_concorsiPL AS vEsiti_concorsiPL_1 ON d.Num_domanda = vEsiti_concorsiPL_1.num_domandaBS AND d.Anno_accademico = vEsiti_concorsiPL_1.Anno_accademico
                     WHERE        
-	                    (d.Anno_accademico = '20202021') and 
+	                    (d.Anno_accademico = '20212022') and 
 	                    i.Cod_sede_studi in ('{code}') AND 
 	                    (i.Data_validita =
 		                    (SELECT        MAX(Data_validita) AS Expr1
@@ -1715,6 +1786,71 @@ as pagato on pagato.Num_domanda=D.Num_domanda and pagato.Anno_accademico=D.Anno_
 
             Logger.Log(99, folderName + ": Spese premio laurea", LogLevel.INFO);
         }
+
+        private void TotalSpendingBL(IXLWorksheet excelWorksheet, string code, string folderName)
+        {
+            string query = $@"
+                    SELECT        
+                        a.Cod_ente, 
+                        dbo.Sede_studi.Descrizione, 
+                        i.Cod_tipologia_studi, 
+                        d.Cod_fiscale, 
+                        dbo.Tipologie_studi.Descrizione AS Expr1, 
+                        dbo.Decod_cittadinanza.Descrizione AS Expr3, 
+                        vEsiti_concorsiBL.Cod_tipo_esito, 
+                        vEsiti_concorsiBL.Imp_beneficio
+                    FROM            
+                        dbo.Domanda AS d INNER JOIN
+                        dbo.Appartenenza AS a ON d.Anno_accademico = a.Anno_accademico AND d.Cod_fiscale = a.Cod_fiscale INNER JOIN
+                        dbo.Sede_studi ON a.Cod_sede_studi = dbo.Sede_studi.Cod_sede_studi INNER JOIN
+                        dbo.Iscrizioni AS i ON d.Anno_accademico = i.Anno_accademico AND d.Cod_fiscale = i.Cod_fiscale INNER JOIN
+                        dbo.Tipologie_studi ON i.Cod_tipologia_studi = dbo.Tipologie_studi.Cod_tipologia_studi INNER JOIN
+                        dbo.Cittadinanza AS c ON d.Cod_fiscale = c.Cod_fiscale INNER JOIN
+                        dbo.Decod_cittadinanza ON c.Cod_cittadinanza = dbo.Decod_cittadinanza.Cod_cittadinanza INNER JOIN
+                        dbo.vEsiti_concorsiBL AS vEsiti_concorsiBL ON d.Num_domanda = vEsiti_concorsiBL.Num_domanda AND d.Anno_accademico = vEsiti_concorsiBL.Anno_accademico
+                    WHERE        
+                        (d.Anno_accademico = '20232024') and 
+                        i.Cod_sede_studi in ('{code}') AND 
+                        (i.Data_validita =
+                            (SELECT        MAX(Data_validita) AS Expr1
+                            FROM            dbo.Iscrizioni
+                            WHERE        (Anno_accademico = i.Anno_accademico) AND (Cod_fiscale = i.Cod_fiscale) AND (Data_validita <= '31/10/2024'))) AND 
+                        (a.Data_validita =
+                            (SELECT        MAX(Data_validita) AS Expr1
+                            FROM            dbo.Appartenenza
+                            WHERE        (Anno_accademico = a.Anno_accademico) AND (Cod_fiscale = a.Cod_fiscale) AND (Data_validita <= '31/10/2024'))) AND 
+                        (c.Data_validita =
+                            (SELECT        MAX(Data_validita) AS Expr1
+                            FROM            dbo.Cittadinanza
+                            WHERE        (Cod_fiscale = c.Cod_fiscale) AND (Data_validita <= '31/10/2024'))
+                        ) and Cod_tipo_esito=2
+                
+                ";
+
+            // Execute SQL Query and get results
+            DataTable queryResults = ExecuteSqlQuery(query, CONNECTION);
+
+            // Summing the Imp_beneficio values for rows where Cod_tipologia_studi is one of the specified values
+            decimal sumImpBeneficioForCodTipoStudi = queryResults.AsEnumerable()
+                .Where(row => new[] { "3", "4", "5", "8", "10" }.Contains(row["Cod_tipologia_studi"].ToString()))
+                .Sum(row => row.Field<decimal>("Imp_beneficio"));
+            excelWorksheet.Cell(17, 3).Value = sumImpBeneficioForCodTipoStudi;
+
+            // Summing the Imp_beneficio values for rows where Cod_tipologia_studi is one of the specified values
+            decimal sumImpBeneficioForCodTipoStudi6 = queryResults.AsEnumerable()
+                .Where(row => new[] { "6" }.Contains(row["Cod_tipologia_studi"].ToString()))
+                .Sum(row => row.Field<decimal>("Imp_beneficio"));
+            excelWorksheet.Cell(17, 4).Value = sumImpBeneficioForCodTipoStudi6;
+
+            // Summing the Imp_beneficio values for rows where Cod_tipologia_studi is one of the specified values
+            decimal sumImpBeneficioForCodTipoStudi7 = queryResults.AsEnumerable()
+                .Where(row => new[] { "7" }.Contains(row["Cod_tipologia_studi"].ToString()))
+                .Sum(row => row.Field<decimal>("Imp_beneficio"));
+            excelWorksheet.Cell(17, 5).Value = sumImpBeneficioForCodTipoStudi7;
+
+            Logger.Log(99, folderName + ": Spese buoni libro", LogLevel.INFO);
+        }
+
 
         private static DataTable ExecuteSqlQuery(string query, SqlConnection conn)
         {

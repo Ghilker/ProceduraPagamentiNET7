@@ -53,6 +53,7 @@ namespace ProcedureNet7
                     _blocksYear = blocksYear.Text,
                     _blocksUsername = blocksUsername.Text,
                     _blocksGiaRimossi = blocksGiaRimossi.Checked,
+                    _blocksInsertMessaggio = blocksInsertMessaggioCheck.Checked,
                 };
                 argsValidation.Validate(blocchiArgs);
                 ProceduraBlocchi proceduraBlocchi = new(_masterForm, mainConnection);
@@ -94,14 +95,13 @@ namespace ProcedureNet7
 
         private static DataTable CreateTemplateDataTable()
         {
-            // Create a new DataTable and add columns
             DataTable dataTable = new DataTable("Template");
             dataTable.Columns.Add("Cod_fiscale", typeof(string));
             dataTable.Columns.Add("Blocchi da togliere", typeof(string));
             dataTable.Columns.Add("Blocchi da mettere", typeof(string));
+            dataTable.Columns.Add("Messaggi da inviare (opzionale)", typeof(string));
 
-            // Add some sample rows (optional)
-            dataTable.Rows.Add("XXXXXXXXXXXXXXXX", "VBA;BPP;IMD", "BVI;DVI");
+            dataTable.Rows.Add("XXXXXXXXXXXXXXXX", "VBA;BPP;IMD", "BVI;DVI", "#MotivoBVI#MotivoDVI");
 
             return dataTable;
         }
