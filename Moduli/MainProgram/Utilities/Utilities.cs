@@ -1,4 +1,5 @@
 ﻿using ClosedXML.Excel;
+using Microsoft.VisualBasic.FileIO;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -15,135 +16,104 @@ namespace ProcedureNet7
 {
     public static class Utilities
     {
-        public static DataTable ReadExcelToDataTable(string filePath, bool firstRowAsData = false)
+        public static DataTable ReadExcelToDataTable(string filePath, bool useFirstRowAsData = false)
         {
-            DataTable dataTable = new();
-            Excel.Application? excelApp = null;
-            Excel.Workbooks? workbooks = null;
-            Excel.Workbook? workbook = null;
-            Excel.Worksheet? worksheet = null;
-            Excel.Range? range = null;
+            // Create a new DataTable
+            DataTable returnDataTable = new DataTable();
 
-            Logger.LogDebug(null, "Initializing Excel application.");
-
-            try
+            // Load the workbook
+            using (XLWorkbook workbook = new XLWorkbook(filePath))
             {
-                excelApp = new Excel.Application();
-                if (excelApp == null)
-                {
-                    Logger.LogError(null, "Excel application could not be started.");
-                    return new DataTable();
-                }
-
-                workbooks = excelApp.Workbooks;
-                workbook = workbooks.Open(filePath);
-                if (workbook == null)
-                {
-                    Logger.LogError(null, "Failed to open workbook.");
-                    return new DataTable();
-                }
-
-                worksheet = workbook.Sheets[1];
+                // Get the first worksheet
+                var worksheet = workbook.Worksheets.FirstOrDefault();
                 if (worksheet == null)
+                    throw new Exception("No worksheet found in the Excel file.");
+
+                // 1) Figure out how many columns are in the "used" range 
+                //    (this ensures we pick up empty columns within the used region).
+                var range = worksheet.RangeUsed();
+                int lastColumnNumber = range.LastColumnUsed().ColumnNumber();
+                int lastRowNumber = range.LastRowUsed().RowNumber();
+
+                // 2) Iterate row by row.
+                for (int rowIdx = 1; rowIdx <= lastRowNumber; rowIdx++)
                 {
-                    Logger.LogError(null, "Failed to get the first worksheet.");
-                    return new DataTable();
-                }
+                    // Grab the row object
+                    var row = worksheet.Row(rowIdx);
 
-                range = worksheet.UsedRange;
-                if (range == null)
-                {
-                    Logger.LogError(null, "Failed to get used range of worksheet.");
-                    return new DataTable();
-                }
-
-                object[,] data = range.Value2;
-                if (data == null)
-                {
-                    Logger.LogWarning(null, "No data found in Excel range.");
-                    return new DataTable(); // Return an empty dataTable if no data
-                }
-
-                int columnsCount = range.Columns.Count;
-                int rowsCount = range.Rows.Count;
-                Logger.LogDebug(null, $"Preparing to process {columnsCount} columns and {rowsCount - (firstRowAsData ? 0 : 1)} rows.");
-
-                Dictionary<string, int> columnNames = new();
-
-                // Adjust start row based on whether the first row is treated as data
-                int startRow = firstRowAsData ? 1 : 2;
-
-                // Process column names
-                for (int col = 1; col <= columnsCount; col++)
-                {
-                    string columnName;
-                    if (firstRowAsData)
+                    // If this is the first row AND user doesn't want it as data 
+                    // => interpret it as column headers
+                    if (rowIdx == 1 && !useFirstRowAsData)
                     {
-                        // Use default column names if the first row is treated as data
-                        columnName = $"Column{col}";
+                        for (int colIdx = 1; colIdx <= lastColumnNumber; colIdx++)
+                        {
+                            string originalHeader = row.Cell(colIdx).GetValue<string>();
+                            string sanitizedHeader = SanitizeColumnName(originalHeader);
+                            returnDataTable.Columns.Add(sanitizedHeader);
+                        }
                     }
                     else
                     {
-                        // Use the first row for column names if not treated as data
-                        string originalColumnName = data[1, col]?.ToString() ?? $"Column{col}";
-                        columnName = SanitizeColumnName(originalColumnName);
-
-                        if (columnNames.TryGetValue(columnName, out int value))
+                        // If the DataTable has no columns yet (meaning the first row 
+                        // is actually data), create columns programmatically.
+                        if (returnDataTable.Columns.Count == 0)
                         {
-                            columnNames[columnName] = ++value;
-                            columnName += $"_{value}";
+                            for (int colIdx = 1; colIdx <= lastColumnNumber; colIdx++)
+                            {
+                                returnDataTable.Columns.Add("Column" + colIdx);
+                            }
                         }
-                        else
+
+                        // Create a new DataRow to fill
+                        DataRow dataRow = returnDataTable.NewRow();
+
+                        // Read every column in the row, including empty ones
+                        for (int colIdx = 1; colIdx <= lastColumnNumber; colIdx++)
                         {
-                            columnNames[columnName] = 0;
+                            dataRow[colIdx - 1] = row.Cell(colIdx).GetValue<string>() ?? string.Empty;
                         }
-                    }
-                    dataTable.Columns.Add(columnName);
-                    Logger.LogDebug(null, $"Column added: {columnName}");
-                }
 
-                // Process data rows
-                for (int row = startRow; row <= rowsCount; row++)
-                {
-                    var dataRow = dataTable.NewRow();
-                    for (int col = 1; col <= columnsCount; col++)
-                    {
-                        dataRow[col - 1] = data[row, col]?.ToString() ?? string.Empty;
+                        // Add the row to the DataTable
+                        returnDataTable.Rows.Add(dataRow);
                     }
-                    dataTable.Rows.Add(dataRow);
                 }
-                Logger.LogDebug(null, "Data rows processed successfully.");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(null, $"An error occurred: {ex.Message}");
-                throw; // Re-throwing the exception after logging
-            }
-            finally
-            {
-                // Cleanup
-                if (range != null) Marshal.ReleaseComObject(range);
-                if (worksheet != null) Marshal.ReleaseComObject(worksheet);
-                if (workbook != null)
-                {
-                    workbook.Close(false);
-                    Marshal.ReleaseComObject(workbook);
-                }
-                if (workbooks != null)
-                {
-                    workbooks.Close();
-                    Marshal.ReleaseComObject(workbooks);
-                }
-                if (excelApp != null)
-                {
-                    excelApp.Quit();
-                    Marshal.ReleaseComObject(excelApp);
-                }
-                Logger.LogDebug(null, "Excel resources cleaned up successfully.");
             }
 
-            return dataTable;
+            return returnDataTable;
         }
+
+
+        public static DataTable CsvToDataTable(string csvFilePath)
+        {
+            DataTable returnDataTable = new DataTable();
+
+            using (TextFieldParser parser = new TextFieldParser(csvFilePath))
+            {
+                parser.Delimiters = new[] { ";" };
+                parser.HasFieldsEnclosedInQuotes = true;
+
+                // Assume first row is header
+                string[] headers = parser.ReadFields();
+                if (headers != null)
+                {
+                    foreach (string header in headers)
+                    {
+                        string sanitizedHeader = SanitizeColumnName(header);
+                        returnDataTable.Columns.Add(sanitizedHeader);
+                    }
+                }
+
+                // Read remaining rows
+                while (!parser.EndOfData)
+                {
+                    string[] fields = parser.ReadFields();
+                    returnDataTable.Rows.Add(fields);
+                }
+            }
+
+            return returnDataTable;
+        }
+
 
         public static string SanitizeColumnName(string columnName)
         {
@@ -233,46 +203,90 @@ namespace ProcedureNet7
 
         public static string ExportDataTableToExcel(DataTable dataTable, string folderPath, bool includeHeaders = true, string fileName = "")
         {
-            if (dataTable == null || dataTable.Rows.Count == 0 || string.IsNullOrWhiteSpace(folderPath))
-                throw new ArgumentException("Invalid input parameters.");
-
+            // Generate or sanitize the file name
             fileName = GenerateFileName(fileName);
+
+            // Combine folder path and file name
             string fullPath = Path.Combine(folderPath, fileName);
-            Directory.CreateDirectory(folderPath); // Ensure the directory exists
 
-            Excel.Application excelApp = new();
-            Excel.Workbooks workbooks = null;
-            Excel._Workbook workbook = null;
-            Excel._Worksheet worksheet = null;
-
-            try
+            // Create a new workbook
+            using (var workbook = new XLWorkbook())
             {
-                workbooks = excelApp.Workbooks;
-                workbook = workbooks.Add();
-                worksheet = (Excel._Worksheet)workbook.ActiveSheet!;
+                // Add a worksheet (optionally, you can name it based on something else)
+                var worksheet = workbook.Worksheets.Add("Sheet1");
 
-                // Optionally, add column headers
-                if (includeHeaders && worksheet != null)
-                    AddHeaders(worksheet, dataTable);
+                int currentRow = 1;
+                int totalColumns = dataTable.Columns.Count;
 
-                // Add data rows
-                if (worksheet != null)
-                    AddData(worksheet, dataTable, includeHeaders);
+                // If we want column headers
+                if (includeHeaders)
+                {
+                    for (int col = 0; col < totalColumns; col++)
+                    {
+                        worksheet.Cell(currentRow, col + 1).Value = dataTable.Columns[col].ColumnName;
+                    }
+                    currentRow++;
+                }
 
-                // Save the Excel file
+                // Populate rows
+                foreach (DataRow row in dataTable.Rows)
+                {
+                    for (int col = 0; col < totalColumns; col++)
+                    {
+                        worksheet.Cell(currentRow, col + 1).Value = row[col]?.ToString() ?? string.Empty;
+                    }
+                    currentRow++;
+                }
+
+                // Save the workbook to the specified path
                 workbook.SaveAs(fullPath);
-                return fullPath;
             }
-            catch (Exception ex)
-            {
-                Logger.LogError(null, $"An error occurred while exporting data to Excel: {ex.Message}");
-                throw; // Re-throwing the exception after logging
-            }
-            finally
-            {
-                CleanUp(worksheet, workbook, workbooks, excelApp);
-            }
+
+            return fullPath;
         }
+
+        /* public static string ExportDataTableToExcel(DataTable dataTable, string folderPath, bool includeHeaders = true, string fileName = "")
+         {
+             if (dataTable == null || dataTable.Rows.Count == 0 || string.IsNullOrWhiteSpace(folderPath))
+                 throw new ArgumentException("Invalid input parameters.");
+
+             fileName = GenerateFileName(fileName);
+             string fullPath = Path.Combine(folderPath, fileName);
+             Directory.CreateDirectory(folderPath); // Ensure the directory exists
+
+             Excel.Application excelApp = new();
+             Excel.Workbooks workbooks = null;
+             Excel._Workbook workbook = null;
+             Excel._Worksheet worksheet = null;
+
+             try
+             {
+                 workbooks = excelApp.Workbooks;
+                 workbook = workbooks.Add();
+                 worksheet = (Excel._Worksheet)workbook.ActiveSheet!;
+
+                 // Optionally, add column headers
+                 if (includeHeaders && worksheet != null)
+                     AddHeaders(worksheet, dataTable);
+
+                 // Add data rows
+                 if (worksheet != null)
+                     AddData(worksheet, dataTable, includeHeaders);
+
+                 // Save the Excel file
+                 workbook.SaveAs(fullPath);
+                 return fullPath;
+             }
+             catch (Exception ex)
+             {
+                 Logger.LogError(null, $"An error occurred while exporting data to Excel: {ex.Message}");
+                 throw; // Re-throwing the exception after logging
+             }
+             finally
+             {
+                 CleanUp(worksheet, workbook, workbooks, excelApp);
+             }
+         }*/
 
         private static void CleanUp(Excel._Worksheet worksheet, Excel._Workbook workbook, Excel.Workbooks workbooks, Excel.Application excelApp)
         {

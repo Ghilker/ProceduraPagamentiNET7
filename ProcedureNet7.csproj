@@ -68,6 +68,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Update="Moduli\Controlli\ProceduraControlloStatusSede\FormControlloStatusSede.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Moduli\Varie\ProceduraControlloIBAN\FormControlloIBAN.cs">
       <SubType>Form</SubType>
     </Compile>

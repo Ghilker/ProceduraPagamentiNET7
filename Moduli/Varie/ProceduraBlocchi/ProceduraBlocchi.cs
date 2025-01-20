@@ -126,7 +126,7 @@ namespace ProcedureNet7
                 {
                     InsertMessagesPerStudent(CONNECTION, transaction);
                 }
-
+                Logger.LogInfo(100, "Procedura terminata");
                 transaction.Commit();
             }
             catch (Exception ex)

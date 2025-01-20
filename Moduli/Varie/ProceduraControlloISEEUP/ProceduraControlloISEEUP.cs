@@ -409,8 +409,26 @@ namespace ProcedureNet7
                     }
                 }
 
-                // Commit the transaction
-                sqlTransaction.Commit();
+                _ = _masterForm.Invoke((MethodInvoker)delegate
+                {
+                    DialogResult result = MessageBox.Show(
+                        _masterForm,
+                        "Completare procedura?",
+                        "Attenzione",
+                        MessageBoxButtons.OKCancel,
+                        MessageBoxIcon.Question
+                    );
+
+                    if (result == DialogResult.OK)
+                    {
+                        sqlTransaction?.Commit();
+                    }
+                    else
+                    {
+                        Logger.LogInfo(null, "Procedura interrotta dall'utente.");
+                        sqlTransaction?.Rollback();
+                    }
+                });
 
                 Logger.LogInfo(100, "Fine lavorazione");
             }

@@ -248,6 +248,10 @@ namespace ProcedureNet7
                             FormControlloIBAN controlloIBAN = new FormControlloIBAN(this);
                             ShowFormInPanel(controlloIBAN);
                             break;
+                        case ProcedureVerifiche.ControlloStatusSede:
+                            FormControlloStatusSede controlloStatusSede = new FormControlloStatusSede(this);
+                            ShowFormInPanel(controlloStatusSede);
+                            break;
                     }
                 }
 #endif
@@ -346,6 +350,8 @@ namespace ProcedureNet7
             ControlloID,
             [ProcedureCategory("Verifiche", "Programmatore")]
             ControlloIBAN,
+            [ProcedureCategory("Verifiche", "Programmatore")]
+            ControlloStatusSede,
         }
 
     }

@@ -1456,7 +1456,7 @@ namespace ProcedureNet7
                         {
                             studente.blocchiDaTogliere.Add("VAI");
                         }
-                        studente.motivazioniBlocchiInseriti.Add("VAI", $"Anno corso riscontrato {studente.annoCorsoUni} -  Anno corso dichiarato {studente.annoCorsoUni}");
+                        studente.motivazioniBlocchiInseriti.Add("IAD", $"Anno corso riscontrato {studente.annoCorsoUni} -  Anno corso dichiarato {studente.annoCorsoDic}");
                         studente.blocchiDaMettere.Add("IAD");
                         studente.incongruenzeDaMettere.Add("63");
                     }
@@ -1494,7 +1494,7 @@ namespace ProcedureNet7
                     {
                         if (!studente.blocchiPresenti.ContainsKey("IAD") && !studente.blocchiDaMettere.Contains("IAD"))
                         {
-                            studente.motivazioniBlocchiInseriti.Add("IAD", $"Anno prima immatricolazione riscontrato {studente.aaImmatricolazioneUni}");
+                            studente.motivazioniBlocchiInseriti.Add("VAI", $"Anno prima immatricolazione riscontrato {studente.aaImmatricolazioneUni}");
                             studente.blocchiDaMettere.Add("VAI");
                         }
                         studente.incongruenzeDaMettere.Add("85");
@@ -1529,7 +1529,7 @@ namespace ProcedureNet7
                     if (studente.creditiDaRinunciaDic == 0 && studente.creditiConvalidatiUni > 0)
                     {
                         studente.blocchiDaMettere.Add("CRC");
-                        studente.motivazioniBlocchiInseriti.Add("CRC", $"CFU convalidati riscontrati {studente.creditiConvalidatiUni} -  CFU convalidati dichiarati {studente.creditiDaRinunciaDic}");
+                        studente.motivazioniBlocchiInseriti.Add("CRC", $"Riscontrati crediti convalidati in carriera, è in corso la verifica con l'ateneo");
                     }
 
                     if (checkStem && studente.sessoDic == "F" && studente.stemDic)

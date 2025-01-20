@@ -1780,9 +1780,9 @@ namespace ProcedureNet7
             {
                 PopulateStudentReversali();
                 PopulateStudentDetrazioni();
+                PopulateNucleoFamiliare();
                 if (!isIntegrazione)
                 {
-                    PopulateNucleoFamiliare();
                     PopulateStudentiAssegnazioni();
                 }
             }
@@ -2751,7 +2751,7 @@ namespace ProcedureNet7
                 {
                     StudentePagam studente = pair.Value;
 
-                    if (studente.codFiscale == "NSTVSS98C59G015C")
+                    if (studente.codFiscale == "BDLKJD99R57Z100X")
                     {
                         string stest = "";
                     }
@@ -2960,41 +2960,6 @@ namespace ProcedureNet7
                         {
                             importoDaPagare = importoMassimo * 0.5;
                             importoMassimo *= 0.5;
-
-                            bool hasDomicilio = studente.domicilioCheck;
-                            bool isMoreThanHalfAbroad = studente.numeroComponentiNucleoFamiliareEstero >= (studente.numeroComponentiNucleoFamiliare / 2.0);
-                            if (studente.statusSede == "B" && studente.forzaturaStatusSede != "B")
-                            {
-                                if (!studente.rifugiato && studente.esitoPA == 0 && !isMoreThanHalfAbroad && studente.tipoCorso != 6)
-                                {
-                                    if (!hasDomicilio || (hasDomicilio && (!studente.contrattoValido || (studente.domicilio.prorogatoLocazione && !studente.prorogaValido))))
-                                    {
-                                        importoDaPagare = importoDaPagare / 3 * 2;
-                                        importoMassimo = importoMassimo / 3 * 2;
-
-                                        string messaggio = string.Empty;
-                                        if (studente.domicilio == null)
-                                        {
-                                            messaggio += "#Nessun domicilio trovato";
-                                        }
-                                        if (!hasDomicilio)
-                                        {
-                                            messaggio += "#Durata contratto minore dieci mesi";
-                                        }
-                                        if (!studente.contrattoValido && studente.domicilio != null)
-                                        {
-                                            messaggio += $"#Serie contratto non valida: {studente.domicilio.codiceSerieLocazione}";
-                                        }
-                                        if (studente.domicilio != null && studente.domicilio.prorogatoLocazione && !studente.prorogaValido)
-                                        {
-                                            messaggio += $"#Serie proroga non valida: Contratto {studente.domicilio.codiceSerieLocazione} - Proroga {studente.domicilio.codiceSerieProrogaLocazione}";
-                                        }
-
-                                        studentiPagatiComePendolari.Add((studente.codFiscale, messaggio));
-                                        studente.SetPagatoPendolare(true);
-                                    }
-                                }
-                            }
                         }
                     }
                     else if (tipoBeneficio == "BS" && !isTR)
@@ -3044,6 +3009,15 @@ namespace ProcedureNet7
                             studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
                             return;
                         }
+                    }
+                    if (!isTR)
+                    {
+                        selectedAcademicProcessor.AdjustPendolarePayment(
+                            studente,
+                            ref importoDaPagare,
+                            ref importoMassimo,
+                            studentiPagatiComePendolari
+                        );
                     }
 
                     if (Math.Abs(importiPagati - (importoMassimo - importoReversali)) < 5)
