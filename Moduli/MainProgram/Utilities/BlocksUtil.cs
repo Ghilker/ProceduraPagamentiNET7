@@ -440,6 +440,96 @@ namespace ProcedureNet7
             return result;
         }
 
+        /// <summary>
+        /// Returns a Dictionary for the given CF list, indicating whether an active block exists (true/false) 
+        /// for each CF. 
+        /// </summary>
+        /// <param name="conn">An open SqlConnection.</param>
+        /// <param name="transaction">An existing SqlTransaction, or null if not using transactions.</param>
+        /// <param name="codFiscaleList">List of CFs to check.</param>
+        /// <param name="blockCode">The block code to look for.</param>
+        /// <param name="annoAccademico">Academic year to filter on.</param>
+        /// <returns>Dictionary where key=CF, value=true if an active block is found, false otherwise.</returns>
+        public static Dictionary<string, bool> HasBlock(
+            SqlConnection conn,
+            SqlTransaction transaction,
+            List<string> codFiscaleList,
+            string blockCode,
+            string annoAccademico)
+        {
+            // Prepare the result with default "false" for every CF
+            var result = codFiscaleList
+                .Distinct() // ensure no duplicates cause key collisions
+                .ToDictionary(cf => cf, cf => false);
+
+            if (codFiscaleList == null || codFiscaleList.Count == 0)
+            {
+                return result; // nothing to do
+            }
+
+            // 1) Create temp table and insert CFs
+            CreateAndPopulateTempTable(conn, transaction, codFiscaleList);
+
+            // 2) Query for CFs which currently have an active block
+            string sql = @"
+            SELECT DISTINCT d.Cod_fiscale
+            FROM dbo.Domanda d
+            INNER JOIN dbo.Motivazioni_blocco_pagamenti mbp ON d.Num_domanda = mbp.Num_domanda and d.anno_accademico = mbp.anno_accademico
+            INNER JOIN #CodFiscaleTempTable cf
+                ON cf.CodFiscale = d.Cod_fiscale
+            WHERE mbp.Cod_tipologia_blocco = @blockCode
+              AND mbp.Blocco_pagamento_attivo = 1
+              AND mbp.Data_fine_validita IS NULL
+              AND d.Anno_accademico = @annoAccademico
+              AND d.tipo_bando IN ('lz','l2');
+        ";
+
+            using (SqlCommand cmd = new SqlCommand(sql, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@annoAccademico", annoAccademico);
+                cmd.Parameters.AddWithValue("@blockCode", blockCode);
+
+                using (SqlDataReader rdr = cmd.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        string cfWithBlock = rdr.GetString(0);
+                        if (result.ContainsKey(cfWithBlock))
+                        {
+                            result[cfWithBlock] = true;
+                        }
+                    }
+                }
+            }
+
+            // 3) Drop temp table
+            DropTempTable(conn, transaction);
+
+            // 4) Return dictionary of CF -> bool
+            return result;
+        }
+
+        /// <summary>
+        /// Overload for a single CF check. 
+        /// </summary>
+        /// <param name="conn">An open SqlConnection.</param>
+        /// <param name="transaction">An existing SqlTransaction, or null if not using transactions.</param>
+        /// <param name="codFiscale">Single CF to check.</param>
+        /// <param name="blockCode">The block code to look for.</param>
+        /// <param name="annoAccademico">Academic year to filter on.</param>
+        /// <returns>True if the CF has an active block, otherwise false.</returns>
+        public static bool HasBlock(
+            SqlConnection conn,
+            SqlTransaction transaction,
+            string codFiscale,
+            string blockCode,
+            string annoAccademico)
+        {
+            // Just reuse the bulk logic with a single item
+            var singleList = new List<string> { codFiscale };
+            Dictionary<string, bool> resultDict = HasBlock(conn, transaction, singleList, blockCode, annoAccademico);
+            return resultDict[codFiscale];
+        }
 
         /// <summary>
         /// Create a #CodFiscaleTempTable with a single NVARCHAR(16) column, then bulk insert the CFs.

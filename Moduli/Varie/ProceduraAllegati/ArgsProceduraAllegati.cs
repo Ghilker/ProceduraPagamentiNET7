@@ -23,7 +23,6 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
         public string _selectedTipoAllegato { get; set; }
         public string _selectedTipoAllegatoName { get; set; }
 
-        [Required(ErrorMessage = "Indicare il tipo di beneficio")]
         public string _selectedTipoBeneficio { get; set; }
 
         public ArgsProceduraAllegati()

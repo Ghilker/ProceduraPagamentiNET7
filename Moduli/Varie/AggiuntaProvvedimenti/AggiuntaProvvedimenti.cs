@@ -157,7 +157,7 @@ namespace ProcedureNet7
                 });
                 foreach (string excelFilePath in excelFilePaths)
                 {
-                    if (excelFilePath.StartsWith("~"))
+                    if (excelFilePath.StartsWith("~") || excelFilePath.Contains("Riepilogo", StringComparison.InvariantCultureIgnoreCase))
                     {
                         continue;
                     }
@@ -165,7 +165,7 @@ namespace ProcedureNet7
                     DataGridView? studentsGridView = null;
                     if (beneficioProvvedimento == "BS" || beneficioProvvedimento == "CI")
                     {
-                        MessageBox.Show("Selezionare il primo numero domanda", "Seleziona", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(_masterForm, "Selezionare il primo numero domanda", "Seleziona", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         studentsGridView = Utilities.CreateDataGridView(allStudentsData, _masterForm, provvedimentiPanel, OnNumDomandaClicked);
                     }
                     else

@@ -161,7 +161,7 @@ namespace ProcedureNet7
                 case "05":
                 case "09":
                 case "13":
-                    panelInserimentoImpegni.Visible = true;
+                    panelInserimentoImpegni.Visible = false;
                     break;
                 case "03":
                 case "04":

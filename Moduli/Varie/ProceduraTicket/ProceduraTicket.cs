@@ -5,13 +5,14 @@ using System.Net;
 using System.Net.Mail;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Windows.Forms;
 using Excel = Microsoft.Office.Interop.Excel;
 
 namespace ProcedureNet7
 {
     internal class ProceduraTicket : BaseProcedure<ArgsProceduraTicket>
     {
-        private bool _deleteChiusi;
+        private bool _isFileWithMessagges;
         private bool _deleteAnniPrecedenti;
         private bool _sendMail;
 
@@ -19,15 +20,13 @@ namespace ProcedureNet7
 
         public override void RunProcedure(ArgsProceduraTicket args)
         {
-            _deleteChiusi = args._ticketChecks[0];
+            _isFileWithMessagges = args._ticketChecks[0];
             _deleteAnniPrecedenti = args._ticketChecks[1];
             _sendMail = args._ticketChecks[2];
             string ticketFilePath = args._ticketFilePath;
             string mailFilePath = args._mailFilePath;
             string senderMail = string.Empty;
             string senderPassword = string.Empty;
-
-
 
             _masterForm.inProcedure = true;
             try
@@ -43,7 +42,14 @@ namespace ProcedureNet7
                     "Contributi Alloggio",
                     "Posti Alloggio",
                     "MENSA",
-                    "Accettazione Posto Alloggio"
+                    "Accettazione Posto Alloggio",
+                    "RIMBORSO DEPOSITO CAUZIONALE",
+                    "AREA 8",
+                    "Ufficio Inclusione",
+                    "URP",
+                    "CERTIFICAZIONE UNICA",
+                    "Portafuturo",
+                    "RIMBORSO DEPOSITO CAUZIONALE-Non pi� attiva",
                 };
 
                 // 2. Filter the table in one shot
@@ -56,11 +62,16 @@ namespace ProcedureNet7
                         && !unwantedCategories.Contains(row.Field<string>("CATEGORIA"))
 
                         // AND AZIONE != "PRESA_IN_CARICO"
-                        && !row.Field<string>("AZIONE").Equals("PRESA_IN_CARICO", StringComparison.OrdinalIgnoreCase)
+                        && (!_isFileWithMessagges
+                            ? !row.Field<string>("AZIONE").Equals("PRESA_IN_CARICO", StringComparison.OrdinalIgnoreCase)
+                            : true)
 
-                        // AND NUM_RICHIESTE_STUDENTE != 0
-                        && row.Field<string>("NUM_RICHIESTE_STUDENTE") != "0"
+                    // Conditional check based on isMessage
+                        && (_isFileWithMessagges
+                            ? string.IsNullOrWhiteSpace(row.Field<string>("PRIMO_MSG_OPERATORE"))
+                            : row.Field<string>("NUM_RICHIESTE_STUDENTE") != "0")
                     );
+
 
                 // 3. Copy the filtered rows back to a DataTable
                 //    (Handle case where all rows are removed)
@@ -74,18 +85,31 @@ namespace ProcedureNet7
                 }
 
                 // Define an array of columns to remove
-                string[] columnsToRemove = new[]
+                string[] columnsToRemove;
+                if (_isFileWithMessagges)
                 {
-                    "NREC",
-                    "NUM_TICKET_CREATI_STUDENTE",
-                    "NUM_RICHIESTE_STUDENTE",
-                    "NUM_RISPOSTE_OPERATORE",
-                    "DATA_ULTIMO_MESSAGGIO",
-                    "AZIONE",
-                    "UID",
-                    "DATA_LOG"
-                };
-
+                    columnsToRemove = new[]
+                    {
+                        "NREC",
+                        "PRIMO_MSG_OPERATORE",
+                        "UID",
+                        "DATA_LOG"
+                    };
+                }
+                else
+                {
+                    columnsToRemove = new[]
+                    {
+                        "NREC",
+                        "NUM_TICKET_CREATI_STUDENTE",
+                        "NUM_RICHIESTE_STUDENTE",
+                        "NUM_RISPOSTE_OPERATORE",
+                        "DATA_ULTIMO_MESSAGGIO",
+                        "AZIONE",
+                        "UID",
+                        "DATA_LOG"
+                    };
+                }
                 // Loop through each column name and remove if it exists in the DataTable
                 foreach (string columnName in columnsToRemove)
                 {
@@ -150,18 +174,29 @@ namespace ProcedureNet7
                         EnableSsl = true
                     };
 
+                    string messageBody = @"
+                        <p>Buongiorno,</p>
+                        <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/09/2024 
+                        con gli esiti di borsa e i blocchi presenti, integrato con le università
+                        di appartenenza dello studente.</p>";
+
+                    if (_isFileWithMessagges)
+                    {
+                        messageBody += @"<p>I ticket contengono anche il primo messaggio che lo studente 
+                        ha inviato così da facilitare la lavorazione.</p>";
+                    }
+
+                    messageBody += @"
+                        <p>Per domande, chiarimenti e suggerimenti resto a disposizione.</p>
+                        <p>Buona giornata e buon lavoro.</p>";
+
                     // 3) Build the MailMessage
                     MailMessage mailMessage = new()
                     {
                         // You can also set From = new MailAddress(senderMail) if desired
                         From = new MailAddress("giacomo.pavone@laziodisco.it"),
                         Subject = $"Estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
-                        Body = @"<p>Buongiorno,</p>
-                 <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/09/2024 
-                    con gli esiti di borsa e i blocchi presenti, integrato con le università
-                    di appartenenza dello studente.</p>
-                 <p>Per domande, chiarimenti e suggerimenti resto a disposizione.</p>
-                 <p>Buona giornata e buon lavoro.</p>",
+                        Body = messageBody,
                         IsBodyHtml = true
                     };
 
@@ -229,7 +264,6 @@ namespace ProcedureNet7
             }
 
             // 2) Create a temporary table in SQL
-            //    We assume CODFISC is at most 16-20 characters; adjust size if needed.
             using (SqlCommand cmdCreateTemp = new SqlCommand(
                 @"IF OBJECT_ID('tempdb..#tmpCodFisc') IS NOT NULL
                      DROP TABLE #tmpCodFisc;
@@ -251,36 +285,66 @@ namespace ProcedureNet7
                 bulkCopy.WriteToServer(codFiscTable);
             }
 
-            // 4) Build the SQL query that joins #tmpCodFisc to your other tables
+            // 4) Build the SQL query that incorporates the updated temp table logic
             string sqlQuery = @"
-                SELECT 
-                    Domanda.Num_domanda, 
-                    Domanda.Cod_fiscale, 
-                    vEsiti_concorsiBS.esito_BS as Esito_BS_24_25, 
-                    vEsiti_concorsiPA.esito_PA as Esito_PA_24_25, 
-                    dbo.SlashDescrBlocchi(Domanda.Num_domanda, Domanda.Anno_accademico, 'BS') AS Blocchi_24_25, 
-                    Sede_studi.Descrizione AS Sede_Università_24_25
-                FROM #tmpCodFisc t
-                    INNER JOIN Domanda
-                        ON Domanda.Cod_fiscale = t.Cod_fiscale
-                    LEFT JOIN vEsiti_concorsiBS
-                        ON Domanda.Anno_accademico = vEsiti_concorsiBS.Anno_accademico
-                        AND Domanda.Num_domanda = vEsiti_concorsiBS.Num_domanda
-                    LEFT JOIN vEsiti_concorsiPA
-                        ON Domanda.Anno_accademico = vEsiti_concorsiPA.Anno_accademico
-                        AND Domanda.Num_domanda = vEsiti_concorsiPA.Num_domanda
-                    INNER JOIN vIscrizioni
-                        ON vIscrizioni.Cod_fiscale = Domanda.Cod_fiscale
-                        AND vIscrizioni.Anno_accademico = Domanda.Anno_accademico
-                    INNER JOIN Sede_studi
-                        ON Sede_studi.Cod_sede_studi = vIscrizioni.Cod_sede_studi
+                -- Materialize Temp Tables
+                SELECT Num_domanda, esito_BS
+                INTO #Temp_vEsiti_concorsiBS
+                FROM vEsiti_concorsiBS
+                WHERE Anno_accademico = '20242025';
+
+                SELECT Num_domanda, esito_PA
+                INTO #Temp_vEsiti_concorsiPA
+                FROM vEsiti_concorsiPA
+                WHERE Anno_accademico = '20242025';
+
+                SELECT Cod_fiscale, Cod_sede_studi
+                INTO #Temp_vIscrizioni
+                FROM vIscrizioni
+                WHERE Anno_accademico = '20242025' AND tipo_bando = 'lz';
+
+                SELECT
+                    MBP.num_domanda,
+                    STRING_AGG(TMP2.Descrizione, '#') AS Blocchi
+                INTO #Temp_CTE_Blocchi
+                FROM Motivazioni_blocco_pagamenti AS MBP
+                INNER JOIN Tipologie_motivazioni_blocco_pag AS TMP2
+                    ON MBP.Cod_tipologia_blocco = TMP2.Cod_tipologia_blocco
+                WHERE MBP.blocco_pagamento_attivo = '1' AND MBP.Anno_accademico = '20242025'
+                GROUP BY MBP.num_domanda;
+
+                -- Final Query with temp tables
+                SELECT
+                    d.Num_domanda,
+                    d.Cod_fiscale,
+                    COALESCE(vBS.esito_BS, '')         AS Esito_BS_24_25,
+                    COALESCE(vPA.esito_PA, '')         AS Esito_PA_24_25,
+                    COALESCE(mbpagg.Blocchi, '')       AS Blocchi_24_25,
+                    ss.Descrizione                     AS Sede_Università_24_25
+                FROM Domanda AS d
+                    INNER JOIN #tmpCodFisc AS t
+                        ON d.Cod_fiscale = t.Cod_fiscale
+                    LEFT JOIN #Temp_vEsiti_concorsiBS  AS vBS
+                        ON d.Num_domanda = vBS.Num_domanda
+                    LEFT JOIN #Temp_vEsiti_concorsiPA  AS vPA
+                        ON d.Num_domanda = vPA.Num_domanda
+                    INNER JOIN #Temp_vIscrizioni       AS vi
+                        ON vi.Cod_fiscale = d.Cod_fiscale
+                    INNER JOIN Sede_studi           AS ss
+                        ON ss.Cod_sede_studi = vi.Cod_sede_studi
+                    LEFT JOIN #Temp_CTE_Blocchi           AS mbpagg
+                        ON mbpagg.num_domanda = d.Num_domanda
                 WHERE 
-                    Domanda.Anno_accademico = '20242025'
-                    AND Domanda.Tipo_bando IN ('LZ', 'L2')
+                    d.Anno_accademico = '20242025'
+                    AND d.Tipo_bando IN ('LZ', 'L2')
                 ORDER BY 
-                    Domanda.Cod_fiscale;
-        
-                DROP TABLE #tmpCodFisc; -- Clean up temp table
+                    d.Cod_fiscale;
+
+                -- Clean up temporary tables
+                DROP TABLE #Temp_vEsiti_concorsiBS;
+                DROP TABLE #Temp_vEsiti_concorsiPA;
+                DROP TABLE #Temp_vIscrizioni;
+                DROP TABLE #Temp_CTE_Blocchi;
             ";
 
             // 5) Execute the query and fill result
@@ -294,6 +358,7 @@ namespace ProcedureNet7
 
             return result;
         }
+
         public static void MergeJoinedDataAsStrings(
             DataTable tickets,    // original table with "CODFISC"
             DataTable joinedData) // from DB, with "Cod_fiscale" and other columns

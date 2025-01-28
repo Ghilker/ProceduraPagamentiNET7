@@ -13,8 +13,8 @@ namespace ProcedureNet7
         public ProceduraControlloIBAN(MasterForm masterForm, SqlConnection mainConnection)
             : base(masterForm, mainConnection) { }
 
-        string? selectedAA;
-        SqlTransaction? sqlTransaction;
+        private string? selectedAA;
+        private SqlTransaction? sqlTransaction;
 
         public override void RunProcedure(ArgsProceduraControlloIBAN args)
         {
@@ -24,36 +24,52 @@ namespace ProcedureNet7
             sqlTransaction = CONNECTION.BeginTransaction();
             try
             {
-                // 1) Seleziono i dati degli studenti (Cod_fiscale, IBAN) che potrebbero avere un IBAN errato
+                // 1) Seleziono i dati degli studenti (Cod_fiscale, IBAN) con possibili IBAN errati
+                Logger.LogInfo(null, "Step 1: Seleziono i dati (Cod_fiscale, IBAN) degli studenti con possibili IBAN errati.");
+
                 string sqlQuery = $@"
                     SELECT DISTINCT
-                        domanda.Cod_fiscale, 
+                        Domanda.Cod_fiscale, 
                         vMODALITA_PAGAMENTO.IBAN
                     FROM 
                         Domanda 
                     INNER JOIN 
                         vMODALITA_PAGAMENTO ON Domanda.Cod_fiscale = vMODALITA_PAGAMENTO.Cod_fiscale 
                     INNER JOIN 
-	                    vEsiti_concorsiBS vb ON Domanda.Anno_accademico = vb.Anno_accademico 
-                                           AND Domanda.Num_domanda = vb.Num_domanda
+                        vEsiti_concorsiBS vb ON Domanda.Anno_accademico = vb.Anno_accademico 
+                                              AND Domanda.Num_domanda = vb.Num_domanda
                     WHERE 
                         Domanda.Anno_accademico >= '{selectedAA}' 
                         AND Domanda.Tipo_bando = 'lz' 
                         AND vb.Cod_tipo_esito <> 0
-                    ORDER BY domanda.cod_fiscale
+                    ORDER BY Domanda.cod_fiscale
                 ";
 
-                // 2) Estraggo i codici fiscali degli studenti con IBAN non valido
+                Logger.LogInfo(null, $"Eseguo la seguente query:\n{sqlQuery}");
+
+                // Step 2: Verifico validità IBAN per ciascuno studente estratto.
+                Logger.LogInfo(null, "Step 2: Verifico validità IBAN per ciascuno studente estratto.");
                 List<string> studentiDaBloccare = new();
+                Dictionary<string, string> fiscalCodeToIbanMap = new(); // Dictionary to store Cod_fiscale -> IBAN mapping
+                int rowCounter = 0;
+
                 using (SqlCommand readData = new(sqlQuery, CONNECTION, sqlTransaction))
                 {
                     using (SqlDataReader reader = readData.ExecuteReader())
                     {
                         while (reader.Read())
                         {
+                            rowCounter++;
                             string codFiscale = Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper().Trim();
                             string IBAN = Utilities.SafeGetString(reader, "IBAN").ToUpper().Trim();
 
+                            // Save Cod_fiscale -> IBAN mapping for later use
+                            if (!fiscalCodeToIbanMap.ContainsKey(codFiscale))
+                            {
+                                fiscalCodeToIbanMap[codFiscale] = IBAN;
+                            }
+
+                            // Validate the IBAN
                             bool ibanValido = IbanValidatorUtil.ValidateIban(IBAN);
                             if (!ibanValido)
                             {
@@ -62,6 +78,10 @@ namespace ProcedureNet7
                         }
                     }
                 }
+
+                Logger.LogInfo(null, $"Trovati {rowCounter} record in totale. " +
+                                     $"Di questi, {studentiDaBloccare.Count} presentano IBAN non valido.");
+
 
                 // Se non c'è nessuno da bloccare, posso interrompere qui
                 if (!studentiDaBloccare.Any())
@@ -76,19 +96,18 @@ namespace ProcedureNet7
                 );
 
                 // 3) Messaggio da inviare
+                Logger.LogInfo(null, "Step 3: Creo il messaggio di notifica per gli studenti.");
                 string messaggio =
                     "Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>" +
                     "La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
 
-                // 4) Recupero in un'unica query *tutti* gli anni accademici associati a *tutti* i CF
-                //    (invece di farne uno per ogni studente)
+                // 4) Recupero in un'unica query tutti gli anni accademici associati a *tutti* i CF
+                Logger.LogInfo(null, "Step 4: Recupero in un'unica query tutti gli anni accademici per i CF individuati.");
                 List<string> distinctCF = studentiDaBloccare.Distinct().ToList();
 
                 // Costruisco una stringa con gli N CF tra apici singoli, es. 'CF1','CF2','CF3'
-                // (In un contesto reale potrebbe essere preferibile usare i parametri multipli o una table-valued parameter)
                 string cfsJoined = string.Join("','", distinctCF);
 
-                // Query per prendere (Cod_fiscale, Anno_accademico) in bulk
                 string anniQuery = $@"
                     SELECT DISTINCT 
                         Cod_fiscale, 
@@ -97,6 +116,8 @@ namespace ProcedureNet7
                     WHERE Cod_fiscale IN ('{cfsJoined}')
                 ";
 
+                Logger.LogInfo(null, $"Eseguo la query per anni accademici:\n{anniQuery}");
+
                 // Mappatura CF -> lista di AA
                 Dictionary<string, List<string>> studAnnoAccademico = new();
 
@@ -104,12 +125,13 @@ namespace ProcedureNet7
                 {
                     using (SqlDataReader anniReader = cmd.ExecuteReader())
                     {
+                        int anniCounter = 0;
                         while (anniReader.Read())
                         {
+                            anniCounter++;
                             string cf = Utilities.SafeGetString(anniReader, "Cod_fiscale").ToUpper().Trim();
                             string aa = Utilities.SafeGetString(anniReader, "Anno_accademico");
 
-                            // Controllo che non sia stringa vuota
                             if (!string.IsNullOrWhiteSpace(cf) && !string.IsNullOrWhiteSpace(aa))
                             {
                                 if (!studAnnoAccademico.ContainsKey(cf))
@@ -122,14 +144,13 @@ namespace ProcedureNet7
                                 }
                             }
                         }
+                        Logger.LogInfo(null, $"Recuperati {anniCounter} record di (CF, AA).");
                     }
                 }
 
-                // studAnnoAccademico: { "ABCD1234": ["20232024", "20222023"], "XYZT5678": ["20232024"] ... }
-
-                // 5) Invertire la mappatura (annoAccademico -> [cf1, cf2, ...])
+                // 5) Invertire la mappatura (CF -> [anni]) in (AnnoAccademico -> [CF])
+                Logger.LogInfo(null, "Step 5: Invertire la mappatura (CF -> [anni]) in (AnnoAccademico -> [CF]).");
                 Dictionary<string, List<string>> cfsPerAnno = new();
-
                 foreach (var kvp in studAnnoAccademico)
                 {
                     string cf = kvp.Key;
@@ -145,33 +166,105 @@ namespace ProcedureNet7
                     }
                 }
 
-                // 6) Aggiungo i blocchi in bulk per anno accademico
+                // 6) Aggiunta blocchi in bulk per ciascun anno accademico, 
+                //    ma prima verifichiamo chi HA GIÀ il blocco e saltiamo quei CF.
+                Logger.LogInfo(null, "Step 6: Aggiunta blocchi in bulk per ciascun anno accademico (saltando chi ha già il blocco).");
+
+                // Per i messaggi: vogliamo inviarli solo a chi riceve effettivamente il nuovo blocco
+                // (ossia chi NON lo aveva già).
+                var cfsThatWillReceiveBlock = new HashSet<string>();
+
                 foreach (var kvp in cfsPerAnno)
                 {
                     string annoAccademico = kvp.Key;
-                    List<string> codFiscali = kvp.Value.Distinct().ToList();
+                    List<string> allCfsForThisYear = kvp.Value.Distinct().ToList();
 
+                    // 6a) Bulk-check: chi ha già il blocco "BSS" su questo AnnoAccademico?
+                    Dictionary<string, bool> hasBlockDict = BlocksUtil.HasBlock(
+                        CONNECTION,
+                        sqlTransaction,
+                        allCfsForThisYear,
+                        "BSS",
+                        annoAccademico
+                    );
+
+                    // 6b) Teniamo solo chi NON ha il blocco
+                    List<string> cfsToBlock = allCfsForThisYear
+                        .Where(cf => !hasBlockDict[cf])
+                        .ToList();
+
+                    if (!cfsToBlock.Any())
+                    {
+                        // Nessuno da bloccare per quest'anno
+                        Logger.LogInfo(null,
+                            $"Nessun nuovo blocco aggiunto per AnnoAccademico={annoAccademico} (tutti avevano già il blocco o nessuno da bloccare).");
+                        continue;
+                    }
+
+                    // Aggiungo i CF effettivamente da bloccare
+                    Logger.LogInfo(null,
+                        $"Aggiungo blocco [BSS] per AnnoAccademico={annoAccademico}, su {cfsToBlock.Count} CF (saltati {allCfsForThisYear.Count - cfsToBlock.Count} con blocco già presente).");
+
+                    // 6c) Invocazione AddBlock solo sui CF senza blocco
                     BlocksUtil.AddBlock(
                         CONNECTION,
                         sqlTransaction,
-                        codFiscali,
+                        cfsToBlock,
                         "BSS",
                         annoAccademico,
                         "Area4_IbanCheck",
                         true
                     );
+
+                    // 6d) Segno questi CF come coloro che riceveranno anche il messaggio
+                    foreach (var cf in cfsToBlock)
+                    {
+                        cfsThatWillReceiveBlock.Add(cf);
+                    }
                 }
 
-                // 7) Inserisco i messaggi per tutti gli studenti con IBAN errato, in un’unica chiamata
-                MessageUtils.InsertMessages(
-                    CONNECTION,
-                    sqlTransaction,
-                    distinctCF,
-                    messaggio,
-                    "Area4_IbanCheck"
-                );
+                // Step 7: Inserisco il messaggio di avviso SOLO per i CF a cui abbiamo effettivamente aggiunto il blocco
+                Logger.LogInfo(null, "Step 7: Creazione dei messaggi personalizzati per gli studenti con blocco.");
+
+                if (cfsThatWillReceiveBlock.Any())
+                {
+                    var personalizedMessages = new Dictionary<string, string>();
+
+                    foreach (var cf in cfsThatWillReceiveBlock)
+                    {
+                        // Retrieve the wrong IBAN from the dictionary
+                        string wrongIban = fiscalCodeToIbanMap.ContainsKey(cf)
+                            ? fiscalCodeToIbanMap[cf]
+                            : "IBAN non disponibile";
+
+                        // Create the personalized message
+                        string messaggioPersonalizzato =
+                            $"Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>" +
+                            $"IBAN: {wrongIban}#<br>" +
+                            "La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
+
+                        // Add the message to the dictionary
+                        personalizedMessages[cf] = messaggioPersonalizzato;
+                    }
+
+                    // Insert personalized messages into the database
+                    MessageUtils.InsertMessages(
+                        CONNECTION,
+                        sqlTransaction,
+                        personalizedMessages,
+                        "Area4_IbanCheck"
+                    );
+
+                    Logger.LogInfo(null, $"Inseriti {personalizedMessages.Count} messaggi personalizzati per i rispettivi studenti.");
+                }
+                else
+                {
+                    Logger.LogInfo(null, "Nessun nuovo blocco inserito => nessun messaggio inserito.");
+                }
+
 
                 // 8) Confermo la transazione (interazione con l'utente)
+                Logger.LogInfo(null, "Step 8: Richiedo conferma per completare la procedura.");
                 _ = _masterForm.Invoke((MethodInvoker)delegate
                 {
                     DialogResult result = MessageBox.Show(
@@ -184,20 +277,20 @@ namespace ProcedureNet7
 
                     if (result == DialogResult.OK)
                     {
-                        Logger.LogInfo(100, "Procedura terminata.");
+                        Logger.LogInfo(100, "Procedura terminata con successo. Eseguo commit della transazione.");
                         sqlTransaction?.Commit();
                     }
                     else
                     {
-                        Logger.LogInfo(null, "Procedura interrotta dall'utente.");
+                        Logger.LogInfo(null, "Procedura interrotta dall'utente. Eseguo rollback della transazione.");
                         sqlTransaction?.Rollback();
                     }
                 });
             }
             catch (Exception ex)
             {
+                Logger.LogError(100, $"Errore durante l'esecuzione della procedura: {ex.Message}");
                 sqlTransaction?.Rollback();
-                Logger.LogError(100, $"Errore: {ex.Message}");
             }
         }
     }

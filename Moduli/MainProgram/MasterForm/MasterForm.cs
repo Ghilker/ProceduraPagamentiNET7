@@ -60,12 +60,12 @@ namespace ProcedureNet7
         {
             procedureSelect.Items.Clear();
             int maxWidth = 0;
-            using (Graphics g = procedureSelect.CreateGraphics())
+            using (Graphics graphic = procedureSelect.CreateGraphics())
             {
                 var procedures = new List<string>();
 
 #if PAGAMENTI || DEBUG
-                // Add ProcedurePagamenti
+
                 foreach (var value in Enum.GetValues(typeof(ProcedurePagamenti)))
                 {
                     var fieldInfo = typeof(ProcedurePagamenti).GetField(value.ToString());

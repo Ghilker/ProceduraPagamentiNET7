@@ -64,7 +64,7 @@ namespace ProcedureNet7
             proceduraAllegatiTipoCombo.DisplayMember = "Text";
             proceduraAllegatiTipoCombo.ValueMember = "Value";
 
-            Utilities.CreateDropDownMenu(ref filtroBeneficioBTN, ref selectedBeneficiStrip, proceduraAllegatiBeneficiItems);
+            //Utilities.CreateDropDownMenu(ref filtroBeneficioBTN, ref selectedBeneficiStrip, proceduraAllegatiBeneficiItems);
         }
 
         private void RunProcedureBtnClick(object sender, EventArgs e)
@@ -115,7 +115,7 @@ namespace ProcedureNet7
                     _selectedTipoAllegatoName = selectedTipoAllegatoName,
                     _selectedTipoBeneficio = selectedTipoBeneficioValue
                 };
-                argsValidation.Validate(argsProceduraAllegati);
+                // argsValidation.Validate(argsProceduraAllegati);
                 ProceduraAllegati proceduraAllegati = new(_masterForm, mainConnection);
                 proceduraAllegati.RunProcedure(argsProceduraAllegati);
             }

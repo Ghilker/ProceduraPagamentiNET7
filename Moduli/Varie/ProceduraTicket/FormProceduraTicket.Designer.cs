@@ -31,13 +31,13 @@
             ticketSendMailCheck = new CheckBox();
             ticketMaillbl = new Label();
             ticketMailFilebtn = new Button();
-            ticketDeleteRedCheck = new CheckBox();
-            ticketDeleteChiusiCheck = new CheckBox();
+            ticketHasMessages = new CheckBox();
             ticketFilelbl = new Label();
             ticketFileBtn = new Button();
             label1 = new Label();
             button1 = new Button();
             openFileDialog = new OpenFileDialog();
+            ticketDeleteRedCheck = new CheckBox();
             SuspendLayout();
             // 
             // ticketSendMailCheck
@@ -72,27 +72,16 @@
             ticketMailFilebtn.UseVisualStyleBackColor = true;
             ticketMailFilebtn.Click += TicketMailFilebtn_Click;
             // 
-            // ticketDeleteRedCheck
+            // ticketHasMessages
             // 
-            ticketDeleteRedCheck.AutoSize = true;
-            ticketDeleteRedCheck.Location = new Point(51, 108);
-            ticketDeleteRedCheck.Margin = new Padding(4, 3, 4, 3);
-            ticketDeleteRedCheck.Name = "ticketDeleteRedCheck";
-            ticketDeleteRedCheck.Size = new Size(156, 19);
-            ticketDeleteRedCheck.TabIndex = 14;
-            ticketDeleteRedCheck.Text = "Cancella anni precedenti";
-            ticketDeleteRedCheck.UseVisualStyleBackColor = true;
-            // 
-            // ticketDeleteChiusiCheck
-            // 
-            ticketDeleteChiusiCheck.AutoSize = true;
-            ticketDeleteChiusiCheck.Location = new Point(51, 83);
-            ticketDeleteChiusiCheck.Margin = new Padding(4, 3, 4, 3);
-            ticketDeleteChiusiCheck.Name = "ticketDeleteChiusiCheck";
-            ticketDeleteChiusiCheck.Size = new Size(137, 19);
-            ticketDeleteChiusiCheck.TabIndex = 13;
-            ticketDeleteChiusiCheck.Text = "Cancella ticket chiusi";
-            ticketDeleteChiusiCheck.UseVisualStyleBackColor = true;
+            ticketHasMessages.AutoSize = true;
+            ticketHasMessages.Location = new Point(51, 83);
+            ticketHasMessages.Margin = new Padding(4, 3, 4, 3);
+            ticketHasMessages.Name = "ticketHasMessages";
+            ticketHasMessages.Size = new Size(160, 19);
+            ticketHasMessages.TabIndex = 13;
+            ticketHasMessages.Text = "File contenente messaggi";
+            ticketHasMessages.UseVisualStyleBackColor = true;
             // 
             // ticketFilelbl
             // 
@@ -140,6 +129,18 @@
             // 
             openFileDialog.FileName = "openFileDialog1";
             // 
+            // ticketDeleteRedCheck
+            // 
+            ticketDeleteRedCheck.AutoSize = true;
+            ticketDeleteRedCheck.Location = new Point(51, 108);
+            ticketDeleteRedCheck.Margin = new Padding(4, 3, 4, 3);
+            ticketDeleteRedCheck.Name = "ticketDeleteRedCheck";
+            ticketDeleteRedCheck.Size = new Size(156, 19);
+            ticketDeleteRedCheck.TabIndex = 14;
+            ticketDeleteRedCheck.Text = "Cancella anni precedenti";
+            ticketDeleteRedCheck.UseVisualStyleBackColor = true;
+            ticketDeleteRedCheck.Visible = false;
+            // 
             // FormProceduraTicket
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -153,7 +154,7 @@
             Controls.Add(ticketMaillbl);
             Controls.Add(ticketMailFilebtn);
             Controls.Add(ticketDeleteRedCheck);
-            Controls.Add(ticketDeleteChiusiCheck);
+            Controls.Add(ticketHasMessages);
             Controls.Add(ticketFilelbl);
             Controls.Add(ticketFileBtn);
             FormBorderStyle = FormBorderStyle.None;
@@ -167,12 +168,12 @@
         private CheckBox ticketSendMailCheck;
         private Label ticketMaillbl;
         private Button ticketMailFilebtn;
-        private CheckBox ticketDeleteRedCheck;
-        private CheckBox ticketDeleteChiusiCheck;
+        private CheckBox ticketHasMessages;
         private Label ticketFilelbl;
         private Button ticketFileBtn;
         private Label label1;
         private Button button1;
         private OpenFileDialog openFileDialog;
+        private CheckBox ticketDeleteRedCheck;
     }
 }

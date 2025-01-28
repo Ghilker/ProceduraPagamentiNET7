@@ -3,7 +3,6 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using System.Data;
 using System.Data.SqlClient;
 using System.Runtime.InteropServices;
-using Excel = Microsoft.Office.Interop.Excel;
 
 namespace ProcedureNet7.ProceduraAllegatiSpace
 {
@@ -34,11 +33,11 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
         };
         private readonly Dictionary<string, string> decodTipoBando = new()
         {
-            { "BS", "LZ" },
-            { "PA", "LZ" },
-            { "CI", "LZ" },
-            { "PL", "PL" },
-            { "BL", "BL" }
+            { "BS", "Borsa di studio" },
+            { "PA", "Posto alloggio" },
+            { "CI", "Contributo integrativo" },
+            { "PL", "Premio di laurea" },
+            { "BL", "Buono libro" }
         };
         string selectedTipoBando = string.Empty;
 
@@ -48,7 +47,23 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
         {
             _masterForm.inProcedure = true;
             Logger.Log(0, "Inizio procedura allegati", LogLevel.INFO);
+
             selectedAA = args._selectedAA;
+            selectedCfFile = args._selectedFileExcel;
+            selectedSavePath = args._selectedSaveFolder;
+            selectedTipoAllegato = args._selectedTipoAllegato;
+
+            //DataTable cfDaLavorare = Utilities.ReadExcelToDataTable(selectedCfFile);
+
+            _ = _masterForm.Invoke((MethodInvoker)delegate
+            {
+                using FormTipoBeneficioAllegato selectTipoPagam = new();
+                selectTipoPagam.StartPosition = FormStartPosition.CenterParent;
+                DialogResult result = selectTipoPagam.ShowDialog(_masterForm);
+
+            });
+
+            /*selectedAA = args._selectedAA;
             selectedCfFile = args._selectedFileExcel;
             selectedSavePath = args._selectedSaveFolder;
             selectedTipoAllegato = args._selectedTipoAllegato;
@@ -483,7 +498,7 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
                     borders[Excel.XlBordersIndex.xlInsideVertical].Weight = Excel.XlBorderWeight.xlMedium;
                     borders[Excel.XlBordersIndex.xlInsideHorizontal].Weight = Excel.XlBorderWeight.xlMedium;
                 }
-            }
+            }*/
         }
 
         private DataTable RiammissioneVincitore()

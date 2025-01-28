@@ -246,7 +246,7 @@ namespace ProcedureNet7.Storni
                 foreach (var group in groupedByAnnoAccademico)
                 {
                     List<string> codFiscaleMainList = group.Select(s => s.codFiscale).ToList();
-                    BlocksUtil.AddBlock(CONNECTION, sqlTransaction, codFiscaleMainList, "BSS", group.Key, "IBANStorni");
+                    BlocksUtil.AddBlock(CONNECTION, sqlTransaction, codFiscaleMainList, "BSS", group.Key, "IBANStorni", true);
                 }
             }
             catch

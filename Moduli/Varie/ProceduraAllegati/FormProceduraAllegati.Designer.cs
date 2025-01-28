@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            label25 = new Label();
             label24 = new Label();
             proceduraAllegatiAA = new TextBox();
             label23 = new Label();
@@ -41,22 +40,12 @@
             label1 = new Label();
             excelFileDialog = new OpenFileDialog();
             saveFolderDialog = new FolderBrowserDialog();
-            filtroBeneficioBTN = new Button();
             SuspendLayout();
-            // 
-            // label25
-            // 
-            label25.AutoSize = true;
-            label25.Location = new Point(317, 136);
-            label25.Name = "label25";
-            label25.Size = new Size(164, 15);
-            label25.TabIndex = 9;
-            label25.Text = "Selezionare il tipo di beneficio";
             // 
             // label24
             // 
             label24.AutoSize = true;
-            label24.Location = new Point(317, 165);
+            label24.Location = new Point(317, 135);
             label24.Name = "label24";
             label24.Size = new Size(257, 15);
             label24.TabIndex = 7;
@@ -64,7 +53,7 @@
             // 
             // proceduraAllegatiAA
             // 
-            proceduraAllegatiAA.Location = new Point(44, 157);
+            proceduraAllegatiAA.Location = new Point(44, 127);
             proceduraAllegatiAA.Name = "proceduraAllegatiAA";
             proceduraAllegatiAA.Size = new Size(267, 23);
             proceduraAllegatiAA.TabIndex = 6;
@@ -152,23 +141,13 @@
             // 
             excelFileDialog.FileName = "Excel con CF";
             // 
-            // filtroBeneficioBTN
-            // 
-            filtroBeneficioBTN.Location = new Point(46, 127);
-            filtroBeneficioBTN.Name = "filtroBeneficioBTN";
-            filtroBeneficioBTN.Size = new Size(265, 24);
-            filtroBeneficioBTN.TabIndex = 29;
-            filtroBeneficioBTN.UseVisualStyleBackColor = true;
-            // 
             // FormProceduraAllegati
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
-            Controls.Add(filtroBeneficioBTN);
             Controls.Add(label1);
-            Controls.Add(label25);
             Controls.Add(button1);
             Controls.Add(label24);
             Controls.Add(proceduraAllegatiCFbtn);
@@ -186,7 +165,6 @@
         }
 
         #endregion
-        private Label label25;
         private Label label24;
         private TextBox proceduraAllegatiAA;
         private Label label23;
@@ -199,6 +177,5 @@
         private Label label1;
         private OpenFileDialog excelFileDialog;
         private FolderBrowserDialog saveFolderDialog;
-        private Button filtroBeneficioBTN;
     }
 }

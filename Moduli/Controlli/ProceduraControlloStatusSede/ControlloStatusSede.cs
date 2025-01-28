@@ -46,43 +46,105 @@ namespace ProcedureNet7
             // 1) Prepare the query
             // -----------------------
             string dataQuery = $@"
-                    SELECT 
-                        LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE, 
-                        LUOGO_REPERIBILITA_STUDENTE.TITOLO_ONEROSO, 
-                        LUOGO_REPERIBILITA_STUDENTE.N_SERIE_CONTRATTO, 
-                        LUOGO_REPERIBILITA_STUDENTE.DATA_REG_CONTRATTO,  
-                        LUOGO_REPERIBILITA_STUDENTE.DATA_DECORRENZA, 
-                        LUOGO_REPERIBILITA_STUDENTE.DATA_SCADENZA, 
-                        LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO, 
-                        LUOGO_REPERIBILITA_STUDENTE.PROROGA, 
-                        LUOGO_REPERIBILITA_STUDENTE.DURATA_PROROGA, 
-                        LUOGO_REPERIBILITA_STUDENTE.ESTREMI_PROROGA,
-                        LUOGO_REPERIBILITA_STUDENTE.TIPO_CONTRATTO_TITOLO_ONEROSO,
-                        LUOGO_REPERIBILITA_STUDENTE.DENOM_ENTE,
-                        LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO,
-                        LUOGO_REPERIBILITA_STUDENTE.IMPORTO_RATA
-                    FROM LUOGO_REPERIBILITA_STUDENTE
-                    INNER JOIN Comuni ON LUOGO_REPERIBILITA_STUDENTE.COD_COMUNE = Comuni.Cod_comune
-					INNER JOIN Domanda on LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO = Domanda.Anno_accademico and LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE = Domanda.Cod_fiscale and LUOGO_REPERIBILITA_STUDENTE.tipo_bando = Domanda.Tipo_bando
-					INNER JOIN vValori_calcolati vv on Domanda.Anno_accademico = vv.Anno_accademico and Domanda.Num_domanda = vv.Num_domanda and vv.Status_sede = 'B'
-					INNER JOIN vEsiti_concorsiBS vb on Domanda.Anno_accademico = vb.Anno_accademico and Domanda.Num_domanda = vb.Num_domanda and vb.Cod_tipo_esito <> 0
-					INNER JOIN vDATIGENERALI_dom vd on Domanda.Anno_accademico = vd.Anno_accademico and Domanda.Num_domanda = vd.Num_domanda and vd.Rifug_politico <> 1
-					inner join vNucleo_familiare vn on Domanda.Anno_accademico = vn.Anno_accademico and Domanda.Num_domanda = vn.Num_domanda and vn.Numero_conviventi_estero < (vn.Num_componenti / 2)
-					inner  join vEsiti_concorsiPA vp on Domanda.Anno_accademico = vp.Anno_accademico and Domanda.Num_domanda = vp.Num_domanda and vp.Cod_tipo_esito = 0
-					inner join vIscrizioni vi on Domanda.Anno_accademico = vi.Anno_accademico and Domanda.Cod_fiscale = vi.Cod_fiscale and Domanda.Tipo_bando = vi.tipo_bando
-					and vi.Cod_tipologia_studi <> '06'
-                    WHERE 
-                        (LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO = '{selectedAA}') 
-                        AND (LUOGO_REPERIBILITA_STUDENTE.TIPO_LUOGO   = 'DOM') 
-                        AND (LUOGO_REPERIBILITA_STUDENTE.DATA_VALIDITA = (
-                            SELECT MAX(DATA_VALIDITA)
-                            FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
-                            WHERE 
-                                (COD_FISCALE    = LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE) 
-                                AND (ANNO_ACCADEMICO = LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO) 
-                                AND (TIPO_LUOGO     = 'DOM')
-                        ))
-						and Domanda.Cod_fiscale not in (select Cod_fiscale from Forzature_StatusSede where Data_fine_validita is null and Status_sede = 'B')
+                    SELECT
+            LRS.COD_FISCALE, 
+	        LRS.TITOLO_ONEROSO, 
+	        LRS.N_SERIE_CONTRATTO, 
+	        LRS.DATA_REG_CONTRATTO,  
+	        LRS.DATA_DECORRENZA, 
+	        LRS.DATA_SCADENZA, 
+	        LRS.DURATA_CONTRATTO, 
+	        LRS.PROROGA, 
+	        LRS.DURATA_PROROGA, 
+	        LRS.ESTREMI_PROROGA,
+	        LRS.TIPO_CONTRATTO_TITOLO_ONEROSO,
+	        LRS.DENOM_ENTE,
+	        LRS.DURATA_CONTRATTO,
+	        LRS.IMPORTO_RATA
+        FROM 
+            LUOGO_REPERIBILITA_STUDENTE AS LRS
+            INNER JOIN Comuni 
+                ON LRS.COD_COMUNE = Comuni.Cod_comune
+            INNER JOIN Domanda
+                ON LRS.ANNO_ACCADEMICO = Domanda.Anno_accademico
+               AND LRS.COD_FISCALE     = Domanda.Cod_fiscale
+               AND LRS.tipo_bando      = Domanda.Tipo_bando
+
+            -- Must be Status_sede = 'B'
+            INNER JOIN vValori_calcolati AS vv
+                ON Domanda.Anno_accademico = vv.Anno_accademico
+               AND Domanda.Num_domanda     = vv.Num_domanda
+               AND vv.Status_sede = 'B'
+
+            -- Must have tipo esito BS != 0
+            INNER JOIN vEsiti_concorsiBS AS vb
+                ON Domanda.Anno_accademico = vb.Anno_accademico
+               AND Domanda.Num_domanda     = vb.Num_domanda
+               AND vb.Cod_tipo_esito <> 0
+
+            -- Must not be rifug politico
+            INNER JOIN vDATIGENERALI_dom AS vd
+                ON Domanda.Anno_accademico = vd.Anno_accademico
+               AND Domanda.Num_domanda     = vd.Num_domanda
+               AND vd.Rifug_politico <> 1
+
+            -- Additional constraints for vIscrizioni
+            INNER JOIN vIscrizioni AS vi
+                ON Domanda.Anno_accademico = vi.Anno_accademico
+               AND Domanda.Cod_fiscale     = vi.Cod_fiscale
+               AND Domanda.Tipo_bando      = vi.tipo_bando
+               AND vi.Cod_tipologia_studi <> '06'
+
+            -- Join to vResidenza to handle the 'EE' logic
+            INNER JOIN vResidenza AS vr
+                ON vr.Cod_fiscale      = Domanda.Cod_fiscale
+               AND vr.Anno_accademico = Domanda.Anno_accademico
+               -- Adjust if necessary to match the rest of your keys
+        WHERE
+            -- Same check for LUOGO_REPERIBILITA_STUDENTE
+            LRS.ANNO_ACCADEMICO = '{selectedAA}'
+            AND LRS.TIPO_LUOGO = 'DOM'
+            AND LRS.DATA_VALIDITA = (
+                 SELECT MAX(DATA_VALIDITA) 
+                 FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
+                 WHERE rsd.COD_FISCALE      = LRS.COD_FISCALE
+                   AND rsd.ANNO_ACCADEMICO = LRS.ANNO_ACCADEMICO
+                   AND rsd.TIPO_LUOGO      = 'DOM'
+            )
+
+            -- Must NOT be in forzature as B
+            AND Domanda.Cod_fiscale NOT IN (
+                 SELECT Cod_Fiscale
+                 FROM Forzature_StatusSede
+                 WHERE Data_fine_validita IS NULL
+                   AND Status_sede = 'B'
+                   AND Anno_Accademico = '{selectedAA}'
+            )
+
+            -- Must NOT have tipo esito PA <> 0
+            AND Domanda.Num_domanda NOT IN (
+                 SELECT Num_domanda
+                 FROM vEsiti_concorsiPA
+                 WHERE (Cod_tipo_esito <> 0)
+                   AND (Anno_accademico = '{selectedAA}')
+            )
+
+            -- Now handle the ""EE"" logic via 'NOT' approach:
+            AND NOT (
+                vr.provincia_residenza = 'EE'
+                AND Domanda.Num_domanda IN
+                (
+                     SELECT d1.Num_domanda
+                     FROM Domanda d1
+                     INNER JOIN vNucleo_familiare vn1
+                          ON d1.Anno_accademico = vn1.Anno_accademico
+                         AND d1.Num_domanda     = vn1.Num_domanda
+                     WHERE vn1.Numero_conviventi_estero >= vn1.Num_componenti / 2
+                )
+		
+            );
+
+
                 ";
 
             // -----------------------
@@ -150,15 +212,44 @@ namespace ProcedureNet7
 
                     if (effectiveStart <= effectiveEnd)
                     {
-                        int monthsCovered = ((effectiveEnd.Year - effectiveStart.Year) * 12)
-                                          + (effectiveEnd.Month - effectiveStart.Month + 1);
+                        int monthsCovered = 0;
+
+                        // Start from the 1st day of the month of 'effectiveStart'
+                        DateTime currentMonthStart = new DateTime(effectiveStart.Year, effectiveStart.Month, 1);
+
+                        // Iterate while the start of the month is within the effective coverage
+                        while (currentMonthStart <= effectiveEnd)
+                        {
+                            // End of the current month
+                            DateTime currentMonthEnd = currentMonthStart.AddMonths(1).AddDays(-1);
+
+                            // Determine the portion of this month actually covered
+                            // Coverage starts on the later of (effectiveStart or currentMonthStart)
+                            DateTime coverageStart = (currentMonthStart < effectiveStart) ? effectiveStart : currentMonthStart;
+                            // Coverage ends on the earlier of (effectiveEnd or currentMonthEnd)
+                            DateTime coverageEnd = (currentMonthEnd > effectiveEnd) ? effectiveEnd : currentMonthEnd;
+
+                            // Calculate how many days are covered in this month
+                            double daysCovered = (coverageEnd - coverageStart).TotalDays + 1;
+
+                            // If coverage in this calendar month is at least 15 days, consider it a "full month"
+                            if (daysCovered >= 15)
+                            {
+                                monthsCovered++;
+                            }
+
+                            // Move to the next month
+                            currentMonthStart = currentMonthStart.AddMonths(1);
+                        }
+
+                        // Check if there are at least 10 months fully covered (>=25 days each)
                         if (monthsCovered >= 10)
                         {
-                            // Mark the student as having a valid domicile for >=10 months
                             studenteDomicilioOK = true;
                         }
                     }
                 }
+
 
                 // ----- CONTRATTO ENTE -----
                 bool contrattoEnte = row.ContrattoEnte;
