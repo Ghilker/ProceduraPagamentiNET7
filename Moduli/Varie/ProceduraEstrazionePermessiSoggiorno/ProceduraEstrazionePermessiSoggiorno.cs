@@ -36,49 +36,64 @@ namespace ProcedureNet7
                 // First query (CON 23/24)
                 DataTable dataTableCon2324 = new DataTable();
                 string queryCon2324 = $@"
-SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
-FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
-inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
-                    WHERE        (Domanda.Anno_accademico = 20242025) AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
-(SELECT DISTINCT 
-    sps.Cod_fiscale
-FROM STATUS_ALLEGATI AS sa
-INNER JOIN Specifiche_permesso_soggiorno AS sps ON sa.id_allegato = sps.id_allegato
-WHERE
-    sa.data_validita = (
-        SELECT MAX(data_validita)
-        FROM STATUS_ALLEGATI AS STA
-        WHERE id_allegato = sa.id_allegato
-    )
-    AND sps.Data_validita = (
-        SELECT MAX(Data_validita)
-        FROM Specifiche_permesso_soggiorno AS br
-        WHERE Num_domanda = sps.Num_domanda AND Cod_fiscale = sps.Cod_fiscale and sps.Data_validita < '11/12/2024'
-    )
-    AND sa.cod_status = '01'
-    AND sps.Anno_accademico IS NULL
-    AND NOT EXISTS (
-        SELECT 1
-        FROM STATUS_ALLEGATI AS sa2
-        INNER JOIN Specifiche_permesso_soggiorno AS sps2 ON sa2.id_allegato = sps2.id_allegato
-        WHERE
-            sa2.cod_status = '05'
-            AND sps2.Cod_fiscale = sps.Cod_fiscale
-            AND (
-                (sps.Tipo_documento = '02'
-                 AND sps2.Tipo_documento = sps.Tipo_documento
-                 AND sps2.Data_richiesta_rilascio_rinnovo = sps.Data_richiesta_rilascio_rinnovo)
-                OR (sps.Tipo_documento = '03'
-                    AND sps2.Tipo_documento = sps.Tipo_documento
-                    AND sps2.Tipo_permesso = sps.Tipo_permesso
-                    AND sps2.Data_scadenza = sps.Data_scadenza)
-            )
-    )
-)
-and status_compilazione >= '90'
-and Domanda.Num_domanda in (select num_domanda from vEsiti_concorsiPA where anno_accademico = 20242025 and Cod_tipo_esito <> 0)
-and Domanda.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico = 20242025)
-ORDER BY domanda.Cod_fiscale;
+            SELECT DISTINCT 
+                   d.Cod_fiscale, 
+                   s.Cognome, 
+                   s.Nome, 
+                   s.Codice_Studente
+            FROM Domanda AS d
+            INNER JOIN Studente AS s 
+                ON d.Cod_fiscale = s.Cod_fiscale
+            INNER JOIN vStatus_compilazione AS vsc
+                ON d.Anno_accademico = vsc.Anno_accademico
+                AND d.Num_domanda = vsc.Num_domanda
+            WHERE d.Anno_accademico IN ('20242025','20232024')
+              AND d.Tipo_bando = 'lz'
+              AND d.Cod_fiscale IN
+              (
+                  SELECT DISTINCT 
+                         sps.Cod_fiscale
+                  FROM STATUS_ALLEGATI AS sa
+                  INNER JOIN Specifiche_permesso_soggiorno AS sps 
+                      ON sa.id_allegato = sps.id_allegato
+                  WHERE 
+                        -- The usual logic for picking the ""latest"" STATUS_ALLEGATI and permesso_soggiorno
+                        sa.data_validita = (
+                            SELECT MAX(data_validita)
+                            FROM STATUS_ALLEGATI AS sta
+                            WHERE sta.id_allegato = sa.id_allegato
+                        )
+                        AND sps.Data_validita = (
+                            SELECT MAX(Data_validita)
+                            FROM Specifiche_permesso_soggiorno AS br
+                            WHERE br.Num_domanda = sps.Num_domanda
+                              AND br.Cod_fiscale = sps.Cod_fiscale
+                        )
+                        AND sa.cod_status = '01'
+                        AND (sps.Anno_accademico IS NULL 
+                             OR sps.Anno_accademico IN ('20232024','20242025'))
+            
+                        -- Ensure the student actually has at least one allegato before 2025-02-10
+                        AND EXISTS
+                        (
+                            SELECT 1
+                            FROM STATUS_ALLEGATI AS saE
+                            INNER JOIN Specifiche_permesso_soggiorno AS spsE 
+                                ON saE.id_allegato = spsE.id_allegato
+                            WHERE spsE.Cod_fiscale = sps.Cod_fiscale
+                              AND saE.data_validita < '11/02/2025'
+                        )
+              )
+              AND vsc.status_compilazione >= '90'
+              AND d.Num_domanda IN 
+                  (
+                      SELECT num_domanda
+                      FROM vEsiti_concorsiBS
+                      WHERE anno_accademico = 20242025
+                        AND Cod_tipo_esito <> 0
+                  )
+            ORDER BY d.Cod_fiscale;
+
                 ";
 
                 Logger.LogInfo(30, "Executing SQL query for CON 23/24.");
@@ -279,9 +294,8 @@ ORDER BY domanda.Cod_fiscale;
                         Subject = $"Estrazione studenti per PS - {DateTime.Now:dd/MM/yyyy}",
                         Body = $@"  <p>Buongiorno,</p>
                             <p>su richiesta di Rita che legge in copia,</p>
-                            <p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere <b>urgentemente</b> validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
-                            <p>L'allegato presente in questa mail sostituisce gli allegati già ricevuti in precedenza.</p>
-                            <p>Ti ricordo di <b>non rimuovere i blocchi</b> poiché è attiva una procedura che li rimuove massivamente ogni 2 ore circa.</p> 
+                            <p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
+                            <p>Ti ricordo di <b>non rimuovere i blocchi</b> poiché è attiva una procedura che li rimuove massivamente.</p> 
 
                            <p>Grazie e buon lavoro!</p>",
                         IsBodyHtml = true

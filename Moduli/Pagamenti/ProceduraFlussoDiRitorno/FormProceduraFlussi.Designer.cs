@@ -36,6 +36,7 @@
             label1 = new Label();
             button1 = new Button();
             openFileDialog = new OpenFileDialog();
+            button2 = new Button();
             SuspendLayout();
             // 
             // proceduraFlussoRitornoNomeFileCheck
@@ -108,6 +109,16 @@
             // 
             openFileDialog.FileName = "openFileDialog1";
             // 
+            // button2
+            // 
+            button2.Location = new Point(524, 118);
+            button2.Name = "button2";
+            button2.Size = new Size(75, 23);
+            button2.TabIndex = 56;
+            button2.Text = "button2";
+            button2.UseVisualStyleBackColor = true;
+            button2.Click += button2_Click;
+            // 
             // FormProceduraFlussi
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -115,6 +126,7 @@
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             ControlBox = false;
+            Controls.Add(button2);
             Controls.Add(label1);
             Controls.Add(button1);
             Controls.Add(proceduraFlussoRitornoNomeFileCheck);
@@ -139,5 +151,6 @@
         private Label label1;
         private Button button1;
         private OpenFileDialog openFileDialog;
+        private Button button2;
     }
 }

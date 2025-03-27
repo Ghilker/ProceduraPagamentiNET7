@@ -293,6 +293,219 @@ namespace ProcedureNet7
 
 
         /// <summary>
+        /// Removes a payment block for the given list of num_domanda.
+        /// </summary>
+        /// <param name="conn">Open SqlConnection</param>
+        /// <param name="transaction">Active SqlTransaction</param>
+        /// <param name="numDomandaList">List of num_domanda</param>
+        /// <param name="blockCode">Block code (Cod_tipologia_blocco)</param>
+        /// <param name="annoAccademico">Anno Accademico</param>
+        /// <param name="utente">Utente</param>
+        /// <returns>A BlockRemoveResult with details of the removal.</returns>
+        /// <summary>
+        /// Removes a payment block for the given list of num_domanda (as strings).
+        /// </summary>
+        /// <param name="conn">Open SqlConnection</param>
+        /// <param name="transaction">Active SqlTransaction</param>
+        /// <param name="numDomandaList">List of num_domanda (string)</param>
+        /// <param name="blockCode">Block code (Cod_tipologia_blocco)</param>
+        /// <param name="annoAccademico">Anno Accademico</param>
+        /// <param name="utente">Utente</param>
+        /// <returns>A BlockRemoveResult with details of the removal.</returns>
+        public static BlockRemoveResult RemoveBlockNumDomanda(
+            SqlConnection conn,
+            SqlTransaction transaction,
+            List<string> numDomandaList,
+            string blockCode,
+            string annoAccademico,
+            string utente)
+        {
+            var result = new BlockRemoveResult();
+
+            // 1) Create a temp table for Num_domanda (string)
+            CreateAndPopulateNumDomandaTempTable(conn, transaction, numDomandaList);
+
+            // 2) Get the list of columns from DatiGenerali_dom and vDATIGENERALI_dom
+            List<string> columnNames = GetColumnNames(conn, transaction, "DatiGenerali_dom");
+            List<string> vColumns = GetColumnNames(conn, transaction, "vDATIGENERALI_dom");
+
+            // Define columns needing explicit values
+            Dictionary<string, string> explicitValues = new Dictionary<string, string>()
+            {
+                { "Data_validita", "CURRENT_TIMESTAMP" }, // SQL expression
+                { "Utente", "@utenteValue" },             // Parameter
+                { "Blocco_pagamento", "0" },              // For RemoveBlock
+                { "Id_domanda", "d.id_domanda" }
+            };
+
+            List<string> insertColumns = new List<string>();
+            List<string> selectColumns = new List<string>();
+
+            foreach (string columnName in columnNames)
+            {
+                insertColumns.Add($"[{columnName}]");
+
+                if (explicitValues.ContainsKey(columnName))
+                {
+                    selectColumns.Add(explicitValues[columnName]);
+                }
+                else if (vColumns.Contains(columnName))
+                {
+                    selectColumns.Add($"v.[{columnName}]");
+                }
+                else
+                {
+                    // Assign NULL for columns not in vDATIGENERALI_dom and not in explicitValues
+                    selectColumns.Add("NULL");
+                }
+            }
+
+            string insertColumnsList = string.Join(", ", insertColumns);
+            string selectColumnsList = string.Join(", ", selectColumns);
+
+            // 3) Figure out which num_domanda actually have an active block (before the update)
+            string activeBlocksSql = @"
+                SELECT DISTINCT d.Num_domanda
+                FROM dbo.Domanda d
+                INNER JOIN dbo.Motivazioni_blocco_pagamenti mbp
+                    ON d.Num_domanda = mbp.Num_domanda
+                INNER JOIN #NumDomandaTempTable nd
+                    ON nd.NumDomanda = d.Num_domanda
+                WHERE mbp.Anno_accademico = @annoAccademico
+                  AND mbp.Cod_tipologia_blocco = @blockCode
+                  AND mbp.Blocco_pagamento_attivo = 1
+                  AND mbp.Data_fine_validita IS NULL
+                  AND d.Anno_accademico = @annoAccademico
+                  AND d.tipo_bando IN ('lz','l2');
+            ";
+
+            var domandeWithActiveBlock = new List<string>();
+            using (SqlCommand activeCmd = new SqlCommand(activeBlocksSql, conn, transaction))
+            {
+                activeCmd.Parameters.AddWithValue("@annoAccademico", annoAccademico);
+                activeCmd.Parameters.AddWithValue("@blockCode", blockCode);
+
+                using (SqlDataReader rdr = activeCmd.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        // Num_domanda is a string
+                        domandeWithActiveBlock.Add(Utilities.SafeGetString(rdr, "Num_domanda"));
+                    }
+                }
+            }
+
+            // Everyone else in numDomandaList => no active block to remove
+            result.NothingToRemove = numDomandaList
+                .Where(dom => !domandeWithActiveBlock.Contains(dom))
+                .ToList();
+
+            // 4) Perform the actual remove logic
+            string sql = $@"
+                UPDATE Motivazioni_blocco_pagamenti
+                SET Blocco_pagamento_attivo = 0, 
+                    Data_fine_validita = CURRENT_TIMESTAMP, 
+                    Utente_sblocco = @utenteValue
+                WHERE Anno_accademico = @annoAccademico 
+                    AND Cod_tipologia_blocco = @blockCode 
+                    AND Blocco_pagamento_attivo = 1
+                    AND Num_domanda IN 
+                    (
+                        SELECT d.Num_domanda
+                        FROM dbo.Domanda d
+                        INNER JOIN #NumDomandaTempTable nd ON d.Num_domanda = nd.NumDomanda
+                        WHERE d.Anno_accademico = @annoAccademico 
+                          AND d.tipo_bando IN ('lz','l2')
+                    );
+
+                INSERT INTO [DatiGenerali_dom] ({insertColumnsList})
+                    SELECT DISTINCT {selectColumnsList}
+                    FROM Domanda d
+                         INNER JOIN vDATIGENERALI_dom v ON d.Anno_accademico = v.Anno_accademico 
+                                                        AND d.Num_domanda = v.Num_domanda
+                         INNER JOIN #NumDomandaTempTable nd ON d.Num_domanda = nd.NumDomanda
+                    WHERE d.Anno_accademico = @annoAccademico
+                      AND d.tipo_bando IN ('lz', 'l2')
+                      AND d.Num_domanda NOT IN (
+                          SELECT DISTINCT Num_domanda
+                          FROM Motivazioni_blocco_pagamenti
+                          WHERE Anno_accademico = @annoAccademico 
+                            AND Data_fine_validita IS NULL
+                            AND Blocco_pagamento_attivo = 1
+                      );
+            ";
+
+            using (SqlCommand command = new SqlCommand(sql, conn, transaction))
+            {
+                command.Parameters.AddWithValue("@annoAccademico", annoAccademico);
+                command.Parameters.AddWithValue("@utenteValue", utente);
+                command.Parameters.AddWithValue("@blockCode", blockCode);
+
+                int affectedRows = command.ExecuteNonQuery();
+                Logger.LogInfo(null, $"{affectedRows} rows affected in RemoveBlock operation for BlockCode: {blockCode}.");
+            }
+
+            // 5) Those who actually had it removed are exactly domandeWithActiveBlock
+            result.ActuallyRemoved.AddRange(domandeWithActiveBlock);
+
+            // 6) Drop temp table
+            DropNumDomandaTempTable(conn, transaction);
+
+            // 7) Return the result
+            return result;
+        }
+
+        private static void CreateAndPopulateNumDomandaTempTable(
+            SqlConnection conn,
+            SqlTransaction transaction,
+            List<string> numDomandaList)
+        {
+            // Adjust the length/type (VARCHAR(50), NVARCHAR(50), etc.) according to how Num_domanda is stored
+            string createTableSql = @"
+                IF OBJECT_ID('tempdb..#NumDomandaTempTable') IS NOT NULL
+                    DROP TABLE #NumDomandaTempTable;
+
+                CREATE TABLE #NumDomandaTempTable (
+                    NumDomanda VARCHAR(50) NOT NULL
+                );
+            ";
+
+            using (SqlCommand cmd = new SqlCommand(createTableSql, conn, transaction))
+            {
+                cmd.ExecuteNonQuery();
+            }
+
+            // Bulk insert approach
+            using (var bulk = new SqlBulkCopy(conn, SqlBulkCopyOptions.Default, transaction))
+            {
+                bulk.DestinationTableName = "#NumDomandaTempTable";
+                var table = new DataTable();
+                table.Columns.Add("NumDomanda", typeof(string));
+
+                foreach (string dom in numDomandaList)
+                {
+                    table.Rows.Add(dom);
+                }
+
+                bulk.WriteToServer(table);
+            }
+        }
+
+        private static void DropNumDomandaTempTable(SqlConnection conn, SqlTransaction transaction)
+        {
+            string dropTableSql = @"
+        IF OBJECT_ID('tempdb..#NumDomandaTempTable') IS NOT NULL
+            DROP TABLE #NumDomandaTempTable;
+    ";
+
+            using (SqlCommand cmd = new SqlCommand(dropTableSql, conn, transaction))
+            {
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+
+        /// <summary>
         /// Removes a block for the given CF list. Returns details about who actually got removed,
         /// and who had nothing to remove.
         /// </summary>

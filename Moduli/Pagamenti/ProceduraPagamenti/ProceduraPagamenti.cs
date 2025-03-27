@@ -51,7 +51,6 @@ namespace ProcedureNet7
         bool usingStringWhere = false;
 
         bool isTR = false;
-        bool isMensa = false;
         bool insertInDatabase = false;
 
         SqlTransaction? sqlTransaction = null;
@@ -280,11 +279,6 @@ namespace ProcedureNet7
                     isTR = true;
                 }
 
-                if ((tipoBeneficio + selectedTipoPagamento).Substring(0, 3) == "BSM")
-                {
-                    isMensa = true;
-                }
-
                 categoriaPagam = selectTipoPagam.SelectedCategoriaBeneficio;
                 codTipoPagamento = tipoBeneficio + selectedTipoPagamento;
             }
@@ -305,11 +299,7 @@ namespace ProcedureNet7
             {
                 string currentBeneficio;
 
-                if (isMensa)
-                {
-                    currentBeneficio = "ME";
-                }
-                else if (isTR)
+                if (isTR)
                 {
                     currentBeneficio = "TR";
                 }
@@ -436,13 +426,13 @@ namespace ProcedureNet7
                 dbTableExists = command.ExecuteScalar() != null;
             }
 
-            if (selectedTipoProcedura == "0" || selectedTipoProcedura == "2")
+            if (selectedTipoProcedura == TipologiaProcedura.Completa.ToCode() || selectedTipoProcedura == TipologiaProcedura.SoloCreazioneTabella.ToCode())
             {
                 Logger.LogDebug(null, "Creazione della tabella del database in base al tipo di procedura selezionato");
                 CreateDBTable();
             }
 
-            if (selectedTipoProcedura == "2")
+            if (selectedTipoProcedura == TipologiaProcedura.SoloCreazioneTabella.ToCode())
             {
                 Logger.LogInfo(null, "Verifica o creazione della tabella del database completata");
                 exitProcedureEarly = true;
@@ -450,7 +440,7 @@ namespace ProcedureNet7
                 return;
             }
 
-            if (selectedTipoProcedura == "1" && !dbTableExists)
+            if (selectedTipoProcedura == TipologiaProcedura.SenzaCreazioneTabella.ToCode() && !dbTableExists)
             {
                 Logger.LogInfo(null, $"Tabella con nome {dbTableName} non esistente nel database");
                 exitProcedureEarly = true;
@@ -860,18 +850,12 @@ namespace ProcedureNet7
                     _ = int.TryParse(Utilities.SafeGetString(reader, "disabile"), out int disabile);
                     _ = int.TryParse(Utilities.SafeGetString(reader, "Superamento_esami"), out int superamentoEsami);
                     _ = int.TryParse(Utilities.SafeGetString(reader, "Superamento_esami_tassa_reg"), out int superamentoEsamiTassaRegionale);
-                    _ = int.TryParse(Utilities.SafeGetString(reader, "richiesta_mensa"), out int monetizzazioneMensa);
                     _ = int.TryParse(Utilities.SafeGetString(reader, "anno_corso"), out int annoCorso);
                     int esitoPA = Utilities.SafeGetInt(reader, "EsitoPA");
                     string studenteCodEnte = Utilities.SafeGetString(reader, "cod_ente");
 
                     bool skipTipoStudente = false;
                     bool skipCodEnte = false;
-
-                    if (isMensa && monetizzazioneMensa == 0)
-                    {
-                        continue;
-                    }
 
                     if (esitoPA == 2 && (selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
                     {
@@ -918,7 +902,6 @@ namespace ProcedureNet7
                             esitoPA,
                             superamentoEsami == 1,
                             superamentoEsamiTassaRegionale == 1,
-                            monetizzazioneMensa == 1,
                             Utilities.SafeGetString(reader, "Status_sede").Trim().ToUpper(),
                             Utilities.SafeGetInt(reader, "Rifug_politico") == 1
                         );
@@ -1074,7 +1057,7 @@ namespace ProcedureNet7
 
             FilterPagamenti();
 
-            if (tipoBeneficio == "BS" && !isTR && !isMensa && !studenteForzato)
+            if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR && !studenteForzato && categoriaPagam != "PR")
             {
                 ControlloProvvedimenti();
             }
@@ -1141,7 +1124,7 @@ namespace ProcedureNet7
                         INNER JOIN #CFestrazione cf ON Domanda.cod_fiscale = cf.Cod_fiscale
                         INNER JOIN Decod_pagam_new ON Pagamenti.Cod_tipo_pagam = Decod_pagam_new.Cod_tipo_pagam_old OR Pagamenti.Cod_tipo_pagam = Decod_pagam_new.Cod_tipo_pagam_new
                             ";
-                if (tipoBeneficio != "PL")
+                if (tipoBeneficio != TipoBeneficio.PremioDiLaurea.ToCode())
                 {
                     sqlPagam += $@"
                     WHERE
@@ -1180,12 +1163,7 @@ namespace ProcedureNet7
                                     continue;
                                 }
 
-                                if (cod_tipo_pagam.Substring(0, 3) == "BSM" && !isMensa)
-                                {
-                                    continue;
-                                }
-
-                                if (cod_tipo_pagam.Substring(0, 2) != "BS" && (isTR || isMensa))
+                                if (cod_tipo_pagam.Substring(0, 2) != "BS" && isTR)
                                 {
                                     continue;
                                 }
@@ -1208,7 +1186,6 @@ namespace ProcedureNet7
                     StudentePagam studenteDaControllare = pair.Value;
                     bool stessoPagamento = false;
                     bool okTassaRegionale = false;
-                    bool okMensa = false;
 
                     if (studenteDaControllare.pagamentiEffettuati == null || studenteDaControllare.pagamentiEffettuati.Count <= 0)
                     {
@@ -1224,7 +1201,7 @@ namespace ProcedureNet7
                         if (pagamento.codTipoPagam == codTipoPagamento)
                         {
                             stessoPagamento = true;
-                            if (tipoBeneficio == "PL")
+                            if (tipoBeneficio == TipoBeneficio.PremioDiLaurea.ToCode())
                             {
                                 stessoPagamento = false;
                                 Logger.LogWarning(null, $"Attenzione: Studente con cf {studenteDaControllare.codFiscale} ha già preso il premio di laurea!");
@@ -1237,14 +1214,9 @@ namespace ProcedureNet7
                             okTassaRegionale = true;
                         }
 
-                        if (isMensa && (pagamento.codTipoPagam == "BSM0" || pagamento.codTipoPagam == "BSM1" || pagamento.codTipoPagam == "BSM2") && !pagamento.ritiratoAzienda)
-                        {
-                            okMensa = true;
-                        }
-
                         importiPagati += pagamento.importoPagamento;
                     }
-                    if ((stessoPagamento || (isTR && !okTassaRegionale) || (isMensa && !okMensa)) && !studentiDaRimuovereHash.Contains(studenteDaControllare.codFiscale))
+                    if ((stessoPagamento || (isTR && !okTassaRegionale)) && !studentiDaRimuovereHash.Contains(studenteDaControllare.codFiscale))
                     {
                         studentiDaRimuovereHash.Add(studenteDaControllare.codFiscale);
                         continue;
@@ -1253,7 +1225,7 @@ namespace ProcedureNet7
                     Math.Round(importiPagati, 2);
                     studenteDaControllare.SetImportiPagati(importiPagati);
 
-                    if (tipoBeneficio == "BS" && !isTR && !isMensa && Math.Abs(studenteDaControllare.importoBeneficio - studenteDaControllare.importoPagato) < 5)
+                    if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR && Math.Abs(studenteDaControllare.importoBeneficio - studenteDaControllare.importoPagato) < 5)
                     {
                         studentiDaRimuovereHash.Add(studenteDaControllare.codFiscale);
                     }
@@ -1507,13 +1479,13 @@ namespace ProcedureNet7
                                 WHERE Anno_accademico = '{selectedAA}' 
                                     AND Data_fine_validita IS NULL 
                                     AND Blocco_pagamento_attivo = 1";
-            if (tipoBeneficio == "BL")
+            if (tipoBeneficio == TipoBeneficio.BuonoLibro.ToCode())
             {
                 sqlKiller += " AND cod_tipologia_blocco in ('BPD', 'BSS', 'BS1')";
             }
             sqlKiller += " )";
 
-            if (tipoBeneficio == "BS")
+            if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode())
             {
                 sqlKiller += " AND Domanda.tipo_bando like 'L%'";
             }
@@ -1687,7 +1659,7 @@ namespace ProcedureNet7
                 esclusoUpdate.ExecuteNonQuery();
             }
             HashSet<string> listaStudentiDaEliminarePEC = new();
-            if (tipoBeneficio == "BS")
+            if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode())
             {
                 // Check for students with invalid PEC addresses
                 string sqlStudentiPecKiller = $@"
@@ -1776,7 +1748,7 @@ namespace ProcedureNet7
             PopulateStudentForzature();
             PopulateStudentPaymentMethod();
             PopulateStudentiVecchioEsitoPA();
-            if (tipoBeneficio == "BS" && !isTR)
+            if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR)
             {
                 PopulateStudentReversali();
                 PopulateStudentDetrazioni();
@@ -2149,6 +2121,9 @@ namespace ProcedureNet7
                     // At least one digit, one letter, can include slash/hyphen/spaces, 5-50 in length
                     string pattern7 = @"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9/\s\-]{5,50}$";
 
+                    // NEW: Pattern for "3Tn.15706" style series.
+                    string pattern8 = @"^3Tn\.[0-9]+$";
+
                     // Check them in sequence
                     if (Regex.IsMatch(serie, pattern1, options)) return true;
                     if (Regex.IsMatch(serie, pattern1b, options)) return true;
@@ -2158,11 +2133,13 @@ namespace ProcedureNet7
                     if (Regex.IsMatch(serie, pattern4, options)) return true;
                     if (Regex.IsMatch(serie, pattern5, options)) return true;
                     if (Regex.IsMatch(serie, pattern6, options)) return true;
-                    if (Regex.IsMatch(serie, pattern7)) return true;
+                    if (Regex.IsMatch(serie, pattern7, options)) return true;
+                    if (Regex.IsMatch(serie, pattern8, options)) return true;
 
                     // If none match, it's invalid
                     return false;
                 }
+
             }
             void PopulateStudentPaymentMethod()
             {
@@ -2751,7 +2728,7 @@ namespace ProcedureNet7
                 {
                     StudentePagam studente = pair.Value;
 
-                    if (studente.codFiscale == "BDLKJD99R57Z100X")
+                    if (studente.codFiscale == "FRCLTR04S50L219I")
                     {
                         string stest = "";
                     }
@@ -2796,7 +2773,7 @@ namespace ProcedureNet7
                     bool stornoIntegrazionePrimaRata = false;
                     bool riemessaIntegrazionePrimaRata = false;
 
-                    if (tipoBeneficio == "BS")
+                    if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode())
                     {
                         // Process pagamentiEffettuati
                         foreach (Pagamento pagamento in studente.pagamentiEffettuati)
@@ -2942,7 +2919,7 @@ namespace ProcedureNet7
                     }
 
                     // Calculate importoDaPagare based on various conditions
-                    if (categoriaPagam == "PR" && tipoBeneficio == "BS" && !isTR)
+                    if (categoriaPagam == "PR" && tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR)
                     {
                         string currentYear = selectedAA[..4];
                         DateTime percentDate = new(int.Parse(currentYear), 11, 10);
@@ -2962,7 +2939,7 @@ namespace ProcedureNet7
                             importoMassimo *= 0.5;
                         }
                     }
-                    else if (tipoBeneficio == "BS" && !isTR)
+                    else if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR)
                     {
                         importoDaPagare = importoMassimo;
                         if (studente.annoCorso == 1)
@@ -2987,9 +2964,12 @@ namespace ProcedureNet7
 
                         if ((!hasSaldo || (hasSaldo && saldoStorno && !riemessaSecondaRata)) && !studenteForzato)
                         {
-                            studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
-                            studentiRimossiBag.Add((studente.codFiscale, "Non ha saldo/saldo non riemesso"));
-                            return;
+                            if (!(studente.annoCorso == 1 && (studente.superamentoEsami || studente.superamentoEsamiTassaRegionale)))
+                            {
+                                studentiDaRimuovereDallaTabella[studente.codFiscale] = true;
+                                studentiRimossiBag.Add((studente.codFiscale, "Non ha saldo/saldo non riemesso"));
+                                return;
+                            }
                         }
 
                         if (studente.disabile)
@@ -4273,116 +4253,6 @@ namespace ProcedureNet7
                     throw;
                 }
             }
-        }
-        private void EstrazioneDatiBanca(string beneficioFolderPath)
-        {
-            List<StudentePagam> studentiDaControllareBanca = new();
-            List<string> studentiBancaCF = new();
-            Dictionary<string, string> codiciCittadinanza = new()
-            {
-                { "Z224", "IRANIANA"},
-            };
-
-
-            foreach (KeyValuePair<string, StudentePagam> entry in studentiDaPagare)
-            {
-                StudentePagam studente = entry.Value;
-                if (!codiciCittadinanza.ContainsKey(studente.codCittadinanza))
-                {
-                    continue;
-                }
-
-                if (studente.IBAN.Substring(0, 2).ToUpper() != "LT")
-                {
-                    continue;
-                }
-
-                if (studente.swift.Substring(0, 8).ToUpper() != "REVOLT21")
-                {
-                    continue;
-                }
-
-                studentiDaControllareBanca.Add(studente);
-                studentiBancaCF.Add(studente.codFiscale);
-            }
-
-            #region CF TABLE INIZIALE
-            Logger.LogInfo(30, "Lavorazione studenti");
-
-            Logger.LogDebug(null, "Pulizia tabella CF");
-            string createTempTable = "TRUNCATE TABLE #CFEstrazione;";
-            using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            })
-            {
-                createCmd.ExecuteNonQuery();
-            }
-
-            Logger.LogDebug(null, "Inserimento in tabella CF dei codici fiscali");
-            Logger.LogInfo(30, "Lavorazione studenti - creazione tabella codici fiscali");
-
-            // Create a DataTable to hold the fiscal codes
-            using (DataTable cfTable = new DataTable())
-            {
-                cfTable.Columns.Add("Cod_fiscale", typeof(string));
-
-                foreach (var cf in studentiBancaCF)
-                {
-                    cfTable.Rows.Add(cf);
-                }
-
-                // Use SqlBulkCopy to efficiently insert the data into the temporary table
-                using SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction);
-                bulkCopy.DestinationTableName = "#CFEstrazione";
-                bulkCopy.WriteToServer(cfTable);
-            }
-
-            Logger.LogDebug(null, "Creazione index della tabella CF");
-            string indexingCFTable = "CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale)";
-            using (SqlCommand indexingCFTableCmd = new SqlCommand(indexingCFTable, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            })
-            {
-                indexingCFTableCmd.ExecuteNonQuery();
-            }
-
-            Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
-            string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
-            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            })
-            {
-                updateStatisticsCmd.ExecuteNonQuery();
-            }
-            #endregion
-
-            string queryIniziale = $@"
-SELECT * FROM Domanda inner join #cfestrazione cfe on Domanda.cod_fiscale = cfe.cod_fiscale WHERE anno_accademico = '{selectedAA}' and tipo_bando = 'lz'
-   
-   and domanda.cod_fiscale in (SELECT distinct cod_fiscale
-        FROM vSpecifiche_permesso_soggiorno 
-        INNER JOIN VStatus_Allegati ON vSpecifiche_permesso_soggiorno.id_allegato = VStatus_Allegati.id_allegato
-        WHERE 
-        vSpecifiche_permesso_soggiorno.Tipo_documento = '03' 
-        AND ((vSpecifiche_permesso_soggiorno.Tipo_permesso = '01' AND vSpecifiche_permesso_soggiorno.Data_scadenza >= GETDATE()) OR vSpecifiche_permesso_soggiorno.Tipo_permesso = '02' OR vSpecifiche_permesso_soggiorno.Tipo_permesso = '03')
-        AND cod_status = '05' 
-        AND (Anno_accademico IS NULL OR Anno_accademico = '20232024'))
-	)
-                ";
-
-            DataTable studentiBanca = new();
-            studentiBanca.Columns.Add("CodFiscale");
-            studentiBanca.Columns.Add("Nome");
-            studentiBanca.Columns.Add("Cognome");
-            studentiBanca.Columns.Add("Data nascita");
-            studentiBanca.Columns.Add("IBAN");
-            studentiBanca.Columns.Add("Cittadinanza");
-            studentiBanca.Columns.Add("Tipo documento");
-            studentiBanca.Columns.Add("Data scadenza");
-
         }
     }
 }

@@ -192,6 +192,10 @@ namespace ProcedureNet7
                             FormProceduraTicket proceduraTicket = new FormProceduraTicket(this);
                             ShowFormInPanel(proceduraTicket);
                             break;
+                        case ProcedureVarie.ProceduraControlloTicket:
+                            FormControlloTicket controlloTicket = new FormControlloTicket(this);
+                            ShowFormInPanel(controlloTicket);
+                            break;
                         case ProcedureVarie.ProceduraAllegati:
                             FormProceduraAllegati proceduraAllegati = new FormProceduraAllegati(this);
                             ShowFormInPanel(proceduraAllegati);
@@ -322,6 +326,8 @@ namespace ProcedureNet7
             ProceduraBlocchi,
             [ProcedureCategory("Varie", "Programmatore")]
             ProceduraTicket,
+            [ProcedureCategory("Varie", "Programmatore")]
+            ProceduraControlloTicket,
             [ProcedureCategory("Varie", "Programmatore")]
             ProceduraAggiuntaProvvedimento,
             [ProcedureCategory("Varie", "Operatore")]

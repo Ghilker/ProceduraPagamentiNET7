@@ -19,7 +19,9 @@ namespace ProcedureNet7
         public static Dictionary<string, string> pagamentiDirect = new()
         {
             { "#BS#P0#PR#00#2#2#0000", "Prima rata borsa - Massivo" },
+            { "#BS#P1#PR#00#2#2#0000", "Riemissione prima rata borsa - Massivo" },
             { "#BS#I0#PR#00#2#2#0000", "Integrazione prima rata borsa - Massivo" },
+            { "#BS#I1#PR#00#2#2#0000", "Riemissione integrazione prima rata borsa - Massivo" },
             { "#BS#S0#SA#00#2#2#0000", "Saldo borsa - Massivo" },
             { "#BS#T0#SA#00#2#2#0000", "Tassa regionale - Massivo" },
         };
@@ -320,4 +322,45 @@ namespace ProcedureNet7
                             ";
 
     }
+
+    public enum TipologiaProcedura
+    {
+        Completa,
+        SenzaCreazioneTabella,
+        SoloCreazioneTabella
+    }
+    public enum TipoBeneficio
+    {
+        BorsaDiStudio,
+        PremioDiLaurea,
+        BuonoLibro,
+        TassaRegionale
+    }
+
+    public static class PagamentiExtensions
+    {
+        public static string ToCode(this TipologiaProcedura tipologiaProcedura)
+        {
+            switch (tipologiaProcedura)
+            {
+                case TipologiaProcedura.Completa: return "0";
+                case TipologiaProcedura.SenzaCreazioneTabella: return "1";
+                case TipologiaProcedura.SoloCreazioneTabella: return "2";
+                default: throw new ArgumentOutOfRangeException(nameof(tipologiaProcedura), tipologiaProcedura, null);
+            }
+        }
+        public static string ToCode(this TipoBeneficio tipoBeneficio)
+        {
+            switch (tipoBeneficio)
+            {
+                case TipoBeneficio.BorsaDiStudio: return "BS";
+                case TipoBeneficio.PremioDiLaurea: return "PL";
+                case TipoBeneficio.BuonoLibro: return "BL";
+                case TipoBeneficio.TassaRegionale: return "TR";
+
+                default: throw new ArgumentOutOfRangeException(nameof(tipoBeneficio), tipoBeneficio, null);
+            }
+        }
+    }
+
 }

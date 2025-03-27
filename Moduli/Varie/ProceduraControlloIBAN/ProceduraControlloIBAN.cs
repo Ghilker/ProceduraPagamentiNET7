@@ -262,8 +262,145 @@ namespace ProcedureNet7
                     Logger.LogInfo(null, "Nessun nuovo blocco inserito => nessun messaggio inserito.");
                 }
 
+                try
+                {
+                    string activeBlocksQuery = $@"
+                        SELECT
+                            bmp.Anno_accademico,
+                            bmp.Num_domanda,
+                            bmp.Data_validita AS BlockDate,
+                            d.Cod_fiscale
+                        FROM vMotivazioni_blocco_pagamenti bmp
+                        INNER JOIN Domanda d ON bmp.num_domanda = d.num_domanda
+                        WHERE  bmp.Cod_tipologia_blocco = 'BSS'
+                          AND d.anno_accademico = '{selectedAA}'
+                    ";
 
-                // 8) Confermo la transazione (interazione con l'utente)
+                    List<(string cf, DateTime blockDate, string annoAcc, string numDomanda)> activeBlocks = new();
+
+                    using (SqlCommand cmd = new SqlCommand(activeBlocksQuery, CONNECTION, sqlTransaction))
+                    {
+                        using (var reader = cmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                string cf = Utilities.SafeGetString(reader, "Cod_fiscale").Trim().ToUpper();
+                                DateTime blockDate = reader.GetDateTime(reader.GetOrdinal("BlockDate"));
+                                string annoAcc = Utilities.SafeGetString(reader, "Anno_accademico");
+                                string numDomanda = Utilities.SafeGetString(reader, "Num_domanda");
+
+                                activeBlocks.Add((cf, blockDate, annoAcc, numDomanda));
+                            }
+                        }
+                    }
+                    Logger.LogInfo(null, $"Trovati {activeBlocks.Count} blocchi BSS attivi inseriti da area4_iban_check.");
+                    foreach (var block in activeBlocks)
+                    {
+                        // a) Prelevo l'IBAN immediatamente prima del blockDate
+                        //    - In caso non ci fosse, "ibanBefore" rimarrà null (o string.Empty).
+                        string ibanBefore = null;
+                        string ibanBeforeQuery = @"
+                                SELECT TOP 1 IBAN
+                                FROM MODALITA_PAGAMENTO
+                                WHERE Cod_fiscale = @cf
+                                  AND data_validita < @blockDate
+                                ORDER BY data_validita DESC
+                            ";
+
+                        using (SqlCommand cmdBefore = new SqlCommand(ibanBeforeQuery, CONNECTION, sqlTransaction))
+                        {
+                            cmdBefore.Parameters.AddWithValue("@cf", block.cf);
+                            cmdBefore.Parameters.AddWithValue("@blockDate", block.blockDate);
+
+                            object result = cmdBefore.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                ibanBefore = Convert.ToString(result)?.Trim().ToUpper();
+                            }
+                        }
+
+                        // b) Prelevo l'IBAN attuale (l'ultimo in ordine di data_validita)
+                        string ibanCurrent = null;
+                        string ibanCurrentQuery = @"
+                                SELECT IBAN
+                                FROM vMODALITA_PAGAMENTO
+                                WHERE Cod_fiscale = @cf
+                            ";
+
+                        using (SqlCommand cmdCurrent = new SqlCommand(ibanCurrentQuery, CONNECTION, sqlTransaction))
+                        {
+                            cmdCurrent.Parameters.AddWithValue("@cf", block.cf);
+
+                            object result = cmdCurrent.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                ibanCurrent = Convert.ToString(result)?.Trim().ToUpper();
+                            }
+                        }
+
+                        // If we can't find an IBAN at all, skip the check
+                        if (string.IsNullOrWhiteSpace(ibanCurrent))
+                        {
+                            // Possibly log something or skip
+                            Logger.LogInfo(null, $"CF={block.cf}: Nessun IBAN corrente trovato. Salto il controllo.");
+                            continue;
+                        }
+
+                        // c) Confronto
+                        bool ibanChanged = false;
+                        if (ibanBefore == null)
+                        {
+                            // Se non esiste un IBAN "prima", potremmo considerarli diversi
+                            // perché l'utente ha inserito un IBAN dopo il blocco o non ne aveva affatto.
+                            ibanChanged = true;
+                        }
+                        else
+                        {
+                            // Se la stringa attuale è diversa da quella pre-blocco
+                            ibanChanged = !ibanCurrent.Equals(ibanBefore, StringComparison.OrdinalIgnoreCase);
+                        }
+
+                        if (ibanChanged)
+                        {
+                            bool ibanValido = IbanValidatorUtil.ValidateIban(ibanCurrent);
+                            if (!ibanValido)
+                            {
+                                Logger.LogInfo(null, $"CF={block.cf}: IBAN: {ibanCurrent} errato. Inserisco messaggio.");
+                                string messaggioPersonalizzato =
+                                    $"Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>" +
+                                    $"IBAN: {ibanCurrent}#<br>" +
+                                    "La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
+
+                                MessageUtils.InsertMessages(
+                                    CONNECTION,
+                                    sqlTransaction,
+                                    new List<string>() { block.cf },
+                                    messaggioPersonalizzato,
+                                    "Area4_IbanCheck"
+                                );
+                                continue;
+                            }
+                            else
+                            {
+                                Logger.LogInfo(null, $"CF={block.cf}: IBAN: {ibanCurrent} modificato. Rimuovo blocco.");
+                                BlocksUtil.RemoveBlock(CONNECTION, sqlTransaction, new List<string>() { block.cf }, "BSS", selectedAA, "Area4_IbanCheck");
+                            }
+                        }
+                        else
+                        {
+                            Logger.LogInfo(null,
+                                $"CF={block.cf}: L'IBAN NON è cambiato (prima={ibanBefore}, adesso={ibanCurrent}). Blocco lasciato attivo.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(100, $"Errore nello rimozione blocchi su IBAN aggiornati: {ex.Message}");
+                    throw;
+                }
+
+
+                // step 8) Confermo la transazione (interazione con l'utente)
                 Logger.LogInfo(null, "Step 8: Richiedo conferma per completare la procedura.");
                 _ = _masterForm.Invoke((MethodInvoker)delegate
                 {

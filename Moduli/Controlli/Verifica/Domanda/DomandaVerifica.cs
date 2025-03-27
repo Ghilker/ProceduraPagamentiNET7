@@ -6,6 +6,19 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7.Verifica
 {
+
+    public class VerDomanda
+    {
+        public string AnnoAccademico;
+        public string NumDomanda;
+        public string TipoBando;
+
+
+
+
+    }
+
+    /*
     public class StudenteVerifica
     {
         public string codFiscale;
@@ -225,4 +238,5 @@ namespace ProcedureNet7.Verifica
     {
         public int annoCorsoCalcolato;
     }
+    */
 }

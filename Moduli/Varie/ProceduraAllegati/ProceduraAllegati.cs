@@ -3,6 +3,7 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using System.Data;
 using System.Data.SqlClient;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace ProcedureNet7.ProceduraAllegatiSpace
 {
@@ -18,6 +19,9 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
         string selectedNomeAllegato = string.Empty;
         string selectedBeneficio = string.Empty;
         string AAsplit = string.Empty;
+
+        SqlTransaction sqlTransaction;
+
         private readonly Dictionary<string, string> provvedimentiItems = new()
         {
             { "01", "Riammissione come vincitore" },
@@ -49,6 +53,7 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
             Logger.Log(0, "Inizio procedura allegati", LogLevel.INFO);
 
             selectedAA = args._selectedAA;
+            selectedAA = "20242025";
             selectedCfFile = args._selectedFileExcel;
             selectedSavePath = args._selectedSaveFolder;
             selectedTipoAllegato = args._selectedTipoAllegato;
@@ -57,11 +62,96 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
 
             _ = _masterForm.Invoke((MethodInvoker)delegate
             {
-                using FormTipoBeneficioAllegato selectTipoPagam = new();
-                selectTipoPagam.StartPosition = FormStartPosition.CenterParent;
-                DialogResult result = selectTipoPagam.ShowDialog(_masterForm);
+                using FormTipoBeneficioAllegato tipoBeneficioAllegato = new(CONNECTION, selectedAA);
+                tipoBeneficioAllegato.StartPosition = FormStartPosition.CenterParent;
+                DialogResult result = tipoBeneficioAllegato.ShowDialog(_masterForm);
+                if (result == DialogResult.OK)
+                {
+                    // Retrieve the list of selected BenefitSelection objects.
+                    var selectedBenefits = tipoBeneficioAllegato.SelectedBenefici;
+
+                    // Process each selection.
+                    foreach (var selection in selectedBenefits)
+                    {
+                        // Log the benefit details. You can adjust the log message as needed.
+                        Logger.LogInfo(null, $"{selection.ImpegnoPair} - {selection.BenefitKey}");
+                    }
+                }
 
             });
+
+            Logger.Log(10, "Creazione dataTable", LogLevel.INFO);
+            DataTable cfDaLavorareDT = Utilities.ReadExcelToDataTable(selectedCfFile);
+            List<string> cfs = new List<string>();
+            foreach (DataRow row in cfDaLavorareDT.Rows)
+            {
+                string codFiscale = row[0].ToString().ToUpper().Trim();
+                cfs.Add(codFiscale);
+            }
+
+
+            #region CF TABLE INIZIALE
+            Logger.LogInfo(30, "Lavorazione studenti");
+
+            Logger.LogDebug(null, "Pulizia tabella CF");
+            string createTempTable = "TRUNCATE TABLE #CFEstrazione;";
+            using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                createCmd.ExecuteNonQuery();
+            }
+
+            Logger.LogDebug(null, "Inserimento in tabella CF dei codici fiscali");
+            Logger.LogInfo(30, "Lavorazione studenti - creazione tabella codici fiscali");
+
+            // Create a DataTable to hold the fiscal codes
+            using (DataTable cfTable = new DataTable())
+            {
+                cfTable.Columns.Add("Cod_fiscale", typeof(string));
+
+                foreach (var cf in cfs)
+                {
+                    cfTable.Rows.Add(cf);
+                }
+
+                // Use SqlBulkCopy to efficiently insert the data into the temporary table
+                using SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction);
+                bulkCopy.DestinationTableName = "#CFEstrazione";
+                bulkCopy.WriteToServer(cfTable);
+            }
+
+            Logger.LogDebug(null, "Creazione index della tabella CF");
+            string indexingCFTable = "CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale)";
+            using (SqlCommand indexingCFTableCmd = new SqlCommand(indexingCFTable, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                indexingCFTableCmd.ExecuteNonQuery();
+            }
+
+            Logger.LogDebug(null, "Aggiornamento statistiche della tabella CF");
+            string updateStatistics = "UPDATE STATISTICS #CFEstrazione";
+            using (SqlCommand updateStatisticsCmd = new SqlCommand(updateStatistics, CONNECTION, sqlTransaction)
+            {
+                CommandTimeout = 9000000
+            })
+            {
+                updateStatisticsCmd.ExecuteNonQuery();
+            }
+            #endregion
+
+
+            switch (selectedTipoAllegato)
+            {
+                case "01": //Riammissione come vincitore
+                    break;
+                case "02": //Riammissione come idoneo
+                    break;
+            }
+
 
             /*selectedAA = args._selectedAA;
             selectedCfFile = args._selectedFileExcel;
@@ -69,7 +159,7 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
             selectedTipoAllegato = args._selectedTipoAllegato;
             selectedNomeAllegato = args._selectedTipoAllegatoName;
             selectedBeneficio = args._selectedTipoBeneficio;
-            selectedTipoBando = decodTipoBando[selectedBeneficio];
+            selectedTipoBando = tipoBenefici[selectedBeneficio];
 
 
             Logger.Log(10, "Creazione dataTable", LogLevel.INFO);

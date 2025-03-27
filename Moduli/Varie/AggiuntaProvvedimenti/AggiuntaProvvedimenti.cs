@@ -165,7 +165,7 @@ namespace ProcedureNet7
                     DataGridView? studentsGridView = null;
                     if (beneficioProvvedimento == "BS" || beneficioProvvedimento == "CI")
                     {
-                        MessageBox.Show(_masterForm, "Selezionare il primo numero domanda", "Seleziona", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show("Selezionare il primo numero domanda", "Seleziona", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         studentsGridView = Utilities.CreateDataGridView(allStudentsData, _masterForm, provvedimentiPanel, OnNumDomandaClicked);
                     }
                     else
@@ -415,8 +415,7 @@ namespace ProcedureNet7
 
                 if (commonCodes.Count > 0 && (provvedimentoSelezionato == "01" || provvedimentoSelezionato == "02"))
                 {
-                    // If needed, remove block for these codes and update DatiGenerali_dom
-                    UpdateDatiGeneraliDom(commonCodes, aaProvvedimento, "Area4", 0);
+                    BlocksUtil.RemoveBlockNumDomanda(CONNECTION, sqlTransaction, commonCodes, "BRM", aaProvvedimento, "Area4");
                 }
 
                 // 6) Now find the remaining codes that are not in #TempCommonCodes
@@ -498,7 +497,7 @@ namespace ProcedureNet7
                     // If needed, also update DatiGeneraliDom for these newly inserted codes
                     if (provvedimentoSelezionato == "01" || provvedimentoSelezionato == "02")
                     {
-                        UpdateDatiGeneraliDom(newCodes, aaProvvedimento, "Area4", 0);
+                        BlocksUtil.RemoveBlockNumDomanda(CONNECTION, sqlTransaction, newCodes, "BRM", aaProvvedimento, "Area4");
                     }
                 }
                 else
@@ -517,130 +516,6 @@ namespace ProcedureNet7
                 sqlTransaction?.Rollback();
                 throw;
             }
-        }
-
-
-        // Helper method to update DatiGenerali_dom dynamically
-        private void UpdateDatiGeneraliDom(List<string> numDomandas, string aaProvvedimento, string utenteSblocco, int bloccoPagamento)
-        {
-            // Retrieve column names
-            List<string> columnNames = GetColumnNames(CONNECTION, sqlTransaction, "DatiGenerali_dom");
-            List<string> vColumns = GetColumnNames(CONNECTION, sqlTransaction, "vDATIGENERALI_dom");
-
-            // Define explicit values
-            Dictionary<string, string> explicitValues = new Dictionary<string, string>()
-            {
-                { "Data_validita", "CURRENT_TIMESTAMP" },    // SQL expression
-                { "Utente", $"'{utenteSblocco}'" },          // User who is updating
-                { "Blocco_pagamento", bloccoPagamento.ToString() }, // Blocco_pagamento value
-            };
-
-            List<string> insertColumns = new List<string>();
-            List<string> selectColumns = new List<string>();
-
-            foreach (string columnName in columnNames)
-            {
-                insertColumns.Add($"[{columnName}]");
-
-                if (explicitValues.ContainsKey(columnName))
-                {
-                    selectColumns.Add(explicitValues[columnName]);
-                }
-                else if (vColumns.Contains(columnName))
-                {
-                    selectColumns.Add($"v.[{columnName}]");
-                }
-                else if (columnName == "Anno_accademico" || columnName == "Num_domanda")
-                {
-                    selectColumns.Add($"d.[{columnName}]");
-                }
-                else
-                {
-                    // Assign NULL for columns not in vDATIGENERALI_dom and not in explicitValues
-                    selectColumns.Add("NULL");
-                }
-            }
-
-            string insertColumnsList = string.Join(", ", insertColumns);
-            string selectColumnsList = string.Join(", ", selectColumns);
-
-            // Build parameterized query for Num_domanda
-            List<string> numDomParamList = numDomandas.Select((numDom, index) => $"@numDom{index}").ToList();
-
-            string sql = $@"
-                    UPDATE Motivazioni_blocco_pagamenti
-                    SET Blocco_pagamento_attivo = 0, 
-                        Data_fine_validita = CURRENT_TIMESTAMP, 
-                        Utente_sblocco = @utenteSblocco
-                    WHERE Anno_accademico = @aaProvvedimento 
-                        AND Cod_tipologia_blocco = 'BRM' 
-                        AND Blocco_pagamento_attivo = 1
-                        AND Num_domanda IN 
-                            (SELECT Num_domanda
-                             FROM Domanda d
-                             WHERE Anno_accademico = @aaProvvedimento
-                                 AND tipo_bando IN ('lz') 
-                                 AND d.Num_domanda IN ({string.Join(", ", numDomParamList)}));
-
-                    INSERT INTO DatiGenerali_dom ({insertColumnsList})
-                    SELECT DISTINCT {selectColumnsList}
-                    FROM 
-                        Domanda d
-                        INNER JOIN vDATIGENERALI_dom v ON d.Anno_accademico = v.Anno_accademico AND 
-                                                         d.Num_domanda = v.Num_domanda 
-                    WHERE 
-                        d.Anno_accademico = @aaProvvedimento AND
-                        d.tipo_bando IN ('lz','l2') AND
-                        d.Num_domanda IN ({string.Join(", ", numDomParamList)}) AND
-                        d.Num_domanda NOT IN (
-                            SELECT DISTINCT Num_domanda
-                            FROM Motivazioni_blocco_pagamenti
-                            WHERE Anno_accademico = @aaProvvedimento 
-                                AND Data_fine_validita IS NOT NULL
-                                AND Blocco_pagamento_attivo = 1
-                        );
-                ";
-
-            using (SqlCommand command = new SqlCommand(sql, CONNECTION, sqlTransaction))
-            {
-                command.Parameters.AddWithValue("@aaProvvedimento", aaProvvedimento);
-                command.Parameters.AddWithValue("@utenteSblocco", utenteSblocco);
-
-                for (int i = 0; i < numDomandas.Count; i++)
-                {
-                    command.Parameters.AddWithValue($"@numDom{i}", numDomandas[i]);
-                }
-
-                command.ExecuteNonQuery();
-            }
-        }
-
-        // Helper method to get column names
-        private List<string> GetColumnNames(SqlConnection conn, SqlTransaction transaction, string tableName)
-        {
-            List<string> columnNames = new List<string>();
-            string query = @"
-                SELECT COLUMN_NAME 
-                FROM INFORMATION_SCHEMA.COLUMNS 
-                WHERE TABLE_NAME = @TableName AND TABLE_SCHEMA = 'dbo'
-            ";
-
-            using (SqlCommand cmd = new SqlCommand(query, conn, transaction))
-            {
-                cmd.Parameters.AddWithValue("@TableName", tableName);
-                using (SqlDataReader reader = cmd.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        if (reader.GetString(0) == "Id_DatiGenerali_dom" || reader.GetString(0) == "Id_Domanda")
-                        {
-                            continue;
-                        }
-                        columnNames.Add(reader.GetString(0));
-                    }
-                }
-            }
-            return columnNames;
         }
 
         private void HandleSpecificheImpegni(string selectedFile)

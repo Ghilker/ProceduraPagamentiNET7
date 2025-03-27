@@ -11,153 +11,195 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Excel = Microsoft.Office.Interop.Excel;
 
-
 namespace ProcedureNet7
 {
     public static class Utilities
     {
+        /// <summary>
+        /// Reads data from an Excel file into a DataTable.
+        /// Optionally uses the first row as data instead of headers.
+        /// </summary>
+        /// <param name="filePath">Path to the Excel file</param>
+        /// <param name="useFirstRowAsData">If true, the first row is treated as data rather than headers.</param>
+        /// <returns>A populated DataTable.</returns>
         public static DataTable ReadExcelToDataTable(string filePath, bool useFirstRowAsData = false)
         {
-            // Create a new DataTable
+            Logger.LogDebug(null, $"Starting to read Excel file: '{filePath}' (useFirstRowAsData={useFirstRowAsData}).");
+
             DataTable returnDataTable = new DataTable();
 
-            // Load the workbook
-            using (XLWorkbook workbook = new XLWorkbook(filePath))
+            try
             {
-                // Get the first worksheet
-                var worksheet = workbook.Worksheets.FirstOrDefault();
-                if (worksheet == null)
-                    throw new Exception("No worksheet found in the Excel file.");
-
-                // 1) Figure out how many columns are in the "used" range 
-                //    (this ensures we pick up empty columns within the used region).
-                var range = worksheet.RangeUsed();
-                int lastColumnNumber = range.LastColumnUsed().ColumnNumber();
-                int lastRowNumber = range.LastRowUsed().RowNumber();
-
-                // 2) Iterate row by row.
-                for (int rowIdx = 1; rowIdx <= lastRowNumber; rowIdx++)
+                using (XLWorkbook workbook = new XLWorkbook(filePath))
                 {
-                    // Grab the row object
-                    var row = worksheet.Row(rowIdx);
-
-                    // If this is the first row AND user doesn't want it as data 
-                    // => interpret it as column headers
-                    if (rowIdx == 1 && !useFirstRowAsData)
+                    var worksheet = workbook.Worksheets.FirstOrDefault();
+                    if (worksheet == null)
                     {
-                        for (int colIdx = 1; colIdx <= lastColumnNumber; colIdx++)
-                        {
-                            string originalHeader = row.Cell(colIdx).GetValue<string>();
-                            string sanitizedHeader = SanitizeColumnName(originalHeader);
-                            returnDataTable.Columns.Add(sanitizedHeader);
-                        }
+                        Logger.LogError(null, "No worksheet found in the Excel file.");
+                        throw new Exception("No worksheet found in the Excel file.");
                     }
-                    else
+
+                    // Get the used range
+                    var range = worksheet.RangeUsed();
+                    int lastColumnNumber = range.LastColumnUsed().ColumnNumber();
+                    int lastRowNumber = range.LastRowUsed().RowNumber();
+
+                    // Iterate row by row
+                    for (int rowIdx = 1; rowIdx <= lastRowNumber; rowIdx++)
                     {
-                        // If the DataTable has no columns yet (meaning the first row 
-                        // is actually data), create columns programmatically.
-                        if (returnDataTable.Columns.Count == 0)
+                        var row = worksheet.Row(rowIdx);
+
+                        // If first row is headers (unless useFirstRowAsData == true)
+                        if (rowIdx == 1 && !useFirstRowAsData)
                         {
                             for (int colIdx = 1; colIdx <= lastColumnNumber; colIdx++)
                             {
-                                returnDataTable.Columns.Add("Column" + colIdx);
+                                string originalHeader = row.Cell(colIdx).GetValue<string>();
+                                string sanitizedHeader = SanitizeColumnName(originalHeader);
+                                returnDataTable.Columns.Add(sanitizedHeader);
                             }
                         }
-
-                        // Create a new DataRow to fill
-                        DataRow dataRow = returnDataTable.NewRow();
-
-                        // Read every column in the row, including empty ones
-                        for (int colIdx = 1; colIdx <= lastColumnNumber; colIdx++)
+                        else
                         {
-                            dataRow[colIdx - 1] = row.Cell(colIdx).GetValue<string>() ?? string.Empty;
-                        }
+                            // If the DataTable has no columns, create them
+                            if (returnDataTable.Columns.Count == 0)
+                            {
+                                for (int colIdx = 1; colIdx <= lastColumnNumber; colIdx++)
+                                {
+                                    returnDataTable.Columns.Add("Column" + colIdx);
+                                }
+                            }
 
-                        // Add the row to the DataTable
-                        returnDataTable.Rows.Add(dataRow);
+                            DataRow dataRow = returnDataTable.NewRow();
+                            for (int colIdx = 1; colIdx <= lastColumnNumber; colIdx++)
+                            {
+                                dataRow[colIdx - 1] = row.Cell(colIdx).GetValue<string>() ?? string.Empty;
+                            }
+                            returnDataTable.Rows.Add(dataRow);
+                        }
                     }
                 }
+
+                Logger.LogInfo(null,
+                    $"Successfully read Excel file: '{filePath}'. Rows={returnDataTable.Rows.Count}, Cols={returnDataTable.Columns.Count}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error reading Excel file '{filePath}': {ex.Message}");
+                throw; // re-throw for higher-level handling
             }
 
             return returnDataTable;
         }
 
-
+        /// <summary>
+        /// Reads a CSV file into a DataTable. Assumes the first row is a header row.
+        /// </summary>
         public static DataTable CsvToDataTable(string csvFilePath)
         {
+            Logger.LogDebug(null, $"Starting to read CSV file: '{csvFilePath}'.");
+
             DataTable returnDataTable = new DataTable();
 
-            using (TextFieldParser parser = new TextFieldParser(csvFilePath))
+            try
             {
-                parser.Delimiters = new[] { ";" };
-                parser.HasFieldsEnclosedInQuotes = true;
-
-                // Assume first row is header
-                string[] headers = parser.ReadFields();
-                if (headers != null)
+                using (TextFieldParser parser = new TextFieldParser(csvFilePath))
                 {
-                    foreach (string header in headers)
+                    parser.Delimiters = new[] { ";" };
+                    parser.HasFieldsEnclosedInQuotes = true;
+
+                    // Assume first row is header
+                    string[] headers = parser.ReadFields();
+                    if (headers != null)
                     {
-                        string sanitizedHeader = SanitizeColumnName(header);
-                        returnDataTable.Columns.Add(sanitizedHeader);
+                        foreach (string header in headers)
+                        {
+                            string sanitizedHeader = SanitizeColumnName(header);
+                            returnDataTable.Columns.Add(sanitizedHeader);
+                        }
+                    }
+
+                    // Read remaining rows
+                    while (!parser.EndOfData)
+                    {
+                        string[] fields = parser.ReadFields();
+                        // Ensure the row has the same number of columns
+                        // (in case CSV lines have varying columns)
+                        while (fields.Length < returnDataTable.Columns.Count)
+                        {
+                            // Add empty values for missing columns
+                            fields = fields.Concat(new[] { string.Empty }).ToArray();
+                        }
+
+                        returnDataTable.Rows.Add(fields);
                     }
                 }
 
-                // Read remaining rows
-                while (!parser.EndOfData)
-                {
-                    string[] fields = parser.ReadFields();
-                    returnDataTable.Rows.Add(fields);
-                }
+                Logger.LogInfo(null,
+                    $"Successfully read CSV file: '{csvFilePath}'. Rows={returnDataTable.Rows.Count}, Cols={returnDataTable.Columns.Count}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error reading CSV file '{csvFilePath}': {ex.Message}");
+                throw;
             }
 
             return returnDataTable;
         }
 
-
+        /// <summary>
+        /// Sanitizes a column name by removing special characters (except spaces).
+        /// </summary>
         public static string SanitizeColumnName(string columnName)
         {
-            // Regular expression to remove any special characters but preserve spaces
             return Regex.Replace(columnName, "[^a-zA-Z0-9_ ]", "");
         }
 
-        // Method to check database connection
+        /// <summary>
+        /// Checks if the application can connect to a database using the supplied connection string.
+        /// </summary>
         public static bool CanConnectToDatabase(string connectionString, out SqlConnection? outConnection)
         {
+            Logger.LogDebug(null, "Attempting to open a SQL connection.");
+            outConnection = null;
+
             try
             {
                 SqlConnection connection = new(connectionString);
-                connection.Open(); // Attempt to open the connection
+                connection.Open();
                 outConnection = connection;
-                return true; // Connection successful
+                Logger.LogInfo(null, "SQL connection opened successfully.");
+                return true;
             }
-            catch
+            catch (Exception ex)
             {
-                outConnection = null;
-                return false; // Connection failed
+                Logger.LogError(null, $"Failed to open SQL connection: {ex.Message}");
+                return false;
             }
         }
 
+        /// <summary>
+        /// Checks if the existing SqlConnection is valid and open.
+        /// </summary>
         public static bool CanConnectToDatabase(SqlConnection connection)
         {
             if (connection == null)
-            {
                 return false;
-            }
-            if (connection.State == System.Data.ConnectionState.Open)
-            {
-                return true;
-            }
-            return false;
 
+            return connection.State == ConnectionState.Open;
         }
 
+        /// <summary>
+        /// Returns a comma-separated list of selected codes from a set of ToolStripMenuItems (checked).
+        /// </summary>
         public static string GetCheckBoxSelectedCodes(ToolStripItemCollection? items)
         {
             if (items == null)
             {
+                Logger.LogWarning(null, "No ToolStrip items provided. Returning empty codes.");
                 return "''";
             }
+
             List<string> selectedCodes = new();
             foreach (ToolStripMenuItem item in items)
             {
@@ -167,260 +209,202 @@ namespace ProcedureNet7
                     selectedCodes.Add("'" + code.Replace("'", "''") + "'");
                 }
             }
-            return selectedCodes.Count == 0 ? "''" : string.Join(", ", selectedCodes);
+
+            string result = selectedCodes.Count == 0 ? "''" : string.Join(", ", selectedCodes);
+            Logger.LogDebug(null, $"Selected codes: {result}");
+            return result;
         }
 
+        /// <summary>
+        /// Prompts the user to pick a file, sets the path label and variable, optionally only writing 'Selezionato'.
+        /// </summary>
         public static void ChooseFileAndSetPath(Label filePathLabel, FileDialog fileDialogToOpen, ref string varToSave, bool writeOnlySelected = false)
         {
-            // Show the OpenFileDialog.
-            DialogResult result = fileDialogToOpen.ShowDialog();
-
-            // Check if the user selected a file.
-            if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(fileDialogToOpen.FileName))
+            try
             {
-                varToSave = fileDialogToOpen.FileName;
-                if (writeOnlySelected)
+                Logger.LogDebug(null, "Opening file dialog...");
+                DialogResult result = fileDialogToOpen.ShowDialog();
+
+                if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(fileDialogToOpen.FileName))
                 {
-                    filePathLabel.Text = "Selezionato";
-                    return;
-                }
-                filePathLabel.Text = varToSave;
-            }
-        }
-
-        public static void ChooseFolder(Label folderPathLabel, FolderBrowserDialog chosenFolderDialog, ref string varToSaveTo)
-        {
-            // Show the FolderBrowserDialog.
-            DialogResult result = chosenFolderDialog.ShowDialog();
-
-            // Check if the user selected a folder.
-            if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(chosenFolderDialog.SelectedPath))
-            {
-                varToSaveTo = chosenFolderDialog.SelectedPath;
-                folderPathLabel.Text = varToSaveTo;
-            }
-        }
-
-        public static string ExportDataTableToExcel(DataTable dataTable, string folderPath, bool includeHeaders = true, string fileName = "")
-        {
-            // Generate or sanitize the file name
-            fileName = GenerateFileName(fileName);
-
-            // Combine folder path and file name
-            string fullPath = Path.Combine(folderPath, fileName);
-
-            // Create a new workbook
-            using (var workbook = new XLWorkbook())
-            {
-                // Add a worksheet (optionally, you can name it based on something else)
-                var worksheet = workbook.Worksheets.Add("Sheet1");
-
-                int currentRow = 1;
-                int totalColumns = dataTable.Columns.Count;
-
-                // If we want column headers
-                if (includeHeaders)
-                {
-                    for (int col = 0; col < totalColumns; col++)
+                    varToSave = fileDialogToOpen.FileName;
+                    if (writeOnlySelected)
                     {
-                        worksheet.Cell(currentRow, col + 1).Value = dataTable.Columns[col].ColumnName;
-                    }
-                    currentRow++;
-                }
-
-                // Populate rows
-                foreach (DataRow row in dataTable.Rows)
-                {
-                    for (int col = 0; col < totalColumns; col++)
-                    {
-                        worksheet.Cell(currentRow, col + 1).Value = row[col]?.ToString() ?? string.Empty;
-                    }
-                    currentRow++;
-                }
-
-                // Save the workbook to the specified path
-                workbook.SaveAs(fullPath);
-            }
-
-            return fullPath;
-        }
-
-        /* public static string ExportDataTableToExcel(DataTable dataTable, string folderPath, bool includeHeaders = true, string fileName = "")
-         {
-             if (dataTable == null || dataTable.Rows.Count == 0 || string.IsNullOrWhiteSpace(folderPath))
-                 throw new ArgumentException("Invalid input parameters.");
-
-             fileName = GenerateFileName(fileName);
-             string fullPath = Path.Combine(folderPath, fileName);
-             Directory.CreateDirectory(folderPath); // Ensure the directory exists
-
-             Excel.Application excelApp = new();
-             Excel.Workbooks workbooks = null;
-             Excel._Workbook workbook = null;
-             Excel._Worksheet worksheet = null;
-
-             try
-             {
-                 workbooks = excelApp.Workbooks;
-                 workbook = workbooks.Add();
-                 worksheet = (Excel._Worksheet)workbook.ActiveSheet!;
-
-                 // Optionally, add column headers
-                 if (includeHeaders && worksheet != null)
-                     AddHeaders(worksheet, dataTable);
-
-                 // Add data rows
-                 if (worksheet != null)
-                     AddData(worksheet, dataTable, includeHeaders);
-
-                 // Save the Excel file
-                 workbook.SaveAs(fullPath);
-                 return fullPath;
-             }
-             catch (Exception ex)
-             {
-                 Logger.LogError(null, $"An error occurred while exporting data to Excel: {ex.Message}");
-                 throw; // Re-throwing the exception after logging
-             }
-             finally
-             {
-                 CleanUp(worksheet, workbook, workbooks, excelApp);
-             }
-         }*/
-
-        private static void CleanUp(Excel._Worksheet worksheet, Excel._Workbook workbook, Excel.Workbooks workbooks, Excel.Application excelApp)
-        {
-            if (worksheet != null) Marshal.ReleaseComObject(worksheet);
-            if (workbook != null)
-            {
-                workbook.Close(false);
-                Marshal.ReleaseComObject(workbook);
-            }
-            if (workbooks != null)
-            {
-                workbooks.Close();
-                Marshal.ReleaseComObject(workbooks);
-            }
-            if (excelApp != null)
-            {
-                excelApp.Quit();
-                Marshal.ReleaseComObject(excelApp);
-            }
-        }
-
-        private static string GenerateFileName(string fileName)
-        {
-            return !string.IsNullOrWhiteSpace(fileName) ? $"{fileName}.xlsx" : $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-        }
-
-        private static void AddHeaders(Excel._Worksheet worksheet, DataTable dataTable)
-        {
-            for (int i = 0; i < dataTable.Columns.Count; i++)
-                worksheet.Cells[1, i + 1] = dataTable.Columns[i].ColumnName;
-        }
-
-        private static void AddData(Excel._Worksheet worksheet, DataTable dataTable, bool includeHeaders)
-        {
-            int rowOffset = includeHeaders ? 2 : 1;
-            int rowCount = dataTable.Rows.Count;
-            int columnCount = dataTable.Columns.Count;
-
-            object[,] values = new object[rowCount, columnCount];
-
-            for (int i = 0; i < rowCount; i++)
-            {
-                for (int j = 0; j < columnCount; j++)
-                {
-                    if (dataTable.Columns[j].DataType == typeof(string) && IsDate(dataTable.Rows[i][j].ToString()))
-                    {
-                        values[i, j] = "#" + dataTable.Rows[i][j].ToString();
+                        filePathLabel.Text = "Selezionato";
                     }
                     else
                     {
-                        values[i, j] = dataTable.Rows[i][j]?.ToString() ?? string.Empty;
+                        filePathLabel.Text = varToSave;
                     }
+                    Logger.LogInfo(null, $"File selected: {varToSave}");
                 }
-            }
-
-            Excel.Range range = worksheet.Cells[rowOffset, 1];
-            range = range.Resize[rowCount, columnCount];
-            range.Value = values; // Set the entire block of values in one shot
-        }
-
-        private static bool IsDate(string input)
-        {
-            return DateTime.TryParseExact(input, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out _);
-        }
-
-        private static void AddDataInBulk(Excel._Worksheet worksheet, DataTable dataTable, bool includeHeaders)
-        {
-            int columnsCount = dataTable.Columns.Count;
-            object[,] values = new object[dataTable.Rows.Count, columnsCount];
-
-            for (int i = 0; i < dataTable.Rows.Count; i++)
-            {
-                for (int j = 0; j < columnsCount; j++)
+                else
                 {
-                    values[i, j] = dataTable.Rows[i][j];
+                    Logger.LogWarning(null, "No file was selected or file path is empty.");
                 }
             }
-
-            int rowOffset = includeHeaders ? 2 : 1;
-            string excelRange = $"A{rowOffset}:" + GetExcelColumnName(columnsCount) + $"{rowOffset + dataTable.Rows.Count - 1}";
-            Excel.Range range = worksheet.Range[excelRange];
-            range.Value = values;
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error in ChooseFileAndSetPath: {ex.Message}");
+                throw;
+            }
         }
 
-        private static string GetExcelColumnName(int columnNumber)
+        /// <summary>
+        /// Prompts the user to pick a folder, sets the label and variable accordingly.
+        /// </summary>
+        public static void ChooseFolder(Label folderPathLabel, FolderBrowserDialog chosenFolderDialog, ref string varToSaveTo)
         {
-            int dividend = columnNumber;
-            string columnName = String.Empty;
-            int modulo;
-
-            while (dividend > 0)
+            try
             {
-                modulo = (dividend - 1) % 26;
-                columnName = Convert.ToChar(65 + modulo).ToString() + columnName;
-                dividend = (dividend - modulo) / 26;
+                Logger.LogDebug(null, "Opening folder dialog...");
+                DialogResult result = chosenFolderDialog.ShowDialog();
+
+                if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(chosenFolderDialog.SelectedPath))
+                {
+                    varToSaveTo = chosenFolderDialog.SelectedPath;
+                    folderPathLabel.Text = varToSaveTo;
+                    Logger.LogInfo(null, $"Folder selected: {varToSaveTo}");
+                }
+                else
+                {
+                    Logger.LogWarning(null, "No folder was selected or path is empty.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error in ChooseFolder: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Exports a DataTable to an Excel file using ClosedXML.
+        /// </summary>
+        public static string ExportDataTableToExcel(DataTable dataTable, string folderPath, bool includeHeaders = true, string fileName = "")
+        {
+            Logger.LogDebug(null, "Starting ExportDataTableToExcel...");
+
+            if (dataTable == null || dataTable.Rows.Count == 0)
+            {
+                Logger.LogWarning(null, "DataTable is null or empty, no Excel file will be created.");
+                return string.Empty;
             }
 
-            return columnName;
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                Logger.LogError(null, "Folder path is invalid or empty.");
+                throw new ArgumentException("Folder path cannot be empty.", nameof(folderPath));
+            }
+
+            try
+            {
+                fileName = GenerateFileName(fileName);
+                string fullPath = Path.Combine(folderPath, fileName);
+
+                // Ensure directory
+                Directory.CreateDirectory(folderPath);
+
+                using (var workbook = new XLWorkbook())
+                {
+                    var worksheet = workbook.Worksheets.Add("Sheet1");
+
+                    int currentRow = 1;
+                    int totalColumns = dataTable.Columns.Count;
+
+                    // If we want column headers
+                    if (includeHeaders)
+                    {
+                        for (int col = 0; col < totalColumns; col++)
+                        {
+                            worksheet.Cell(currentRow, col + 1).Value = dataTable.Columns[col].ColumnName;
+                        }
+                        currentRow++;
+                    }
+
+                    // Populate rows
+                    foreach (DataRow row in dataTable.Rows)
+                    {
+                        for (int col = 0; col < totalColumns; col++)
+                        {
+                            worksheet.Cell(currentRow, col + 1).Value = row[col]?.ToString() ?? string.Empty;
+                        }
+                        currentRow++;
+                    }
+
+                    workbook.SaveAs(fullPath);
+                }
+
+                Logger.LogInfo(null, $"Excel file created successfully at '{folderPath}\\{fileName}'.");
+                return Path.Combine(folderPath, fileName);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error exporting DataTable to Excel: {ex.Message}");
+                throw;
+            }
         }
 
+
+
+        private static string GenerateFileName(string fileName)
+        {
+            return !string.IsNullOrWhiteSpace(fileName)
+                ? $"{fileName}.xlsx"
+                : $"Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+        }
+
+        /// <summary>
+        /// Writes a DataTable to a text file. Each row is semicolon-separated.
+        /// </summary>
         public static void WriteDataTableToTextFile(DataTable dataTable, string directoryPath, string fileName)
         {
-            fileName = Path.ChangeExtension(fileName, ".txt");
-            string filePath = Path.Combine(directoryPath, fileName);
+            Logger.LogDebug(null, "Starting WriteDataTableToTextFile...");
 
-            StringBuilder sb = new();
-
-            // Iterate through all rows in the DataTable
-            foreach (DataRow row in dataTable.Rows)
+            if (dataTable == null || dataTable.Rows.Count == 0)
             {
-                // Array to hold the cells in the current row
-                string[] array = new string[dataTable.Columns.Count];
-
-                // Fill the array with the cell values
-                for (int i = 0; i < dataTable.Columns.Count; i++)
-                {
-                    string? nullableRowContent = row[i].ToString();
-                    string rowContent = "";
-                    if (nullableRowContent != null)
-                    {
-                        rowContent = nullableRowContent;
-                    }
-                    // Use .ToString() to ensure that even null values become empty strings
-                    array[i] = rowContent;
-                }
-
-                // Join the array elements with a semicolon and append to the StringBuilder
-                sb.AppendLine(string.Join(";", array));
+                Logger.LogWarning(null, "DataTable is null or empty, no text file will be created.");
+                return;
             }
 
-            // Write the StringBuilder contents to the text file at the specified path
-            File.WriteAllText(filePath, sb.ToString());
+            if (string.IsNullOrWhiteSpace(directoryPath))
+            {
+                Logger.LogError(null, "Directory path is invalid or empty.");
+                throw new ArgumentException("Directory path cannot be empty.", nameof(directoryPath));
+            }
+
+            try
+            {
+                fileName = Path.ChangeExtension(fileName, ".txt");
+                string filePath = Path.Combine(directoryPath, fileName);
+
+                Directory.CreateDirectory(directoryPath); // ensure directory
+
+                StringBuilder sb = new();
+                foreach (DataRow row in dataTable.Rows)
+                {
+                    string[] array = new string[dataTable.Columns.Count];
+                    for (int i = 0; i < dataTable.Columns.Count; i++)
+                    {
+                        string? nullableRowContent = row[i].ToString();
+                        array[i] = nullableRowContent ?? string.Empty;
+                    }
+                    sb.AppendLine(string.Join(";", array));
+                }
+
+                File.WriteAllText(filePath, sb.ToString());
+                Logger.LogInfo(null, $"Text file created successfully at '{filePath}'.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error writing DataTable to text file: {ex.Message}");
+                throw;
+            }
         }
 
+        /// <summary>
+        /// Creates a DataGridView for a given DataTable and adds it to a panel in a form.
+        /// </summary>
         public static DataGridView CreateDataGridView(
             DataTable dataTable,
             Form mainForm,
@@ -429,230 +413,230 @@ namespace ProcedureNet7
             DataGridViewCellMouseEventHandler? columnHeaderMouseClick_Handler = null,
             string keyTag = "")
         {
+            Logger.LogDebug(null, "Starting CreateDataGridView...");
+
+            if (dataTable == null)
+            {
+                Logger.LogWarning(null, "DataTable is null. Creating an empty DataGridView.");
+                dataTable = new DataTable();
+            }
+
             DataGridView newDataGridView = new();
 
-            // Execute the following code on the UI thread
-            mainForm.Invoke((MethodInvoker)delegate
+            try
             {
-                newDataGridView = new DataGridView
+                mainForm.Invoke((MethodInvoker)delegate
                 {
-                    Name = "dataGridView" + (panelToAddTo.Controls.Count + 1).ToString(),
-                    Size = mainForm.ClientSize,
-                    Dock = DockStyle.Fill,
-                    AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-                    ScrollBars = ScrollBars.Both,
-                    Tag = keyTag,
-                };
+                    newDataGridView = new DataGridView
+                    {
+                        Name = "dataGridView" + (panelToAddTo.Controls.Count + 1).ToString(),
+                        Size = mainForm.ClientSize,
+                        Dock = DockStyle.Fill,
+                        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                        ScrollBars = ScrollBars.Both,
+                        Tag = keyTag,
+                    };
 
-                if (mouseClick_Handler != null)
-                {
-                    newDataGridView.CellClick += new DataGridViewCellEventHandler(mouseClick_Handler);
-                }
+                    if (mouseClick_Handler != null)
+                        newDataGridView.CellClick += mouseClick_Handler;
 
-                if (columnHeaderMouseClick_Handler != null)
-                {
-                    newDataGridView.ColumnHeaderMouseClick += new DataGridViewCellMouseEventHandler(columnHeaderMouseClick_Handler);
-                }
+                    if (columnHeaderMouseClick_Handler != null)
+                        newDataGridView.ColumnHeaderMouseClick += columnHeaderMouseClick_Handler;
 
-                panelToAddTo.Controls.Add(newDataGridView);
-                newDataGridView.BringToFront();
+                    panelToAddTo.Controls.Add(newDataGridView);
+                    newDataGridView.BringToFront();
 
-                // Disable sorting for each column
-                foreach (DataGridViewColumn column in newDataGridView.Columns)
-                {
-                    column.SortMode = DataGridViewColumnSortMode.NotSortable;
-                }
+                    foreach (DataGridViewColumn column in newDataGridView.Columns)
+                        column.SortMode = DataGridViewColumnSortMode.NotSortable;
 
-                newDataGridView.DataSource = dataTable;
-                newDataGridView.Cursor = Cursors.Hand;
-            });
+                    newDataGridView.DataSource = dataTable;
+                    newDataGridView.Cursor = Cursors.Hand;
+                });
+
+                Logger.LogInfo(null, "DataGridView created and added to panel successfully.");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error creating DataGridView: {ex.Message}");
+                throw;
+            }
 
             return newDataGridView;
         }
 
-        public static void CreateDropDownMenu(ref Button buttonToUse, ref ContextMenuStrip? contextMenuStrip, Dictionary<string, string> dictionaryToUse, bool allActive = false, int visibleItemCount = 30, bool clean = false)
+        /// <summary>
+        /// Creates a dropdown menu (ContextMenuStrip) for a dictionary of items and attaches it to a button.
+        /// </summary>
+        public static void CreateDropDownMenu(
+            ref Button buttonToUse,
+            ref ContextMenuStrip? contextMenuStrip,
+            Dictionary<string, string> dictionaryToUse,
+            bool allActive = false,
+            int visibleItemCount = 30,
+            bool clean = false)
         {
-            contextMenuStrip = new ContextMenuStrip();
-            Button localButtonToUse = buttonToUse;
-            // List to hold all menu items
-            List<ToolStripMenuItem> allMenuItems = new();
-            List<string> selectedItems = new();
-            foreach (KeyValuePair<string, string> item in dictionaryToUse)
+            Logger.LogDebug(null, $"Starting CreateDropDownMenu for button '{buttonToUse.Name}'...");
+
+            try
             {
-                ToolStripMenuItem menuItem;
-                if (clean)
+                contextMenuStrip = new ContextMenuStrip();
+                Button localButtonToUse = buttonToUse;
+
+                List<ToolStripMenuItem> allMenuItems = new();
+                List<string> selectedItems = new();
+
+                foreach (KeyValuePair<string, string> item in dictionaryToUse)
                 {
-                    menuItem = new ToolStripMenuItem($"{item.Value}")
+                    string text = clean
+                        ? $"{item.Value}"
+                        : $"{item.Key} - {item.Value}";
+
+                    ToolStripMenuItem menuItem = new ToolStripMenuItem(text)
                     {
                         CheckOnClick = true,
                         Checked = allActive,
                         Font = new Font("Segoe UI", 10, FontStyle.Regular),
                         Tag = item.Key
                     };
-                }
-                else
-                {
-                    menuItem = new ToolStripMenuItem($"{item.Key} - {item.Value}")
+
+                    menuItem.Click += (sender, e) =>
                     {
-                        CheckOnClick = true,
-                        Checked = allActive,
-                        Font = new Font("Segoe UI", 10, FontStyle.Regular),
-                        Tag = item.Key
+                        if (sender is ToolStripMenuItem clickedItem)
+                        {
+                            string? nullTag = clickedItem.Tag?.ToString();
+                            string tag = nullTag ?? string.Empty;
+
+                            if (clickedItem.Checked)
+                            {
+                                if (!string.IsNullOrWhiteSpace(tag))
+                                    selectedItems.Add(tag);
+                            }
+                            else
+                            {
+                                if (!string.IsNullOrWhiteSpace(tag) && selectedItems.Contains(tag))
+                                    selectedItems.Remove(tag);
+                            }
+
+                            localButtonToUse.Text = string.Join(", ", selectedItems);
+
+                            // Adjust the font if there are selected items
+                            if (selectedItems.Count > 0)
+                                AdjustFontSizeToFit(localButtonToUse, localButtonToUse.Text);
+                            else
+                                localButtonToUse.Font = new Font(localButtonToUse.Font.FontFamily, 10, FontStyle.Regular);
+                        }
                     };
+
+                    allMenuItems.Add(menuItem);
                 }
 
-                menuItem.Click += (sender, e) =>
+                int scrollPosition = 0;
+                ContextMenuStrip localMenuStrip = contextMenuStrip;
+
+                void InitialPopulation()
                 {
-                    if (sender is ToolStripMenuItem clickedItem)
+                    localMenuStrip.Items.Clear();
+                    for (int i = 0; i < Math.Min(visibleItemCount, allMenuItems.Count); i++)
                     {
-                        string? nullTag = clickedItem.Tag.ToString();
-                        string tag = "";
-                        if (nullTag != null)
-                        {
-                            tag = nullTag;
-                        }
-                        else
-                        {
-                            Logger.LogWarning(null, $"Tag vuota nel CreateDropDownMenu del {menuItem}");
-                        }
-                        // Check if the item is being selected or deselected
-                        if (clickedItem.Checked)
-                        {
-                            if (!string.IsNullOrWhiteSpace(tag))
-                            {
-                                // Add the item's key to the list of selected items
-                                selectedItems.Add(tag);
-                            }
-                        }
-                        else
-                        {
-                            if (!string.IsNullOrWhiteSpace(tag) && selectedItems.Contains(tag))
-                            {
-                                // Remove the item's key from the list of selected items
-                                selectedItems.Remove(tag);
-                            }
-                        }
-
-                        // Update the button's text with all selected item keys, joined by commas
-                        localButtonToUse.Text = string.Join(", ", selectedItems);
-
-                        if (selectedItems.Count > 0)
-                        {
-                            AdjustFontSizeToFit(localButtonToUse, localButtonToUse.Text);
-                        }
-                        else
-                        {
-                            // Reset font size to default if no items are selected
-                            localButtonToUse.Font = new Font(localButtonToUse.Font.FontFamily, 10, FontStyle.Regular);
-                        }
+                        localMenuStrip.Items.Add(allMenuItems[i]);
                     }
+                }
+
+                buttonToUse.Click += (sender, e) =>
+                {
+                    InitialPopulation();
+                    localMenuStrip.Show(localButtonToUse, new Point(0, localButtonToUse.Height));
                 };
 
-                allMenuItems.Add(menuItem);
-            }
-
-            int scrollPosition = 0; // Track the current scroll position
-
-            ContextMenuStrip localMenuStrip = contextMenuStrip;
-
-            void InitialPopulation()
-            {
-                localMenuStrip.Items.Clear();
-                for (int i = 0; i < Math.Min(visibleItemCount, allMenuItems.Count); i++)
+                contextMenuStrip.MouseWheel += (sender, e) =>
                 {
-                    localMenuStrip.Items.Add(allMenuItems[i]);
-                }
-            }
+                    int previousScrollPosition = scrollPosition;
+                    scrollPosition -= Math.Sign(e.Delta) * 3; // Smoother scroll
+                    scrollPosition = Math.Max(0, Math.Min(scrollPosition, allMenuItems.Count - visibleItemCount));
 
-            void AdjustFontSizeToFit(Button button, string text)
-            {
-                using Graphics g = button.CreateGraphics();
-                float fontSize = button.Font.Size;
-                SizeF stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
+                    int delta = scrollPosition - previousScrollPosition;
+                    UpdateVisibleItems(scrollPosition, delta);
+                };
 
-                // Try increasing font size until the text size exceeds the button's dimensions
-                while (true)
+                void UpdateVisibleItems(int newScrollPosition, int delta)
                 {
-                    SizeF newSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize + 0.2f));
-
-                    // Check if increasing makes the text too large for the button's width or height
-                    if (newSize.Width > button.Width - 10 || newSize.Height > button.Height - 10) // 10 is a buffer to avoid text touching the button edges
+                    if (delta > 0) // scrolling down
                     {
-                        break; // Stop if the next size would exceed the button's dimensions
+                        for (int i = 0; i < delta; i++)
+                        {
+                            if (localMenuStrip.Items.Count >= visibleItemCount)
+                                localMenuStrip.Items.RemoveAt(0);
+
+                            if (newScrollPosition + visibleItemCount - 1 + i < allMenuItems.Count)
+                                localMenuStrip.Items.Add(allMenuItems[newScrollPosition + visibleItemCount - 1 + i]);
+                        }
                     }
-                    else
+                    else if (delta < 0) // scrolling up
                     {
-                        fontSize += 0.2f; // Increase font size by small increments
+                        for (int i = delta; i < 0; i++)
+                        {
+                            if (localMenuStrip.Items.Count >= visibleItemCount)
+                                localMenuStrip.Items.RemoveAt(localMenuStrip.Items.Count - 1);
+
+                            if (newScrollPosition - i < allMenuItems.Count)
+                                localMenuStrip.Items.Insert(0, allMenuItems[newScrollPosition - i]);
+                        }
+                    }
+                }
+
+                void AdjustFontSizeToFit(Button button, string text)
+                {
+                    using Graphics g = button.CreateGraphics();
+                    float fontSize = button.Font.Size;
+                    SizeF stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
+
+                    // Increase font size while it fits
+                    while (true)
+                    {
+                        SizeF newSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize + 0.2f));
+                        if (newSize.Width > button.Width - 10 || newSize.Height > button.Height - 10)
+                        {
+                            break;
+                        }
+                        fontSize += 0.2f;
                         stringSize = newSize;
                     }
-                }
 
-                // Decrease font size if the text size exceeds the button's width or height
-                while ((stringSize.Width > button.Width - 10 || stringSize.Height > button.Height - 10) && fontSize > 1)
-                {
-                    fontSize -= 0.2f; // Decrease font size by small increments
-                    stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
-                }
-
-                // Apply the calculated font size to the button
-                button.Font = new Font(button.Font.FontFamily, fontSize, button.Font.Style);
-            }
-
-            void UpdateVisibleItems(int newScrollPosition, int delta)
-            {
-                if (delta > 0) // Scrolling down
-                {
-                    for (int i = 0; i < delta; i++)
+                    // Decrease font size if too large
+                    while ((stringSize.Width > button.Width - 10 || stringSize.Height > button.Height - 10) && fontSize > 1)
                     {
-                        if (localMenuStrip.Items.Count >= visibleItemCount)
-                        {
-                            localMenuStrip.Items.RemoveAt(0);
-                        }
-                        if (newScrollPosition + visibleItemCount - 1 + i < allMenuItems.Count)
-                        {
-                            localMenuStrip.Items.Add(allMenuItems[newScrollPosition + visibleItemCount - 1 + i]);
-                        }
+                        fontSize -= 0.2f;
+                        stringSize = g.MeasureString(text, new Font(button.Font.FontFamily, fontSize));
                     }
+
+                    button.Font = new Font(button.Font.FontFamily, fontSize, button.Font.Style);
                 }
-                else if (delta < 0) // Scrolling up
-                {
-                    for (int i = delta; i < 0; i++)
-                    {
-                        if (localMenuStrip.Items.Count >= visibleItemCount)
-                        {
-                            localMenuStrip.Items.RemoveAt(localMenuStrip.Items.Count - 1);
-                        }
-                        if (newScrollPosition - i < allMenuItems.Count)
-                        {
-                            localMenuStrip.Items.Insert(0, allMenuItems[newScrollPosition - i]);
-                        }
-                    }
-                }
+
+                Logger.LogInfo(null, $"CreateDropDownMenu completed for button '{buttonToUse.Name}'.");
             }
-
-            buttonToUse.Click += (sender, e) =>
+            catch (Exception ex)
             {
-                InitialPopulation(); // Populate the initial set of items
-                localMenuStrip.Show(localButtonToUse, new Point(0, localButtonToUse.Height));
-            };
-
-            contextMenuStrip.MouseWheel += (sender, e) =>
-            {
-                int previousScrollPosition = scrollPosition;
-                scrollPosition -= Math.Sign(e.Delta) * 3; // Smoother scroll with smaller step
-                scrollPosition = Math.Max(0, Math.Min(scrollPosition, allMenuItems.Count - visibleItemCount));
-
-                int delta = scrollPosition - previousScrollPosition;
-
-                UpdateVisibleItems(scrollPosition, delta); // Update visible items based on scroll
-            };
+                Logger.LogError(null, $"Error creating dropdown menu: {ex.Message}");
+                throw;
+            }
         }
 
+        /// <summary>
+        /// Ensures that a directory path exists. If not, it is created.
+        /// </summary>
         public static string EnsureDirectory(string path)
         {
-            if (!Directory.Exists(path))
+            try
             {
-                Directory.CreateDirectory(path);
+                if (!Directory.Exists(path))
+                    Directory.CreateDirectory(path);
+
+                Logger.LogDebug(null, $"Directory ensured: {path}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error ensuring directory '{path}': {ex.Message}");
+                throw;
             }
             return path;
         }
@@ -664,18 +648,16 @@ namespace ProcedureNet7
 
         public static string RemoveNonAlphanumeric(string input)
         {
-            // Use Regex to replace any character that is not a letter or number with an empty string
             return Regex.Replace(input, "[^a-zA-Z0-9]", "");
         }
+
         public static string RemoveNonNumeric(string input)
         {
-            // Use Regex to replace any character that is not a letter or number with an empty string
             return Regex.Replace(input, "[^0-9]", "");
         }
 
         public static string RemoveNonAlphanumericAndKeepSpaces(string input)
         {
-            // Use Regex to replace any character that is not a letter, number, or space with an empty string
             return Regex.Replace(input, "[^a-zA-Z0-9 ]", "");
         }
 
@@ -684,8 +666,6 @@ namespace ProcedureNet7
             if (record[fieldName] is DBNull or null)
                 return string.Empty;
 
-            // At this point, record[fieldName] is neither DBNull nor null.
-            // You can now safely call ToString() on it.
             return record[fieldName].ToString()!;
         }
 
@@ -716,31 +696,44 @@ namespace ProcedureNet7
             if (record[index] is DBNull or null)
                 return string.Empty;
 
-            // At this point, record[fieldName] is neither DBNull nor null.
-            // You can now safely call ToString() on it.
             return record[index].ToString()!;
         }
+
+        /// <summary>
+        /// Converts a generic List of objects (with public properties) to a DataTable.
+        /// </summary>
         public static DataTable ConvertListToDataTable<T>(List<T> items)
         {
+            Logger.LogDebug(null, $"Converting list of {typeof(T).Name} to DataTable...");
+
             DataTable dataTable = new DataTable(typeof(T).Name);
 
-            // Get all the properties
-            PropertyInfo[] Props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            foreach (PropertyInfo prop in Props)
+            try
             {
-                // Setting column names as Property names
-                dataTable.Columns.Add(prop.Name, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
-            }
-            foreach (T item in items)
-            {
-                var values = new object[Props.Length];
-                for (int i = 0; i < Props.Length; i++)
+                PropertyInfo[] props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                foreach (PropertyInfo prop in props)
                 {
-                    // Inserting property values to DataTable rows
-                    values[i] = Props[i].GetValue(item, null);
+                    dataTable.Columns.Add(prop.Name, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
                 }
-                dataTable.Rows.Add(values);
+
+                foreach (T item in items)
+                {
+                    var values = new object[props.Length];
+                    for (int i = 0; i < props.Length; i++)
+                    {
+                        values[i] = props[i].GetValue(item, null) ?? DBNull.Value;
+                    }
+                    dataTable.Rows.Add(values);
+                }
+
+                Logger.LogInfo(null, $"Conversion successful. Rows={dataTable.Rows.Count}, Cols={dataTable.Columns.Count}.");
             }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"Error converting list to DataTable: {ex.Message}");
+                throw;
+            }
+
             return dataTable;
         }
     }
