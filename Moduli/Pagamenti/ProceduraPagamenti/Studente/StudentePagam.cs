@@ -193,7 +193,6 @@ namespace ProcedureNet7
             bool prorogaValido,
             bool contrattoEnte,
             string denominazioneEnte,
-            int durataContrattoEnte,
             double importoRataEnte
             )
         {
@@ -211,7 +210,6 @@ namespace ProcedureNet7
             this.prorogaValido = prorogaValido;
             domicilio.contrEnte = contrattoEnte;
             domicilio.denominazioneIstituto = denominazioneEnte;
-            domicilio.durataMesiContrattoIstituto = durataContrattoEnte;
             domicilio.importoMensileRataIstituto = importoRataEnte;
         }
 
@@ -366,7 +364,6 @@ namespace ProcedureNet7
 
         public TipologiaEnteIstituto tipologiaEnteIstituto;
         public string denominazioneIstituto;
-        public int durataMesiContrattoIstituto;//vDomicilio.durata_contratto
         public double importoMensileRataIstituto;
     }
 }

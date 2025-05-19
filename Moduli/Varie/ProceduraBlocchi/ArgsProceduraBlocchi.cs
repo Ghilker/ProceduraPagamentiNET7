@@ -21,6 +21,7 @@ namespace ProcedureNet7
         public string _blocksUsername { get; set; }
         public bool _blocksGiaRimossi { get; set; }
         public bool _blocksInsertMessaggio { get; set; }
+        public bool _blocksInsertNota { get; set; }
 
         public ArgsProceduraBlocchi()
         {

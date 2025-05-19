@@ -13,6 +13,7 @@ namespace ProcedureNet7
         public string _selectedFileFlusso { get; set; }
         [Required(ErrorMessage = "Indicare il codice del mandato opzionale inserito in precedenza")]
         public string _selectedImpegnoProvv { get; set; }
+        public bool _ignoraFlussi1 { get; set; }
 
         public ArgsProceduraFlussoDiRitorno()
         {

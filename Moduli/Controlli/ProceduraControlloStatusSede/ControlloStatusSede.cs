@@ -18,6 +18,24 @@ namespace ProcedureNet7
         public string selectedAA = string.Empty;
         public string folderPath = string.Empty;
         public DataTable studentiPendolari = new();
+        private static readonly Dictionary<string, int> _comuneCompatGroup = new()
+        {
+            // group 1
+            ["G954"] = 1,
+            ["L725"] = 1,
+
+            // group 2
+            ["G698"] = 2,
+            ["E472"] = 2,
+
+            // group 3
+            ["D708"] = 3,
+            ["D843"] = 3,
+
+            // group 4
+            ["A323"] = 4,
+            ["F880"] = 4
+        };
 
         public override void RunProcedure(ArgsControlloStatusSede args)
         {
@@ -25,7 +43,24 @@ namespace ProcedureNet7
             folderPath = args._folderPath;
 
             studentiPendolari.Columns.Add("CodFiscale");
+            studentiPendolari.Columns.Add("TitoloOneroso");
+            studentiPendolari.Columns.Add("SerieContratto");
+            studentiPendolari.Columns.Add("DataRegistrazione");
+            studentiPendolari.Columns.Add("DataDecorrenza");
+            studentiPendolari.Columns.Add("DataScadenza");
+            studentiPendolari.Columns.Add("DurataContratto");
+            studentiPendolari.Columns.Add("Prorogato");
+            studentiPendolari.Columns.Add("DurataProroga");
+            studentiPendolari.Columns.Add("SerieProroga");
+            studentiPendolari.Columns.Add("ContrattoEnte");
+            studentiPendolari.Columns.Add("DenomEnte");
+            studentiPendolari.Columns.Add("ImportoRataEnte");
             studentiPendolari.Columns.Add("Motivo");
+            studentiPendolari.Columns.Add("StatoAttuale");
+            studentiPendolari.Columns.Add("StatoSuggerito");
+            studentiPendolari.Columns.Add("ComuneDom");
+            studentiPendolari.Columns.Add("ComuneRes");
+            studentiPendolari.Columns.Add("ComuneSede");
 
             PopulateStudentDomicilio();
 
@@ -59,10 +94,27 @@ namespace ProcedureNet7
 	        LRS.ESTREMI_PROROGA,
 	        LRS.TIPO_CONTRATTO_TITOLO_ONEROSO,
 	        LRS.DENOM_ENTE,
-	        LRS.DURATA_CONTRATTO,
-	        LRS.IMPORTO_RATA
+	        LRS.IMPORTO_RATA,
+            LRS.COD_COMUNE  AS CodComuneDom,
+            vr.Cod_comune   AS CodComuneRes,
+            cl.Comune_Sede_studi AS CodComuneSede,
+            vv.Status_sede,
+            prev.DATA_SCADENZA AS PrevScadenza,
+            DATEDIFF(day, prev.DATA_SCADENZA, LRS.DATA_REG_CONTRATTO) AS GiorniDallaScad,
+	        dbo.SlashBlocchi(vv.Num_domanda, vv.Anno_accademico, '') as cod_blocchi
         FROM 
             LUOGO_REPERIBILITA_STUDENTE AS LRS
+            OUTER APPLY (
+                SELECT TOP 1
+                       prev.DATA_SCADENZA
+                FROM   LUOGO_REPERIBILITA_STUDENTE prev
+                WHERE  prev.COD_FISCALE      = LRS.COD_FISCALE
+                  AND  prev.ANNO_ACCADEMICO  = LRS.ANNO_ACCADEMICO
+                  AND  prev.TIPO_LUOGO       = 'DOM'
+                  AND  prev.PROROGA          = 0                -- original contract
+                  AND  prev.DATA_VALIDITA    < LRS.DATA_VALIDITA
+                ORDER BY prev.DATA_VALIDITA DESC
+            ) AS prev
             INNER JOIN Comuni 
                 ON LRS.COD_COMUNE = Comuni.Cod_comune
             INNER JOIN Domanda
@@ -74,7 +126,7 @@ namespace ProcedureNet7
             INNER JOIN vValori_calcolati AS vv
                 ON Domanda.Anno_accademico = vv.Anno_accademico
                AND Domanda.Num_domanda     = vv.Num_domanda
-               AND vv.Status_sede = 'B'
+               AND vv.Status_sede in ('B', 'D')
 
             -- Must have tipo esito BS != 0
             INNER JOIN vEsiti_concorsiBS AS vb
@@ -94,6 +146,14 @@ namespace ProcedureNet7
                AND Domanda.Cod_fiscale     = vi.Cod_fiscale
                AND Domanda.Tipo_bando      = vi.tipo_bando
                AND vi.Cod_tipologia_studi <> '06'
+
+            INNER JOIN Corsi_laurea           AS cl
+                  ON vi.Cod_corso_laurea     = cl.Cod_corso_laurea
+                 AND vi.Anno_accad_inizio    = cl.Anno_accad_inizio
+                 AND vi.Cod_tipo_ordinamento = cl.Cod_tipo_ordinamento
+                 AND vi.Cod_facolta          = cl.Cod_facolta
+                 AND vi.Cod_sede_studi       = cl.Cod_sede_studi
+                 AND vi.Cod_tipologia_studi  = cl.Cod_tipologia_studi
 
             -- Join to vResidenza to handle the 'EE' logic
             INNER JOIN vResidenza AS vr
@@ -121,6 +181,14 @@ namespace ProcedureNet7
                    AND Anno_Accademico = '{selectedAA}'
             )
 
+            AND Domanda.Cod_fiscale NOT IN (
+                 SELECT Cod_Fiscale
+                 FROM Forzature_StatusSede
+                 WHERE Data_fine_validita IS NULL
+                   AND Status_sede = 'D'
+                   AND Anno_Accademico = '{selectedAA}'
+            )
+
             -- Must NOT have tipo esito PA <> 0
             AND Domanda.Num_domanda NOT IN (
                  SELECT Num_domanda
@@ -142,6 +210,7 @@ namespace ProcedureNet7
                      WHERE vn1.Numero_conviventi_estero >= vn1.Num_componenti / 2
                 )
 		
+            
             );
 
 
@@ -177,8 +246,16 @@ namespace ProcedureNet7
                             DurataProroga = Utilities.SafeGetInt(reader, "DURATA_PROROGA"),
                             SerieProroga = Utilities.SafeGetString(reader, "ESTREMI_PROROGA"),
                             DenominazioneEnte = Utilities.SafeGetString(reader, "DENOM_ENTE"),
-                            DurataContrattoEnte = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO"),
-                            ImportoRataEnte = Utilities.SafeGetDouble(reader, "IMPORTO_RATA")
+                            ImportoRataEnte = Utilities.SafeGetDouble(reader, "IMPORTO_RATA"),
+                            StatusSede = Utilities.SafeGetString(reader, "Status_sede"),
+                            CodBlocchi = Utilities.SafeGetString(reader, "cod_blocchi"),
+                            ComuneDomicilio = Utilities.SafeGetString(reader, "CodComuneDom"),
+                            ComuneResidenza = Utilities.SafeGetString(reader, "CodComuneRes"),
+                            ComuneSedeStudi = Utilities.SafeGetString(reader, "CodComuneSede"),
+                            GiorniDallaScad = Utilities.SafeGetInt(reader, "GiorniDallaScad"),
+                            PrevScadenza = Utilities.SafeGetDateTime(reader, "PrevScadenza"),
+
+
                         });
                     }
                 }
@@ -189,7 +266,26 @@ namespace ProcedureNet7
             // -----------------------
             foreach (var row in domicilioRows)
             {
+
+                if (row.CodFiscale == "MLNNNL04M44F839V")
+                {
+                    string test = "";
+                }
                 bool studenteDomicilioOK = false;
+                bool hasVccBlock = !string.IsNullOrWhiteSpace(row.CodBlocchi) &&
+                   row.CodBlocchi.IndexOf("/VVC", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                bool domEqualsRes = AreComuniCompatible(row.ComuneDomicilio,
+                                        row.ComuneResidenza);
+
+
+                bool domEqualsSeat = string.Equals(row.ComuneDomicilio,
+                                                    row.ComuneSedeStudi,
+                                                    StringComparison.OrdinalIgnoreCase);
+
+                bool geoOk = !domEqualsRes && domEqualsSeat;
+
+
                 Domicilio domicilio = new Domicilio();
                 // Debug check
                 if (row.CodFiscale == "VLNDNS01T54E885A")
@@ -254,7 +350,7 @@ namespace ProcedureNet7
                 // ----- CONTRATTO ENTE -----
                 bool contrattoEnte = row.ContrattoEnte;
                 string denominazioneEnte = row.DenominazioneEnte;
-                int durataContrattoEnte = row.DurataContrattoEnte;
+                int durataContratto = row.DurataContratto;
                 double importoRataEnte = row.ImportoRataEnte;
                 bool contrattoEnteValido = false;
 
@@ -268,7 +364,7 @@ namespace ProcedureNet7
                     else
                     {
                         // Must have at least 10 months and a rate > 0
-                        if (durataContrattoEnte < 10 || importoRataEnte <= 0)
+                        if (durataContratto < 10 || importoRataEnte <= 0)
                         {
                             studenteDomicilioOK = false;
                         }
@@ -295,14 +391,24 @@ namespace ProcedureNet7
                     prorogaValido = false;
                 }
 
-                bool isDomicilioValidOrNotNeeded = studenteDomicilioOK && contrattoValido && !(row.Prorogato == true && !prorogaValido);
+                bool prorogaTempisticaOK =
+    !(row.Prorogato ?? false)            // nothing to check if no proroga
+    || row.GiorniDallaScad <= 30;        // filed within 30 days
 
-                if (isDomicilioValidOrNotNeeded)
-                    continue;
+                // final validity
+                bool isDomicilioValidOrNotNeeded =
+                        studenteDomicilioOK
+                     && contrattoValido
+                     && !(row.Prorogato == true && !prorogaValido)
+                     && prorogaTempisticaOK              // ← NEW
+                     && geoOk;
 
                 // Build the message for reasons why they were paid as pendolari
                 string messaggio = string.Empty;
-
+                if (!geoOk)
+                {
+                    messaggio += "#Comune domicilio/residenza/sede non coerenti";
+                }
                 if (!studenteDomicilioOK)
                 {
                     messaggio += "#Durata contratto minore dieci mesi";
@@ -318,7 +424,92 @@ namespace ProcedureNet7
                         $"- Proroga {serieProroga}";
                 }
 
-                studentiPendolari.Rows.Add(row.CodFiscale, messaggio);
+                if (row.Prorogato == true && !prorogaTempisticaOK)
+                {
+                    messaggio += $"#Proroga inserita dopo {row.GiorniDallaScad} giorni (limite 30)";
+                }
+
+                if (row.StatusSede == "B" && !isDomicilioValidOrNotNeeded)
+                {
+                    studentiPendolari.Rows.Add(
+                        row.CodFiscale,
+                        row.TitoloOneroso,
+                        row.SerieContratto,
+                        row.DataRegistrazioneString,
+                        row.DataDecorrenzaString,
+                        row.DataScadenzaString,
+                        row.DurataContratto,
+                        row.Prorogato,
+                        row.DurataProroga,
+                        row.SerieProroga,
+                        row.ContrattoEnte,
+                        row.DenominazioneEnte,
+                        row.ImportoRataEnte,
+                        messaggio,
+                        "B",                            // StatoAttuale
+                        "D",                             // StatoSuggerito
+                        row.ComuneDomicilio,
+                        row.ComuneResidenza,
+                        row.ComuneSedeStudi
+                    );
+                    continue;
+                }
+
+                if (row.StatusSede == "B" && isDomicilioValidOrNotNeeded && hasVccBlock)
+                {
+                    string motivoVcc = "#Rimuovere blocco VVC";
+                    studentiPendolari.Rows.Add(
+                        row.CodFiscale,
+                        row.TitoloOneroso,
+                        row.SerieContratto,
+                        row.DataRegistrazioneString,
+                        row.DataDecorrenzaString,
+                        row.DataScadenzaString,
+                        row.DurataContratto,
+                        row.Prorogato,
+                        row.DurataProroga,
+                        row.SerieProroga,
+                        row.ContrattoEnte,
+                        row.DenominazioneEnte,
+                        row.ImportoRataEnte,
+                        motivoVcc,
+                        "B",
+                        "B",
+                        row.ComuneDomicilio,
+                        row.ComuneResidenza,
+                        row.ComuneSedeStudi
+                    );
+                    continue;
+                }
+
+                // ─── D ➜ B ────────────────────────────────────────────────────────────────
+                if (row.StatusSede == "D" && isDomicilioValidOrNotNeeded)
+                {
+                    string motivazione = "#Contratto valido almeno 10 mesi";
+                    // (aggiungi eventuali altri motivi se utili)
+
+                    studentiPendolari.Rows.Add(
+                        row.CodFiscale,
+                        row.TitoloOneroso,
+                        row.SerieContratto,
+                        row.DataRegistrazioneString,
+                        row.DataDecorrenzaString,
+                        row.DataScadenzaString,
+                        row.DurataContratto,
+                        row.Prorogato,
+                        row.DurataProroga,
+                        row.SerieProroga,
+                        row.ContrattoEnte,
+                        row.DenominazioneEnte,
+                        row.ImportoRataEnte,
+                        motivazione,
+                        "D",                            // StatoAttuale
+                        "B",                             // StatoSuggerito
+                        row.ComuneDomicilio,
+                        row.ComuneResidenza,
+                        row.ComuneSedeStudi
+                    );
+                }
 
             }
 
@@ -352,10 +543,11 @@ namespace ProcedureNet7
                     return false;
                 }
 
-                // Exclude '3T' or 'serie 3T' alone
-                string serieWithoutSpaces = Regex.Replace(serie, @"\s+", "");
-                if (string.Equals(serieWithoutSpaces, "3T", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(serieWithoutSpaces, "serie3T", StringComparison.OrdinalIgnoreCase))
+                string serieNoSpaces = Regex.Replace(serie, @"\s+", "");
+                if (string.Equals(serieNoSpaces, "3T", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(serieNoSpaces, "T3", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(serieNoSpaces, "serie3T", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(serieNoSpaces, "serieT3", StringComparison.OrdinalIgnoreCase))
                 {
                     return false;
                 }
@@ -407,6 +599,15 @@ namespace ProcedureNet7
                 // If none match, it's invalid
                 return false;
             }
+        }
+        private static bool AreComuniCompatible(string? c1, string? c2)
+        {
+            if (string.Equals(c1, c2, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return _comuneCompatGroup.TryGetValue(c1 ?? string.Empty, out int g1) &&
+                   _comuneCompatGroup.TryGetValue(c2 ?? string.Empty, out int g2) &&
+                   g1 == g2;
         }
     }
 }

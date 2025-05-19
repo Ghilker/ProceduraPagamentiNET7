@@ -680,6 +680,18 @@ namespace ProcedureNet7
             return defaultValue;
         }
 
+        public static DateTime SafeGetDateTime(this IDataRecord record, string fieldName, DateTime? defaultValue = null)
+        {
+            if (record[fieldName] is DBNull or null)
+                return defaultValue ?? DateTime.MinValue;
+
+            if (DateTime.TryParse(record[fieldName].ToString(), out DateTime result))
+                return result;
+
+            return defaultValue ?? DateTime.MinValue;
+        }
+
+
         public static double SafeGetDouble(this IDataRecord record, string fieldName, double defaultValue = 0.0)
         {
             if (record[fieldName] is DBNull or null)

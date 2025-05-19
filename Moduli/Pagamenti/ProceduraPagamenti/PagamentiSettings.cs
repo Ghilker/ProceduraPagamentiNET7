@@ -317,7 +317,7 @@ namespace ProcedureNet7
                                     WHERE
 		                                Cod_tipo_esito='2' AND
                                         domanda.Anno_accademico = @annoAccademico AND
-                                        Domanda.Tipo_bando in ('lz', 'pl', 'bl', 'ca')
+                                        Domanda.Tipo_bando in ('lz', 'pl', 'bl', 'ca', 'cs')
                                 )
                             ";
 
@@ -334,7 +334,8 @@ namespace ProcedureNet7
         BorsaDiStudio,
         PremioDiLaurea,
         BuonoLibro,
-        TassaRegionale
+        TassaRegionale,
+        ContributoStraordinario
     }
 
     public static class PagamentiExtensions
@@ -357,6 +358,7 @@ namespace ProcedureNet7
                 case TipoBeneficio.PremioDiLaurea: return "PL";
                 case TipoBeneficio.BuonoLibro: return "BL";
                 case TipoBeneficio.TassaRegionale: return "TR";
+                case TipoBeneficio.ContributoStraordinario: return "CS";
 
                 default: throw new ArgumentOutOfRangeException(nameof(tipoBeneficio), tipoBeneficio, null);
             }

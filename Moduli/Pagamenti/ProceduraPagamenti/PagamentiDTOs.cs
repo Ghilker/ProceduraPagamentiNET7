@@ -35,11 +35,22 @@ namespace ProcedureNet7
         public string DataDecorrenzaString { get; set; } = "";
         public string DataScadenzaString { get; set; } = "";
         public int DurataContratto { get; set; }
-        public bool Prorogato { get; set; }
+        public bool? Prorogato { get; set; }
         public int DurataProroga { get; set; }
         public string SerieProroga { get; set; } = "";
         public string DenominazioneEnte { get; set; } = "";
-        public int DurataContrattoEnte { get; set; }
         public double ImportoRataEnte { get; set; }
+        public string StatusSede { get; set; }
+        public string CodBlocchi { get; set; }
+
+        public string ComuneDomicilio { get; set; }
+        public string ComuneResidenza { get; set; }
+        public string ComuneSedeStudi { get; set; }
+
+        public DateTime AAStart { get; set; }
+        public DateTime AAEnd { get; set; }
+
+        public int GiorniDallaScad { get; set; }   // NEW
+        public DateTime? PrevScadenza { get; set; }
     }
 }

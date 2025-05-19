@@ -1209,10 +1209,30 @@ namespace ProcedureNet7
                             break;
                         }
 
-                        if (isTR && (pagamento.codTipoPagam == "BSS0" || pagamento.codTipoPagam == "BSS1" || pagamento.codTipoPagam == "BSS2") && !pagamento.ritiratoAzienda)
+                        if (isTR &&
+                            (
+                                (
+                                    (studenteDaControllare.superamentoEsami
+                                     || studenteDaControllare.superamentoEsamiTassaRegionale)
+                                    && (pagamento.codTipoPagam == "BSS0"
+                                        || pagamento.codTipoPagam == "BSS1"
+                                        || pagamento.codTipoPagam == "BSS2")
+                                    && !pagamento.ritiratoAzienda
+                                )
+                                ||
+                                (
+                                    studenteDaControllare.superamentoEsamiTassaRegionale
+                                    && (pagamento.codTipoPagam == "BSP0"
+                                        || pagamento.codTipoPagam == "BSP1"
+                                        || pagamento.codTipoPagam == "BSP2")
+                                    && !pagamento.ritiratoAzienda
+                                )
+                            )
+                        )
                         {
                             okTassaRegionale = true;
                         }
+
 
                         importiPagati += pagamento.importoPagamento;
                     }
@@ -1490,6 +1510,11 @@ namespace ProcedureNet7
                 sqlKiller += " AND Domanda.tipo_bando like 'L%'";
             }
 
+            if (tipoBeneficio == TipoBeneficio.ContributoStraordinario.ToCode())
+            {
+                sqlKiller += " AND Domanda.tipo_bando like 'CS'";
+            }
+
             SqlCommand readData = new(sqlKiller, CONNECTION, sqlTransaction)
             {
                 CommandTimeout = 9000000
@@ -1556,7 +1581,7 @@ namespace ProcedureNet7
                     studentiDaPagare.TryGetValue(codFiscale, out StudentePagam? studente);
                     if (studente != null)
                     {
-                        string IBAN = Utilities.SafeGetString(reader, "IBAN").ToUpper();
+                        string IBAN = Utilities.SafeGetString(reader, "IBAN").ToUpper().Trim();
                         if (IBAN == string.Empty && !listaStudentiDaEliminareIBAN.Contains(studente.codFiscale))
                         {
                             listaStudentiDaEliminareIBAN.Add(studente.codFiscale);
@@ -1931,7 +1956,6 @@ namespace ProcedureNet7
                                 DurataProroga = Utilities.SafeGetInt(reader, "DURATA_PROROGA"),
                                 SerieProroga = Utilities.SafeGetString(reader, "ESTREMI_PROROGA"),
                                 DenominazioneEnte = Utilities.SafeGetString(reader, "DENOM_ENTE"),
-                                DurataContrattoEnte = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO"),
                                 ImportoRataEnte = Utilities.SafeGetDouble(reader, "IMPORTO_RATA")
                             });
                         }
@@ -1982,7 +2006,7 @@ namespace ProcedureNet7
                     // ----- CONTRATTO ENTE -----
                     bool contrattoEnte = row.ContrattoEnte;
                     string denominazioneEnte = row.DenominazioneEnte;
-                    int durataContrattoEnte = row.DurataContrattoEnte;
+                    int durataContratto = row.DurataContratto;
                     double importoRataEnte = row.ImportoRataEnte;
                     bool contrattoEnteValido = false;
 
@@ -1996,7 +2020,7 @@ namespace ProcedureNet7
                         else
                         {
                             // Must have at least 10 months and a rate > 0
-                            if (durataContrattoEnte < 10 || importoRataEnte <= 0)
+                            if (durataContratto < 10 || importoRataEnte <= 0)
                             {
                                 studente.SetDomicilioCheck(false);
                             }
@@ -2037,14 +2061,13 @@ namespace ProcedureNet7
                         dataDecorrenza,
                         dataScadenza,
                         row.DurataContratto,
-                        row.Prorogato,
+                        row.Prorogato ?? false,
                         row.DurataProroga,
                         serieProroga,
                         contrattoValido,
                         prorogaValido,
                         contrattoEnte,
                         denominazioneEnte,
-                        durataContrattoEnte,
                         importoRataEnte
                     );
                 }
@@ -2728,11 +2751,11 @@ namespace ProcedureNet7
                 {
                     StudentePagam studente = pair.Value;
 
-                    if (studente.codFiscale == "FRCLTR04S50L219I")
+                    if (studente.codFiscale == "DLULMR99P61Z129L")
                     {
                         string stest = "";
                     }
-                    if (studente.codFiscale == "RZZFNC99S42H501Y")
+                    if (studente.codFiscale == "DAOMWN92M21Z352U")
                     {
                         string stest = "";
                     }
@@ -2773,7 +2796,7 @@ namespace ProcedureNet7
                     bool stornoIntegrazionePrimaRata = false;
                     bool riemessaIntegrazionePrimaRata = false;
 
-                    if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode())
+                    if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() || tipoBeneficio == TipoBeneficio.ContributoStraordinario.ToCode())
                     {
                         // Process pagamentiEffettuati
                         foreach (Pagamento pagamento in studente.pagamentiEffettuati)
@@ -2919,7 +2942,9 @@ namespace ProcedureNet7
                     }
 
                     // Calculate importoDaPagare based on various conditions
-                    if (categoriaPagam == "PR" && tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR)
+                    if (categoriaPagam == "PR" && (
+                        tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() || tipoBeneficio == TipoBeneficio.ContributoStraordinario.ToCode()
+                        ) && !isTR)
                     {
                         string currentYear = selectedAA[..4];
                         DateTime percentDate = new(int.Parse(currentYear), 11, 10);
@@ -2939,7 +2964,7 @@ namespace ProcedureNet7
                             importoMassimo *= 0.5;
                         }
                     }
-                    else if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR)
+                    else if ((tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() || tipoBeneficio == TipoBeneficio.ContributoStraordinario.ToCode()) && !isTR)
                     {
                         importoDaPagare = importoMassimo;
                         if (studente.annoCorso == 1)
@@ -2990,7 +3015,7 @@ namespace ProcedureNet7
                             return;
                         }
                     }
-                    if (!isTR)
+                    if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR)
                     {
                         selectedAcademicProcessor.AdjustPendolarePayment(
                             studente,

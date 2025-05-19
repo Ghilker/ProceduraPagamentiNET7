@@ -196,7 +196,7 @@ namespace ProcedureNet7
                 INNER JOIN #CodFiscaleTempTable cf
                     ON d.Cod_fiscale = cf.CodFiscale
                 WHERE d.Anno_accademico = @annoAccademico 
-                    AND d.tipo_bando IN ('lz', 'l2') 
+                    AND d.tipo_bando IN ('lz','l2') 
                     AND d.Num_domanda NOT IN
                         (SELECT DISTINCT Num_domanda
                          FROM dbo.Motivazioni_blocco_pagamenti
@@ -214,7 +214,7 @@ namespace ProcedureNet7
                     INNER JOIN #CodFiscaleTempTable cf ON d.Cod_fiscale = cf.CodFiscale
                 WHERE 
                     d.Anno_accademico = @annoAccademico AND
-                    d.tipo_bando IN ('lz', 'l2') AND
+                    d.tipo_bando IN ('lz','l2') AND
                     d.Num_domanda IN (
                         SELECT DISTINCT Num_domanda
                         FROM Motivazioni_blocco_pagamenti

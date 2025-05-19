@@ -34,6 +34,7 @@ namespace ProcedureNet7
                 Logger.LogInfo(0, $"Inizio lavorazione");
                 selectedFileFlusso = args._selectedFileFlusso;
                 selectedOldMandato = args._selectedImpegnoProvv;
+                ignoraFlussi1 = args._ignoraFlussi1;
                 Logger.LogInfo(10, $"Creazione lista studenti");
                 CreateStudentiList();
                 Logger.LogInfo(20, $"Selezione codice movimento generale");
@@ -52,13 +53,17 @@ namespace ProcedureNet7
 
                 InsertMessaggio(CONNECTION, sqlTransaction);
 
-                Logger.LogInfo(88, $"Annullamento pagamenti scartati");
-                Scartati(CONNECTION, sqlTransaction);
+                if (!ignoraFlussi1)
+                {
+                    Logger.LogInfo(88, $"Annullamento pagamenti scartati");
+                    Scartati(CONNECTION, sqlTransaction);
+                }
                 _ = _masterForm.Invoke((MethodInvoker)delegate
                 {
                     DialogResult result = MessageBox.Show(_masterForm, "continuare?", "cont", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                     if (result == DialogResult.No)
                     {
+                        sqlTransaction.Rollback();
                         throw new Exception("Chiuso dall'utente");
                     }
                 });
@@ -66,8 +71,10 @@ namespace ProcedureNet7
                 _masterForm.inProcedure = false;
                 Logger.LogInfo(100, $"Fine lavorazione");
                 Logger.LogInfo(100, $"Totale studenti lavorati: {studenteRitornoList.Count}");
-                Logger.LogInfo(100, $"Di cui scartati: {studentiScartati.Count}");
-
+                if (!ignoraFlussi1)
+                {
+                    Logger.LogInfo(100, $"Di cui scartati: {studentiScartati.Count}");
+                }
                 sqlTransaction.Commit();
             }
             catch (Exception ex)
@@ -408,52 +415,24 @@ namespace ProcedureNet7
         {
             try
             {
-                string createTempTable = @"
-                        CREATE TABLE #TempMessaggio
-                        (
-                            CodFiscale CHAR(16)
-                        );
-                        ";
-                SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
-                createCmd.ExecuteNonQuery();
-
-                DataTable messaggioTable = MessaggioTable(studenteRitornoList);
-                BulkInsertIntoSqlTable(CONNECTION, messaggioTable, "#TempMessaggio", sqlTransaction);
-
                 string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{selectedOldMandato.Substring(0, 4)}'";
                 SqlCommand cmd1 = new(sqlTipoPagam, CONNECTION, sqlTransaction);
                 string pagamentoDescrizione = (string)cmd1.ExecuteScalar();
 
                 string messaggio = @$"Gentile studente/ssa, il pagamento riguardante ''{pagamentoDescrizione}'' è avvenuto con successo. <br>Puoi trovare il dettaglio nella sezione storico esiti pagamenti della tua area riservata";
-
-                string sqlInsertPagam = $@"
-                       INSERT INTO [dbo].[MESSAGGI_STUDENTE]
-                                   ([COD_FISCALE]
-                                   ,[DATA_INSERIMENTO_MESSAGGIO]
-                                   ,[MESSAGGIO]
-                                   ,[LETTO]
-                                   ,[DATA_LETTURA]
-                                   ,[UTENTE])
-                         SELECT
-                                   tm.CodFiscale
-		                           ,CURRENT_TIMESTAMP
-                                   ,'{messaggio}'
-                                   ,0
-                                   ,NULL
-                                   ,'Area4_pagam'
-
-                        from #TempMessaggio as tm
-
-                        ";
-
-                using (SqlCommand cmd = new SqlCommand(sqlInsertPagam, CONNECTION, sqlTransaction))
+                Dictionary<string, string> messages = new();
+                foreach (StudenteRitorno studente in studenteRitornoList)
                 {
-                    cmd.ExecuteNonQuery();
+
+                    if (messages.ContainsKey(studente.codFiscale))
+                    {
+                        continue;
+                    }
+
+                    messages.Add(studente.codFiscale, messaggio);
                 }
 
-                string dropTable = "DROP TABLE #TempMessaggio";
-                SqlCommand dropTableCmd = new(dropTable, CONNECTION, sqlTransaction);
-                dropTableCmd.ExecuteNonQuery();
+                MessageUtils.InsertMessages(CONNECTION, sqlTransaction, messages);
             }
             catch
             {

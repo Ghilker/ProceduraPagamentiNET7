@@ -36,7 +36,7 @@
             label1 = new Label();
             button1 = new Button();
             openFileDialog = new OpenFileDialog();
-            button2 = new Button();
+            proceduraFlussoRitornoIgnoraCheck = new CheckBox();
             SuspendLayout();
             // 
             // proceduraFlussoRitornoNomeFileCheck
@@ -109,15 +109,15 @@
             // 
             openFileDialog.FileName = "openFileDialog1";
             // 
-            // button2
+            // proceduraFlussoRitornoIgnoraCheck
             // 
-            button2.Location = new Point(524, 118);
-            button2.Name = "button2";
-            button2.Size = new Size(75, 23);
-            button2.TabIndex = 56;
-            button2.Text = "button2";
-            button2.UseVisualStyleBackColor = true;
-            button2.Click += button2_Click;
+            proceduraFlussoRitornoIgnoraCheck.AutoSize = true;
+            proceduraFlussoRitornoIgnoraCheck.Location = new Point(29, 146);
+            proceduraFlussoRitornoIgnoraCheck.Name = "proceduraFlussoRitornoIgnoraCheck";
+            proceduraFlussoRitornoIgnoraCheck.Size = new Size(108, 19);
+            proceduraFlussoRitornoIgnoraCheck.TabIndex = 56;
+            proceduraFlussoRitornoIgnoraCheck.Text = "Ignora flussi a 1";
+            proceduraFlussoRitornoIgnoraCheck.UseVisualStyleBackColor = true;
             // 
             // FormProceduraFlussi
             // 
@@ -126,7 +126,7 @@
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             ControlBox = false;
-            Controls.Add(button2);
+            Controls.Add(proceduraFlussoRitornoIgnoraCheck);
             Controls.Add(label1);
             Controls.Add(button1);
             Controls.Add(proceduraFlussoRitornoNomeFileCheck);
@@ -151,6 +151,6 @@
         private Label label1;
         private Button button1;
         private OpenFileDialog openFileDialog;
-        private Button button2;
+        private CheckBox proceduraFlussoRitornoIgnoraCheck;
     }
 }

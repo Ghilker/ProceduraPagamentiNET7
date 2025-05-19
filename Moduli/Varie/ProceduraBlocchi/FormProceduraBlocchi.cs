@@ -54,6 +54,7 @@ namespace ProcedureNet7
                     _blocksUsername = blocksUsername.Text,
                     _blocksGiaRimossi = blocksGiaRimossi.Checked,
                     _blocksInsertMessaggio = blocksInsertMessaggioCheck.Checked,
+                    _blocksInsertNota = blocksInsertNotaCheck.Checked
                 };
                 argsValidation.Validate(blocchiArgs);
                 ProceduraBlocchi proceduraBlocchi = new(_masterForm, mainConnection);
@@ -100,8 +101,9 @@ namespace ProcedureNet7
             dataTable.Columns.Add("Blocchi da togliere", typeof(string));
             dataTable.Columns.Add("Blocchi da mettere", typeof(string));
             dataTable.Columns.Add("Messaggi da inviare (opzionale)", typeof(string));
+            dataTable.Columns.Add("Nota blocco (opzionale)", typeof(string));
 
-            dataTable.Rows.Add("XXXXXXXXXXXXXXXX", "VBA;BPP;IMD", "BVI;DVI", "#MotivoBVI#MotivoDVI");
+            dataTable.Rows.Add("XXXXXXXXXXXXXXXX", "VBA;BPP;IMD", "BVI;VBE", "#MotivoBVI#MotivoVBE", "#NotaBVI#NotaVBE");
 
             return dataTable;
         }

@@ -40,6 +40,7 @@
             templateBlocchiDownload = new Button();
             blocksGiaRimossi = new CheckBox();
             blocksInsertMessaggioCheck = new CheckBox();
+            blocksInsertNotaCheck = new CheckBox();
             SuspendLayout();
             // 
             // label6
@@ -150,10 +151,20 @@
             blocksInsertMessaggioCheck.AutoSize = true;
             blocksInsertMessaggioCheck.Location = new Point(29, 158);
             blocksInsertMessaggioCheck.Name = "blocksInsertMessaggioCheck";
-            blocksInsertMessaggioCheck.Size = new Size(301, 19);
+            blocksInsertMessaggioCheck.Size = new Size(262, 19);
             blocksInsertMessaggioCheck.TabIndex = 32;
-            blocksInsertMessaggioCheck.Text = "Inserisci messaggio motivazione inserimento blocco";
+            blocksInsertMessaggioCheck.Text = "Inserisci messaggio studente in area riservata";
             blocksInsertMessaggioCheck.UseVisualStyleBackColor = true;
+            // 
+            // blocksInsertNotaCheck
+            // 
+            blocksInsertNotaCheck.AutoSize = true;
+            blocksInsertNotaCheck.Location = new Point(29, 183);
+            blocksInsertNotaCheck.Name = "blocksInsertNotaCheck";
+            blocksInsertNotaCheck.Size = new Size(256, 19);
+            blocksInsertNotaCheck.TabIndex = 33;
+            blocksInsertNotaCheck.Text = "Inserisci nota blocchi in blocchi pagamento";
+            blocksInsertNotaCheck.UseVisualStyleBackColor = true;
             // 
             // FormProceduraBlocchi
             // 
@@ -162,6 +173,7 @@
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             ControlBox = false;
+            Controls.Add(blocksInsertNotaCheck);
             Controls.Add(blocksInsertMessaggioCheck);
             Controls.Add(blocksGiaRimossi);
             Controls.Add(templateBlocchiDownload);
@@ -194,5 +206,6 @@
         private Button templateBlocchiDownload;
         private CheckBox blocksGiaRimossi;
         private CheckBox blocksInsertMessaggioCheck;
+        private CheckBox blocksInsertNotaCheck;
     }
 }

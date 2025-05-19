@@ -1,6 +1,9 @@
 ﻿using ProcedureNet7.ProceduraAllegatiSpace;
+using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Linq;
 
 namespace ProcedureNet7
 {
@@ -17,11 +20,14 @@ namespace ProcedureNet7
         //   CF -> list of (Block, Reason)
         private readonly Dictionary<string, List<(string Block, string Reason)>> blocksAddedByCF = new();
 
+        // New dictionary for notes keyed by (CF, Block)
+        private readonly Dictionary<(string CF, string Block), string> blocksNotes = new();
+
         private bool _blocksGiaRimossi;
         private bool _blocksInsertMessaggio;
+        private bool _blocksInsertNota;
 
         private readonly Dictionary<string, string> _blockDescriptions = new();
-
 
         public ProceduraBlocchi(MasterForm masterForm, SqlConnection mainConnection)
             : base(masterForm, mainConnection) { }
@@ -33,6 +39,7 @@ namespace ProcedureNet7
             _blocksUsername = args._blocksUsername;
             _blocksGiaRimossi = args._blocksGiaRimossi;
             _blocksInsertMessaggio = args._blocksInsertMessaggio;
+            _blocksInsertNota = args._blocksInsertNota;
 
             _masterForm.inProcedure = true;
             try
@@ -126,6 +133,19 @@ namespace ProcedureNet7
                 {
                     InsertMessagesPerStudent(CONNECTION, transaction);
                 }
+
+                // 3) Insert notes in bulk if any note was provided in Excel.
+                if (_blocksInsertNota && blocksNotes.Any())
+                {
+                    NoteBlockUtils.InsertBlockNotes(
+                        CONNECTION,
+                        transaction,
+                        blocksNotes,
+                        _blocksUsername,
+                        _blocksYear
+                    );
+                }
+
                 Logger.LogInfo(100, "Procedura terminata");
                 transaction.Commit();
             }
@@ -137,12 +157,14 @@ namespace ProcedureNet7
             }
         }
 
+        // Modified ProcessRowInMemory method: each block in the "to add" column gets its own note.
         private void ProcessRowInMemory(string codFiscale, DataRow data)
         {
             // data[0] = codFiscale
             // data[1] = blocks to remove
             // data[2] = blocks to add
             // data[3] = reasons (OPTIONAL)
+            // data[4] = notes (OPTIONAL) - each block gets a unique note separated by a delimiter (e.g. '#')
 
             if (string.IsNullOrEmpty(data[1]?.ToString()) && string.IsNullOrEmpty(data[2]?.ToString()))
             {
@@ -151,10 +173,9 @@ namespace ProcedureNet7
 
             // Delimiters for block columns
             char[] blockDelimiters = { ';', ':', '|', '/', '#' };
-
             static string CleanBlock(string b) => b.TrimEnd(';', ':', '|', '/', '#').Trim();
 
-            // Blocks to Remove
+            // Process Blocks to Remove
             if (!string.IsNullOrWhiteSpace(data[1]?.ToString()))
             {
                 foreach (string blk in data[1].ToString().Split(blockDelimiters, StringSplitOptions.RemoveEmptyEntries))
@@ -169,7 +190,7 @@ namespace ProcedureNet7
                 }
             }
 
-            // Blocks to Add
+            // Process Blocks to Add
             if (!string.IsNullOrWhiteSpace(data[2]?.ToString()))
             {
                 var toAdd = data[2].ToString()
@@ -178,6 +199,7 @@ namespace ProcedureNet7
                     .Where(b => !string.IsNullOrEmpty(b))
                     .ToList();
 
+                // Process reasons (optional) from column index 3
                 List<string> reasonsList = new();
                 if (data.Table.Columns.Count > 3)
                 {
@@ -191,10 +213,27 @@ namespace ProcedureNet7
                     }
                 }
 
+                // Process unique notes (optional) from column index 4.
+                // Each note corresponds to a block in the same order.
+                List<string> notesList = new();
+                if (data.Table.Columns.Count > 4)
+                {
+                    string noteCell = data[4]?.ToString() ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(noteCell))
+                    {
+                        notesList = noteCell
+                            .Split('#', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(n => n.Trim())
+                            .ToList();
+                    }
+                }
+
+                // Loop through each block and assign its corresponding reason and note.
                 for (int i = 0; i < toAdd.Count; i++)
                 {
                     string block = toAdd[i];
                     string reason = (i < reasonsList.Count) ? reasonsList[i] : string.Empty;
+                    string note = (i < notesList.Count) ? notesList[i] : string.Empty;
 
                     if (!blocksToAdd.TryGetValue(block, out List<string>? cfList))
                     {
@@ -203,13 +242,18 @@ namespace ProcedureNet7
                     }
                     cfList.Add(codFiscale);
 
-                    // We'll record (block, reason), but only tentatively.
-                    // We'll refine it later to send messages only if the block is truly added.
+                    // Record (block, reason) for messaging purposes.
                     if (!blocksAddedByCF.ContainsKey(codFiscale))
                     {
                         blocksAddedByCF[codFiscale] = new List<(string Block, string Reason)>();
                     }
                     blocksAddedByCF[codFiscale].Add((block, reason));
+
+                    // If a note is present, store it for the (CF, block) pair.
+                    if (!string.IsNullOrWhiteSpace(note))
+                    {
+                        blocksNotes[(codFiscale, block)] = note;
+                    }
                 }
             }
         }
@@ -225,7 +269,6 @@ namespace ProcedureNet7
                 try
                 {
                     var cfList = blocksToRemove[block];
-                    // We'll get the result of removal:
                     BlockRemoveResult removeResult = BlocksUtil.RemoveBlock(
                         conn,
                         transaction,
@@ -236,8 +279,6 @@ namespace ProcedureNet7
                     );
 
                     Logger.LogInfo(75, $"Processato blocco {block} da togliere");
-                    // If you need to do something with removeResult, you can do it here.
-                    // e.g. removeResult.ActuallyRemoved, removeResult.NothingToRemove
                 }
                 catch (Exception ex)
                 {
@@ -254,7 +295,6 @@ namespace ProcedureNet7
                 try
                 {
                     var cfList = blocksToAdd[block];
-                    // We'll get the result of addition:
                     BlockAddResult addResult = BlocksUtil.AddBlock(
                         conn,
                         transaction,
@@ -267,25 +307,18 @@ namespace ProcedureNet7
 
                     Logger.LogInfo(75, $"Processato blocco {block} da mettere");
 
-                    // Now refine blocksAddedByCF so we only keep those that actually got added
-                    // for each CF in addResult.ActuallyAdded:
+                    // Refine blocksAddedByCF to keep only CFs that were actually added.
                     foreach (var cf in cfList)
                     {
-                        // If the CF wasn't in addResult.ActuallyAdded, remove it from blocksAddedByCF
-                        // (or skip) so we won't send them a message.
                         if (!addResult.ActuallyAdded.Contains(cf) && blocksAddedByCF.ContainsKey(cf))
                         {
-                            // remove any (block, reason) pair with this block
                             blocksAddedByCF[cf].RemoveAll(x => x.Block.Equals(block, StringComparison.OrdinalIgnoreCase));
-
-                            // If that leaves the list empty, remove the CF key altogether
                             if (blocksAddedByCF[cf].Count == 0)
                             {
                                 blocksAddedByCF.Remove(cf);
                             }
                         }
                     }
-
                 }
                 catch (Exception ex)
                 {
@@ -294,20 +327,16 @@ namespace ProcedureNet7
             }
         }
 
-        /// <summary>
-        /// Builds one HTML message per CF summarizing all blocks (and reasons), then inserts them.
-        /// We only insert messages for CFs that truly had blocks added (see refined blocksAddedByCF).
-        /// </summary>
         private void InsertMessagesPerStudent(SqlConnection conn, SqlTransaction transaction)
         {
             var messagesDict = new Dictionary<string, string>();
 
-            // For each CF that had blocks actually added (refined in ApplyBlocks)
+            // For each CF that had blocks actually added.
             foreach (var cf in blocksAddedByCF.Keys)
             {
                 var blocksList = blocksAddedByCF[cf]; // List<(string BlockCode, string Reason)>
 
-                // Build HTML
+                // Build HTML message.
                 string htmlMessage = "Gentile studente, i seguenti blocchi sono stati aggiunti sulla sua posizione:<br>";
 
                 var lines = new List<string>();
@@ -334,9 +363,8 @@ namespace ProcedureNet7
             {
                 return decoded;
             }
-
-            // Fallback: code not found in the dictionary, just return the code
             return blockCode;
         }
+
     }
 }

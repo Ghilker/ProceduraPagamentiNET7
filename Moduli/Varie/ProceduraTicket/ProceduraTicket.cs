@@ -171,7 +171,8 @@ namespace ProcedureNet7
                     {
                         Port = 587,
                         Credentials = new NetworkCredential(senderMail, senderPassword),
-                        EnableSsl = true
+                        EnableSsl = true,
+                        UseDefaultCredentials = false
                     };
 
                     string messageBody = @"
@@ -188,13 +189,14 @@ namespace ProcedureNet7
 
                     messageBody += @"
                         <p>Per domande, chiarimenti e suggerimenti resto a disposizione.</p>
-                        <p>Buona giornata e buon lavoro.</p>";
+                        <p>Buona giornata e buon lavoro.</p>
+                        <p>Giacomo Pavone</p> ";
 
                     // 3) Build the MailMessage
                     MailMessage mailMessage = new()
                     {
                         // You can also set From = new MailAddress(senderMail) if desired
-                        From = new MailAddress("giacomo.pavone@laziodisco.it"),
+                        From = new MailAddress(senderMail),
                         Subject = $"Estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
                         Body = messageBody,
                         IsBodyHtml = true
