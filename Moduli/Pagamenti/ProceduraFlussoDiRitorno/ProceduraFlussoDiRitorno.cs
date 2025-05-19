@@ -17,6 +17,8 @@ namespace ProcedureNet7
         string selectedOldMandato = "";
         string selectedTipoBando = "";
 
+        bool ignoraFlussi1 = false;
+
         List<StudenteRitorno> studenteRitornoList = new List<StudenteRitorno>();
         List<StudenteRitorno> studentiScartati = new List<StudenteRitorno>();
 
