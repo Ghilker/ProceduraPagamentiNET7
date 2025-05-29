@@ -157,6 +157,7 @@ public class Logger : IDisposable
         }
     }
 
+
     private int CalculateDynamicBatchSize()
     {
         int queueCount = logQueue.Count;
