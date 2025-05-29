@@ -81,140 +81,136 @@ namespace ProcedureNet7
             // 1) Prepare the query
             // -----------------------
             string dataQuery = $@"
-                    SELECT
-            LRS.COD_FISCALE, 
-	        LRS.TITOLO_ONEROSO, 
-	        LRS.N_SERIE_CONTRATTO, 
-	        LRS.DATA_REG_CONTRATTO,  
-	        LRS.DATA_DECORRENZA, 
-	        LRS.DATA_SCADENZA, 
-	        LRS.DURATA_CONTRATTO, 
-	        LRS.PROROGA, 
-	        LRS.DURATA_PROROGA, 
-	        LRS.ESTREMI_PROROGA,
-	        LRS.TIPO_CONTRATTO_TITOLO_ONEROSO,
-	        LRS.DENOM_ENTE,
-	        LRS.IMPORTO_RATA,
-            LRS.COD_COMUNE  AS CodComuneDom,
-            vr.Cod_comune   AS CodComuneRes,
-            cl.Comune_Sede_studi AS CodComuneSede,
-            vv.Status_sede,
-            prev.DATA_SCADENZA AS PrevScadenza,
-            DATEDIFF(day, prev.DATA_SCADENZA, LRS.DATA_REG_CONTRATTO) AS GiorniDallaScad,
-	        dbo.SlashBlocchi(vv.Num_domanda, vv.Anno_accademico, '') as cod_blocchi
-        FROM 
-            LUOGO_REPERIBILITA_STUDENTE AS LRS
-            OUTER APPLY (
-                SELECT TOP 1
-                       prev.DATA_SCADENZA
-                FROM   LUOGO_REPERIBILITA_STUDENTE prev
-                WHERE  prev.COD_FISCALE      = LRS.COD_FISCALE
-                  AND  prev.ANNO_ACCADEMICO  = LRS.ANNO_ACCADEMICO
-                  AND  prev.TIPO_LUOGO       = 'DOM'
-                  AND  prev.PROROGA          = 0                -- original contract
-                  AND  prev.DATA_VALIDITA    < LRS.DATA_VALIDITA
-                ORDER BY prev.DATA_VALIDITA DESC
-            ) AS prev
-            INNER JOIN Comuni 
-                ON LRS.COD_COMUNE = Comuni.Cod_comune
-            INNER JOIN Domanda
-                ON LRS.ANNO_ACCADEMICO = Domanda.Anno_accademico
-               AND LRS.COD_FISCALE     = Domanda.Cod_fiscale
-               AND LRS.tipo_bando      = Domanda.Tipo_bando
+            SELECT
+                LRS.COD_FISCALE, 
+	            LRS.TITOLO_ONEROSO, 
+	            LRS.N_SERIE_CONTRATTO, 
+	            LRS.DATA_REG_CONTRATTO,  
+	            LRS.DATA_DECORRENZA, 
+	            LRS.DATA_SCADENZA, 
+	            LRS.DURATA_CONTRATTO, 
+	            LRS.PROROGA, 
+	            LRS.DURATA_PROROGA, 
+	            LRS.ESTREMI_PROROGA,
+	            LRS.TIPO_CONTRATTO_TITOLO_ONEROSO,
+	            LRS.DENOM_ENTE,
+	            LRS.IMPORTO_RATA,
+                LRS.COD_COMUNE  AS CodComuneDom,
+                vr.Cod_comune   AS CodComuneRes,
+                cl.Comune_Sede_studi AS CodComuneSede,
+                vv.Status_sede,
+                prev.DATA_SCADENZA AS PrevScadenza,
+                DATEDIFF(day, prev.DATA_SCADENZA, LRS.DATA_REG_CONTRATTO) AS GiorniDallaScad,
+	            dbo.SlashBlocchi(vv.Num_domanda, vv.Anno_accademico, '') as cod_blocchi
+            FROM 
+                LUOGO_REPERIBILITA_STUDENTE AS LRS
+                OUTER APPLY (
+                    SELECT TOP 1
+                            prev.DATA_SCADENZA
+                    FROM   LUOGO_REPERIBILITA_STUDENTE prev
+                    WHERE  prev.COD_FISCALE      = LRS.COD_FISCALE
+                        AND  prev.ANNO_ACCADEMICO  = LRS.ANNO_ACCADEMICO
+                        AND  prev.TIPO_LUOGO       = 'DOM'
+                        AND  prev.PROROGA          = 0                -- original contract
+                        AND  prev.DATA_VALIDITA    < LRS.DATA_VALIDITA
+                    ORDER BY prev.DATA_VALIDITA DESC
+                ) AS prev
+                INNER JOIN Comuni 
+                    ON LRS.COD_COMUNE = Comuni.Cod_comune
+                INNER JOIN Domanda
+                    ON LRS.ANNO_ACCADEMICO = Domanda.Anno_accademico
+                    AND LRS.COD_FISCALE     = Domanda.Cod_fiscale
+                    AND LRS.tipo_bando      = Domanda.Tipo_bando
 
-            -- Must be Status_sede = 'B'
-            INNER JOIN vValori_calcolati AS vv
-                ON Domanda.Anno_accademico = vv.Anno_accademico
-               AND Domanda.Num_domanda     = vv.Num_domanda
-               AND vv.Status_sede in ('B', 'D')
+                -- Must be Status_sede = 'B'
+                INNER JOIN vValori_calcolati AS vv
+                    ON Domanda.Anno_accademico = vv.Anno_accademico
+                    AND Domanda.Num_domanda     = vv.Num_domanda
+                    AND vv.Status_sede in ('B', 'D')
 
-            -- Must have tipo esito BS != 0
-            INNER JOIN vEsiti_concorsiBS AS vb
-                ON Domanda.Anno_accademico = vb.Anno_accademico
-               AND Domanda.Num_domanda     = vb.Num_domanda
-               AND vb.Cod_tipo_esito <> 0
+                -- Must have tipo esito BS != 0
+                INNER JOIN vEsiti_concorsiBS AS vb
+                    ON Domanda.Anno_accademico = vb.Anno_accademico
+                    AND Domanda.Num_domanda     = vb.Num_domanda
+                    AND vb.Cod_tipo_esito <> 0
 
-            -- Must not be rifug politico
-            INNER JOIN vDATIGENERALI_dom AS vd
-                ON Domanda.Anno_accademico = vd.Anno_accademico
-               AND Domanda.Num_domanda     = vd.Num_domanda
-               AND vd.Rifug_politico <> 1
+                -- Must not be rifug politico
+                INNER JOIN vDATIGENERALI_dom AS vd
+                    ON Domanda.Anno_accademico = vd.Anno_accademico
+                    AND Domanda.Num_domanda     = vd.Num_domanda
+                    AND vd.Rifug_politico <> 1
 
-            -- Additional constraints for vIscrizioni
-            INNER JOIN vIscrizioni AS vi
-                ON Domanda.Anno_accademico = vi.Anno_accademico
-               AND Domanda.Cod_fiscale     = vi.Cod_fiscale
-               AND Domanda.Tipo_bando      = vi.tipo_bando
-               AND vi.Cod_tipologia_studi <> '06'
+                -- Additional constraints for vIscrizioni
+                INNER JOIN vIscrizioni AS vi
+                    ON Domanda.Anno_accademico = vi.Anno_accademico
+                    AND Domanda.Cod_fiscale     = vi.Cod_fiscale
+                    AND Domanda.Tipo_bando      = vi.tipo_bando
+                    AND vi.Cod_tipologia_studi <> '06'
 
-            INNER JOIN Corsi_laurea           AS cl
-                  ON vi.Cod_corso_laurea     = cl.Cod_corso_laurea
-                 AND vi.Anno_accad_inizio    = cl.Anno_accad_inizio
-                 AND vi.Cod_tipo_ordinamento = cl.Cod_tipo_ordinamento
-                 AND vi.Cod_facolta          = cl.Cod_facolta
-                 AND vi.Cod_sede_studi       = cl.Cod_sede_studi
-                 AND vi.Cod_tipologia_studi  = cl.Cod_tipologia_studi
+                INNER JOIN Corsi_laurea           AS cl
+                        ON vi.Cod_corso_laurea     = cl.Cod_corso_laurea
+                        AND vi.Anno_accad_inizio    = cl.Anno_accad_inizio
+                        AND vi.Cod_tipo_ordinamento = cl.Cod_tipo_ordinamento
+                        AND vi.Cod_facolta          = cl.Cod_facolta
+                        AND vi.Cod_sede_studi       = cl.Cod_sede_studi
+                        AND vi.Cod_tipologia_studi  = cl.Cod_tipologia_studi
 
-            -- Join to vResidenza to handle the 'EE' logic
-            INNER JOIN vResidenza AS vr
-                ON vr.Cod_fiscale      = Domanda.Cod_fiscale
-               AND vr.Anno_accademico = Domanda.Anno_accademico
-               -- Adjust if necessary to match the rest of your keys
-        WHERE
-            -- Same check for LUOGO_REPERIBILITA_STUDENTE
-            LRS.ANNO_ACCADEMICO = '{selectedAA}'
-            AND LRS.TIPO_LUOGO = 'DOM'
-            AND LRS.DATA_VALIDITA = (
-                 SELECT MAX(DATA_VALIDITA) 
-                 FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
-                 WHERE rsd.COD_FISCALE      = LRS.COD_FISCALE
-                   AND rsd.ANNO_ACCADEMICO = LRS.ANNO_ACCADEMICO
-                   AND rsd.TIPO_LUOGO      = 'DOM'
-            )
-
-            -- Must NOT be in forzature as B
-            AND Domanda.Cod_fiscale NOT IN (
-                 SELECT Cod_Fiscale
-                 FROM Forzature_StatusSede
-                 WHERE Data_fine_validita IS NULL
-                   AND Status_sede = 'B'
-                   AND Anno_Accademico = '{selectedAA}'
-            )
-
-            AND Domanda.Cod_fiscale NOT IN (
-                 SELECT Cod_Fiscale
-                 FROM Forzature_StatusSede
-                 WHERE Data_fine_validita IS NULL
-                   AND Status_sede = 'D'
-                   AND Anno_Accademico = '{selectedAA}'
-            )
-
-            -- Must NOT have tipo esito PA <> 0
-            AND Domanda.Num_domanda NOT IN (
-                 SELECT Num_domanda
-                 FROM vEsiti_concorsiPA
-                 WHERE (Cod_tipo_esito <> 0)
-                   AND (Anno_accademico = '{selectedAA}')
-            )
-
-            -- Now handle the ""EE"" logic via 'NOT' approach:
-            AND NOT (
-                vr.provincia_residenza = 'EE'
-                AND Domanda.Num_domanda IN
-                (
-                     SELECT d1.Num_domanda
-                     FROM Domanda d1
-                     INNER JOIN vNucleo_familiare vn1
-                          ON d1.Anno_accademico = vn1.Anno_accademico
-                         AND d1.Num_domanda     = vn1.Num_domanda
-                     WHERE vn1.Numero_conviventi_estero >= vn1.Num_componenti / 2
+                -- Join to vResidenza to handle the 'EE' logic
+                INNER JOIN vResidenza AS vr
+                    ON vr.Cod_fiscale      = Domanda.Cod_fiscale
+                    AND vr.Anno_accademico = Domanda.Anno_accademico
+                    -- Adjust if necessary to match the rest of your keys
+            WHERE
+                -- Same check for LUOGO_REPERIBILITA_STUDENTE
+                LRS.ANNO_ACCADEMICO = '{selectedAA}'
+                AND LRS.TIPO_LUOGO = 'DOM'
+                AND LRS.DATA_VALIDITA = (
+                        SELECT MAX(DATA_VALIDITA) 
+                        FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
+                        WHERE rsd.COD_FISCALE      = LRS.COD_FISCALE
+                        AND rsd.ANNO_ACCADEMICO = LRS.ANNO_ACCADEMICO
+                        AND rsd.TIPO_LUOGO      = 'DOM'
                 )
-		
-            
-            );
 
+                -- Must NOT be in forzature as B
+                AND Domanda.Cod_fiscale NOT IN (
+                        SELECT Cod_Fiscale
+                        FROM Forzature_StatusSede
+                        WHERE Data_fine_validita IS NULL
+                        AND Status_sede = 'B'
+                        AND Anno_Accademico = '{selectedAA}'
+                )
 
-                ";
+                AND Domanda.Cod_fiscale NOT IN (
+                        SELECT Cod_Fiscale
+                        FROM Forzature_StatusSede
+                        WHERE Data_fine_validita IS NULL
+                        AND Status_sede = 'D'
+                        AND Anno_Accademico = '{selectedAA}'
+                )
+
+                -- Must NOT have tipo esito PA <> 0
+                AND Domanda.Num_domanda NOT IN (
+                        SELECT Num_domanda
+                        FROM vEsiti_concorsiPA
+                        WHERE (Cod_tipo_esito <> 0)
+                        AND (Anno_accademico = '{selectedAA}')
+                )
+
+                -- Now handle the ""EE"" logic via 'NOT' approach:
+                AND NOT (
+                    vr.provincia_residenza = 'EE'
+                    AND Domanda.Num_domanda IN
+                    (
+                            SELECT d1.Num_domanda
+                            FROM Domanda d1
+                            INNER JOIN vNucleo_familiare vn1
+                                ON d1.Anno_accademico = vn1.Anno_accademico
+                                AND d1.Num_domanda     = vn1.Num_domanda
+                            WHERE vn1.Numero_conviventi_estero >= vn1.Num_componenti / 2
+                    )
+                );
+            ";
 
             // -----------------------
             // 2) Read data into DTOs
@@ -287,11 +283,6 @@ namespace ProcedureNet7
 
 
                 Domicilio domicilio = new Domicilio();
-                // Debug check
-                if (row.CodFiscale == "VLNDNS01T54E885A")
-                {
-                    string test = ""; // Just to set a breakpoint, presumably
-                }
 
                 // ----- TITOLO ONEROSO -----
                 bool titoloOneroso = row.TitoloOneroso;
@@ -380,8 +371,8 @@ namespace ProcedureNet7
                 string serieContratto = row.SerieContratto;
                 string serieProroga = row.SerieProroga;
 
-                bool contrattoValido = contrattoEnteValido || IsValidSerie(serieContratto);
-                bool prorogaValido = IsValidSerie(serieProroga);
+                bool contrattoValido = contrattoEnteValido || DomicilioUtils.IsValidSerie(serieContratto);
+                bool prorogaValido = DomicilioUtils.IsValidSerie(serieProroga);
 
                 // If the proroga contains the same base as the contract, we consider that invalid
                 if (!string.IsNullOrEmpty(serieContratto)
@@ -392,8 +383,8 @@ namespace ProcedureNet7
                 }
 
                 bool prorogaTempisticaOK =
-    !(row.Prorogato ?? false)            // nothing to check if no proroga
-    || row.GiorniDallaScad <= 30;        // filed within 30 days
+                    !(row.Prorogato ?? false)            // nothing to check if no proroga
+                    || row.GiorniDallaScad <= 30;        // filed within 30 days
 
                 // final validity
                 bool isDomicilioValidOrNotNeeded =
@@ -511,93 +502,6 @@ namespace ProcedureNet7
                     );
                 }
 
-            }
-
-
-            // -----------------------
-            // Local helper method
-            // -----------------------
-            bool IsValidSerie(string serie)
-            {
-                if (string.IsNullOrWhiteSpace(serie))
-                    return false;
-
-                serie = serie.Trim();
-                // Remove trailing dots
-                serie = serie.TrimEnd('.');
-
-                // Case-insensitive matching
-                RegexOptions options = RegexOptions.IgnoreCase;
-
-                // Exclude date-only entries or date ranges
-                string dateOnlyPattern1 = @"^\d{1,2}/\d{1,2}/\d{2,4}$";
-                string dateOnlyPattern2 = @"^\d{1,2}/\d{1,2}/\d{2,4}\s*[\-–]\s*\d{1,2}/\d{1,2}/\d{2,4}$";
-                string dateOnlyPattern3 = @"^dal\s+\d{1,2}/\d{1,2}/\d{2,4}\s+al\s+\d{1,2}/\d{1,2}/\d{2,4}$";
-                string dateWordsPattern = @"^dal\s+\d{1,2}\s+\w+\s+\d{4}\s+al\s+\d{1,2}\s+\w+\s+\d{4}$";
-
-                if (Regex.IsMatch(serie, dateOnlyPattern1, options) ||
-                    Regex.IsMatch(serie, dateOnlyPattern2, options) ||
-                    Regex.IsMatch(serie, dateOnlyPattern3, options) ||
-                    Regex.IsMatch(serie, dateWordsPattern, options))
-                {
-                    return false;
-                }
-
-                string serieNoSpaces = Regex.Replace(serie, @"\s+", "");
-                if (string.Equals(serieNoSpaces, "3T", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(serieNoSpaces, "T3", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(serieNoSpaces, "serie3T", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(serieNoSpaces, "serieT3", StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                // Exclude 'Foglio/part/sub/Cat' patterns unless they match a valid code
-                if (Regex.IsMatch(serie, @"\b(Foglio|part|sub|Cat)\b", options) &&
-                    !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
-                {
-                    return false;
-                }
-
-                // Exclude 'PRENOTAZIONE' unless there's a valid code
-                if (Regex.IsMatch(serie, @"\bPRENOTAZIONE\b", options) &&
-                    !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
-                {
-                    return false;
-                }
-
-                // Exclude 'automatico' unless there's a valid code
-                if (Regex.IsMatch(serie, @"automatico", options) &&
-                    !Regex.IsMatch(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options))
-                {
-                    return false;
-                }
-
-                // Patterns for valid codes
-                string pattern1 = @"^(T|TRF|TEL)\s?[A-Z0-9]{10,50}\.?$";
-                string pattern1b = @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b";
-                string pattern2 = @"^[\d/\s\-]{4,}$";
-                string pattern2b = @"^\d{1,20}([/\s\-]\d{1,20})+$";
-                string pattern3 = @"(?i)^(.*\b(serie\s*3\s*T|serie\s*3T|serie\s*T3|serie\s*T|serie\s*IT|3\s*T|3T|T3|3/T)\b.*)$";
-                string pattern4 = @"^QC([\s/]*\w+)+$";
-                string pattern5 = @"(?i)^(.*\b(Protocollo|PROT\.?|prot\.?n?\.?|Protocol-?)\b.*\d+.*)$";
-                string pattern6 = @"^(RA/|RM|FC/)\s*\S+$";
-                // At least one digit, one letter, can include slash/hyphen/spaces, 5-50 in length
-                string pattern7 = @"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9/\s\-]{5,50}$";
-
-                // Check them in sequence
-                if (Regex.IsMatch(serie, pattern1, options)) return true;
-                if (Regex.IsMatch(serie, pattern1b, options)) return true;
-                if (Regex.IsMatch(serie, pattern2, options)) return true;
-                if (Regex.IsMatch(serie, pattern2b, options)) return true;
-                if (Regex.IsMatch(serie, pattern3, options)) return true;
-                if (Regex.IsMatch(serie, pattern4, options)) return true;
-                if (Regex.IsMatch(serie, pattern5, options)) return true;
-                if (Regex.IsMatch(serie, pattern6, options)) return true;
-                if (Regex.IsMatch(serie, pattern7)) return true;
-
-                // If none match, it's invalid
-                return false;
             }
         }
         private static bool AreComuniCompatible(string? c1, string? c2)

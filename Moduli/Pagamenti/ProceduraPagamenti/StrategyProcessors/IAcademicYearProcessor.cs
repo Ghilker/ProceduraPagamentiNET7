@@ -13,7 +13,7 @@ namespace ProcedureNet7.PagamentiProcessor
         public abstract string GetProvvedimentiQuery(string selectedAA, string tipoBeneficio);
         public abstract HashSet<string> ProcessProvvedimentiQuery(SqlDataReader reader);
         public abstract void AdjustPendolarePayment(
-            StudentePagam studente,
+            StudentePagamenti studente,
             ref double importoDaPagare,
             ref double importoMassimo,
             ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari

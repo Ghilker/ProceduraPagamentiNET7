@@ -37,25 +37,25 @@ namespace ProcedureNet7.PagamentiProcessor
             return listaStudentiDaMantenere;
         }
 
-        public void AdjustPendolarePayment(StudentePagam studente, ref double importoDaPagare, ref double importoMassimo, ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari)
+        public void AdjustPendolarePayment(StudentePagamenti studente, ref double importoDaPagare, ref double importoMassimo, ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari)
         {
-            bool hasDomicilio = studente.domicilioCheck;
-            bool isMoreThanHalfAbroad = studente.numeroComponentiNucleoFamiliareEstero >= (studente.numeroComponentiNucleoFamiliare / 2.0);
+            bool hasDomicilio = studente.InformazioniSede.DomicilioCheck;
+            bool isMoreThanHalfAbroad = studente.InformazioniPersonali.NumeroComponentiNucleoFamiliareEstero >= (studente.InformazioniPersonali.NumeroComponentiNucleoFamiliare / 2.0);
 
             // Guard clause: if status is not 'B' or there's a forced 'B', exit early
-            if (studente.statusSede != "B" || studente.forzaturaStatusSede == "B")
+            if (studente.InformazioniSede.StatusSede != "B" || studente.InformazioniSede.ForzaturaStatusSede == "B")
                 return;
 
             // Guard clause: if any of these conditions is true, exit early
-            if (studente.rifugiato ||
-                studente.esitoPA != 0 ||
+            if (studente.InformazioniPersonali.Rifugiato ||
+                studente.InformazioniBeneficio.EsitoPA != 0 ||
                 isMoreThanHalfAbroad ||
-                studente.tipoCorso == 6)
+                studente.InformazioniIscrizione.TipoCorso == 6)
                 return;
 
             // Guard clause: if the student DOES have domicile and everything is valid, exit early
             // (Because that means we do NOT need to apply pendolare logic)
-            bool isDomicilioValidOrNotNeeded = hasDomicilio && studente.contrattoValido && !(studente.domicilio?.prorogatoLocazione == true && !studente.prorogaValido);
+            bool isDomicilioValidOrNotNeeded = hasDomicilio && studente.InformazioniSede.ContrattoValido && !(studente.InformazioniSede.Domicilio?.prorogatoLocazione == true && !studente.InformazioniSede.ProrogaValido);
 
             if (isDomicilioValidOrNotNeeded)
                 return;
@@ -67,7 +67,7 @@ namespace ProcedureNet7.PagamentiProcessor
             // Build the message for reasons why they were paid as pendolari
             string messaggio = string.Empty;
 
-            if (studente.domicilio == null)
+            if (studente.InformazioniSede.Domicilio == null)
             {
                 messaggio += "#Nessun domicilio trovato";
             }
@@ -75,19 +75,19 @@ namespace ProcedureNet7.PagamentiProcessor
             {
                 messaggio += "#Durata contratto minore dieci mesi";
             }
-            if (!studente.contrattoValido && studente.domicilio != null)
+            if (!studente.InformazioniSede.ContrattoValido && studente.InformazioniSede.Domicilio != null)
             {
-                messaggio += $"#Serie contratto non valida: {studente.domicilio.codiceSerieLocazione}";
+                messaggio += $"#Serie contratto non valida: {studente.InformazioniSede.Domicilio.codiceSerieLocazione}";
             }
-            if (studente.domicilio?.prorogatoLocazione == true && !studente.prorogaValido)
+            if (studente.InformazioniSede.Domicilio?.prorogatoLocazione == true && !studente.InformazioniSede.ProrogaValido)
             {
                 messaggio +=
-                    $"#Serie proroga non valida: Contratto {studente.domicilio.codiceSerieLocazione} " +
-                    $"- Proroga {studente.domicilio.codiceSerieProrogaLocazione}";
+                    $"#Serie proroga non valida: Contratto {studente.InformazioniSede.Domicilio.codiceSerieLocazione} " +
+                    $"- Proroga {studente.InformazioniSede.Domicilio.codiceSerieProrogaLocazione}";
             }
 
             // Record the reason and mark the student as 'paid as pendolare'
-            studentiPagatiComePendolari.Add((studente.codFiscale, messaggio));
+            studentiPagatiComePendolari.Add((studente.InformazioniPersonali.CodFiscale, messaggio));
             studente.SetPagatoPendolare(true);
         }
 

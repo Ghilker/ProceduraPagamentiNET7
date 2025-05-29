@@ -10,11 +10,11 @@ namespace ProcedureNet7
 {
     public partial class StudentOverview : Form
     {
-        private Dictionary<string, StudentePagam> daPagare;
-        private List<StudentePagam> studenti;
+        private Dictionary<string, StudentePagamenti> daPagare;
+        private List<StudentePagamenti> studenti;
         private DataGridView dataGridView;
 
-        public StudentOverview(List<StudentePagam> studenti, ref Dictionary<string, StudentePagam> daPagare, Form mainForm)
+        public StudentOverview(List<StudentePagamenti> studenti, ref Dictionary<string, StudentePagamenti> daPagare, Form mainForm)
         {
             InitializeComponent();
             this.daPagare = daPagare;
@@ -32,7 +32,7 @@ namespace ProcedureNet7
             PopulateDataGridView(studenti, mainForm);
         }
 
-        private void PopulateDataGridView(List<StudentePagam> studenti, Form mainForm)
+        private void PopulateDataGridView(List<StudentePagamenti> studenti, Form mainForm)
         {
             DataTable studentiDt = Utilities.ConvertListToDataTable(studenti);
 
@@ -57,20 +57,20 @@ namespace ProcedureNet7
                 {
                     var studente = studenti[row.Index];
 
-                    if (studente.assegnazioni != null && studente.assegnazioni.Count > 0)
+                    if (studente.InformazioniPagamento.Assegnazioni != null && studente.InformazioniPagamento.Assegnazioni.Count > 0)
                     {
-                        var finalStatus = GetAssegnazioneStatus(studente.assegnazioni);
+                        var finalStatus = GetAssegnazioneStatus(studente.InformazioniPagamento.Assegnazioni);
                         AddButtonCell(row, "Assegnazioni", "assegnazioniCheck", finalStatus);
                     }
-                    if (studente.reversali != null && studente.reversali.Count > 0)
+                    if (studente.InformazioniPagamento.Reversali != null && studente.InformazioniPagamento.Reversali.Count > 0)
                     {
                         AddButtonCell(row, "Reversali", "reversaliCheck");
                     }
-                    if (studente.detrazioni != null && studente.detrazioni.Count > 0)
+                    if (studente.InformazioniPagamento.Detrazioni != null && studente.InformazioniPagamento.Detrazioni.Count > 0)
                     {
                         AddButtonCell(row, "Detrazioni", "detrazioniCheck");
                     }
-                    if (studente.pagamentiEffettuati != null && studente.pagamentiEffettuati.Count > 0)
+                    if (studente.InformazioniPagamento.PagamentiEffettuati != null && studente.InformazioniPagamento.PagamentiEffettuati.Count > 0)
                     {
                         AddButtonCell(row, "Pagamenti", "pagamentiEffettuatiCheck");
                     }
@@ -174,14 +174,14 @@ namespace ProcedureNet7
             }
         }
 
-        private IList? GetListByColumnName(StudentePagam studente, string columnName)
+        private IList? GetListByColumnName(StudentePagamenti studente, string columnName)
         {
             return columnName switch
             {
-                "assegnazioniCheck" => studente.assegnazioni,
-                "reversaliCheck" => studente.reversali,
-                "detrazioniCheck" => studente.detrazioni,
-                "pagamentiEffettuatiCheck" => studente.pagamentiEffettuati,
+                "assegnazioniCheck" => studente.InformazioniPagamento.Assegnazioni,
+                "reversaliCheck" => studente.InformazioniPagamento.Reversali,
+                "detrazioniCheck" => studente.InformazioniPagamento.Detrazioni,
+                "pagamentiEffettuatiCheck" => studente.InformazioniPagamento.PagamentiEffettuati,
                 _ => null
             };
         }

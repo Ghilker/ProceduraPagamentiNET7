@@ -8,16 +8,16 @@ namespace ProcedureNet7
 {
     public class Assegnazione
     {
-        public string codPensionato { get; private set; }
-        public string codStanza { get; private set; }
+        public string codPensionato { get; private set; } = string.Empty;
+        public string codStanza { get; private set; } = string.Empty;
         public DateTime dataDecorrenza { get; private set; }
         public DateTime dataFineAssegnazione { get; private set; }
-        public string codFineAssegnazione { get; private set; }
-        public string codTipoStanza { get; private set; }
+        public string codFineAssegnazione { get; private set; } = string.Empty;
+        public string codTipoStanza { get; private set; } = string.Empty;
         public double costoTotale { get; private set; }
         public double costoMensile { get; private set; }
         public AssegnazioneDataCheck statoCorrettezzaAssegnazione { get; private set; }
-        public string idAssegnazione { get; private set; }
+        public string idAssegnazione { get; private set; } = string.Empty;
 
         public Assegnazione()
         {

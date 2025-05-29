@@ -238,7 +238,8 @@ namespace ProcedureNet7
 	                    Tipologie_pagam 
 	                    INNER JOIN Tipologie_benefici ON Tipologie_benefici.Cod_beneficio = Left(Tipologie_pagam.cod_tipo_pagam, 2)
                     WHERE        
-	                    (Tipologie_pagam.visibile IS NOT NULL)";
+	                    LEN(cod_tipo_pagam) = 4";
+
             SqlCommand cmd = new SqlCommand(sql, conn, sqlTransaction);
 
             using (SqlDataReader reader = cmd.ExecuteReader())
