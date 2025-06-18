@@ -10,12 +10,7 @@ namespace ProcedureNet7
 {
     internal static class Program
     {
-        private const string RegistryKeyPath = @"SOFTWARE\ProcedureNet7";
-        private const string RegistryUsernameKey = "Username";
-        private const string RegistryPasswordHashKey = "PasswordHash";
-        private const string RegistryExpirationDateKey = "ExpirationDate";
-        private const string RegistryUserIDKey = "UserID";
-        private const string RegistryUserTierKey = "UserTier";
+        
 
         // Booleans to enable or disable checks
         private static readonly bool DisableFileCheck = false;
