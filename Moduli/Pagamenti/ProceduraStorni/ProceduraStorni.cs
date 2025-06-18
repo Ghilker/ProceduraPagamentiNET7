@@ -50,7 +50,7 @@ namespace ProcedureNet7.Storni
                 Logger.LogInfo(30, $"Lavorazione studenti");
                 List<string> codFiscali = studenti.Select(studente => studente.codFiscale).ToList();
 
-                string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
+                string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16) COLLATE Latin1_General_CI_AS);";
                 SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
                 createCmd.ExecuteNonQuery();
 
@@ -66,7 +66,7 @@ namespace ProcedureNet7.Storni
                 string queryCheckIBAN = $@"
                         SELECT vMODALITA_PAGAMENTO.Cod_fiscale, IBAN 
                         FROM vMODALITA_PAGAMENTO INNER JOIN
-                            #CFEstrazione AS CF ON vMODALITA_PAGAMENTO.cod_fiscale = CF.cod_fiscale
+                        #CFEstrazione AS CF ON vMODALITA_PAGAMENTO.cod_fiscale COLLATE Latin1_General_CI_AS = CF.cod_fiscale
                         WHERE Data_fine_validita IS NULL
                     ";
 
@@ -105,7 +105,7 @@ namespace ProcedureNet7.Storni
                 string sqlMappingTable = $@"
                         CREATE TABLE #MappingTable
                         (
-                            CodFiscale CHAR(16),
+                            CodFiscale CHAR(16) COLLATE Latin1_General_CI_AS,
                             NumMandato VARCHAR(10),
                             impReintroito VARCHAR(10),
                             IBAN_Storno VARCHAR(50)
@@ -139,7 +139,7 @@ namespace ProcedureNet7.Storni
                     SELECT Pagamenti.Anno_accademico, Domanda.cod_fiscale
                     FROM Pagamenti INNER JOIN
                     Domanda ON Pagamenti.anno_accademico = Domanda.anno_accademico AND Pagamenti.num_domanda = Domanda.num_domanda INNER JOIN
-                    #MappingTable AS MT ON Domanda.cod_fiscale = MT.CodFiscale AND Pagamenti.cod_mandato = MT.NumMandato
+                    #MappingTable AS MT ON Domanda.cod_fiscale COLLATE Latin1_General_CI_AS = MT.CodFiscale AND Pagamenti.cod_mandato = MT.NumMandato
                     WHERE pagamenti.ese_finanziario = '{esercizioFinanziario}'
                     ";
 
@@ -188,7 +188,7 @@ namespace ProcedureNet7.Storni
                         IBAN_Storno = MT.IBAN_Storno
                     FROM Pagamenti INNER JOIN 
                     Domanda ON Pagamenti.anno_accademico = Domanda.anno_accademico AND Pagamenti.num_domanda = Domanda.num_domanda INNER JOIN
-                    #MappingTable AS MT ON Domanda.cod_fiscale = MT.CodFiscale AND Pagamenti.cod_mandato = MT.NumMandato
+                    #MappingTable AS MT ON Domanda.cod_fiscale COLLATE Latin1_General_CI_AS = MT.CodFiscale AND Pagamenti.cod_mandato = MT.NumMandato
                     WHERE pagamenti.ese_finanziario = '{esercizioFinanziario}'
                     ";
 

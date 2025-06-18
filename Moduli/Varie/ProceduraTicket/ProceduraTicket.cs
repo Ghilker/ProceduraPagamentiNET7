@@ -272,7 +272,7 @@ namespace ProcedureNet7
 
                   CREATE TABLE #tmpCodFisc
                   (
-                      Cod_fiscale VARCHAR(20) NOT NULL
+                      Cod_fiscale VARCHAR(20) COLLATE Latin1_General_CI_AS NOT NULL
                   );",
                 CONNECTION))
             {

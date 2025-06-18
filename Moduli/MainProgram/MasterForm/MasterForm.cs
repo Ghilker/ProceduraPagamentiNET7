@@ -224,6 +224,10 @@ namespace ProcedureNet7
                             FormRendicontoMiur rendicontoMiur = new FormRendicontoMiur(this);
                             ShowFormInPanel(rendicontoMiur);
                             break;
+                        case ProcedureVarie.ProceduraGeneratoreFlussi:
+                            FormGeneratoreFlussi generatoreFlussi = new FormGeneratoreFlussi(this);
+                            ShowFormInPanel(generatoreFlussi);
+                            break;
                     }
                 }
 #endif
@@ -341,7 +345,10 @@ namespace ProcedureNet7
             [ProcedureCategory("Varie", "Funzionario")]
             ProceduraControlloPS,
             [ProcedureCategory("Varie", "Funzionario")]
-            ProceduraRendicontoMiur
+            ProceduraRendicontoMiur,
+            [ProcedureCategory("Varie", "Funzionario")]
+            ProceduraGeneratoreFlussi
+
         }
 
         public enum ProcedureVerifiche
