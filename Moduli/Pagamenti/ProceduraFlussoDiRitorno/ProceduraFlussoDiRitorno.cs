@@ -177,8 +177,8 @@ namespace ProcedureNet7
                 string createTempTable = @"
                     CREATE TABLE #TempStudenteMappings
                     (
-                        CodFiscale CHAR(16),
-                        NumReversale VARCHAR(20)
+                        CodFiscale CHAR(16) COLLATE Latin1_General_CI_AS,
+                        NumReversale VARCHAR(20) COLLATE Latin1_General_CI_AS
                     );
                     ";
                 SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
@@ -216,9 +216,9 @@ namespace ProcedureNet7
                 string createTempTable = @"
                         CREATE TABLE #TempMovimentiContabili
                         (
-                            CodFiscale CHAR(16),
+                            CodFiscale CHAR(16) COLLATE Latin1_General_CI_AS,
                             DataEmissione DATETIME,
-                            CodMovimentoGenerale VARCHAR(50)
+                            CodMovimentoGenerale VARCHAR(50) COLLATE Latin1_General_CI_AS
                         );
                         ";
                 SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
@@ -260,10 +260,10 @@ namespace ProcedureNet7
                 string createTempTable = @"
                         CREATE TABLE #TempPagamenti
                         (
-                            CodFiscale CHAR(16),
+                            CodFiscale CHAR(16) COLLATE Latin1_General_CI_AS,
                             DataEmissione DATETIME,
-                            CodMovimentoGenerale VARCHAR(50),
-                            NumMandato VARCHAR(20)
+                            CodMovimentoGenerale VARCHAR(50) COLLATE Latin1_General_CI_AS,
+                            NumMandato VARCHAR(20) COLLATE Latin1_General_CI_AS
                         );
                         ";
                 SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
@@ -309,10 +309,10 @@ namespace ProcedureNet7
                 string createTempTable = @"
                         CREATE TABLE #TempReversali
                         (
-                            CodFiscale CHAR(16),
+                            CodFiscale CHAR(16) COLLATE Latin1_General_CI_AS,
                             DataEmissione DATETIME,
-                            CodMovimentoGenerale VARCHAR(50),
-                            NumMandato VARCHAR(20)
+                            CodMovimentoGenerale VARCHAR(50) COLLATE Latin1_General_CI_AS,
+                            NumMandato VARCHAR(20) COLLATE Latin1_General_CI_AS
                         );
                         ";
                 SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);
@@ -376,8 +376,8 @@ namespace ProcedureNet7
                 string createTempTable = @"
                         CREATE TABLE #TempMovimentiContabili
                         (
-                            NumMandato VARCHAR(50),
-                            CodMovimentoGenerale VARCHAR(50)
+                            NumMandato VARCHAR(50) COLLATE Latin1_General_CI_AS,
+                            CodMovimentoGenerale VARCHAR(50) COLLATE Latin1_General_CI_AS
                         );
                         ";
                 SqlCommand createCmd = new(createTempTable, CONNECTION, sqlTransaction);

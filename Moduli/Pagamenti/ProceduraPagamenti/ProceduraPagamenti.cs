@@ -465,38 +465,38 @@ namespace ProcedureNet7
             {
                 _ = queryBuilder.Append($@"
                                         CREATE TABLE {dbTableName} (
-	                                        anno_accademico CHAR(8),
-	                                        cod_fiscale CHAR(16),
-	                                        Cognome VARCHAR(75),
-	                                        Nome VARCHAR(75),
-	                                        Data_nascita DATETIME,
-                                            sesso CHAR(1),
-	                                        num_domanda NUMERIC (10,0),
-	                                        cod_tipo_esito CHAR(1),
-	                                        status_sede CHAR(1),
-	                                        cod_cittadinanza CHAR(4),
-	                                        cod_ente CHAR(2),
-	                                        cod_beneficio CHAR(2),
-                                            esitoPA CHAR(1),
-	                                        anno_corso CHAR(2),
-	                                        disabile CHAR(1),
-	                                        imp_beneficio DECIMAL(8,2),
-	                                        iscrizione_fuoritermine CHAR(1),
-	                                        pagamento_tassareg CHAR(1),
-	                                        blocco_pagamento CHAR(1),
-	                                        esonero_pag_tassa_reg CHAR(1),
-	                                        cod_corso SMALLINT,
-	                                        facolta VARCHAR(150),
-	                                        sede_studi VARCHAR(3),
-	                                        superamento_esami CHAR(1),
-	                                        superamento_esami_tassa_reg CHAR(1),
-                                            richiesta_mensa CHAR(1),
-                                            Rifug_politico CHAR(1),
-                                            liquidabile CHAR(1),
-                                            note VARCHAR(MAX),
-                                            togliere_loreto VARCHAR(4),
-                                            togliere_PEC CHAR(1)
-                                        );");
+                                        anno_accademico CHAR(8) COLLATE Latin1_General_CI_AS,
+                                        cod_fiscale CHAR(16) COLLATE Latin1_General_CI_AS,
+                                        Cognome VARCHAR(75) COLLATE Latin1_General_CI_AS,
+                                        Nome VARCHAR(75) COLLATE Latin1_General_CI_AS,
+                                        Data_nascita DATETIME,
+                                        sesso CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        num_domanda NUMERIC (10,0),
+                                        cod_tipo_esito CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        status_sede CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        cod_cittadinanza CHAR(4) COLLATE Latin1_General_CI_AS,
+                                        cod_ente CHAR(2) COLLATE Latin1_General_CI_AS,
+                                        cod_beneficio CHAR(2) COLLATE Latin1_General_CI_AS,
+                                        esitoPA CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        anno_corso CHAR(2) COLLATE Latin1_General_CI_AS,
+                                        disabile CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        imp_beneficio DECIMAL(8,2),
+                                        iscrizione_fuoritermine CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        pagamento_tassareg CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        blocco_pagamento CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        esonero_pag_tassa_reg CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        cod_corso SMALLINT,
+                                        facolta VARCHAR(150) COLLATE Latin1_General_CI_AS,
+                                        sede_studi VARCHAR(3) COLLATE Latin1_General_CI_AS,
+                                        superamento_esami CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        superamento_esami_tassa_reg CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        richiesta_mensa CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        Rifug_politico CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        liquidabile CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        note VARCHAR(MAX) COLLATE Latin1_General_CI_AS,
+                                        togliere_loreto VARCHAR(4) COLLATE Latin1_General_CI_AS,
+                                        togliere_PEC CHAR(1) COLLATE Latin1_General_CI_AS
+                                    );");
             }
 
             _ = queryBuilder.Append($@"         DECLARE @maxDataValidita DATETIME
@@ -925,7 +925,7 @@ namespace ProcedureNet7
             List<string> codFiscali = studentiDaPagare.Keys.ToList();
 
             Logger.LogDebug(null, "Creazione tabella CF");
-            string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16));";
+            string createTempTable = "CREATE TABLE #CFEstrazione (Cod_fiscale VARCHAR(16) COLLATE Latin1_General_CI_AS);";
             using (SqlCommand createCmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction)
             {
                 CommandTimeout = 9000000
@@ -3072,7 +3072,7 @@ namespace ProcedureNet7
                 if (studentiDaRimuovereDallaTabella.Count > 0 && !string.IsNullOrWhiteSpace(selectedVecchioMandato))
                 {
                     Logger.LogInfo(55, $"Lavorazione studenti - Rimozione dalla tabella d'appoggio");
-                    string createTempTableSql = "CREATE TABLE #TempCodFiscale (cod_fiscale VARCHAR(255));";
+                    string createTempTableSql = "CREATE TABLE #TempCodFiscale (cod_fiscale VARCHAR(255) COLLATE Latin1_General_CI_AS);";
                     SqlCommand createTableCommand = new(createTempTableSql, CONNECTION, sqlTransaction)
                     {
                         CommandTimeout = 9000000

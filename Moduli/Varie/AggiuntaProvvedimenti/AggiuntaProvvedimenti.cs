@@ -269,7 +269,7 @@ namespace ProcedureNet7
                             DROP TABLE #TempFiscalCodes;
 
                         CREATE TABLE #TempFiscalCodes (
-                            FiscalCode VARCHAR(50) NOT NULL
+                        FiscalCode VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
                         );
                     ";
 
@@ -278,7 +278,7 @@ namespace ProcedureNet7
                             DROP TABLE #TempNumDom;
 
                         CREATE TABLE #TempNumDom (
-                            NumDomanda VARCHAR(50) NOT NULL
+                        NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
                         );
                     ";
 
@@ -360,7 +360,7 @@ namespace ProcedureNet7
                             DROP TABLE #TempCommonCodes;
 
                         CREATE TABLE #TempCommonCodes (
-                            NumDomanda VARCHAR(50) NOT NULL
+                        NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
                         );
                     ";
                 using (var cmd = new SqlCommand(createTempCommonTable, CONNECTION, sqlTransaction))
