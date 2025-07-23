@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+
 namespace ProcedureNet7
 {
     internal class ArgsProceduraGeneratoreFlussi : IValidatableObject
@@ -28,4 +29,5 @@ namespace ProcedureNet7
             return results;
         }
     }
+
 }

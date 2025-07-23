@@ -584,6 +584,8 @@ namespace ProcedureNet7
                 {
                     CommandTimeout = 90000000
                 };
+                Logger.LogDebug(null, "QUERY SQL CREAZIONE TABELLA:");
+                Logger.LogDebug(null, sqlQuery);
                 _ = cmd.ExecuteNonQuery();
             }
             catch (Exception ex)
@@ -594,6 +596,8 @@ namespace ProcedureNet7
             finally
             {
                 progressUpdater.StopUpdating();
+
+
                 Logger.LogInfo(1, "Fine creazione tabella d'appoggio");
             }
         }
