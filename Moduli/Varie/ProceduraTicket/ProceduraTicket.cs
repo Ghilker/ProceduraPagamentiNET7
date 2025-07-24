@@ -177,9 +177,10 @@ namespace ProcedureNet7
 
                     string messageBody = @"
                         <p>Buongiorno,</p>
-                        <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/09/2024 
+                        <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/05/2025 
                         con gli esiti di borsa e i blocchi presenti, integrato con le università
-                        di appartenenza dello studente.</p>";
+                        di appartenenza dello studente. In più è disponibile una colonna 
+                        aggiuntiva che indica se lo studente ha presentato domanda per il 25/26</p>";
 
                     if (_isFileWithMessagges)
                     {
@@ -315,6 +316,12 @@ namespace ProcedureNet7
                 WHERE MBP.blocco_pagamento_attivo = '1' AND MBP.Anno_accademico = '20242025'
                 GROUP BY MBP.num_domanda;
 
+                SELECT DISTINCT Cod_fiscale
+                INTO #Tmp_Has_25_26
+                FROM Domanda
+                WHERE Anno_accademico = '20252026'
+                  AND Tipo_bando IN ('LZ', 'L2'); 
+
                 -- Final Query with temp tables
                 SELECT
                     d.Num_domanda,
@@ -322,7 +329,9 @@ namespace ProcedureNet7
                     COALESCE(vBS.esito_BS, '')         AS Esito_BS_24_25,
                     COALESCE(vPA.esito_PA, '')         AS Esito_PA_24_25,
                     COALESCE(mbpagg.Blocchi, '')       AS Blocchi_24_25,
-                    ss.Descrizione                     AS Sede_Università_24_25
+                    ss.Descrizione                     AS Sede_Università_24_25,
+                    CASE WHEN h25.Cod_fiscale IS NULL THEN 'NO' ELSE 'SI' END
+                        AS Ha_domanda_25_26
                 FROM Domanda AS d
                     INNER JOIN #tmpCodFisc AS t
                         ON d.Cod_fiscale = t.Cod_fiscale
@@ -336,6 +345,7 @@ namespace ProcedureNet7
                         ON ss.Cod_sede_studi = vi.Cod_sede_studi
                     LEFT JOIN #Temp_CTE_Blocchi           AS mbpagg
                         ON mbpagg.num_domanda = d.Num_domanda
+                    LEFT  JOIN #Tmp_Has_25_26     AS h25 ON h25.Cod_fiscale = d.Cod_fiscale
                 WHERE 
                     d.Anno_accademico = '20242025'
                     AND d.Tipo_bando IN ('LZ', 'L2')
@@ -346,7 +356,9 @@ namespace ProcedureNet7
                 DROP TABLE #Temp_vEsiti_concorsiBS;
                 DROP TABLE #Temp_vEsiti_concorsiPA;
                 DROP TABLE #Temp_vIscrizioni;
-                DROP TABLE #Temp_CTE_Blocchi;
+                DROP TABLE #Temp_CTE_Blocchi;                
+                DROP TABLE #Tmp_Has_25_26;
+
             ";
 
             // 5) Execute the query and fill result

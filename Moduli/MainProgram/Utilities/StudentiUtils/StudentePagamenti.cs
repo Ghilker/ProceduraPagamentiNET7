@@ -119,6 +119,11 @@ namespace ProcedureNet7
             InformazioniPagamento.NumeroImpegno = impegno;
         }
 
+        public void SetCategoriaCU(string categoriaCU)
+        {
+            InformazioniPagamento.CategoriaCU = categoriaCU;
+        }
+
         public void AddReversale(string codReversale, double importo, string nota, string codTipoPagamOld, string codTipoPagamNew)
         {
             Reversale reversale = new Reversale(codReversale, importo, nota, codTipoPagamOld, codTipoPagamNew);

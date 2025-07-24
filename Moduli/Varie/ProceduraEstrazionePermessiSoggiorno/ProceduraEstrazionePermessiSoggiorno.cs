@@ -36,63 +36,14 @@ namespace ProcedureNet7
                 // First query (CON 23/24)
                 DataTable dataTableCon2324 = new DataTable();
                 string queryCon2324 = $@"
-            SELECT DISTINCT 
-                   d.Cod_fiscale, 
-                   s.Cognome, 
-                   s.Nome, 
-                   s.Codice_Studente
-            FROM Domanda AS d
-            INNER JOIN Studente AS s 
-                ON d.Cod_fiscale = s.Cod_fiscale
-            INNER JOIN vStatus_compilazione AS vsc
-                ON d.Anno_accademico = vsc.Anno_accademico
-                AND d.Num_domanda = vsc.Num_domanda
-            WHERE d.Anno_accademico IN ('20242025','20232024')
-              AND d.Tipo_bando = 'lz'
-              AND d.Cod_fiscale IN
-              (
-                  SELECT DISTINCT 
-                         sps.Cod_fiscale
-                  FROM STATUS_ALLEGATI AS sa
-                  INNER JOIN Specifiche_permesso_soggiorno AS sps 
-                      ON sa.id_allegato = sps.id_allegato
-                  WHERE 
-                        -- The usual logic for picking the ""latest"" STATUS_ALLEGATI and permesso_soggiorno
-                        sa.data_validita = (
-                            SELECT MAX(data_validita)
-                            FROM STATUS_ALLEGATI AS sta
-                            WHERE sta.id_allegato = sa.id_allegato
-                        )
-                        AND sps.Data_validita = (
-                            SELECT MAX(Data_validita)
-                            FROM Specifiche_permesso_soggiorno AS br
-                            WHERE br.Num_domanda = sps.Num_domanda
-                              AND br.Cod_fiscale = sps.Cod_fiscale
-                        )
-                        AND sa.cod_status = '01'
-                        AND (sps.Anno_accademico IS NULL 
-                             OR sps.Anno_accademico IN ('20232024','20242025'))
-            
-                        -- Ensure the student actually has at least one allegato before 2025-02-10
-                        AND EXISTS
-                        (
-                            SELECT 1
-                            FROM STATUS_ALLEGATI AS saE
-                            INNER JOIN Specifiche_permesso_soggiorno AS spsE 
-                                ON saE.id_allegato = spsE.id_allegato
-                            WHERE spsE.Cod_fiscale = sps.Cod_fiscale
-                              AND saE.data_validita < '11/02/2025'
-                        )
-              )
-              AND vsc.status_compilazione >= '90'
-              AND d.Num_domanda IN 
-                  (
-                      SELECT num_domanda
-                      FROM vEsiti_concorsiBS
-                      WHERE anno_accademico = 20242025
-                        AND Cod_tipo_esito <> 0
-                  )
-            ORDER BY d.Cod_fiscale;
+select distinct s.Cod_fiscale, s.Nome, s.Cognome, s.Codice_Studente from vSpecifiche_permesso_soggiorno vs inner join VStatus_Allegati va on vs.id_allegato = va.id_allegato 
+
+inner join Domanda d on vs.Cod_fiscale = d.Cod_fiscale and d.Anno_accademico in (20242025, 20232024) and d.Tipo_bando = 'lz' 
+inner join vEsiti_concorsi ve on d.Num_domanda = ve.Num_domanda and ve.Cod_beneficio = 'bs' and ve.Cod_tipo_esito = 2
+inner join Studente s on d.Cod_fiscale = s.Cod_fiscale
+where (vs.Anno_accademico is null or vs.Anno_accademico is not null) and va.cod_status = '01' and va.data_fine_validita is null
+and d.Num_domanda in (select Num_domanda from vMotivazioni_blocco_pagamenti where Anno_accademico = 20242025 and Cod_tipologia_blocco = 'bpp') 
+and d.Cod_fiscale in (select cod_fiscale from vIscrizioni where Anno_accademico = 20242025 and tipo_bando = 'lz' and Anno_corso <> 1)
 
                 ";
 
@@ -295,9 +246,9 @@ ORDER BY domanda.Cod_fiscale;
                         Body = $@"  <p>Buongiorno,</p>
                             <p>su richiesta di Rita che legge in copia,</p>
                             <p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
-                            <p>Ti ricordo di <b>non rimuovere i blocchi</b> poiché è attiva una procedura che li rimuove massivamente.</p> 
 
-                           <p>Grazie e buon lavoro!</p>",
+                           <p>Grazie e buon lavoro!</p>
+                            <p>Giacomo Pavone</p> ",
                         IsBodyHtml = true
                     };
 

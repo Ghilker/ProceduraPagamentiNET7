@@ -106,9 +106,9 @@ namespace ProcedureNet7.Storni
                         CREATE TABLE #MappingTable
                         (
                             CodFiscale CHAR(16) COLLATE Latin1_General_CI_AS,
-                            NumMandato VARCHAR(10),
-                            impReintroito VARCHAR(10),
-                            IBAN_Storno VARCHAR(50)
+                            NumMandato VARCHAR(10) COLLATE Latin1_General_CI_AS,
+                            impReintroito VARCHAR(10) COLLATE Latin1_General_CI_AS,
+                            IBAN_Storno VARCHAR(50) COLLATE Latin1_General_CI_AS
                         )";
 
                 SqlCommand mappingTableCmd = new(sqlMappingTable, CONNECTION, sqlTransaction);

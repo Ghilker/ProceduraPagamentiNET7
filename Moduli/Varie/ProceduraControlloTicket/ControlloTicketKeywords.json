@@ -1,906 +1,402 @@
 {
-  "PositiveKeywords": [
+  "Keywords": [
     {
-      "Keyword": "rimuovere il blocco",
-      "Probability": 0.95
+      "Keyword": "complet",
+      "Weight": 0.55
     },
     {
-      "Keyword": "sbloccare il mio blocco",
-      "Probability": 0.90
+      "Keyword": "compil",
+      "Weight": 0.45
     },
     {
-      "Keyword": "sbloccare",
-      "Probability": 0.90
+      "Keyword": "non riesc",
+      "Weight": 0.60
     },
     {
-      "Keyword": "bloccato",
-      "Probability": 0.90
+      "Keyword": "non sono riusc",
+      "Weight": 0.55
     },
     {
-      "Keyword": "bloccata",
-      "Probability": 0.90
+      "Keyword": "non mi fa",
+      "Weight": 0.55
     },
     {
-      "Keyword": "blocked",
-      "Probability": 0.90
+      "Keyword": "non mi permette",
+      "Weight": 0.45
     },
     {
-      "Keyword": "rimuovi il mio blocco",
-      "Probability": 0.90
+      "Keyword": "non mi consente",
+      "Weight": 0.45
     },
     {
-      "Keyword": "rimuovere i blocchi",
-      "Probability": 0.85
+      "Keyword": "non mi fa andare avanti",
+      "Weight": 0.60
     },
     {
-      "Keyword": "eliminare il blocco",
-      "Probability": 0.85
+      "Keyword": "impossibil",
+      "Weight": 0.50
     },
     {
-      "Keyword": "sblocca la mia borsa di studio",
-      "Probability": 0.90
+      "Keyword": "andare avanti",
+      "Weight": 0.40
     },
     {
-      "Keyword": "rimuovere la blocca",
-      "Probability": 0.80
+      "Keyword": "trasmett",
+      "Weight": 0.65
     },
     {
-      "Keyword": "rimuovere il blocco del permesso di soggiorno",
-      "Probability": 0.90
+      "Keyword": "tasto trasmett",
+      "Weight": 0.65
     },
     {
-      "Keyword": "rimuovere il blocco accademico",
-      "Probability": 0.85
+      "Keyword": "invio domanda",
+      "Weight": 0.45
     },
     {
-      "Keyword": "rimuovere il blocco sulla mia borsa di studio",
-      "Probability": 0.90
+      "Keyword": "invio della domanda",
+      "Weight": 0.45
     },
     {
-      "Keyword": "remove my block",
-      "Probability": 0.95
+      "Keyword": "presentare la domanda",
+      "Weight": 0.35
     },
     {
-      "Keyword": "remove the block",
-      "Probability": 0.95
+      "Keyword": "nuova domanda",
+      "Weight": 0.30
     },
     {
-      "Keyword": "remove the payment block",
-      "Probability": 0.90
+      "Keyword": "riapr",
+      "Weight": 0.55
     },
     {
-      "Keyword": "remove the residence permit block",
-      "Probability": 0.90
+      "Keyword": "riapertura",
+      "Weight": 0.50
     },
     {
-      "Keyword": "remove block",
-      "Probability": 0.85
+      "Keyword": "sito si blocca",
+      "Weight": 0.65
     },
     {
-      "Keyword": "unlock my scholarship",
-      "Probability": 0.90
+      "Keyword": "mi si blocca",
+      "Weight": 0.60
     },
     {
-      "Keyword": "remove the block on my account",
-      "Probability": 0.90
+      "Keyword": "pagina si blocca",
+      "Weight": 0.60
     },
     {
-      "Keyword": "remove the block for academic year",
-      "Probability": 0.85
+      "Keyword": "blocc",
+      "Weight": 0.55
     },
     {
-      "Keyword": "remove the block related to my scholarship",
-      "Probability": 0.90
-    },
-
-    {
-      "Keyword": "nonostante abbia pagato la tassa regionale",
-      "Probability": 0.90
+      "Keyword": "crash",
+      "Weight": 0.55
     },
     {
-      "Keyword": "uploaded",
-      "Probability": 0.90
+      "Keyword": "bug",
+      "Weight": 0.55
     },
     {
-      "Keyword": "permesso soggiorno",
-      "Probability": 0.90
+      "Keyword": "errore",
+      "Weight": 0.40
     },
     {
-      "Keyword": "permesso di soggiorno",
-      "Probability": 0.90
+      "Keyword": "errore del sistema",
+      "Weight": 0.55
     },
     {
-      "Keyword": "residence permit",
-      "Probability": 0.90
+      "Keyword": "sistema bloccato",
+      "Weight": 0.55
     },
     {
-      "Keyword": "resident permit",
-      "Probability": 0.90
+      "Keyword": "portale bloccato",
+      "Weight": 0.55
     },
     {
-      "Keyword": "permit",
-      "Probability": 0.90
+      "Keyword": "pagina bianca",
+      "Weight": 0.50
     },
     {
-      "Keyword": "removal of the block",
-      "Probability": 0.90
+      "Keyword": "schermo bianco",
+      "Weight": 0.45
     },
     {
-      "Keyword": "risulta ancora",
-      "Probability": 0.40
+      "Keyword": "sessione scaduta",
+      "Weight": 0.45
     },
     {
-      "Keyword": "pagoPa",
-      "Probability": 0.90
+      "Keyword": "termine scaduto",
+      "Weight": 0.35
+    },
+    {
+      "Keyword": "decaduti i termini",
+      "Weight": 0.40
+    },
+    {
+      "Keyword": "scadenza",
+      "Weight": 0.25
+    },
+    {
+      "Keyword": "deadline",
+      "Weight": 0.25
+    },
+    {
+      "Keyword": "technical issue",
+      "Weight": 0.65
+    },
+    {
+      "Keyword": "system gets stuck",
+      "Weight": 0.65
+    },
+    {
+      "Keyword": "portal stuck",
+      "Weight": 0.60
+    },
+    {
+      "Keyword": "cannot submit",
+      "Weight": 0.65
+    },
+    {
+      "Keyword": "could not submit",
+      "Weight": 0.65
+    },
+    {
+      "Keyword": "can't submit",
+      "Weight": 0.65
+    },
+    {
+      "Keyword": "submit my application",
+      "Weight": 0.45
+    },
+    {
+      "Keyword": "complete my application",
+      "Weight": 0.50
+    },
+    {
+      "Keyword": "finish my application",
+      "Weight": 0.45
+    },
+    {
+      "Keyword": "send my application",
+      "Weight": 0.40
+    },
+    {
+      "Keyword": "come posso risolvere",
+      "Weight": 0.35
+    },
+    {
+      "Keyword": "come posso fare",
+      "Weight": 0.30
+    },
+    {
+      "Keyword": "spiegarmi qual è il problema",
+      "Weight": 0.30
+    },
+    {
+      "Keyword": "nessun operatore",
+      "Weight": 0.30
+    },
+    {
+      "Keyword": "non risponde nessuno",
+      "Weight": 0.30
+    },
+    {
+      "Keyword": "doppia iscrizione",
+      "Weight": 0.40
+    },
+    {
+      "Keyword": "laurea triennale",
+      "Weight": 0.20
+    },
+    {
+      "Keyword": "error 500",
+      "Weight": 0.50
+    },
+    {
+      "Keyword": "error 404",
+      "Weight": 0.45
+    },
+    {
+      "Keyword": "token scadut",
+      "Weight": 0.45
+    },
+    {
+      "Keyword": "white page",
+      "Weight": 0.45
+    },
+    {
+      "Keyword": "stuck",
+      "Weight": 0.40
     }
   ],
   "NegativeKeywords": [
     {
-      "Keyword": "problema",
-      "Weight": -0.80
+      "Keyword": "pagamento",
+      "Weight": 0.40
     },
     {
-      "Keyword": "2023",
-      "Probability": -100.00
+      "Keyword": "payment",
+      "Weight": 0.40
     },
     {
-      "Keyword": "non ho blocco",
-      "Probability": -2.95
+      "Keyword": "accredito",
+      "Weight": 0.35
     },
     {
-      "Keyword": "non ricevuto",
-      "Weight": -0.85
+      "Keyword": "iban",
+      "Weight": 0.35
     },
     {
-      "Keyword": "mancanza",
-      "Weight": -0.80
+      "Keyword": "bonifico",
+      "Weight": 0.35
     },
     {
-      "Keyword": "non risolto",
-      "Weight": -0.85
+      "Keyword": "mandato",
+      "Weight": 0.35
     },
     {
-      "Keyword": "ancora in attesa",
-      "Weight": -0.70
+      "Keyword": "rimborso",
+      "Weight": 0.35
     },
     {
-      "Keyword": "non corretto",
-      "Weight": -0.80
+      "Keyword": "ricevuta",
+      "Weight": 0.30
     },
     {
-      "Keyword": "riduzione",
-      "Weight": -0.75
+      "Keyword": "quietanza",
+      "Weight": 0.30
     },
     {
-      "Keyword": "discrepanza",
-      "Weight": -0.75
+      "Keyword": "fattura",
+      "Weight": 0.30
     },
     {
-      "Keyword": "non posso",
-      "Weight": -0.80
+      "Keyword": "contabili",
+      "Weight": 0.30
     },
-    {
-      "Keyword": "issue",
-      "Weight": -0.80
-    },
-    {
-      "Keyword": "problem",
-      "Weight": -0.85
-    },
-    {
-      "Keyword": "not received",
-      "Weight": -0.85
-    },
-    {
-      "Keyword": "discrepancy",
-      "Weight": -0.75
-    },
-    {
-      "Keyword": "waiting for",
-      "Weight": -0.70
-    },
-    {
-      "Keyword": "missing",
-      "Weight": -0.80
-    },
-    {
-      "Keyword": "unclear",
-      "Weight": -0.75
-    }
-  ],
-  "ResidencePermitKeywords": [
     {
       "Keyword": "permesso di soggiorno",
-      "Probability": 1.0
+      "Weight": 0.50
     },
     {
-      "Keyword": "carta di soggiorno",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "ricevuta del permesso",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "rinnovo del permesso",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "documentazione definitiva permesso di soggiorno mancante",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "blocco per permesso di soggiorno",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "caricato il permesso di soggiorno",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "titolo di soggiorno",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "richiesta/rilascio del permesso",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "ricevuta del kit della pratica",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso temporaneo",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "appuntamento per il rinnovo",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "conferma dell'appuntamento",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "documenti per il permesso",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "stampa del permesso",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "questura",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "impronte digitali",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso scaduto",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso rinnovato",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso definitivo",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso in fase di stampa",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso non rilasciato",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso valido",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso non accettato",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso mancante",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso allegato",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso caricato",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso in attesa",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso necessario",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso richiesto",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso in elaborazione",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso non valido",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso definitivo mancante",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso di soggiorno definitivo",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso di soggiorno scaduto",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso di soggiorno rinnovato",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso di soggiorno valido",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "permesso di soggiorno in attesa",
-      "Probability": 1.0
+      "Keyword": "residenza",
+      "Weight": 0.35
     },
     {
       "Keyword": "residence permit",
-      "Probability": 1.0
+      "Weight": 0.50
     },
     {
-      "Keyword": "residence permit renewal",
-      "Probability": 1.0
+      "Keyword": "visa",
+      "Weight": 0.35
     },
     {
-      "Keyword": "residence permit receipt",
-      "Probability": 1.0
+      "Keyword": "alloggio",
+      "Weight": 0.35
     },
     {
-      "Keyword": "fingerprinting appointment",
-      "Probability": 1.0
+      "Keyword": "posto letto",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit block",
-      "Probability": 1.0
+      "Keyword": "accommodation",
+      "Weight": 0.35
     },
     {
-      "Keyword": "missing definitive residence permit documentation",
-      "Probability": 1.0
+      "Keyword": "mensa",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit uploaded",
-      "Probability": 1.0
+      "Keyword": "pasto",
+      "Weight": 0.25
     },
     {
-      "Keyword": "residence permit not ready",
-      "Probability": 1.0
+      "Keyword": "isee",
+      "Weight": 0.40
     },
     {
-      "Keyword": "residence permit in final phase",
-      "Probability": 1.0
+      "Keyword": "dsu",
+      "Weight": 0.35
     },
     {
-      "Keyword": "residence permit printing",
-      "Probability": 1.0
+      "Keyword": "caf",
+      "Weight": 0.35
     },
     {
-      "Keyword": "residence permit deadline",
-      "Probability": 1.0
+      "Keyword": "reddito",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit receipt uploaded",
-      "Probability": 1.0
+      "Keyword": "nucleo familiare",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit renewal receipt",
-      "Probability": 1.0
+      "Keyword": "patrimonio",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit expired",
-      "Probability": 1.0
+      "Keyword": "merito",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit renewal process",
-      "Probability": 1.0
+      "Keyword": "cfu",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit verification",
-      "Probability": 1.0
+      "Keyword": "crediti",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit document",
-      "Probability": 1.0
+      "Keyword": "esami",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit section",
-      "Probability": 1.0
+      "Keyword": "media voti",
+      "Weight": 0.25
     },
     {
-      "Keyword": "residence permit block removal",
-      "Probability": 1.0
+      "Keyword": "graduatoria",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit missing",
-      "Probability": 1.0
+      "Keyword": "scorrimento",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit attached",
-      "Probability": 1.0
+      "Keyword": "ranking",
+      "Weight": 0.25
     },
     {
-      "Keyword": "residence permit submitted",
-      "Probability": 1.0
+      "Keyword": "trasferimento",
+      "Weight": 0.35
     },
     {
-      "Keyword": "residence permit delay",
-      "Probability": 1.0
+      "Keyword": "cambio sede",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit not accepted",
-      "Probability": 1.0
+      "Keyword": "cambio corso",
+      "Weight": 0.30
     },
     {
-      "Keyword": "residence permit in profile",
-      "Probability": 1.0
+      "Keyword": "invalidità",
+      "Weight": 0.25
     },
     {
-      "Keyword": "residence permit issue",
-      "Probability": 1.0
+      "Keyword": "disabilità",
+      "Weight": 0.25
     },
     {
-      "Keyword": "residence permit confirmation",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit status",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit required",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit not uploaded",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit correction",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit valid",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit invalid",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit in progress",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit not processed",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit not available",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit not received",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit not printed",
-      "Probability": 1.0
-    },
-    {
-      "Keyword": "residence permit not finalized",
-      "Probability": 1.0
-    }
-  ],
-  "PaymentKeywords": [
-    {
-      "Keyword": "pagamento",
-      "Probability": 0.5
+      "Keyword": "ticket mensa",
+      "Weight": 0.25
     },
     {
       "Keyword": "rata",
-      "Probability": 0.4
+      "Weight": 0.25
     },
     {
-      "Keyword": "versato",
-      "Probability": 0.3
-    },
-    {
-      "Keyword": "ricevuto",
-      "Probability": 0.3
-    },
-    {
-      "Keyword": "integrazione",
-      "Probability": 0.2
-    },
-    {
-      "Keyword": "importo",
-      "Probability": 0.2
-    },
-    {
-      "Keyword": "saldo",
-      "Probability": 0.3
+      "Keyword": "contributo",
+      "Weight": 0.25
     }
-  ],
-    "TransferKeywords": [
-      {
-        "Group": "cassino",
-        "Weight": 0.5,
-        "Keywords": [
-          "cassino e del lazio meridionale",
-          "cassino",
-          "unicas"
-        ]
-      },
-      {
-        "Group": "costume moda",
-        "Weight": 0.5,
-        "Keywords": [
-          "accademia di costume di moda",
-          "costume moda"
-        ]
-      },
-      {
-        "Group": "icapl",
-        "Weight": 0.5,
-        "Keywords": [
-          "istituto centrale per la patologia degli archivi e del libro (icapl, via milano)",
-          "icapl"
-        ]
-      },
-      {
-        "Group": "restauro",
-        "Weight": 0.5,
-        "Keywords": [
-          "istituto centrale per il restauro (via di san michele)",
-          "istituto centrale restauro"
-        ]
-      },
-      {
-        "Group": "teatro",
-        "Weight": 0.5,
-        "Keywords": [
-          "accademia internazionale di teatro",
-          "accademia internazionale teatro"
-        ]
-      },
-      {
-        "Group": "duofin art",
-        "Weight": 0.5,
-        "Keywords": [
-          "istituto duofin art - accademia delle arti e nuove tecnologie",
-          "duofin art",
-          "duofinart"
-        ]
-      },
-      {
-        "Group": "sapienza",
-        "Weight": 0.5,
-        "Keywords": [
-          "sapienza"
-        ]
-      },
-      {
-        "Group": "tor vergata",
-        "Weight": 0.5,
-        "Keywords": [
-          "tor vergata",
-          "torvergata"
-        ]
-      },
-      {
-        "Group": "columbus",
-        "Weight": 0.5,
-        "Keywords": [
-          "columbus academy ssml",
-          "columbus"
-        ]
-      },
-      {
-        "Group": "respighi",
-        "Weight": 0.5,
-        "Keywords": [
-          "conservatorio statale di musica o. respighi",
-          "respighi conservatorio",
-          "conservatorio respighi"
-        ]
-      },
-      {
-        "Group": "refice",
-        "Weight": 0.5,
-        "Keywords": [
-          "conservatorio l. refice - frosinone",
-          "conservatorio frosinone"
-        ]
-      },
-      {
-        "Group": "tuscia",
-        "Weight": 0.5,
-        "Keywords": [
-          "della tuscia viterbo",
-          "tuscia viterbo",
-          "univit"
-        ]
-      },
-      {
-        "Group": "roma tre",
-        "Weight": 0.5,
-        "Keywords": [
-          "roma tre",
-          "roma3",
-          "roma 3",
-          "romatre"
-        ]
-      },
-      {
-        "Group": "silvio",
-        "Weight": 0.5,
-        "Keywords": [
-          "silvio d'amico"
-        ]
-      },
-      {
-        "Group": "italiano arte",
-        "Weight": 0.5,
-        "Keywords": [
-          "istituto italiano arte artigianato e restauro (via licinio murena)",
-          "italiano arte artigianato restauro"
-        ]
-      },
-      {
-        "Group": "pantheon",
-        "Weight": 0.5,
-        "Keywords": [
-          "istituto pantheon design & technology",
-          "pantheon"
-        ]
-      },
-      {
-        "Group": "luiss",
-        "Weight": 0.5,
-        "Keywords": [
-          "luiss"
-        ]
-      },
-      {
-        "Group": "lumsa",
-        "Weight": 0.5,
-        "Keywords": [
-          "libera degli studi maria ss.assunta lumsa",
-          "lumsa"
-        ]
-      },
-      {
-        "Group": "danza",
-        "Weight": 0.5,
-        "Keywords": [
-          "accademia nazionale di danza",
-          "nazionale danza"
-        ]
-      },
-      {
-        "Group": "link campus",
-        "Weight": 0.5,
-        "Keywords": [
-          "link campus university",
-          "link campus",
-          "unilink"
-        ]
-      },
-      {
-        "Group": "foro italico",
-        "Weight": 0.5,
-        "Keywords": [
-          "degli studi di roma foro italico",
-          "foro italico"
-        ]
-      },
-      {
-        "Group": "mediatori",
-        "Weight": 0.5,
-        "Keywords": [
-          "scuola superiore per mediatori linguistici di roma",
-          "mediatori linguistici roma",
-          "mediatori linguistici"
-        ]
-      },
-      {
-        "Group": "armando curcio",
-        "Weight": 0.5,
-        "Keywords": [
-          "ssml armando curcio",
-          "armando curcio"
-        ]
-      },
-      {
-        "Group": "isef",
-        "Weight": 0.5,
-        "Keywords": [
-          "isef cassino",
-          "isef"
-        ]
-      },
-      {
-        "Group": "belle arti frosinone",
-        "Weight": 0.5,
-        "Keywords": [
-          "accademia belle arti di frosinone",
-          "belle arti frosinone"
-        ]
-      },
-      {
-        "Group": "belle arti viterbo",
-        "Weight": 0.5,
-        "Keywords": [
-          "accademia belle arti di viterbo",
-          "belle arti viterbo"
-        ]
-      },
-      {
-        "Group": "belle arti roma",
-        "Weight": 0.5,
-        "Keywords": [
-          "accademia di belle arti di roma",
-          "belle arti roma"
-        ]
-      },
-      {
-        "Group": "quasar",
-        "Weight": 0.5,
-        "Keywords": [
-          "quasar design university",
-          "quasar"
-        ]
-      },
-      {
-        "Group": "campus biomedico",
-        "Weight": 0.5,
-        "Keywords": [
-          "libera campus biomedico roma",
-          "campus biomedico"
-        ]
-      },
-      {
-        "Group": "cecilia",
-        "Weight": 0.5,
-        "Keywords": [
-          "conservatorio s. cecilia",
-          "conservatorio"
-        ]
-      },
-      {
-        "Group": "saint louis",
-        "Weight": 0.5,
-        "Keywords": [
-          "saint louis college of music",
-          "saint louis"
-        ]
-      },
-      {
-        "Group": "isia",
-        "Weight": 0.5,
-        "Keywords": [
-          "istituto superiore per le industrie artistiche roma isia",
-          "isia"
-        ]
-      },
-      {
-        "Group": "telematica marconi",
-        "Weight": 0.5,
-        "Keywords": [
-          "telematica g. marconi",
-          "unimarconi"
-        ]
-      },
-      {
-        "Group": "unitelma",
-        "Weight": 0.5,
-        "Keywords": [
-          "unitelma"
-        ]
-      },
-      {
-        "Group": "telematica cusano",
-        "Weight": 0.5,
-        "Keywords": [
-          "telematica nicolò cusano",
-          "unicusano"
-        ]
-      },
-      {
-        "Group": "san raffaele",
-        "Weight": 0.5,
-        "Keywords": [
-          "telematica san raffaele roma",
-          "san raffaele"
-        ]
-      },
-      {
-        "Group": "mercatorum",
-        "Weight": 0.5,
-        "Keywords": [
-          "telematica universitas mercatorum",
-          "mercatorum"
-        ]
-      },
-      {
-        "Group": "uninettuno",
-        "Weight": 0.5,
-        "Keywords": [
-          "uninettuno"
-        ]
-      },
-      {
-        "Group": "libera accademia",
-        "Weight": 0.5,
-        "Keywords": [
-          "libera accademia di belle arti di roma",
-          "libera accademia belle arti roma"
-        ]
-      },
-      {
-        "Group": "unicamillus",
-        "Weight": 0.5,
-        "Keywords": [
-          "unicamillus"
-        ]
-      },
-      {
-        "Group": "interpreti",
-        "Weight": 0.5,
-        "Keywords": [
-          "scuola superiore interpreti e traduttori",
-          "interpreti traduttori"
-        ]
-      },
-      {
-        "Group": "studi politici",
-        "Weight": 0.5,
-        "Keywords": [
-          "ist. sup. studi politici s.pio v°",
-          "studi politici spio"
-        ]
-      },
-      {
-        "Group": "internazionali",
-        "Weight": 0.5,
-        "Keywords": [
-          "degli studi internazionali di roma (unint)",
-          "internazionali roma"
-        ]
-      },
-      {
-        "Group": "Trasferimento",
-        "Weight": 2,
-        "Keywords": [
-          "trasferimento"
-        ]
-      }
-    ]
-  }
+  ]
+}

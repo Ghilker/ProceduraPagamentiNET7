@@ -35,7 +35,6 @@
             openFileDialog = new OpenFileDialog();
             GenflussiSavebtn = new Button();
             GenflussiSavelbl = new Label();
-            Genflussickx = new CheckBox();
             saveFolderDialog = new FolderBrowserDialog();
             SuspendLayout();
             // 
@@ -104,23 +103,12 @@
             GenflussiSavelbl.TabIndex = 39;
             GenflussiSavelbl.Text = "_____";
             // 
-            // Genflussickx
-            // 
-            Genflussickx.AutoSize = true;
-            Genflussickx.Location = new Point(36, 147);
-            Genflussickx.Name = "Genflussickx";
-            Genflussickx.Size = new Size(178, 19);
-            Genflussickx.TabIndex = 40;
-            Genflussickx.Text = "Inserisci anche num impegni";
-            Genflussickx.UseVisualStyleBackColor = true;
-            // 
             // FormGeneratoreFlussi
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
-            Controls.Add(Genflussickx);
             Controls.Add(GenflussiSavelbl);
             Controls.Add(GenflussiSavebtn);
             Controls.Add(GenflussiFilelbl);
@@ -143,7 +131,6 @@
         private OpenFileDialog openFileDialog;
         private Button GenflussiSavebtn;
         private Label GenflussiSavelbl;
-        private CheckBox Genflussickx;
         private FolderBrowserDialog saveFolderDialog;
     }
 }
