@@ -9,6 +9,7 @@ namespace ProcedureNet7
     public class InformazioniPagamento
     {
         public string NumeroImpegno { get; set; } = string.Empty;
+        public string CategoriaCU {  get; set; } = string.Empty; 
         public double ImportoPagato { get; set; }
         public double ImportoDaPagareLordo { get; set; }
         public double ImportoDaPagare { get; set; }

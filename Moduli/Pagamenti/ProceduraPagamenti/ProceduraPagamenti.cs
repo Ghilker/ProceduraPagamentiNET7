@@ -57,7 +57,7 @@ namespace ProcedureNet7
         bool exitProcedureEarly = false;
 
         public int studentiProcessatiAmount = 0;
-        public Dictionary<string, Dictionary<string, int>> impegnoAmount = new Dictionary<string, Dictionary<string, int>>();
+        public Dictionary<string, Dictionary<string, Dictionary<string, int>>> impegnoAmount = new Dictionary<string, Dictionary<string, Dictionary<string, int>>>();
 
         IAcademicYearProcessor? selectedAcademicProcessor;
 
@@ -184,19 +184,32 @@ namespace ProcedureNet7
                         if (result == DialogResult.OK)
                         {
                             Logger.LogInfo(100, $"Numero studenti lavorati: {studentiProcessatiAmount}", System.Drawing.Color.DarkGreen);
-                            foreach (KeyValuePair<string, Dictionary<string, int>> impegno in impegnoAmount)
+                            foreach (KeyValuePair<string, Dictionary<string, Dictionary<string, int>>> impegno in impegnoAmount)
                             {
                                 int totaleImpegno = 0;
-                                foreach (KeyValuePair<string, int> ente in impegno.Value)
+                                foreach (KeyValuePair<string, Dictionary<string, int>> categoria in impegno.Value)
                                 {
-                                    totaleImpegno += ente.Value;
+                                    foreach (KeyValuePair<string, int> ente in categoria.Value)
+                                    {
+                                        totaleImpegno += ente.Value;
+                                    }
                                 }
 
                                 Logger.LogInfo(null, $" - di cui: {totaleImpegno} con impegno n°{impegno.Key}", ColorTranslator.FromHtml("#A4449A"));
 
-                                foreach (KeyValuePair<string, int> ente in impegno.Value)
+                                foreach (KeyValuePair<string, Dictionary<string, int>> categoria in impegno.Value)
                                 {
-                                    Logger.LogInfo(null, $" - - di cui: {ente.Value} per {ente.Key}", System.Drawing.Color.DarkBlue);
+                                    int totaleCategoria = 0;
+                                    foreach (KeyValuePair<string, int> ente in categoria.Value)
+                                    {
+                                        totaleCategoria += ente.Value;
+                                    }
+                                    Logger.LogInfo(null, $" - - di cui: {totaleCategoria} con categoria n°{categoria.Key}", System.Drawing.Color.DeepPink);
+
+                                    foreach (KeyValuePair<string, int> ente in categoria.Value)
+                                    {
+                                        Logger.LogInfo(null, $" - - - di cui: {ente.Value} per {ente.Key}", System.Drawing.Color.DarkBlue);
+                                    }
                                 }
                             }
                             Logger.LogInfo(null, $"Totale pagamenti: {Math.Round(importoTotale, 2)} €");
@@ -1190,7 +1203,10 @@ namespace ProcedureNet7
                     StudentePagamenti studenteDaControllare = pair.Value;
                     bool stessoPagamento = false;
                     bool okTassaRegionale = false;
-
+                    if(studenteDaControllare.InformazioniPersonali.CodFiscale == "BBCDSN04M47Z129W")
+                    {
+                        string test = "";
+                    }
                     if (studenteDaControllare.InformazioniPagamento.PagamentiEffettuati == null || studenteDaControllare.InformazioniPagamento.PagamentiEffettuati.Count <= 0)
                     {
                         continue;
@@ -1216,19 +1232,17 @@ namespace ProcedureNet7
                         if (isTR &&
                             (
                                 (
-                                    (studenteDaControllare.InformazioniBeneficio.SuperamentoEsami
-                                     || studenteDaControllare.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)
-                                    && (pagamento.codTipoPagam == "BSS0"
-                                        || pagamento.codTipoPagam == "BSS1"
-                                        || pagamento.codTipoPagam == "BSS2")
+                                    (
+                                    (studenteDaControllare.InformazioniBeneficio.SuperamentoEsami || studenteDaControllare.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)
+                                    || (studenteDaControllare.InformazioniIscrizione.AnnoCorso > 1)
+                                    )
+                                    && (pagamento.codTipoPagam == "BSS0" || pagamento.codTipoPagam == "BSS1" || pagamento.codTipoPagam == "BSS2")
                                     && !pagamento.ritiratoAzienda
                                 )
                                 ||
                                 (
                                     studenteDaControllare.InformazioniBeneficio.SuperamentoEsamiTassaRegionale
-                                    && (pagamento.codTipoPagam == "BSP0"
-                                        || pagamento.codTipoPagam == "BSP1"
-                                        || pagamento.codTipoPagam == "BSP2")
+                                    && (pagamento.codTipoPagam == "BSP0" || pagamento.codTipoPagam == "BSP1" || pagamento.codTipoPagam == "BSP2")
                                     && !pagamento.ritiratoAzienda
                                 )
                             )
@@ -2411,6 +2425,22 @@ namespace ProcedureNet7
                     }
                 }
 
+                var assegnazioniInfoPerStudente = assegnazioniList
+                    .GroupBy(a => a.CodFiscale)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => new
+                        {
+                            Count = g.Count(),
+                            SingleStartEndEqual = g.Count() == 1 &&
+                                                  DateTime.TryParse(g.First().DataDecorrenza, out var s) &&
+                                                  DateTime.TryParse(g.First().DataFineAssegnazione, out var e) &&
+                                                  s == e
+                        });
+
+                // Keep track of fiscal codes for which we already evaluated the "remove" decision
+                HashSet<string> removalEvaluated = new();
+
                 // ---------------------------
                 // 3) Process data OFFLINE
                 // ---------------------------
@@ -2590,7 +2620,8 @@ namespace ProcedureNet7
                         Specifiche_impegni.Cod_fiscale, 
                         num_impegno_primaRata, 
                         num_impegno_saldo, 
-                        importo_assegnato
+                        importo_assegnato,
+                        categoria_CU
                     FROM Specifiche_impegni
                     INNER JOIN #CFEstrazione cfe ON Specifiche_impegni.Cod_fiscale = cfe.Cod_fiscale 
                     WHERE 
@@ -2619,15 +2650,16 @@ namespace ProcedureNet7
                                                    Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
                             var impegnoPrimaRata = Utilities.SafeGetString(reader, "num_impegno_primaRata");
                             var impegnoSaldo = Utilities.SafeGetString(reader, "num_impegno_saldo");
-                            double.TryParse(Utilities.SafeGetString(reader, "importo_assegnato"),
-                                            out double importoAssegnato);
+                            double.TryParse(Utilities.SafeGetString(reader, "importo_assegnato"),out double importoAssegnato);
+                            var categoriaCU = Utilities.SafeGetString(reader, "categoria_CU");
 
                             rows.Add(new PopulateStudentiImpegniDTO
                             {
                                 CodFiscale = codFiscale,
                                 ImpegnoPrimaRata = impegnoPrimaRata,
                                 ImpegnoSaldo = impegnoSaldo,
-                                ImportoAssegnato = importoAssegnato
+                                ImportoAssegnato = importoAssegnato,
+                                CategoriaCU = categoriaCU,
                             });
                         }
                     }
@@ -2663,6 +2695,7 @@ namespace ProcedureNet7
 
                         // Finally set the impegno
                         studente.SetImpegno(impegnoToSet);
+                        studente.SetCategoriaCU(row.CategoriaCU);
                     }
                 }
 
@@ -2979,7 +3012,10 @@ namespace ProcedureNet7
                     else if (isTR)
                     {
                         importoDaPagare = 140;
-
+                        if (studente.InformazioniPersonali.CodFiscale == "BBCDSN04M47Z129W")
+                        {
+                            string test = "";
+                        }
                         if ((!hasSaldo || (hasSaldo && saldoStorno && !riemessaSecondaRata)) && !studenteForzato)
                         {
                             if (!(studente.InformazioniIscrizione.AnnoCorso == 1 && (studente.InformazioniBeneficio.SuperamentoEsami || studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)))
@@ -3206,14 +3242,7 @@ namespace ProcedureNet7
                 foreach (string impegno in impegnoList)
                 {
                     Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno}");
-                    string sqlImpegno = $"SELECT Descr FROM Impegni WHERE anno_accademico = '{selectedAA}' AND num_impegno = '{impegno}' AND categoria_pagamento = '{categoriaPagam}'";
-                    SqlCommand cmdImpegno = new(sqlImpegno, CONNECTION, sqlTransaction)
-                    {
-                        CommandTimeout = 9000000
-                    };
-                    string impegnoDescrizione = (string)cmdImpegno.ExecuteScalar();
-                    string currentFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
-                    ProcessImpegno(impegno, currentFolder);
+                    ProcessImpegno(impegno, beneficioFolderPath);
                 }
             }
             catch (Exception ex)
@@ -3271,7 +3300,7 @@ namespace ProcedureNet7
 
             Logger.LogInfo(10, "Index and statistics optimization complete.");
         }
-        private void ProcessImpegno(string impegno, string currentFolder)
+        private void ProcessImpegno(string impegno, string beneficioFolderPath)
         {
             var groupedStudents = studentiDaPagare.Values
                 .Where(s => s.InformazioniPagamento.NumeroImpegno == impegno)
@@ -3279,49 +3308,186 @@ namespace ProcedureNet7
 
             if (groupedStudents.Any())
             {
-                GenerateOutputFilesPA(currentFolder, groupedStudents, impegno);
-            }
 
-            void GenerateOutputFilesPA(string currentFolder, List<StudentePagamenti> studentsWithSameImpegno, string impegno)
-            {
-                Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Senza detrazioni");
-                var studentsWithPA = studentsWithSameImpegno
-                    .Where(s => (s.InformazioniPagamento.Assegnazioni != null && s.InformazioniPagamento.Assegnazioni.Count > 0) || (s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
-                    .ToList();
-                var studentsWithoutPA = studentsWithSameImpegno
-                    .Where(s => (s.InformazioniPagamento.Assegnazioni == null || s.InformazioniPagamento.Assegnazioni.Count <= 0) && !(s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
-                    .ToList();
-                impegnoAmount.Add(impegno, new Dictionary<string, int>());
-                if (studentsWithoutPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
+                string sqlImpegno = $"SELECT Descr FROM Impegni WHERE anno_accademico = '{selectedAA}' AND num_impegno = '{impegno}' AND categoria_pagamento = '{categoriaPagam}'";
+                SqlCommand cmdImpegno = new(sqlImpegno, CONNECTION, sqlTransaction)
                 {
-                    impegnoAmount[impegno].Add("Senza detrazioni", studentsWithoutPA.Count);
-                    if (tipoStudente == "2")
-                    {
-                        ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
-                    }
-                    else if (tipoStudente == "0")
-                    {
-                        ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: false, "SenzaDetrazioni", "00", impegno);
-                    }
-                    else if (tipoStudente == "1")
-                    {
-                        ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: false, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
-                    }
+                    CommandTimeout = 9000000
+                };
+                string impegnoDescrizione = (string)cmdImpegno.ExecuteScalar();
+                string impegnoFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
+                impegnoAmount.Add(impegno, new Dictionary<string, Dictionary<string, int>>());
 
-                    DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), impegno);
-                    if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
-                    {
-                        Utilities.ExportDataTableToExcel(dataTableMatricole, currentFolder, false, "Matricole");
-                    }
+                foreach (string cat in new string[] {"111", "211", "311"})
+                {
+                    var studentsInCategory = groupedStudents.Where(s => s.InformazioniPagamento.CategoriaCU == cat).ToList();
 
-                    DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), impegno);
-                    if (dataTableASuccessivi != null && dataTableASuccessivi.Rows.Count > 0)
-                    {
-                        Utilities.ExportDataTableToExcel(dataTableASuccessivi, currentFolder, false, "AnniSuccessivi");
+                    if (!studentsInCategory.Any()) 
+                    { 
+                        continue; 
                     }
+                    string sqlCat = $"SELECT descrizione FROM tipologie_categoria_cu WHERE categoria_CU = '{cat}'";
+                    SqlCommand cmdCat = new(sqlCat, CONNECTION, sqlTransaction)
+                    {
+                        CommandTimeout = 9000000
+                    };
+                    string catDescrizione = (string)cmdCat.ExecuteScalar();
+                    string catFolder = Utilities.EnsureDirectory(Path.Combine(impegnoFolder, catDescrizione));
+
+                    ProcessCategory(cat, catDescrizione, studentsInCategory, catFolder, impegno);
                 }
+
+                //GenerateOutputFilesPA(currentFolder, groupedStudents, impegno);
+            }
+            void ProcessCategory(string categoriaCU, string catDescrizione, List<StudentePagamenti> students, string catFolder, string impegno)
+            {
+
+                Logger.LogInfo(60,$"Lavorazione studenti - Impegno {impegno} - Categoria {catDescrizione}");
                 try
                 {
+                    var studentsWithPA = students
+                    .Where(s => (s.InformazioniPagamento.Assegnazioni != null && s.InformazioniPagamento.Assegnazioni.Count > 0) || (s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
+                    .ToList();
+                    var studentsWithoutPA = students
+                    .Where(s => (s.InformazioniPagamento.Assegnazioni == null || s.InformazioniPagamento.Assegnazioni.Count <= 0) && !(s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
+                    .ToList();
+
+                    IEnumerable<StudentePagamenti> target;
+                    switch (categoriaCU)
+                    {
+                        case "111":
+                            impegnoAmount[impegno].Add(categoriaCU, new Dictionary<string, int>());
+                            if (studentsWithoutPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
+                            {
+                                impegnoAmount[impegno][categoriaCU].Add("Senza detrazioni", studentsWithoutPA.Count);
+                                if (tipoStudente == "2")
+                                {
+                                    ProcessStudentsByAnnoCorso(studentsWithoutPA, catFolder, processMatricole: true, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
+                                }
+                                else if (tipoStudente == "0")
+                                {
+                                    ProcessStudentsByAnnoCorso(studentsWithoutPA, catFolder, processMatricole: true, processAnniSuccessivi: false, "SenzaDetrazioni", "00", impegno);
+                                }
+                                else if (tipoStudente == "1")
+                                {
+                                    ProcessStudentsByAnnoCorso(studentsWithoutPA, catFolder, processMatricole: false, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
+                                }
+
+                                DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), impegno);
+                                if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
+                                {
+                                    Utilities.ExportDataTableToExcel(dataTableMatricole, catFolder, false, "Matricole");
+                                }
+
+                                DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), impegno);
+                                if (dataTableASuccessivi != null && dataTableASuccessivi.Rows.Count > 0)
+                                {
+                                    Utilities.ExportDataTableToExcel(dataTableASuccessivi, catFolder, false, "AnniSuccessivi");
+                                }
+                            }
+
+                            if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
+                            {
+                                string newFolderPath = Utilities.EnsureDirectory(Path.Combine(catFolder, "CON DETRAZIONE"));
+                                ProcessStudentsByCodEnte(selectedCodEnte, studentsWithPA, newFolderPath, impegno, categoriaCU);
+                                GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
+                            }
+                            break;
+
+                        case "211":
+                            impegnoAmount[impegno].Add(categoriaCU, new Dictionary<string, int>());
+                            if (studentsWithoutPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
+                            {
+                                impegnoAmount[impegno][categoriaCU].Add("Senza detrazioni", studentsWithoutPA.Count);
+                                if (tipoStudente == "2")
+                                {
+                                    ProcessStudentsByAnnoCorso(studentsWithoutPA, catFolder, processMatricole: true, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
+                                }
+                                else if (tipoStudente == "0")
+                                {
+                                    ProcessStudentsByAnnoCorso(studentsWithoutPA, catFolder, processMatricole: true, processAnniSuccessivi: false, "SenzaDetrazioni", "00", impegno);
+                                }
+                                else if (tipoStudente == "1")
+                                {
+                                    ProcessStudentsByAnnoCorso(studentsWithoutPA, catFolder, processMatricole: false, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
+                                }
+
+                                DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), impegno);
+                                if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
+                                {
+                                    Utilities.ExportDataTableToExcel(dataTableMatricole, catFolder, false, "Matricole");
+                                }
+
+                                DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), impegno);
+                                if (dataTableASuccessivi != null && dataTableASuccessivi.Rows.Count > 0)
+                                {
+                                    Utilities.ExportDataTableToExcel(dataTableASuccessivi, catFolder, false, "AnniSuccessivi");
+                                }
+                            }
+                            break;
+
+                        case "311":
+                            impegnoAmount[impegno].Add(categoriaCU, new Dictionary<string, int>());
+                            if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
+                            {
+                                string newFolderPath = Utilities.EnsureDirectory(Path.Combine(catFolder, "CON DETRAZIONE"));
+                                ProcessStudentsByCodEnte(selectedCodEnte, studentsWithPA, newFolderPath, impegno, categoriaCU);
+                                GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
+                            }
+                            break;
+
+                        default:
+                            target = Enumerable.Empty<StudentePagamenti>();
+                            break;
+                    }
+                }
+                catch(Exception ex)
+                {
+                    throw ex;
+                }
+
+            }
+           /* void GenerateOutputFilesPA(string currentFolder, List<StudentePagamenti> studentsWithSameImpegno, string impegno)
+            {
+                Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Senza detrazioni");
+                try
+                {
+                    var studentsWithPA = studentsWithSameImpegno
+                    .Where(s => (s.InformazioniPagamento.Assegnazioni != null && s.InformazioniPagamento.Assegnazioni.Count > 0) || (s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
+                    .ToList();
+                    var studentsWithoutPA = studentsWithSameImpegno
+                    .Where(s => (s.InformazioniPagamento.Assegnazioni == null || s.InformazioniPagamento.Assegnazioni.Count <= 0) && !(s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
+                    .ToList();
+                    impegnoAmount.Add(impegno, new Dictionary<string, int>());
+                    if (studentsWithoutPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
+                    {
+                        impegnoAmount[impegno].Add("Senza detrazioni", studentsWithoutPA.Count);
+                        if (tipoStudente == "2")
+                        {
+                            ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
+                        }
+                        else if (tipoStudente == "0")
+                        {
+                            ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: false, "SenzaDetrazioni", "00", impegno);
+                        }
+                        else if (tipoStudente == "1")
+                        {
+                            ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: false, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
+                        }
+
+                        DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), impegno);
+                        if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
+                        {
+                            Utilities.ExportDataTableToExcel(dataTableMatricole, currentFolder, false, "Matricole");
+                        }
+
+                        DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), impegno);
+                        if (dataTableASuccessivi != null && dataTableASuccessivi.Rows.Count > 0)
+                        {
+                            Utilities.ExportDataTableToExcel(dataTableASuccessivi, currentFolder, false, "AnniSuccessivi");
+                        }
+                    }
+                
                     if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
                     {
                         string newFolderPath = Utilities.EnsureDirectory(Path.Combine(currentFolder, "CON DETRAZIONE"));
@@ -3333,7 +3499,7 @@ namespace ProcedureNet7
                 {
                     throw ex;
                 }
-            }
+            }*/
             void ProcessStudentsByAnnoCorso(List<StudentePagamenti> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio, string codEnteFlusso, string impegnoFlusso)
             {
                 if (processMatricole && processAnniSuccessivi)
@@ -3352,7 +3518,7 @@ namespace ProcedureNet7
                     }
                 }
             }
-            void ProcessStudentsByCodEnte(string selectedCodEnte, List<StudentePagamenti> studentsWithPA, string newFolderPath, string impegno)
+            void ProcessStudentsByCodEnte(string selectedCodEnte, List<StudentePagamenti> studentsWithPA, string newFolderPath, string impegno, string categoriaCU)
             {
                 if (studentsWithPA.Count <= 0)
                 {
@@ -3408,7 +3574,7 @@ namespace ProcedureNet7
 
                     Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}");
                     string specificFolderPath = Utilities.EnsureDirectory(Path.Combine(newFolderPath, $"{nomeCodEnte}"));
-                    impegnoAmount[impegno].Add(nomeCodEnte, studentsInGroup.Count);
+                    impegnoAmount[impegno][categoriaCU].Add(nomeCodEnte, studentsInGroup.Count);
 
                     if (tipoStudente == "2")
                     {
@@ -3902,7 +4068,7 @@ namespace ProcedureNet7
                 int numberOfBatches = (int)Math.Ceiling((double)(studentiDaProcessare.Count - 1) / batchSize);
                 int currentMovimento = lastCodiceMovimento;
                 StringBuilder finalQueryBuilder = new();
-                Logger.LogInfo(80, $"Lavorazione studenti - Movimenti contabili generali - batch n°0");
+                Logger.LogInfo(80, $"Lavorazione studenti - Movimenti contabili generali");
                 for (int batchNumber = 0; batchNumber < numberOfBatches; batchNumber++)
                 {
                     nextCodiceMovimento = currentMovimento + 1;

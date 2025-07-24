@@ -31,55 +31,42 @@ namespace ProcedureNet7
             if (args == null)
                 throw new ArgumentNullException(nameof(args));
 
-            // 1) Load keywords (from ControlloTicketKeywords.json or your chosen file)
+            // 1) Load keywords
             LoadKeywords();
 
-            // 2) Read CSV into DataTable
+            // 2) Read CSV
             DataTable csvData = CsvToDataTable(args.SelectedCsvPath);
 
-            // 3) Convert DataTable -> List<StudentTicket>
+            // 3) Convert -> model
             List<StudentTicket> tickets = ConvertToStudentTickets(csvData);
 
-            // 4) Distinct CODFISC list
+            // 4) Distinct CF list
             var codFiscList = tickets
                 .Select(t => t.CODFISC)
                 .Where(cf => !string.IsNullOrWhiteSpace(cf))
                 .Distinct()
                 .ToList();
 
-            // 5) Fetch closure data (blocks, esito, etc.)
-            var dbClosureData = FetchClosureData(codFiscList);
+            // 5) Fetch status_compilazione from DB
+            var dbStatusData = FetchStatusData(codFiscList);
 
-            // 6) Merge CSV + DB
-            var mergedData = MergeData(tickets, dbClosureData);
+            // 6) Merge
+            var mergedData = MergeData(tickets, dbStatusData);
 
-            // 7) Filter for closure, residence, etc.
-            var filteredForClosure = ApplyAdditionalFilters(mergedData, permessoCheck: false);
-            var closureResults = AnalyzeMessagesForClosure(filteredForClosure);
+            // 7) Filter
+            var filtered = ApplyFilters(mergedData);
 
-            var filteredForResidence = ApplyAdditionalFilters(mergedData, permessoCheck: true);
-            var residenceResults = AnalyzeMessagesForResidence(filteredForResidence);
-            var transferResults = AnalyzeMessagesForTransfer(filteredForClosure);
+            // 8) Analyze
+            var analyzed = AnalyzeMessages(filtered);
 
-            var paymentResults = AnalyzeMessagesForPayment(filteredForClosure);
-            UpdatePaymentDetails(paymentResults, codFiscList);
+            // 9) Save & CSV
+            ProcessedTickets = analyzed.ToList();
 
-            // 8) Combine if needed (so the Form can show all)
-            ProcessedTickets = closureResults
-                .Union(residenceResults)
-                .Union(transferResults)
-                .Union(paymentResults)
-                .ToList();
-
-            // 9) Write the 3 CSV outputs in the same folder as input
             string? inputDir = Path.GetDirectoryName(args.SelectedCsvPath);
             if (string.IsNullOrEmpty(inputDir))
                 inputDir = AppDomain.CurrentDomain.BaseDirectory;
 
-            WriteClosureTicketsCsv(closureResults, inputDir);
-            WriteResidenceTicketsCsv(residenceResults, inputDir);
-            WritePaymentTicketsCsv(paymentResults, inputDir);
-            WriteTransferTicketsCsv(transferResults, inputDir);
+            WriteTicketsCsv(ProcessedTickets, inputDir);
 
             Logger.LogInfo(100, "Fine lavorazione");
         }
@@ -89,8 +76,6 @@ namespace ProcedureNet7
         {
             try
             {
-                // Adjust the path as needed:
-                // e.g. "ProcedureNet7\\Moduli\\Varie\\ProceduraControlloTicket\\ControlloTicketKeywords.json"
                 string jsonFilePath = Path.Combine(
                     AppDomain.CurrentDomain.BaseDirectory,
                     "Moduli",
@@ -99,12 +84,25 @@ namespace ProcedureNet7
                     "ControlloTicketKeywords.json");
 
                 if (!File.Exists(jsonFilePath))
-                    throw new FileNotFoundException("ControlloTicketKeywords.json not found.", jsonFilePath);
+                {
+                    Logger.LogWarning(100, $"ControlloTicketKeywords.json not found at {jsonFilePath}. Proceeding with empty keyword list.");
+                    keywordConfig = new KeywordConfig();
+                    return;
+                }
 
                 string content = File.ReadAllText(jsonFilePath, Encoding.UTF8);
-                keywordConfig = JsonConvert.DeserializeObject<KeywordConfig>(content);
-                if (keywordConfig == null)
-                    throw new Exception("Failed to deserialize keyword config.");
+                keywordConfig = JsonConvert.DeserializeObject<KeywordConfig>(content) ?? new KeywordConfig();
+
+                // Deduplicate (case-insensitive by keyword string)
+                keywordConfig.Keywords = keywordConfig.Keywords
+                    .GroupBy(k => k.Keyword, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .ToList();
+
+                keywordConfig.NegativeKeywords = keywordConfig.NegativeKeywords
+                    .GroupBy(k => k.Keyword, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .ToList();
             }
             catch (Exception ex)
             {
@@ -123,7 +121,6 @@ namespace ProcedureNet7
             DataTable dt = new DataTable();
             bool isFirstRow = true;
 
-            // If your CSV is not actually UTF-8, you might need Encoding.GetEncoding(1252)
             using (var reader = new StreamReader(csvFilePath, Encoding.GetEncoding(1252)))
             {
                 while (!reader.EndOfStream)
@@ -135,7 +132,6 @@ namespace ProcedureNet7
 
                     if (isFirstRow)
                     {
-                        // create columns from first row
                         foreach (var col in values)
                             dt.Columns.Add(col.Trim());
                         isFirstRow = false;
@@ -187,29 +183,27 @@ namespace ProcedureNet7
             if (!row.Table.Columns.Contains(colName))
                 return string.Empty;
             return row[colName]?.ToString() ?? string.Empty;
+           
         }
-        #endregion
+#endregion
 
-        #region 5) Fetch Closure Data (FULL T-SQL)
-        private List<DatabaseRecord> FetchClosureData(List<string> codFiscList)
+        #region 5) Fetch Status Data
+        private List<StatusRecord> FetchStatusData(List<string> codFiscList)
         {
-            var result = new List<DatabaseRecord>();
+            var result = new List<StatusRecord>();
             if (codFiscList.Count == 0) return result;
 
             using (var transaction = CONNECTION.BeginTransaction())
             {
                 try
                 {
-                    // create #tmpCodFisc
                     string createTmp = @"
-                        IF OBJECT_ID('tempdb..#tmpCodFisc') IS NOT NULL
-                            DROP TABLE #tmpCodFisc;
-                        CREATE TABLE #tmpCodFisc (Cod_fiscale VARCHAR(20) NOT NULL);
-                        ";
+IF OBJECT_ID('tempdb..#tmpCodFisc') IS NOT NULL DROP TABLE #tmpCodFisc;
+CREATE TABLE #tmpCodFisc (Cod_fiscale VARCHAR(20) COLLATE Latin1_General_CI_AS NOT NULL);";
                     using (var cmd = new SqlCommand(createTmp, CONNECTION, transaction))
                         cmd.ExecuteNonQuery();
 
-                    // bulk insert
+                    // bulk insert temp cod fisc
                     DataTable dt = new DataTable();
                     dt.Columns.Add("Cod_fiscale", typeof(string));
                     foreach (var cf in codFiscList) dt.Rows.Add(cf);
@@ -221,114 +215,43 @@ namespace ProcedureNet7
                         bulk.WriteToServer(dt);
                     }
 
-                    // your big T-SQL batch from the WPF code
-                    string sqlBatch = @"
-                        -- Materialize Temp Tables for 2023/2024
-                        SELECT Num_domanda, esito_BS
-                        INTO #Temp_vEsiti_concorsiBS_2324
-                        FROM vEsiti_concorsiBS
-                        WHERE Anno_accademico = '20232024';
+                    string sql = @"
+SELECT
+    d.Anno_accademico,
+    d.Num_domanda,
+    d.Cod_fiscale,
+    d.Data_validita,
+    d.Utente,
+    d.Tipo_bando,
+    d.Id_Domanda,
+    d.DataCreazioneRecord,
+    vs.anno_accademico AS Vs_Anno_accademico,
+    vs.num_domanda     AS Vs_Num_domanda,
+    vs.status_compilazione,
+    vs.data_validita   AS Vs_Data_validita,
+    vs.utente          AS Vs_Utente,
+    vs.lettura,
+    vs.Id_Domanda      AS Vs_Id_Domanda
+FROM Domanda AS d
+INNER JOIN vStatus_compilazione AS vs
+    ON d.Anno_accademico = vs.anno_accademico
+   AND d.Num_domanda     = vs.num_domanda
+WHERE d.Anno_accademico = '20252026'
+  AND d.Cod_fiscale IN (SELECT Cod_fiscale FROM #tmpCodFisc);";
 
-                        SELECT Num_domanda, esito_PA
-                        INTO #Temp_vEsiti_concorsiPA_2324
-                        FROM vEsiti_concorsiPA
-                        WHERE Anno_accademico = '20232024';
-
-                        SELECT Cod_fiscale, Cod_sede_studi
-                        INTO #Temp_vIscrizioni_2324
-                        FROM vIscrizioni
-                        WHERE Anno_accademico = '20232024' AND tipo_bando = 'lz';
-
-                        SELECT
-                            MBP.num_domanda,
-                            STRING_AGG(TMP2.Descrizione, '#') AS Blocchi
-                        INTO #Temp_CTE_Blocchi_2324
-                        FROM Motivazioni_blocco_pagamenti AS MBP
-                        INNER JOIN Tipologie_motivazioni_blocco_pag AS TMP2
-                            ON MBP.Cod_tipologia_blocco = TMP2.Cod_tipologia_blocco
-                        WHERE MBP.blocco_pagamento_attivo = '1' AND MBP.Anno_accademico = '20232024'
-                        GROUP BY MBP.num_domanda;
-
-                        -- Materialize Temp Tables for 2024/2025
-                        SELECT Num_domanda, esito_BS
-                        INTO #Temp_vEsiti_concorsiBS_2425
-                        FROM vEsiti_concorsiBS
-                        WHERE Anno_accademico = '20242025';
-
-                        SELECT Num_domanda, esito_PA
-                        INTO #Temp_vEsiti_concorsiPA_2425
-                        FROM vEsiti_concorsiPA
-                        WHERE Anno_accademico = '20242025';
-
-                        SELECT Cod_fiscale, Cod_sede_studi
-                        INTO #Temp_vIscrizioni_2425
-                        FROM vIscrizioni
-                        WHERE Anno_accademico = '20242025' AND tipo_bando = 'lz';
-
-                        SELECT
-                            MBP.num_domanda,
-                            STRING_AGG(TMP2.Descrizione, '#') AS Blocchi
-                        INTO #Temp_CTE_Blocchi_2425
-                        FROM Motivazioni_blocco_pagamenti AS MBP
-                        INNER JOIN Tipologie_motivazioni_blocco_pag AS TMP2
-                            ON MBP.Cod_tipologia_blocco = TMP2.Cod_tipologia_blocco
-                        WHERE MBP.blocco_pagamento_attivo = '1' AND MBP.Anno_accademico = '20242025'
-                        GROUP BY MBP.num_domanda;
-
-                        -- Final Query with Aggregation by Cod_fiscale
-                        SELECT
-                            d.Cod_fiscale,
-                            MAX(COALESCE(vBS_2425.esito_BS, '')) AS Esito_BS_24_25,
-                            MAX(COALESCE(vPA_2425.esito_PA, '')) AS Esito_PA_24_25,
-                            STRING_AGG(COALESCE(mbpagg_2425.Blocchi, ''), '') AS Blocchi_24_25,
-                            MAX(COALESCE(vBS_2324.esito_BS, '')) AS Esito_BS_23_24,
-                            STRING_AGG(COALESCE(mbpagg_2324.Blocchi, ''), '') AS Blocchi_23_24,
-                            MAX(ss.Descrizione) AS Sede_Università_24_25
-                        FROM Domanda d
-                            INNER JOIN #tmpCodFisc t ON d.Cod_fiscale = t.Cod_fiscale
-                            LEFT JOIN #Temp_vEsiti_concorsiBS_2425 vBS_2425 ON d.Num_domanda = vBS_2425.Num_domanda
-                            LEFT JOIN #Temp_vEsiti_concorsiPA_2425 vPA_2425 ON d.Num_domanda = vPA_2425.Num_domanda
-                            LEFT JOIN #Temp_CTE_Blocchi_2425 mbpagg_2425 ON mbpagg_2425.num_domanda = d.Num_domanda
-                            LEFT JOIN #Temp_vEsiti_concorsiBS_2324 vBS_2324 ON d.Num_domanda = vBS_2324.Num_domanda
-                            LEFT JOIN #Temp_CTE_Blocchi_2324 mbpagg_2324 ON mbpagg_2324.num_domanda = d.Num_domanda
-                            INNER JOIN #Temp_vIscrizioni_2425 vi2425 ON vi2425.Cod_fiscale = d.Cod_fiscale
-                            INNER JOIN Sede_studi ss ON ss.Cod_sede_studi = vi2425.Cod_sede_studi
-                        WHERE 
-                            d.Anno_accademico IN ('20232024', '20242025')
-                            AND d.Tipo_bando IN ('LZ', 'L2')
-                        GROUP BY 
-                            d.Cod_fiscale
-                        ORDER BY 
-                            d.Cod_fiscale;
-
-                        -- Clean up temporary tables
-                        DROP TABLE #Temp_vEsiti_concorsiBS_2324;
-                        DROP TABLE #Temp_vEsiti_concorsiPA_2324;
-                        DROP TABLE #Temp_vIscrizioni_2324;
-                        DROP TABLE #Temp_CTE_Blocchi_2324;
-                        DROP TABLE #Temp_vEsiti_concorsiBS_2425;
-                        DROP TABLE #Temp_vEsiti_concorsiPA_2425;
-                        DROP TABLE #Temp_vIscrizioni_2425;
-                        DROP TABLE #Temp_CTE_Blocchi_2425;
-                        ";
-
-                    using (SqlCommand cmdBatch = new SqlCommand(sqlBatch, CONNECTION, transaction))
+                    using (var cmdBatch = new SqlCommand(sql, CONNECTION, transaction))
+                    using (SqlDataReader reader = cmdBatch.ExecuteReader())
                     {
-                        using (SqlDataReader reader = cmdBatch.ExecuteReader())
+                        while (reader.Read())
                         {
-                            while (reader.Read())
+                            result.Add(new StatusRecord
                             {
-                                result.Add(new DatabaseRecord
-                                {
-                                    Cod_fiscale = reader["Cod_fiscale"]?.ToString(),
-                                    Esito_BS_24_25 = reader["Esito_BS_24_25"]?.ToString(),
-                                    Esito_PA_24_25 = reader["Esito_PA_24_25"]?.ToString(),
-                                    Blocchi_24_25 = reader["Blocchi_24_25"]?.ToString(),
-                                    Esito_BS_23_24 = reader["Esito_BS_23_24"]?.ToString(),
-                                    Blocchi_23_24 = reader["Blocchi_23_24"]?.ToString(),
-                                    Sede_Università_24_25 = reader["Sede_Università_24_25"]?.ToString()
-                                });
-                            }
+                                Cod_fiscale = reader["Cod_fiscale"]?.ToString(),
+                                Anno_accademico = reader["Anno_accademico"]?.ToString(),
+                                Num_domanda = reader["Num_domanda"]?.ToString(),
+                                Status_compilazione = SafeToInt(reader["status_compilazione"]),
+                                Id_Domanda = reader["Id_Domanda"]?.ToString()
+                            });
                         }
                     }
 
@@ -337,99 +260,107 @@ namespace ProcedureNet7
                 catch (Exception ex)
                 {
                     transaction.Rollback();
-                    throw new Exception("Error fetching closure data: " + ex.Message, ex);
+                    throw new Exception("Error fetching status data: " + ex.Message, ex);
                 }
             }
+
             return result;
+        }
+
+        private int SafeToInt(object? value)
+        {
+            if (value == null || value == DBNull.Value) return 0;
+            try
+            {
+                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                int.TryParse(value.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out int v);
+                return v;
+            }
         }
         #endregion
 
         #region 6) Merge
-        private List<MergedTicket> MergeData(List<StudentTicket> tickets, List<DatabaseRecord> dbData)
+        private List<MergedTicket> MergeData(List<StudentTicket> tickets, List<StatusRecord> dbData)
         {
             var merged = from t in tickets
                          join db in dbData on t.CODFISC equals db.Cod_fiscale into dbGroup
-                         from db in dbGroup.DefaultIfEmpty()
+                         from db in dbGroup.OrderByDescending(d => d.Status_compilazione).Take(1).DefaultIfEmpty()
                          select new MergedTicket
                          {
                              ID_TICKET = t.ID_TICKET,
                              CODSTUD = t.CODSTUD,
                              CODFISC = t.CODFISC,
-                             Esito_BS_24_25 = db?.Esito_BS_24_25,
-                             Esito_PA_24_25 = db?.Esito_PA_24_25,
-                             Blocchi_24_25 = db?.Blocchi_24_25,
-                             Esito_BS_23_24 = db?.Esito_BS_23_24,
-                             Blocchi_23_24 = db?.Blocchi_23_24,
-                             Sede_Università_24_25 = db?.Sede_Università_24_25,
                              Primo_Msg_Studente = t.PRIMO_MSG_STUDENTE,
                              CATEGORIA = t.CATEGORIA,
                              SOTTOCATEGORIA = t.SOTTOCATEGORIA,
                              PRIMO_MSG_OPERATORE = t.PRIMO_MSG_OPERATORE,
-                             STATOTK = t.STATO
+                             STATOTK = t.STATO,
+                             Status_compilazione = db?.Status_compilazione ?? 0,
+                             Num_domanda = db?.Num_domanda,
+                             Anno_accademico = db?.Anno_accademico
                          };
             return merged.ToList();
         }
         #endregion
 
         #region 7) Filter + Analyze
-        private List<MergedTicket> ApplyAdditionalFilters(List<MergedTicket> mergedData, bool permessoCheck)
+        private List<MergedTicket> ApplyFilters(List<MergedTicket> mergedData)
         {
             return mergedData.Where(m =>
                 m.STATOTK != null &&
                 !m.STATOTK.Equals("CHIUSO", StringComparison.OrdinalIgnoreCase) &&
                 string.IsNullOrWhiteSpace(m.PRIMO_MSG_OPERATORE) &&
-                m.CATEGORIA != null && (
-                    m.CATEGORIA.Contains("Borse di studio", StringComparison.OrdinalIgnoreCase) ||
-                    m.CATEGORIA.Contains("Documentazione", StringComparison.OrdinalIgnoreCase) ||
-                    m.CATEGORIA.Contains("Informazioni Bando", StringComparison.OrdinalIgnoreCase) ||
-                    m.CATEGORIA.Contains("ISEE", StringComparison.OrdinalIgnoreCase) ||
-                    m.CATEGORIA.Contains("MERITO", StringComparison.OrdinalIgnoreCase)
-                ) &&
-                (permessoCheck || (
-                    ((m.Esito_BS_24_25 != null && (m.Esito_BS_24_25.Contains("Idoneo", StringComparison.OrdinalIgnoreCase) ||
-                                                   m.Esito_BS_24_25.Contains("Vincitore", StringComparison.OrdinalIgnoreCase))) ||
-                     (m.Esito_BS_23_24 != null && (m.Esito_BS_23_24.Contains("Idoneo", StringComparison.OrdinalIgnoreCase) ||
-                                                   m.Esito_BS_23_24.Contains("Vincitore", StringComparison.OrdinalIgnoreCase)))) &&
-                    string.IsNullOrWhiteSpace(m.Blocchi_24_25) &&
-                    string.IsNullOrWhiteSpace(m.Blocchi_23_24)
-                ))
+                m.Status_compilazione >= 90
             ).ToList();
         }
 
-        private List<ProcessedTicket> AnalyzeMessagesForClosure(List<MergedTicket> filteredData)
+        private List<ProcessedTicket> AnalyzeMessages(List<MergedTicket> filteredData)
         {
             if (keywordConfig == null)
                 throw new InvalidOperationException("Keyword config not loaded.");
 
-            var posDict = keywordConfig.PositiveKeywords
-                .ToDictionary(k => k.Keyword, k => k.Probability, StringComparer.OrdinalIgnoreCase);
-
-            var negDict = keywordConfig.NegativeKeywords
-                .ToDictionary(k => k.Keyword, k => Math.Abs(k.Weight), StringComparer.OrdinalIgnoreCase);
+            var posRules = keywordConfig.Keywords ?? new List<WeightedKeyword>();
+            var negRules = keywordConfig.NegativeKeywords ?? new List<WeightedKeyword>();
 
             var processed = new List<ProcessedTicket>();
+
             foreach (var m in filteredData)
             {
-                string msg = m.Primo_Msg_Studente ?? "";
-                double posProb = 0.0;
+                string rawMsg = m.Primo_Msg_Studente ?? "";
+                string msg = NormalizeForMatch(rawMsg);
+
+                // avoid double counting same keyword
+                var matchedPos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var matchedNeg = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                double posWeight = 0.0;
                 double negWeight = 0.0;
 
-                foreach (var kvp in posDict)
+                foreach (var kw in posRules)
                 {
-                    if (msg.IndexOf(kvp.Key, StringComparison.OrdinalIgnoreCase) >= 0)
-                        posProb += kvp.Value;
+                    if (IsMatch(msg, kw.Keyword, kw.IsRegex) && matchedPos.Add(kw.Keyword))
+                        posWeight += kw.Weight;
                 }
-                foreach (var kvp in negDict)
+                foreach (var kw in negRules)
                 {
-                    if (msg.IndexOf(kvp.Key, StringComparison.OrdinalIgnoreCase) >= 0)
-                        negWeight += kvp.Value;
+                    if (IsMatch(msg, kw.Keyword, kw.IsRegex) && matchedNeg.Add(kw.Keyword))
+                        negWeight += kw.Weight;
                 }
 
-                double finalProb = Math.Max(0.0, Math.Min(posProb - negWeight, 1.0));
-                string status = finalProb switch
+                // Scores with smooth exponential curve
+                double posScore = 1.0 - Math.Exp(-posWeight);
+                double negScore = 1.0 - Math.Exp(-negWeight);
+
+                double final = posScore * (1.0 - 0.6 * negScore);
+                final = Math.Clamp(final, 0.0, 1.0);
+
+                string label = final switch
                 {
-                    >= 0.75 => "Chiudere",
-                    >= 0.35 => "Verificare",
+                    >= 0.65 => "Chiudere",
+                    >= 0.30 => "Verificare",
                     _ => "Mantenere aperto"
                 };
 
@@ -440,351 +371,89 @@ namespace ProcedureNet7
                     CODFISC = m.CODFISC,
                     Categoria = m.CATEGORIA,
                     SottoCategoria = m.SOTTOCATEGORIA,
-                    Probability_Close = Math.Round(finalProb, 2),
-                    Status = status,
-                    Primo_Msg_Studente = m.Primo_Msg_Studente,
-                    Esito_BS_24_25 = m.Esito_BS_24_25,
-                    Esito_PA_24_25 = m.Esito_PA_24_25,
-                    Blocchi_24_25 = m.Blocchi_24_25,
-                    Esito_BS_23_24 = m.Esito_BS_23_24,
-                    Blocchi_23_24 = m.Blocchi_23_24,
-                    Sede_Università_24_25 = m.Sede_Università_24_25
+                    Primo_Msg_Studente = rawMsg,
+                    Probability = Math.Round(final, 3),
+                    PositiveScore = Math.Round(posScore, 3),
+                    NegativeScore = Math.Round(negScore, 3),
+                    StatusLabel = label,
+                    KeywordMatch = matchedPos.Count > 0,
+                    Status_compilazione = m.Status_compilazione,
+                    Num_domanda = m.Num_domanda,
+                    Anno_accademico = m.Anno_accademico
                 });
             }
+
             return processed;
         }
 
-        private List<ProcessedTicket> AnalyzeMessagesForResidence(List<MergedTicket> filteredData)
+        private static bool IsMatch(string text, string pattern, bool isRegex)
         {
-            if (keywordConfig == null)
-                throw new InvalidOperationException("Keyword config not loaded.");
+            if (string.IsNullOrWhiteSpace(pattern)) return false;
 
-            var residenceDict = keywordConfig.ResidencePermitKeywords
-                .ToDictionary(k => k.Keyword, k => k.Probability, StringComparer.OrdinalIgnoreCase);
-
-            var processed = new List<ProcessedTicket>();
-            foreach (var m in filteredData)
-            {
-                string msg = m.Primo_Msg_Studente ?? "";
-                bool isResidence = residenceDict.Any(kvp =>
-                    msg.IndexOf(kvp.Key, StringComparison.OrdinalIgnoreCase) >= 0);
-
-                if (!isResidence) continue;
-
-                processed.Add(new ProcessedTicket
-                {
-                    ID_TICKET = m.ID_TICKET,
-                    ID_STUDENTE = m.CODSTUD,
-                    CODFISC = m.CODFISC,
-                    Categoria = m.CATEGORIA,
-                    SottoCategoria = m.SOTTOCATEGORIA,
-                    Primo_Msg_Studente = m.Primo_Msg_Studente,
-                    Status = "Verificare Permesso",
-                    Esito_BS_24_25 = m.Esito_BS_24_25,
-                    Esito_PA_24_25 = m.Esito_PA_24_25,
-                    Blocchi_24_25 = m.Blocchi_24_25,
-                    Esito_BS_23_24 = m.Esito_BS_23_24,
-                    Blocchi_23_24 = m.Blocchi_23_24,
-                    Sede_Università_24_25 = m.Sede_Università_24_25,
-                    IsResidencePermitRelated = true
-                });
-            }
-            return processed;
-        }
-
-        private List<ProcessedTicket> AnalyzeMessagesForPayment(List<MergedTicket> filteredData)
-        {
-            if (keywordConfig == null)
-                throw new InvalidOperationException("Keyword config not loaded.");
-
-            var paymentDict = keywordConfig.PaymentKeywords != null
-                ? keywordConfig.PaymentKeywords.ToDictionary(k => k.Keyword, k => k.Probability, StringComparer.OrdinalIgnoreCase)
-                : new Dictionary<string, double>();
-
-            var processed = new List<ProcessedTicket>();
-            foreach (var m in filteredData)
-            {
-                string msg = m.Primo_Msg_Studente ?? "";
-                bool isPayment = paymentDict.Any(kvp =>
-                    msg.IndexOf(kvp.Key, StringComparison.OrdinalIgnoreCase) >= 0);
-
-                processed.Add(new ProcessedTicket
-                {
-                    ID_TICKET = m.ID_TICKET,
-                    ID_STUDENTE = m.CODSTUD,
-                    CODFISC = m.CODFISC,
-                    Categoria = m.CATEGORIA,
-                    SottoCategoria = m.SOTTOCATEGORIA,
-                    Primo_Msg_Studente = m.Primo_Msg_Studente,
-                    Status = isPayment ? "Verificare Pagamento" : "Non correlato",
-                    Esito_BS_24_25 = m.Esito_BS_24_25,
-                    Esito_PA_24_25 = m.Esito_PA_24_25,
-                    Blocchi_24_25 = m.Blocchi_24_25,
-                    Esito_BS_23_24 = m.Esito_BS_23_24,
-                    Blocchi_23_24 = m.Blocchi_23_24,
-                    Sede_Università_24_25 = m.Sede_Università_24_25,
-                    IsPaymentKeywordPresent = isPayment
-                });
-            }
-            return processed;
-        }
-
-        private List<ProcessedTicket> AnalyzeMessagesForTransfer(List<MergedTicket> filteredData)
-        {
-            if (keywordConfig == null || keywordConfig.TransferKeywords == null)
-                throw new InvalidOperationException("Keyword config not loaded.");
-
-            // Precompile regex patterns for each group's keywords
-            var groupRegexes = keywordConfig.TransferKeywords.Select(group => new
-            {
-                GroupName = group.Group,
-                Weight = group.Weight,
-                // Create regexes for each keyword in the group (match whole words)
-                Patterns = group.Keywords.Select(k => new Regex(@"\b" + Regex.Escape(k.ToLowerInvariant()) + @"\b", RegexOptions.Compiled | RegexOptions.IgnoreCase))
-                                          .ToList()
-            }).ToList();
-
-            var processed = new List<ProcessedTicket>();
-            foreach (var m in filteredData)
-            {
-                string msg = m.Primo_Msg_Studente ?? "";
-                string lowerMsg = msg.ToLowerInvariant();
-                double transferProbability = 0;
-
-                foreach (var group in groupRegexes)
-                {
-                    bool foundInGroup = group.Patterns.Any(p => p.IsMatch(lowerMsg));
-                    if (foundInGroup)
-                    {
-                        transferProbability += group.Weight;
-                    }
-                }
-
-
-                processed.Add(new ProcessedTicket
-                {
-                    ID_TICKET = m.ID_TICKET,
-                    ID_STUDENTE = m.CODSTUD,
-                    CODFISC = m.CODFISC,
-                    Categoria = m.CATEGORIA,
-                    SottoCategoria = m.SOTTOCATEGORIA,
-                    Primo_Msg_Studente = m.Primo_Msg_Studente,
-                    TransferProbability = transferProbability,
-                    Esito_BS_24_25 = m.Esito_BS_24_25,
-                    Esito_PA_24_25 = m.Esito_PA_24_25,
-                    Blocchi_24_25 = m.Blocchi_24_25,
-                    Esito_BS_23_24 = m.Esito_BS_23_24,
-                    Blocchi_23_24 = m.Blocchi_23_24,
-                    Sede_Università_24_25 = m.Sede_Università_24_25
-                });
-            }
-            return processed;
-        }
-
-        #endregion
-
-        #region 11) Payment
-        private void UpdatePaymentDetails(List<ProcessedTicket> tickets, List<string> codFiscList)
-        {
-            if (tickets.Count == 0 || codFiscList.Count == 0) return;
-
-            var payRecords = FetchPayments(codFiscList);
-            foreach (var tk in tickets)
-            {
-                var matching = payRecords
-                    .Where(p => p.CODICE_FISCALE.Equals(tk.CODFISC, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                if (matching.Any())
-                {
-                    tk.IsInPayment = true;
-                    tk.PaymentAmount = matching.Sum(p => p.IMPORTO);
-                    tk.PaymentDate = matching.Max(p => p.DATA_INSERIMENTO);
-                }
-            }
-        }
-
-        private List<PaymentRecord> FetchPayments(List<string> codFiscList)
-        {
-            var res = new List<PaymentRecord>();
-            if (codFiscList.Count == 0) return res;
-
-            using (var transaction = CONNECTION.BeginTransaction())
+            if (isRegex)
             {
                 try
                 {
-                    string createTmp = @"
-                        IF OBJECT_ID('tempdb..#tmpCodFisc') IS NOT NULL
-                            DROP TABLE #tmpCodFisc;
-                        CREATE TABLE #tmpCodFisc (Cod_fiscale VARCHAR(20) NOT NULL);
-                        ";
-                    using (var cmd = new SqlCommand(createTmp, CONNECTION, transaction))
-                        cmd.ExecuteNonQuery();
-
-                    // bulk
-                    DataTable dt = new DataTable();
-                    dt.Columns.Add("Cod_fiscale", typeof(string));
-                    foreach (var cf in codFiscList) dt.Rows.Add(cf);
-
-                    using (SqlBulkCopy bulk = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, transaction))
-                    {
-                        bulk.DestinationTableName = "#tmpCodFisc";
-                        bulk.ColumnMappings.Add("Cod_fiscale", "Cod_fiscale");
-                        bulk.WriteToServer(dt);
-                    }
-
-                    // query
-                    string paymentQuery = @"
-                        SELECT 
-                            MCEE.CODICE_FISCALE, 
-                            MCEE.IMPORTO, 
-                            MCEE.DATA_INSERIMENTO
-                        FROM MOVIMENTI_CONTABILI_ELEMENTARI MCEE
-                        INNER JOIN MOVIMENTI_CONTABILI_GENERALI MCG 
-                            ON MCEE.CODICE_MOVIMENTO = MCG.CODICE_MOVIMENTO
-                        WHERE MCG.COD_MANDATO LIKE '%BS%'
-                          AND MCEE.CODICE_FISCALE IN (SELECT Cod_fiscale FROM #tmpCodFisc)
-                        ";
-                    using (SqlCommand cmdPay = new SqlCommand(paymentQuery, CONNECTION, transaction))
-                    using (SqlDataReader r = cmdPay.ExecuteReader())
-                    {
-                        while (r.Read())
-                        {
-                            res.Add(new PaymentRecord
-                            {
-                                CODICE_FISCALE = r["CODICE_FISCALE"]?.ToString() ?? "",
-                                IMPORTO = Convert.ToDecimal(r["IMPORTO"]),
-                                DATA_INSERIMENTO = Convert.ToDateTime(r["DATA_INSERIMENTO"])
-                            });
-                        }
-                    }
-                    transaction.Commit();
+                    return Regex.IsMatch(text, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    transaction.Rollback();
-                    throw new Exception("Error fetching payment data: " + ex.Message, ex);
+                    // Fallback to simple contains if the regex is invalid
+                    return text.IndexOf(pattern, StringComparison.OrdinalIgnoreCase) >= 0;
                 }
             }
 
-            return res;
+            // simple substring match for stems
+            return text.IndexOf(pattern, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string NormalizeForMatch(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+
+            // Lower + remove diacritics + collapse spaces
+            string lower = input.ToLowerInvariant();
+            string noAccents = RemoveDiacritics(lower);
+
+            return Regex.Replace(noAccents, @"\s+", " ").Trim();
+        }
+
+        private static string RemoveDiacritics(string text)
+        {
+            var sb = new StringBuilder(text.Length);
+            foreach (var c in text.Normalize(NormalizationForm.FormD))
+            {
+                var uc = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (uc != UnicodeCategory.NonSpacingMark)
+                    sb.Append(c);
+            }
+            return sb.ToString().Normalize(NormalizationForm.FormC);
         }
         #endregion
 
         #region 9) Output CSV
-        public void WriteClosureTicketsCsv(List<ProcessedTicket> closureTickets, string folderPath)
+        public void WriteTicketsCsv(List<ProcessedTicket> tickets, string folderPath)
         {
-            string outputPath = Path.Combine(folderPath, "ClosureTickets.csv");
+            string outputPath = Path.Combine(folderPath, "TicketsStatus.csv");
             var sb = new StringBuilder();
 
-            sb.AppendLine("ID_TICKET;ID_STUDENTE;COD_FISCALE;CATEGORIA;SOTTOCATEGORIA;PROBABILITY;CHIUSURA_LABEL;FULL_MESSAGE");
+            sb.AppendLine("ID_TICKET;ID_STUDENTE;COD_FISCALE;CATEGORIA;SOTTOCATEGORIA;STATUS_COMPILAZIONE;POS_SCORE;NEG_SCORE;PROBABILITY;KEYWORD_MATCH;LABEL;FULL_MESSAGE");
 
-            foreach (var c in closureTickets)
+            foreach (var t in tickets)
             {
                 sb.AppendLine(string.Join(";",
-                    c.ID_TICKET,
-                    c.ID_STUDENTE,
-                    c.CODFISC,
-                    EscapeForCsv(c.Categoria),
-                    EscapeForCsv(c.SottoCategoria),
-                    c.Probability_Close.ToString(CultureInfo.InvariantCulture),
-                    EscapeForCsv(c.Status),
-                    EscapeForCsv(c.Primo_Msg_Studente)
-                ));
-            }
-
-            // Write with UTF-8 BOM
-            var utf8Bom = new UTF8Encoding(true);
-            File.WriteAllText(outputPath, sb.ToString(), utf8Bom);
-        }
-
-        /// <summary>
-        /// ADD the esiti 23/24 and 24/25 plus the blocks to the residence CSV
-        /// (ID_TICKET;ID_STUDENTE;COD_FISCALE;CATEGORIA;SOTTOCATEGORIA;ESITO_BS_23_24;BLOCCHI_23_24;ESITO_BS_24_25;BLOCCHI_24_25;FULL_MESSAGE)
-        /// </summary>
-        public void WriteResidenceTicketsCsv(List<ProcessedTicket> residenceTickets, string folderPath)
-        {
-            string outputPath = Path.Combine(folderPath, "ResidenceTickets.csv");
-            var sb = new StringBuilder();
-
-            sb.AppendLine("ID_TICKET;ID_STUDENTE;COD_FISCALE;CATEGORIA;SOTTOCATEGORIA;ESITO_BS_23_24;BLOCCHI_23_24;ESITO_BS_24_25;BLOCCHI_24_25;FULL_MESSAGE");
-
-            foreach (var r in residenceTickets)
-            {
-                sb.AppendLine(string.Join(";",
-                    r.ID_TICKET,
-                    r.ID_STUDENTE,
-                    r.CODFISC,
-                    EscapeForCsv(r.Categoria),
-                    EscapeForCsv(r.SottoCategoria),
-                    EscapeForCsv(r.Esito_BS_23_24),
-                    EscapeForCsv(r.Blocchi_23_24),
-                    EscapeForCsv(r.Esito_BS_24_25),
-                    EscapeForCsv(r.Blocchi_24_25),
-                    EscapeForCsv(r.Primo_Msg_Studente)
-                ));
-            }
-
-            var utf8Bom = new UTF8Encoding(true);
-            File.WriteAllText(outputPath, sb.ToString(), utf8Bom);
-        }
-
-        /// <summary>
-        /// ADD the esiti 23/24 and 24/25 plus the blocks to payment CSV
-        /// (ID_TICKET;ID_STUDENTE;COD_FISCALE;CATEGORIA;SOTTOCATEGORIA;ESITO_BS_23_24;BLOCCHI_23_24;ESITO_BS_24_25;BLOCCHI_24_25;PAYMENT_AMOUNT;PAYMENT_DATE;FULL_MESSAGE)
-        /// </summary>
-        public void WritePaymentTicketsCsv(List<ProcessedTicket> paymentTickets, string folderPath)
-        {
-            string outputPath = Path.Combine(folderPath, "PaymentTickets.csv");
-            var sb = new StringBuilder();
-
-            sb.AppendLine("ID_TICKET;ID_STUDENTE;COD_FISCALE;CATEGORIA;SOTTOCATEGORIA;ESITO_BS_23_24;BLOCCHI_23_24;ESITO_BS_24_25;BLOCCHI_24_25;PAYMENT_AMOUNT;PAYMENT_DATE;FULL_MESSAGE");
-
-            foreach (var p in paymentTickets)
-            {
-                string dateStr = p.PaymentDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
-
-                sb.AppendLine(string.Join(";",
-                    p.ID_TICKET,
-                    p.ID_STUDENTE,
-                    p.CODFISC,
-                    EscapeForCsv(p.Categoria),
-                    EscapeForCsv(p.SottoCategoria),
-                    EscapeForCsv(p.Esito_BS_23_24),
-                    EscapeForCsv(p.Blocchi_23_24),
-                    EscapeForCsv(p.Esito_BS_24_25),
-                    EscapeForCsv(p.Blocchi_24_25),
-                    p.PaymentAmount.ToString(CultureInfo.InvariantCulture),
-                    dateStr,
-                    EscapeForCsv(p.Primo_Msg_Studente)
-                ));
-            }
-
-            var utf8Bom = new UTF8Encoding(true);
-            File.WriteAllText(outputPath, sb.ToString(), utf8Bom);
-        }
-
-        public void WriteTransferTicketsCsv(List<ProcessedTicket> transferTickets, string folderPath)
-        {
-            string outputPath = Path.Combine(folderPath, "TransferTickets.csv");
-            var sb = new StringBuilder();
-
-            sb.AppendLine("ID_TICKET;ID_STUDENTE;COD_FISCALE;CATEGORIA;SOTTOCATEGORIA;ESITO_BS_23_24;BLOCCHI_23_24;ESITO_BS_24_25;BLOCCHI_24_25;TRANSFER_PROBABILITY;FULL_MESSAGE");
-
-            foreach (var p in transferTickets)
-            {
-                sb.AppendLine(string.Join(";",
-                    p.ID_TICKET,
-                    p.ID_STUDENTE,
-                    p.CODFISC,
-                    EscapeForCsv(p.Categoria),
-                    EscapeForCsv(p.SottoCategoria),
-                    EscapeForCsv(p.Esito_BS_23_24),
-                    EscapeForCsv(p.Blocchi_23_24),
-                    EscapeForCsv(p.Esito_BS_24_25),
-                    EscapeForCsv(p.Blocchi_24_25),
-                    p.TransferProbability,
-                    EscapeForCsv(p.Primo_Msg_Studente)
+                    t.ID_TICKET,
+                    t.ID_STUDENTE,
+                    t.CODFISC,
+                    EscapeForCsv(t.Categoria),
+                    EscapeForCsv(t.SottoCategoria),
+                    t.Status_compilazione.ToString(CultureInfo.InvariantCulture),
+                    t.PositiveScore.ToString(CultureInfo.InvariantCulture),
+                    t.NegativeScore.ToString(CultureInfo.InvariantCulture),
+                    t.Probability.ToString(CultureInfo.InvariantCulture),
+                    t.KeywordMatch ? "1" : "0",
+                    EscapeForCsv(t.StatusLabel),
+                    EscapeForCsv(t.Primo_Msg_Studente)
                 ));
             }
 
@@ -795,7 +464,6 @@ namespace ProcedureNet7
         private string EscapeForCsv(string? s)
         {
             if (string.IsNullOrEmpty(s)) return "";
-            // Minimal approach: remove line breaks
             return s.Replace("\r", " ").Replace("\n", " ");
         }
         #endregion
@@ -806,7 +474,7 @@ namespace ProcedureNet7
     {
         public string? NREC { get; set; }
         public string? ID_TICKET { get; set; }
-        public string? CODSTUD { get; set; }   // This becomes ID_STUDENTE in final CSV
+        public string? CODSTUD { get; set; }
         public string? COGNOME { get; set; }
         public string? NOME { get; set; }
         public string? CODFISC { get; set; }
@@ -822,15 +490,13 @@ namespace ProcedureNet7
         public string? DATA_ULTIMO_MESSAGGIO { get; set; }
     }
 
-    internal class DatabaseRecord
+    internal class StatusRecord
     {
         public string? Cod_fiscale { get; set; }
-        public string? Esito_BS_24_25 { get; set; }
-        public string? Esito_PA_24_25 { get; set; }
-        public string? Blocchi_24_25 { get; set; }
-        public string? Esito_BS_23_24 { get; set; }
-        public string? Blocchi_23_24 { get; set; }
-        public string? Sede_Università_24_25 { get; set; }
+        public string? Anno_accademico { get; set; }
+        public string? Num_domanda { get; set; }
+        public int Status_compilazione { get; set; }
+        public string? Id_Domanda { get; set; }
     }
 
     internal class MergedTicket
@@ -838,95 +504,50 @@ namespace ProcedureNet7
         public string? ID_TICKET { get; set; }
         public string? CODSTUD { get; set; }
         public string? CODFISC { get; set; }
-        public string? Esito_BS_24_25 { get; set; }
-        public string? Esito_PA_24_25 { get; set; }
-        public string? Blocchi_24_25 { get; set; }
-        public string? Esito_BS_23_24 { get; set; }
-        public string? Blocchi_23_24 { get; set; }
-        public string? Sede_Università_24_25 { get; set; }
         public string? Primo_Msg_Studente { get; set; }
         public string? CATEGORIA { get; set; }
         public string? SOTTOCATEGORIA { get; set; }
         public string? PRIMO_MSG_OPERATORE { get; set; }
         public string? STATOTK { get; set; }
+
+        public int Status_compilazione { get; set; }
+        public string? Num_domanda { get; set; }
+        public string? Anno_accademico { get; set; }
     }
 
     internal class ProcessedTicket
     {
         public string? ID_TICKET { get; set; }
-        public string? ID_STUDENTE { get; set; }  // from CODSTUD
+        public string? ID_STUDENTE { get; set; }
         public string? CODFISC { get; set; }
         public string? Categoria { get; set; }
         public string? SottoCategoria { get; set; }
-
-        public double Probability_Close { get; set; }
-        public string? Status { get; set; }
         public string? Primo_Msg_Studente { get; set; }
 
-        public string? Esito_BS_24_25 { get; set; }
-        public string? Esito_PA_24_25 { get; set; }
-        public string? Blocchi_24_25 { get; set; }
-        public string? Esito_BS_23_24 { get; set; }
-        public string? Blocchi_23_24 { get; set; }
-        public string? Sede_Università_24_25 { get; set; }
+        public double Probability { get; set; }
+        public double PositiveScore { get; set; }
+        public double NegativeScore { get; set; }
+        public string? StatusLabel { get; set; }
+        public bool KeywordMatch { get; set; }
 
-        public bool IsResidencePermitRelated { get; set; }
-        public bool IsPaymentKeywordPresent { get; set; }
-
-        public bool IsInPayment { get; set; }
-        public decimal PaymentAmount { get; set; }
-        public DateTime? PaymentDate { get; set; }
-
-        public double? TransferProbability { get; set; }
-    }
-
-    internal class PaymentRecord
-    {
-        public string CODICE_FISCALE { get; set; } = "";
-        public decimal IMPORTO { get; set; }
-        public DateTime DATA_INSERIMENTO { get; set; }
+        public int Status_compilazione { get; set; }
+        public string? Num_domanda { get; set; }
+        public string? Anno_accademico { get; set; }
     }
     #endregion
 
     #region Keywords
     internal class KeywordConfig
     {
-        public List<PositiveKeyword> PositiveKeywords { get; set; } = new();
-        public List<NegativeKeyword> NegativeKeywords { get; set; } = new();
-        public List<PaymentKeyword> PaymentKeywords { get; set; } = new();
-        public List<KeywordProbability> ResidencePermitKeywords { get; set; } = new();
-        public List<KeywordTransfer> TransferKeywords { get; set; } = new();
+        public List<WeightedKeyword> Keywords { get; set; } = new();
+        public List<WeightedKeyword> NegativeKeywords { get; set; } = new();
     }
 
-    internal class PositiveKeyword
+    internal class WeightedKeyword
     {
         public string Keyword { get; set; } = "";
-        public double Probability { get; set; }
-    }
-
-    internal class NegativeKeyword
-    {
-        public string Keyword { get; set; } = "";
-        public double Weight { get; set; }
-    }
-
-    internal class PaymentKeyword
-    {
-        public string Keyword { get; set; } = "";
-        public double Probability { get; set; }
-    }
-
-    internal class KeywordProbability
-    {
-        public string Keyword { get; set; } = "";
-        public double Probability { get; set; }
-    }
-
-    internal class KeywordTransfer
-    {
-        public double Weight { get; set; }
-        public string Group { get; set; } = "";
-        public List<string> Keywords { get; set; } = new();
+        public double Weight { get; set; } = 0.4;
+        public bool IsRegex { get; set; } = false;
     }
     #endregion
 }

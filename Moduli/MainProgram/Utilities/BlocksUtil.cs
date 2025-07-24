@@ -466,7 +466,7 @@ namespace ProcedureNet7
                     DROP TABLE #NumDomandaTempTable;
 
                 CREATE TABLE #NumDomandaTempTable (
-                    NumDomanda VARCHAR(50) NOT NULL
+                    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS 
                 );
             ";
 
@@ -750,7 +750,7 @@ namespace ProcedureNet7
         public static void CreateAndPopulateTempTable(SqlConnection conn, SqlTransaction transaction, List<string> codFiscaleList)
         {
             // Create temporary table
-            string createTempTableSql = "CREATE TABLE #CodFiscaleTempTable (CodFiscale NVARCHAR(16) NOT NULL);";
+            string createTempTableSql = "CREATE TABLE #CodFiscaleTempTable (CodFiscale NVARCHAR(16) COLLATE Latin1_General_CI_AS);";
             using (SqlCommand createCmd = new SqlCommand(createTempTableSql, conn, transaction))
             {
                 createCmd.ExecuteNonQuery();
