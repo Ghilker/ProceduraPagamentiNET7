@@ -9,7 +9,7 @@ namespace ProcedureNet7
     public class StudentePagamenti : StudenteInfo
     {
         public InformazioniPagamento InformazioniPagamento { get; set; } = new InformazioniPagamento();
-
+        public StudentePagamenti() { }
         public StudentePagamenti(
             string numDomanda,
             string codFiscale,
