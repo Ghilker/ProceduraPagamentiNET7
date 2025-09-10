@@ -598,7 +598,6 @@ namespace ProcedureNet7
                     CommandTimeout = 90000000
                 };
                 Logger.LogDebug(null, "QUERY SQL CREAZIONE TABELLA:");
-                Logger.LogDebug(null, sqlQuery);
                 _ = cmd.ExecuteNonQuery();
             }
             catch (Exception ex)
@@ -1303,7 +1302,7 @@ namespace ProcedureNet7
                 foreach (var pair in studentiDaPagare)
                 {
                     StudentePagamenti studente = pair.Value;
-                    if (studente.InformazioniPersonali.CodFiscale == "BLDLSS00M23E958G")
+                    if (studente.InformazioniPersonali.CodFiscale == "DRSDBR01L62H501P")
                     {
                         string test = "";
                     }
@@ -1998,7 +1997,7 @@ namespace ProcedureNet7
                         continue;
 
                     // Debug check
-                    if (studente.InformazioniPersonali.CodFiscale == "VLNDNS01T54E885A")
+                    if (studente.InformazioniPersonali.CodFiscale == "MGHLAI03M04Z224D")
                     {
                         string test = ""; // Just to set a breakpoint, presumably
                     }
@@ -2455,7 +2454,10 @@ namespace ProcedureNet7
                         // Studente not found in our dictionary
                         continue;
                     }
-
+                    if(studente.InformazioniPersonali.CodFiscale == "MGHLAI03M04Z224D")
+                    {
+                        string test = "";
+                    }
                     // If stanza is 'XXX' or studente is null, just skip it
                     if (studente == null || assegnazione.CodStanza == "XXX")
                     {
@@ -2777,7 +2779,7 @@ namespace ProcedureNet7
                 {
                     StudentePagamenti studente = pair.Value;
 
-                    if (studente.InformazioniPersonali.CodFiscale == "DLULMR99P61Z129L")
+                    if (studente.InformazioniPersonali.CodFiscale == "MGHLAI03M04Z224D")
                     {
                         string stest = "";
                     }
@@ -3012,7 +3014,7 @@ namespace ProcedureNet7
                     else if (isTR)
                     {
                         importoDaPagare = 140;
-                        if (studente.InformazioniPersonali.CodFiscale == "BBCDSN04M47Z129W")
+                        if (studente.InformazioniPersonali.CodFiscale == "DRSDBR01L62H501P")
                         {
                             string test = "";
                         }
@@ -3559,23 +3561,21 @@ namespace ProcedureNet7
 
                     if (groupName == "Roma")
                     {
-                        nomeCodEnte = "Roma territoriale";
+                        nomeCodEnte = "Roma";
                     }
-                    else
+                    else if(groupName == "02")
                     {
-                        string sqlCodEnte = $"SELECT Descrizione FROM Enti_di_gestione WHERE cod_ente = '{groupName}'";
-                        SqlCommand cmdSede = new(sqlCodEnte, CONNECTION, sqlTransaction)
-                        {
-                            CommandTimeout = 9000000
-                        };
-                        nomeCodEnte = (string)cmdSede.ExecuteScalar();
-                        nomeCodEnte = Utilities.SanitizeColumnName(nomeCodEnte);
+                        nomeCodEnte = "Cassino";
+                    }
+                    else if(groupName == "05")
+                    {
+                        nomeCodEnte = "Viterbo";
                     }
 
-                    Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}");
+                        Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}");
                     string specificFolderPath = Utilities.EnsureDirectory(Path.Combine(newFolderPath, $"{nomeCodEnte}"));
                     impegnoAmount[impegno][categoriaCU].Add(nomeCodEnte, studentsInGroup.Count);
-
+                    
                     if (tipoStudente == "2")
                     {
                         ProcessStudentsByAnnoCorso(studentsInGroup, specificFolderPath, processMatricole: true, processAnniSuccessivi: true, "Con Detrazioni_" + nomeCodEnte, groupName, impegno);

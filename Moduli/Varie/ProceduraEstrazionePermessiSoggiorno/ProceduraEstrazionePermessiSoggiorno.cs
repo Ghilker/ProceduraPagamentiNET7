@@ -42,8 +42,8 @@ inner join Domanda d on vs.Cod_fiscale = d.Cod_fiscale and d.Anno_accademico in 
 inner join vEsiti_concorsi ve on d.Num_domanda = ve.Num_domanda and ve.Cod_beneficio = 'bs' and ve.Cod_tipo_esito = 2
 inner join Studente s on d.Cod_fiscale = s.Cod_fiscale
 where (vs.Anno_accademico is null or vs.Anno_accademico is not null) and va.cod_status = '01' and va.data_fine_validita is null
-and d.Num_domanda in (select Num_domanda from vMotivazioni_blocco_pagamenti where Anno_accademico = 20242025 and Cod_tipologia_blocco = 'bpp') 
-and d.Cod_fiscale in (select cod_fiscale from vIscrizioni where Anno_accademico = 20242025 and tipo_bando = 'lz' and Anno_corso <> 1)
+and d.Num_domanda in (select Num_domanda from vMotivazioni_blocco_pagamenti where Anno_accademico in (20242025, 20232024) and Cod_tipologia_blocco = 'bpp') 
+
 
                 ";
 
