@@ -95,9 +95,11 @@ namespace ProcedureNet7
                         CodFiscale = codFiscaleEstratto,
                         Cognome = Utilities.SafeGetString(reader, "cognome"),
                         Nome = Utilities.SafeGetString(reader, "nome"),
-                        DataNascita = Utilities.SafeGetString(reader, "data_nascita"),
+                        DataNascita = Utilities.SafeGetDateTime(reader, "data_nascita") is DateTime dataNascita ? dataNascita.ToString("dd/MM/yyyy") : string.Empty,
                         Sesso = Utilities.SafeGetString(reader, "sesso"),
-                        LuogoNascita = new LuogoNascita { nomeComune = Utilities.SafeGetString(reader, "Comune_nascita"), codComune = Utilities.SafeGetString(reader, "Cod_comune_nasc"), provincia = Utilities.SafeGetString(reader, "Provincia_nascita") },
+                        LuogoNascita = new LuogoNascita { nomeComune = Utilities.SafeGetString(reader, "Comune_nascita"), 
+                        codComune = Utilities.SafeGetString(reader, "Cod_comune_nasc"), 
+                        provincia = Utilities.SafeGetString(reader, "Provincia_nascita") },
                         IndirizzoEmail = Utilities.SafeGetString(reader, "indirizzo_e_mail"),
                         Telefono = long.Parse(Utilities.SafeGetString(reader, "telefono_cellulare"))
                     },
@@ -109,18 +111,18 @@ namespace ProcedureNet7
                     },
                     InformazioniConto = new InformazioniConto
                     {
-                        IBAN = "IT00X1234567890123456789012",
-                        Swift = "BNLIITRR"
+                        IBAN = Utilities.SafeGetString(reader, "IBAN"),
+                        Swift = Utilities.SafeGetString(reader, "Swift")
                     },
                     InformazioniSede = new InformazioniSede
                     {
                         Residenza = new Residenza
                         {
-                            indirizzo = "Via Roma 1",
-                            CAP = "00100",
-                            provincia = "RM",
-                            nomeComune = "Roma",
-                            codComune = "H501"
+                            indirizzo = Utilities.SafeGetString(reader, "INDIRIZZO"),
+                            CAP = Utilities.SafeGetString(reader, "CAP"),
+                            provincia = Utilities.SafeGetString(reader, "provincia_residenza"),
+                            nomeComune = Utilities.SafeGetString(reader, "Comune_residenza"),
+                            codComune = Utilities.SafeGetString(reader, "COD_COMUNE"),
                         }
                     }
                 };
