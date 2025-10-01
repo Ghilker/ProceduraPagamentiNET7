@@ -33,161 +33,86 @@ namespace ProcedureNet7
 
                 Logger.LogInfo(20, "Starting data extraction for Permessi di Soggiorno.");
 
-                // First query (CON 23/24)
-                DataTable dataTableCon2324 = new DataTable();
-                string queryCon2324 = $@"
-select distinct s.Cod_fiscale, s.Nome, s.Cognome, s.Codice_Studente from vSpecifiche_permesso_soggiorno vs inner join VStatus_Allegati va on vs.id_allegato = va.id_allegato 
-
-inner join Domanda d on vs.Cod_fiscale = d.Cod_fiscale and d.Anno_accademico in (20242025, 20232024) and d.Tipo_bando = 'lz' 
-inner join vEsiti_concorsi ve on d.Num_domanda = ve.Num_domanda and ve.Cod_beneficio = 'bs' and ve.Cod_tipo_esito = 2
+                // =================== Estrazioni ===================
+                var dtBs = ExecuteQuery(@"
+select distinct s.Cod_fiscale, s.Nome, s.Cognome, s.Codice_Studente
+from vSpecifiche_permesso_soggiorno vs
+inner join VStatus_Allegati va on vs.id_allegato = va.id_allegato
+inner join Domanda d on vs.Cod_fiscale = d.Cod_fiscale and d.Anno_accademico in (20252026, 20242025, 20232024) and d.Tipo_bando = 'lz'
+inner join vEsiti_concorsi ve on d.Num_domanda = ve.Num_domanda and ve.Cod_beneficio = 'bs' and ve.Cod_tipo_esito <> 0
 inner join Studente s on d.Cod_fiscale = s.Cod_fiscale
-where (vs.Anno_accademico is null or vs.Anno_accademico is not null) and va.cod_status = '01' and va.data_fine_validita is null
-and d.Num_domanda in (select Num_domanda from vMotivazioni_blocco_pagamenti where Anno_accademico in (20242025, 20232024) and Cod_tipologia_blocco = 'bpp') 
+where va.cod_status = '01' and va.data_fine_validita is null
+");
+                Logger.LogInfo(40, $"[BS] Retrieved {dtBs.Rows.Count} rows.");
 
-
-                ";
-
-                Logger.LogInfo(30, "Executing SQL query for CON 23/24.");
-                SqlCommand readDataCon2324 = new(queryCon2324, CONNECTION)
-                {
-                    CommandTimeout = 90000000
-                };
-                using (SqlDataReader readerCon2324 = readDataCon2324.ExecuteReader())
-                {
-                    dataTableCon2324.Load(readerCon2324);
-                }
-
-                Logger.LogInfo(40, $"Data extraction for CON 23/24 completed. Retrieved {dataTableCon2324.Rows.Count} rows.");
-
-                // Second query (SENZA 23/24)
-                DataTable dataTableSenza2324 = new DataTable();
-                string querySenza2324 = $@"
-SELECT DISTINCT domanda.Cod_fiscale, Cognome, nome, Codice_Studente
-FROM            Domanda inner join studente on Domanda.Cod_fiscale = Studente.Cod_fiscale 
-inner join vStatus_compilazione on Domanda.Anno_accademico = vStatus_compilazione.anno_accademico and Domanda.Num_domanda = vStatus_compilazione.num_domanda
-                    WHERE        (Domanda.Anno_accademico >= '20232024') AND (Tipo_bando = 'lz') AND domanda.Cod_fiscale IN
-(SELECT DISTINCT 
-    sps.Cod_fiscale
-FROM STATUS_ALLEGATI AS sa
-INNER JOIN Specifiche_permesso_soggiorno AS sps ON sa.id_allegato = sps.id_allegato
-WHERE
-    sa.data_validita = (
-        SELECT MAX(data_validita)
-        FROM STATUS_ALLEGATI AS STA
-        WHERE id_allegato = sa.id_allegato
-    )
-    AND sps.Data_validita = (
-        SELECT MAX(Data_validita)
-        FROM Specifiche_permesso_soggiorno AS br
-        WHERE Num_domanda = sps.Num_domanda AND Cod_fiscale = sps.Cod_fiscale
-    )
-    AND sa.cod_status = '01'
-    AND sps.Anno_accademico IS NULL
-    AND NOT EXISTS (
-        SELECT 1
-        FROM STATUS_ALLEGATI AS sa2
-        INNER JOIN Specifiche_permesso_soggiorno AS sps2 ON sa2.id_allegato = sps2.id_allegato
-        WHERE
-            sa2.cod_status = '05'
-            AND sps2.Cod_fiscale = sps.Cod_fiscale
-            AND (
-                (sps.Tipo_documento = '02'
-                 AND sps2.Tipo_documento = sps.Tipo_documento
-                 AND sps2.Data_richiesta_rilascio_rinnovo = sps.Data_richiesta_rilascio_rinnovo)
-                OR (sps.Tipo_documento = '03'
-                    AND sps2.Tipo_documento = sps.Tipo_documento
-                    AND sps2.Tipo_permesso = sps.Tipo_permesso
-                    AND sps2.Data_scadenza = sps.Data_scadenza)
-            )
-    )
-)
-and status_compilazione >= '90'
-ORDER BY domanda.Cod_fiscale;
-                ";
-
-                Logger.LogInfo(50, "Executing SQL query for SENZA 23/24.");
-                SqlCommand readDataSenza2324 = new(querySenza2324, CONNECTION)
-                {
-                    CommandTimeout = 90000000
-                };
-                using (SqlDataReader readerSenza2324 = readDataSenza2324.ExecuteReader())
-                {
-                    dataTableSenza2324.Load(readerSenza2324);
-                }
-
-                Logger.LogInfo(60, $"Data extraction for SENZA 23/24 completed. Retrieved {dataTableSenza2324.Rows.Count} rows.");
+                var dtPa = ExecuteQuery(@"
+select distinct s.Cod_fiscale, s.Nome, s.Cognome, s.Codice_Studente
+from vSpecifiche_permesso_soggiorno vs
+inner join VStatus_Allegati va on vs.id_allegato = va.id_allegato
+inner join Domanda d on vs.Cod_fiscale = d.Cod_fiscale and d.Anno_accademico in (20252026, 20242025, 20232024) and d.Tipo_bando = 'lz'
+inner join vEsiti_concorsi ve on d.Num_domanda = ve.Num_domanda and ve.Cod_beneficio = 'pa' and ve.Cod_tipo_esito <> 0
+inner join Studente s on d.Cod_fiscale = s.Cod_fiscale
+where va.cod_status = '01' and va.data_fine_validita is null
+");
+                Logger.LogInfo(41, $"[PA] Retrieved {dtPa.Rows.Count} rows.");
 
                 if (_sendMail)
                 {
-                    List<string> toEmailsCon2324 = new();
-                    List<string> toEmailsSenza2324 = new();
-                    List<string> ccEmails = new();
-
-                    Logger.LogInfo(70, "Reading email configurations from the file.");
-
                     if (!File.Exists(mailFilePath))
                     {
                         Logger.LogInfo(100, $"Mail file path '{mailFilePath}' does not exist.");
                         return;
                     }
 
-                    using (StreamReader sr = new(mailFilePath))
-                    {
-                        string? line;
-                        while ((line = sr.ReadLine()) != null)
-                        {
-                            if (line.StartsWith("TO#SI#"))
-                            {
-                                toEmailsCon2324.Add(line.Substring(6));
-                            }
-                            else if (line.StartsWith("TO#NO#"))
-                            {
-                                toEmailsSenza2324.Add(line.Substring(6));
-                            }
-                            else if (line.StartsWith("CC#"))
-                            {
-                                ccEmails.Add(line[3..]);
-                            }
-                            else if (line.StartsWith("ID#") && string.IsNullOrEmpty(senderMail))
-                            {
-                                senderMail = line[3..];
-                            }
-                            else if (line.StartsWith("PW#") && string.IsNullOrEmpty(senderPassword))
-                            {
-                                senderPassword = line[3..];
-                            }
-                        }
-                    }
+                    var toEmails = new List<string>();
+                    var ccEmails = new List<string>();
+                    ReadMailConfig(mailFilePath, toEmails, ccEmails, ref senderMail, ref senderPassword);
 
-                    if (toEmailsCon2324.Count == 0 && toEmailsSenza2324.Count == 0)
+                    if (toEmails.Count == 0)
                     {
                         Logger.LogInfo(100, "No recipient email addresses found.");
                         return;
                     }
-
                     if (string.IsNullOrEmpty(senderMail) || string.IsNullOrEmpty(senderPassword))
                     {
                         Logger.LogInfo(100, "Sender email credentials are missing.");
                         return;
                     }
 
-                    // Create a directory with the current date to save the files
+                    // Cartella datata
                     string currentDateFolder = Path.Combine(savePath, DateTime.Now.ToString("yyyyMMdd"));
                     if (!Directory.Exists(currentDateFolder))
-                    {
                         Directory.CreateDirectory(currentDateFolder);
+
+                    // =================== Invii (PA prima) ===================
+                    if (dtPa.Rows.Count > 0)
+                    {
+                        SendEmailWithAttachment(
+                            toEmails, ccEmails, dtPa, currentDateFolder,
+                            filePrefix: "ps_pa",
+                            subject: $"Estrazione studenti per PS (PA) - {DateTime.Now:dd/MM/yyyy}",
+                            htmlBody: GetMailBodyPa(),
+                            minRowsPerEmail: 10
+                        );
+                    }
+                    else
+                    {
+                        Logger.LogInfo(61, "[PA] Nessun record: nessun invio.");
                     }
 
-                    // Handle the first dataset (CON 23/24)
-                    if (toEmailsCon2324.Count > 0)
+                    if (dtBs.Rows.Count > 0)
                     {
-                        SendEmailWithAttachment(toEmailsCon2324, ccEmails, dataTableCon2324, currentDateFolder, "CON_2324", "CON 23/24");
+                        SendEmailWithAttachment(
+                            toEmails, ccEmails, dtBs, currentDateFolder,
+                            filePrefix: "ps_bs",
+                            subject: $"Estrazione studenti per PS (BS) - {DateTime.Now:dd/MM/yyyy}",
+                            htmlBody: GetMailBodyBs(),
+                            minRowsPerEmail: 10
+                        );
                     }
-
-                    // Handle the second dataset (SENZA 23/24)
-                    if (toEmailsSenza2324.Count > 0)
+                    else
                     {
-                        SendEmailWithAttachment(toEmailsSenza2324, ccEmails, dataTableSenza2324, currentDateFolder, "SENZA_2324", "SENZA 23/24");
+                        Logger.LogInfo(60, "[BS] Nessun record: nessun invio.");
                     }
                 }
 
@@ -199,26 +124,119 @@ ORDER BY domanda.Cod_fiscale;
             }
         }
 
-        private void SendEmailWithAttachment(List<string> toEmails, List<string> ccEmails, DataTable dataTable, string saveFolder, string filePrefix, string subjectSuffix)
+        // =================== Helpers ===================
+        private DataTable ExecuteQuery(string sql)
         {
-            // Calculate the number of rows per email
-            int rowsPerEmail = dataTable.Rows.Count / toEmails.Count;
-            int remainder = dataTable.Rows.Count % toEmails.Count;
+            var dt = new DataTable();
+            Logger.LogInfo(30, "Executing SQL query.");
+            using var cmd = new SqlCommand(sql, CONNECTION) { CommandTimeout = 90000000 };
+            using var reader = cmd.ExecuteReader();
+            dt.Load(reader);
+            return dt;
+        }
 
+        private void ReadMailConfig(string path, List<string> toEmails, List<string> ccEmails, ref string id, ref string pw)
+        {
+            Logger.LogInfo(70, "Reading email configurations from the file.");
+            using var sr = new StreamReader(path);
+            string? line;
+            while ((line = sr.ReadLine()) != null)
+            {
+                if (line.StartsWith("TO#SI#"))
+                    toEmails.Add(line.Substring(6));
+                else if (line.StartsWith("CC#"))
+                    ccEmails.Add(line[3..]);
+                else if (line.StartsWith("ID#") && string.IsNullOrEmpty(id))
+                    id = line[3..];
+                else if (line.StartsWith("PW#") && string.IsNullOrEmpty(pw))
+                    pw = line[3..];
+            }
+        }
+
+        private string GetMailBodyBs() => @"
+<p>Buongiorno,</p>
+<p>su richiesta di Rita che legge in copia,</p>
+<p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono
+essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno), questo file dovrà essere lavorato a seguito del completamento della lavorazione del file precedente.
+In questo file potranno essere presenti studenti già lavorati per sovrapposizione con i posti alloggio</p>
+<p>Grazie e buon lavoro!</p>
+<p>Giacomo Pavone</p>";
+
+        private string GetMailBodyPa() => @"
+<p>Buongiorno,</p>
+<p>su richiesta di Rita che legge in copia,</p>
+<p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere validati in maniera urgente i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
+<p>Grazie e buon lavoro!</p>
+<p>Giacomo Pavone</p>";
+
+        private void SendEmailWithAttachment(
+            List<string> toEmailsOriginal,
+            List<string> ccEmails,
+            DataTable dataTable,
+            string saveFolder,
+            string filePrefix,
+            string subject,
+            string htmlBody,
+            int minRowsPerEmail = 10)
+        {
+            var totalRows = dataTable.Rows.Count;
+
+            // Copia la lista TO per questo invio (così PA/BS non si influenzano tra loro)
+            var toEmails = new List<string>(toEmailsOriginal);
+
+            // Se possibile, riduci casualmente i destinatari per garantire >= minRowsPerEmail
+            if (toEmails.Count > 0)
+            {
+                int targetRecipients = Math.Max(1, totalRows / minRowsPerEmail);
+
+                if (targetRecipients == 0) targetRecipients = 1; // safety
+
+                if (toEmails.Count > targetRecipients)
+                {
+                    var rng = new Random();
+                    var skipped = new List<string>();
+
+                    while (toEmails.Count > targetRecipients)
+                    {
+                        int idx = rng.Next(0, toEmails.Count);
+                        string removed = toEmails[idx];
+                        toEmails.RemoveAt(idx);
+                        skipped.Add(removed);
+                    }
+
+                    Logger.LogInfo(85, $"Ridotti i destinatari TO per garantire almeno {minRowsPerEmail} righe per email. Saltati (casuali): {string.Join(", ", skipped)}");
+                }
+
+                if (totalRows < minRowsPerEmail)
+                {
+                    Logger.LogInfo(86, $"Attenzione: solo {totalRows} righe totali — impossibile garantire {minRowsPerEmail} per email. Invio a un solo destinatario.");
+                    // già garantito targetRecipients>=1: con totalRows<min, targetRecipients=1
+                }
+            }
+
+            if (toEmails.Count == 0)
+            {
+                Logger.LogInfo(87, "Nessun destinatario dopo l'aggiustamento: invio annullato per questo dataset.");
+                return;
+            }
+
+            // Suddivisione righe per destinatario
+            int rowsPerEmail = totalRows / toEmails.Count;
+            int remainder = totalRows % toEmails.Count;
             int startIndex = 0;
 
             foreach (var toEmail in toEmails)
             {
-                // Calculate the number of rows to include for this email
                 int rowsForThisEmail = rowsPerEmail + (remainder > 0 ? 1 : 0);
-                remainder = Math.Max(0, remainder - 1);
+                if (remainder > 0) remainder--;
 
-                // Create a new DataTable for this email
+                // Evita invii vuoti (può accadere se totalRows=0)
+                if (rowsForThisEmail <= 0) continue;
+
+                // Costruisci DataTable per questo destinatario
                 DataTable emailDataTable = dataTable.Clone();
                 for (int i = startIndex; i < startIndex + rowsForThisEmail; i++)
-                {
                     emailDataTable.ImportRow(dataTable.Rows[i]);
-                }
 
                 startIndex += rowsForThisEmail;
 
@@ -228,43 +246,32 @@ ORDER BY domanda.Cod_fiscale;
                 Logger.LogInfo(91, $"Saving data to file: {individualSavePath}");
                 string savedToPath = Utilities.ExportDataTableToExcel(emailDataTable, individualSavePath);
 
-                Logger.LogInfo(92, $"Preparing to send email to {toEmail} with subject '{subjectSuffix}'.");
+                Logger.LogInfo(92, $"Preparing to send email to {toEmail} with subject '{subject}'.");
 
                 try
                 {
-                    SmtpClient smtpClient = new("smtp.gmail.com")
+                    using var smtpClient = new SmtpClient("smtp.gmail.com")
                     {
                         Port = 587,
                         Credentials = new NetworkCredential(senderMail, senderPassword),
                         EnableSsl = true,
                     };
 
-                    MailMessage mailMessage = new()
+                    using var mailMessage = new MailMessage
                     {
                         From = new MailAddress(senderMail),
-                        Subject = $"Estrazione studenti per PS - {DateTime.Now:dd/MM/yyyy}",
-                        Body = $@"  <p>Buongiorno,</p>
-                            <p>su richiesta di Rita che legge in copia,</p>
-                            <p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
-
-                           <p>Grazie e buon lavoro!</p>
-                            <p>Giacomo Pavone</p> ",
+                        Subject = subject,
+                        Body = htmlBody,
                         IsBodyHtml = true
                     };
 
                     mailMessage.To.Add(toEmail);
-
-                    foreach (string ccEmail in ccEmails)
-                    {
-                        mailMessage.CC.Add(ccEmail);
-                    }
-
+                    foreach (string cc in ccEmails) mailMessage.CC.Add(cc);
                     mailMessage.Attachments.Add(new Attachment(savedToPath));
 
                     Logger.LogInfo(93, $"Sending email to {toEmail}.");
                     smtpClient.Send(mailMessage);
                     Logger.LogInfo(94, $"Email sent successfully to {toEmail}.");
-                    mailMessage.Dispose();
                 }
                 catch (Exception ex)
                 {
@@ -272,6 +279,5 @@ ORDER BY domanda.Cod_fiscale;
                 }
             }
         }
-
     }
 }

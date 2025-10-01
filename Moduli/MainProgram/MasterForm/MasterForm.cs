@@ -28,7 +28,7 @@ namespace ProcedureNet7
 
         private string userTier;
 
-        public MasterForm(int userID, string userTier)
+        public MasterForm()
         {
             this.userTier = "Programmatore";
             InitializeComponent();

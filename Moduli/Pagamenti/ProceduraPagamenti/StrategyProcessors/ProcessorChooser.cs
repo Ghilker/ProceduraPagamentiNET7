@@ -15,6 +15,7 @@ namespace ProcedureNet7.PagamentiProcessor
                 case "20222023": return new AcademicProcessor2223();
                 case "20232024": return new AcademicProcessor2324();
                 case "20242025": return new AcademicProcessor2425();
+                case "20252026": return new AcademicProcessor2526();
                 default: throw new Exception($"Processor dell'anno accademico {selectedAA} non è implementato!");
             }
         }

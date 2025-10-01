@@ -13,6 +13,9 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Excel = Microsoft.Office.Interop.Excel;
 
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Security.Cryptography;
 namespace ProcedureNet7
 {
     public static class Utilities
@@ -750,9 +753,66 @@ namespace ProcedureNet7
 
             return dataTable;
         }
+
+        public static readonly HashSet<string> _reservedWinNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9",
+            "LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"
+        };
+
+        public static string MakeSafePathSegment(string name, int maxLen)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "untitled";
+
+        // replace invalid chars
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new StringBuilder(name.Length);
+        foreach (var ch in name)
+            sb.Append(invalid.Contains(ch) ? '_' : ch);
+
+        // collapse whitespace, trim, drop trailing dots
+        string cleaned = Regex.Replace(sb.ToString(), @"\s+", " ").Trim().TrimEnd('.');
+        if (cleaned.Length == 0) cleaned = "untitled";
+
+        // avoid reserved names
+        if (_reservedWinNames.Contains(cleaned))
+            cleaned = "_" + cleaned;
+
+        if (cleaned.Length <= maxLen) return cleaned;
+
+        // shorten with stable hash suffix
+        string hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(cleaned))).Substring(0, 8);
+        int keep = Math.Max(1, maxLen - (1 + hash.Length)); // "~" + 8
+        return cleaned.Substring(0, keep) + "~" + hash;
     }
 
-    [AttributeUsage(AttributeTargets.Field, Inherited = false, AllowMultiple = false)]
+        /// <summary>
+        /// Ensures the *full path* (folder + "\\" + base + ext) stays under a conservative limit (default 200).
+        /// Returns a safe base name (without extension) respecting both per-segment and full-path constraints.
+        /// </summary>
+        public static string MakeSafeFileBaseForFolder(
+            string baseNameNoExt,
+            string folderPath,
+            string extensionWithDot,
+            int maxTotalPath = 200,
+            int hardMaxBaseLen = 120)
+        {
+        baseNameNoExt ??= "file";
+        extensionWithDot ??= ".dat";
+
+        string sanitized = MakeSafePathSegment(baseNameNoExt, hardMaxBaseLen);
+        string full = Path.Combine(folderPath, sanitized + extensionWithDot);
+
+        if (full.Length <= maxTotalPath) return sanitized;
+
+        int allowedBaseLen = Math.Max(10, maxTotalPath - folderPath.Length - extensionWithDot.Length - 1);
+        return MakeSafePathSegment(sanitized, allowedBaseLen);
+    }
+
+
+}
+
+[AttributeUsage(AttributeTargets.Field, Inherited = false, AllowMultiple = false)]
     sealed class ProcedureCategoryAttribute : Attribute
     {
         public string Category { get; }

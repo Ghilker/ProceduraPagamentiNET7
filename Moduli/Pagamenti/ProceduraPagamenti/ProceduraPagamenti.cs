@@ -1,5 +1,6 @@
 ﻿using DocumentFormat.OpenXml;
 using ProcedureNet7.PagamentiProcessor;
+using ProcedureNet7.Storni;
 using System.Collections.Concurrent;
 using System.Data;
 using System.Data.SqlClient;
@@ -11,6 +12,7 @@ namespace ProcedureNet7
 {
     public class ProceduraPagamenti : BaseProcedure<ArgsPagamenti>
     {
+        string debugStudente = "";
         string selectedSaveFolder = string.Empty;
         string selectedAA = string.Empty;
 
@@ -960,6 +962,10 @@ namespace ProcedureNet7
 
                 foreach (var cf in codFiscali)
                 {
+                    if (cf == debugStudente)
+                    {
+                        string test = ""; // Just to set a breakpoint, presumably
+                    }
                     cfTable.Rows.Add(cf);
                 }
 
@@ -1086,7 +1092,8 @@ namespace ProcedureNet7
                         CODICE_FISCALE
                     FROM            
                         MOVIMENTI_CONTABILI_ELEMENTARI
-                    WHERE           
+                    WHERE  
+                        ANNO_ACCADEMICO = '{selectedAA}' AND
                         (CODICE_MOVIMENTO IN
                             (SELECT        CODICE_MOVIMENTO
                             FROM            MOVIMENTI_CONTABILI_GENERALI
@@ -1104,7 +1111,7 @@ namespace ProcedureNet7
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "CODICE_FISCALE").ToUpper());
 
-                        if (codFiscale == "BLDLSS00M23E958G")
+                        if (codFiscale == debugStudente)
                         {
                             string test = "";
                         }
@@ -1157,7 +1164,7 @@ namespace ProcedureNet7
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
 
-                        if (codFiscale == "DMGRRA99L64A271Q")
+                        if (codFiscale == debugStudente)
                         {
                             string test = "";
                         }
@@ -1202,7 +1209,7 @@ namespace ProcedureNet7
                     StudentePagamenti studenteDaControllare = pair.Value;
                     bool stessoPagamento = false;
                     bool okTassaRegionale = false;
-                    if(studenteDaControllare.InformazioniPersonali.CodFiscale == "BBCDSN04M47Z129W")
+                    if (studenteDaControllare.InformazioniPersonali.CodFiscale == debugStudente)
                     {
                         string test = "";
                     }
@@ -1302,7 +1309,7 @@ namespace ProcedureNet7
                 foreach (var pair in studentiDaPagare)
                 {
                     StudentePagamenti studente = pair.Value;
-                    if (studente.InformazioniPersonali.CodFiscale == "DRSDBR01L62H501P")
+                    if (studente.InformazioniPersonali.CodFiscale == debugStudente)
                     {
                         string test = "";
                     }
@@ -1547,7 +1554,7 @@ namespace ProcedureNet7
                 while (reader.Read())
                 {
                     string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                    if (codFiscale == "BLDLSS00M23E958G")
+                    if (codFiscale == debugStudente)
                     {
                         string test = "";
                     }
@@ -1595,7 +1602,7 @@ namespace ProcedureNet7
                 while (reader.Read())
                 {
                     string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                    if (codFiscale == "BLDLSS00M23E958G")
+                    if (codFiscale == debugStudente)
                     {
                         string test = "";
                     }
@@ -1677,7 +1684,7 @@ namespace ProcedureNet7
                 while (reader.Read())
                 {
                     string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-                    if (codFiscale == "BLDLSS00M23E958G")
+                    if (codFiscale == debugStudente)
                     {
                         string test = "";
                     }
@@ -1968,7 +1975,7 @@ namespace ProcedureNet7
                             domicilioRows.Add(new StudentiDomicilioDTO
                             {
                                 CodFiscale = codFiscale,
-                                ComuneDomicilio = Utilities.SafeGetString(reader,"COD_COMUNE"),
+                                ComuneDomicilio = Utilities.SafeGetString(reader, "COD_COMUNE"),
                                 TitoloOneroso = (Utilities.SafeGetInt(reader, "TITOLO_ONEROSO") == 1),
                                 ContrattoEnte = (Utilities.SafeGetInt(reader, "TIPO_CONTRATTO_TITOLO_ONEROSO") == 1),
                                 SerieContratto = Utilities.SafeGetString(reader, "N_SERIE_CONTRATTO"),
@@ -1997,7 +2004,7 @@ namespace ProcedureNet7
                         continue;
 
                     // Debug check
-                    if (studente.InformazioniPersonali.CodFiscale == "MGHLAI03M04Z224D")
+                    if (studente.InformazioniPersonali.CodFiscale == debugStudente)
                     {
                         string test = ""; // Just to set a breakpoint, presumably
                     }
@@ -2072,7 +2079,7 @@ namespace ProcedureNet7
                     }
 
                     // Debug check
-                    if (studente.InformazioniPersonali.CodFiscale == "DRSMLD03A68F443G")
+                    if (studente.InformazioniPersonali.CodFiscale == debugStudente)
                     {
                         string test = ""; // Another debugging breakpoint
                     }
@@ -2119,6 +2126,10 @@ namespace ProcedureNet7
                     {
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
                         studentiDaPagare.TryGetValue(codFiscale, out StudentePagamenti? studente);
+                        if (studente?.InformazioniPersonali.CodFiscale == debugStudente)
+                        {
+                            string test = ""; // Just to set a breakpoint, presumably
+                        }
                         studente?.SetInformations(
                                 long.TryParse(Regex.Replace(Utilities.SafeGetString(reader, "telefono_cellulare"), @"[^\d]", ""), out long telefonoNumber) ? telefonoNumber : 0,
                                 Utilities.SafeGetString(reader, "indirizzo_e_mail"),
@@ -2256,7 +2267,7 @@ namespace ProcedureNet7
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
                         studentiDaPagare.TryGetValue(codFiscale, out StudentePagamenti? studente);
 
-                        if (studente != null )
+                        if (studente != null)
                         {
                             studente.InformazioniIscrizione.CodCorsoLaurea = Utilities.SafeGetString(reader, "cod_corso_laurea");
                             studente.InformazioniIscrizione.CodFacolta = Utilities.SafeGetString(reader, "Cod_facolta");
@@ -2454,7 +2465,7 @@ namespace ProcedureNet7
                         // Studente not found in our dictionary
                         continue;
                     }
-                    if(studente.InformazioniPersonali.CodFiscale == "MGHLAI03M04Z224D")
+                    if (studente.InformazioniPersonali.CodFiscale == debugStudente)
                     {
                         string test = "";
                     }
@@ -2652,7 +2663,7 @@ namespace ProcedureNet7
                                                    Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
                             var impegnoPrimaRata = Utilities.SafeGetString(reader, "num_impegno_primaRata");
                             var impegnoSaldo = Utilities.SafeGetString(reader, "num_impegno_saldo");
-                            double.TryParse(Utilities.SafeGetString(reader, "importo_assegnato"),out double importoAssegnato);
+                            double.TryParse(Utilities.SafeGetString(reader, "importo_assegnato"), out double importoAssegnato);
                             var categoriaCU = Utilities.SafeGetString(reader, "categoria_CU");
 
                             rows.Add(new PopulateStudentiImpegniDTO
@@ -2773,13 +2784,12 @@ namespace ProcedureNet7
                 ConcurrentDictionary<string, double> studentiPAnegativo = new();
                 ConcurrentBag<(string CodFiscale, string Motivazione)> studentiRimossiBag = new();
                 ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari = new();
-                ThreadLocal<double> importoTotalePerThread = new(() => 0.0, true);
 
                 Parallel.ForEach(studentiDaPagare, pair =>
                 {
                     StudentePagamenti studente = pair.Value;
 
-                    if (studente.InformazioniPersonali.CodFiscale == "MGHLAI03M04Z224D")
+                    if (studente.InformazioniPersonali.CodFiscale == "SLMMMD03D22Z352E")
                     {
                         string stest = "";
                     }
@@ -3014,7 +3024,7 @@ namespace ProcedureNet7
                     else if (isTR)
                     {
                         importoDaPagare = 140;
-                        if (studente.InformazioniPersonali.CodFiscale == "DRSDBR01L62H501P")
+                        if (studente.InformazioniPersonali.CodFiscale == debugStudente)
                         {
                             string test = "";
                         }
@@ -3067,8 +3077,6 @@ namespace ProcedureNet7
                     importoDaPagare -= (importiPagati + importoPA + importoDetrazioni + importoReversali);
                     importoDaPagare = Math.Round(importoDaPagare, 2);
 
-                    // Accumulate importoDaPagare per thread
-                    importoTotalePerThread.Value += importoDaPagare;
 
                     if ((importoDaPagare == 0 || Math.Abs(importoDaPagare) < 5) && !studentiDaRimuovereDallaTabella.ContainsKey(studente.InformazioniPersonali.CodFiscale))
                     {
@@ -3093,9 +3101,6 @@ namespace ProcedureNet7
                     }
                 });
 
-                // Sum up the importoTotale from all threads
-                importoTotale = importoTotalePerThread.Values.Sum();
-
                 Logger.LogInfo(55, $"UPDATE:Lavorazione studenti - Calcolo importi - Completato");
 
                 // Remove students with zero or negative importoDaPagare
@@ -3103,7 +3108,7 @@ namespace ProcedureNet7
                 {
                     StudentePagamenti studente = pair.Value;
 
-                    if (studente.InformazioniPagamento.ImportoDaPagare> 0)
+                    if (studente.InformazioniPagamento.ImportoDaPagare > 0)
                     {
                         continue;
                     }
@@ -3217,6 +3222,9 @@ namespace ProcedureNet7
 
         private void GenerateOutputFiles()
         {
+            _detAccDisco.Reset();
+            _detAccPnrr.Reset();
+
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files");
             string currentMonthName = DateTime.Now.ToString("MMMM").ToUpper();
             string currentYear = DateTime.Now.ToString("yyyy");
@@ -3252,6 +3260,62 @@ namespace ProcedureNet7
                 throw ex;
             }
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Completato");
+            try
+            {
+
+                Logger.LogInfo(10, "Generazione documenti Word (Determinazioni per fondo)...");
+
+                // Percorsi
+                string templatePath = "D:/modello.docx"; // adattare se necessario
+                string determinaFolder = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, "Determinazione"));
+                string annoBreve = string.Concat(selectedAA.AsSpan(2, 2), selectedAA.AsSpan(6, 2));
+
+                // Build impegni sets per fondo
+                HashSet<string> impegniDisco = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> impegniPnrr = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var imp in impegnoList)
+                {
+                    var f = ResolveTipoFondoForImpegno(imp);
+                    if (string.Equals(f, "PNRR", StringComparison.OrdinalIgnoreCase))
+                        impegniPnrr.Add(imp);
+                    else
+                        impegniDisco.Add(imp);
+                }
+
+                void GenerateFor(string fondo, DeterminaAccumulator acc, HashSet<string> impegniFondo)
+                {
+                    var (countStudents, _, _, _) = acc.TotalsAll();
+                    if (countStudents <= 0 || impegniFondo.Count == 0) return;
+
+                    var determinaModel = BuildDeterminaDatiFromAccumulator(
+                        acc,
+                        pagamentoDescrizione: pagamentoDescrizione,
+                        impegnoList: impegniFondo,
+                        aa: selectedAA,
+                        tipoBeneficio: tipoBeneficio,
+                        categoriaPagam: categoriaPagam,
+                        tipoStudente: tipoStudente,
+                        selectedDataRiferimento: selectedDataRiferimento,
+                        overrideTipoFondo: fondo
+                    );
+
+                    string determinaFileName = $"Determinazione_{pagamentoDescrizione}_{annoBreve}-{fondo}.docx";
+                    string outputPath = Path.Combine(determinaFolder, determinaFileName);
+
+                    WordTagReplacer.FillTemplate(templatePath, outputPath, determinaModel, new System.Globalization.CultureInfo("it-IT"));
+                    Logger.LogInfo(10, $"Documento Word generato: {outputPath}");
+                }
+
+                GenerateFor("DISCO", _detAccDisco, impegniDisco);
+                GenerateFor("PNRR", _detAccPnrr, impegniPnrr);
+
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(10, $"Errore generazione Determinazione Word: {ex.Message}");
+                // non rilanciare se vuoi che la pipeline prosegua comunque
+            }
 
             if (!insertInDatabase)
             {
@@ -3304,6 +3368,11 @@ namespace ProcedureNet7
         }
         private void ProcessImpegno(string impegno, string beneficioFolderPath)
         {
+            var fondo = ResolveTipoFondoForImpegno(impegno);
+            var acc = string.Equals(fondo, "PNRR", StringComparison.OrdinalIgnoreCase)
+                ? _detAccPnrr
+                : _detAccDisco;
+
             var groupedStudents = studentiDaPagare.Values
                 .Where(s => s.InformazioniPagamento.NumeroImpegno == impegno)
                 .ToList();
@@ -3320,13 +3389,13 @@ namespace ProcedureNet7
                 string impegnoFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
                 impegnoAmount.Add(impegno, new Dictionary<string, Dictionary<string, int>>());
 
-                foreach (string cat in new string[] {"111", "211", "311"})
+                foreach (string cat in new string[] { "111", "211", "311" })
                 {
                     var studentsInCategory = groupedStudents.Where(s => s.InformazioniPagamento.CategoriaCU == cat).ToList();
 
-                    if (!studentsInCategory.Any()) 
-                    { 
-                        continue; 
+                    if (!studentsInCategory.Any())
+                    {
+                        continue;
                     }
                     string sqlCat = $"SELECT descrizione FROM tipologie_categoria_cu WHERE categoria_CU = '{cat}'";
                     SqlCommand cmdCat = new(sqlCat, CONNECTION, sqlTransaction)
@@ -3339,12 +3408,11 @@ namespace ProcedureNet7
                     ProcessCategory(cat, catDescrizione, studentsInCategory, catFolder, impegno);
                 }
 
-                //GenerateOutputFilesPA(currentFolder, groupedStudents, impegno);
             }
             void ProcessCategory(string categoriaCU, string catDescrizione, List<StudentePagamenti> students, string catFolder, string impegno)
             {
 
-                Logger.LogInfo(60,$"Lavorazione studenti - Impegno {impegno} - Categoria {catDescrizione}");
+                Logger.LogInfo(60, $"Lavorazione studenti - Impegno {impegno} - Categoria {catDescrizione}");
                 try
                 {
                     var studentsWithPA = students
@@ -3361,6 +3429,7 @@ namespace ProcedureNet7
                             impegnoAmount[impegno].Add(categoriaCU, new Dictionary<string, int>());
                             if (studentsWithoutPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
                             {
+                                acc.AddWithoutPA(impegno, categoriaCU, studentsWithoutPA);
                                 impegnoAmount[impegno][categoriaCU].Add("Senza detrazioni", studentsWithoutPA.Count);
                                 if (tipoStudente == "2")
                                 {
@@ -3390,6 +3459,7 @@ namespace ProcedureNet7
 
                             if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
                             {
+                                acc.AddWithPA(impegno, categoriaCU, studentsWithPA, categoriaPagam);
                                 string newFolderPath = Utilities.EnsureDirectory(Path.Combine(catFolder, "CON DETRAZIONE"));
                                 ProcessStudentsByCodEnte(selectedCodEnte, studentsWithPA, newFolderPath, impegno, categoriaCU);
                                 GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
@@ -3400,6 +3470,7 @@ namespace ProcedureNet7
                             impegnoAmount[impegno].Add(categoriaCU, new Dictionary<string, int>());
                             if (studentsWithoutPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
                             {
+                                acc.AddWithoutPA(impegno, categoriaCU, studentsWithoutPA);
                                 impegnoAmount[impegno][categoriaCU].Add("Senza detrazioni", studentsWithoutPA.Count);
                                 if (tipoStudente == "2")
                                 {
@@ -3432,6 +3503,7 @@ namespace ProcedureNet7
                             impegnoAmount[impegno].Add(categoriaCU, new Dictionary<string, int>());
                             if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
                             {
+                                acc.AddWithPA(impegno, categoriaCU, studentsWithPA, categoriaPagam);
                                 string newFolderPath = Utilities.EnsureDirectory(Path.Combine(catFolder, "CON DETRAZIONE"));
                                 ProcessStudentsByCodEnte(selectedCodEnte, studentsWithPA, newFolderPath, impegno, categoriaCU);
                                 GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
@@ -3443,65 +3515,13 @@ namespace ProcedureNet7
                             break;
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     throw ex;
                 }
 
             }
-           /* void GenerateOutputFilesPA(string currentFolder, List<StudentePagamenti> studentsWithSameImpegno, string impegno)
-            {
-                Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Senza detrazioni");
-                try
-                {
-                    var studentsWithPA = studentsWithSameImpegno
-                    .Where(s => (s.InformazioniPagamento.Assegnazioni != null && s.InformazioniPagamento.Assegnazioni.Count > 0) || (s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
-                    .ToList();
-                    var studentsWithoutPA = studentsWithSameImpegno
-                    .Where(s => (s.InformazioniPagamento.Assegnazioni == null || s.InformazioniPagamento.Assegnazioni.Count <= 0) && !(s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
-                    .ToList();
-                    impegnoAmount.Add(impegno, new Dictionary<string, int>());
-                    if (studentsWithoutPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
-                    {
-                        impegnoAmount[impegno].Add("Senza detrazioni", studentsWithoutPA.Count);
-                        if (tipoStudente == "2")
-                        {
-                            ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
-                        }
-                        else if (tipoStudente == "0")
-                        {
-                            ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: true, processAnniSuccessivi: false, "SenzaDetrazioni", "00", impegno);
-                        }
-                        else if (tipoStudente == "1")
-                        {
-                            ProcessStudentsByAnnoCorso(studentsWithoutPA, currentFolder, processMatricole: false, processAnniSuccessivi: true, "SenzaDetrazioni", "00", impegno);
-                        }
 
-                        DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), impegno);
-                        if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
-                        {
-                            Utilities.ExportDataTableToExcel(dataTableMatricole, currentFolder, false, "Matricole");
-                        }
-
-                        DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), impegno);
-                        if (dataTableASuccessivi != null && dataTableASuccessivi.Rows.Count > 0)
-                        {
-                            Utilities.ExportDataTableToExcel(dataTableASuccessivi, currentFolder, false, "AnniSuccessivi");
-                        }
-                    }
-                
-                    if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
-                    {
-                        string newFolderPath = Utilities.EnsureDirectory(Path.Combine(currentFolder, "CON DETRAZIONE"));
-                        ProcessStudentsByCodEnte(selectedCodEnte, studentsWithPA, newFolderPath, impegno);
-                        GenerateGiuliaFile(newFolderPath, studentsWithPA, impegno);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    throw ex;
-                }
-            }*/
             void ProcessStudentsByAnnoCorso(List<StudentePagamenti> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio, string codEnteFlusso, string impegnoFlusso)
             {
                 if (processMatricole && processAnniSuccessivi)
@@ -3563,19 +3583,19 @@ namespace ProcedureNet7
                     {
                         nomeCodEnte = "Roma";
                     }
-                    else if(groupName == "02")
+                    else if (groupName == "02")
                     {
                         nomeCodEnte = "Cassino";
                     }
-                    else if(groupName == "05")
+                    else if (groupName == "05")
                     {
                         nomeCodEnte = "Viterbo";
                     }
 
-                        Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}");
+                    Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Impegno n°{impegno} - Flusso con detrazioni ente: {nomeCodEnte}");
                     string specificFolderPath = Utilities.EnsureDirectory(Path.Combine(newFolderPath, $"{nomeCodEnte}"));
                     impegnoAmount[impegno][categoriaCU].Add(nomeCodEnte, studentsInGroup.Count);
-                    
+
                     if (tipoStudente == "2")
                     {
                         ProcessStudentsByAnnoCorso(studentsInGroup, specificFolderPath, processMatricole: true, processAnniSuccessivi: true, "Con Detrazioni_" + nomeCodEnte, groupName, impegno);
@@ -3657,11 +3677,6 @@ namespace ProcedureNet7
                     if (studente.InformazioniPagamento.Assegnazioni == null || studente.InformazioniPagamento.Assegnazioni.Count <= 0)
                     {
                         continue;
-                    }
-
-                    if (studente.InformazioniPersonali.CodFiscale == "DGLFPP01H27H501U")
-                    {
-                        string test = "";
                     }
 
                     double accontoPA = Math.Round(studente.InformazioniPagamento.ImportoAccontoPA, 2);
@@ -3839,18 +3854,16 @@ namespace ProcedureNet7
                 {
                     return new DataTable();
                 }
+
                 DataTable studentsData = new();
+
+                // Tipologia pagamento (per titolo)
                 string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{codTipoPagamento}'";
-                SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction)
-                {
-                    CommandTimeout = 9000000
-                };
+                using SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction) { CommandTimeout = 9000000 };
                 string pagamentoDescrizione = (string)cmd.ExecuteScalar();
 
                 string annoAccedemicoFileName = string.Concat(selectedAA.AsSpan(2, 2), selectedAA.AsSpan(6, 2));
-
                 string impegnoNome = "impegno " + impegno;
-
                 string titolo = pagamentoDescrizione + " " + annoAccedemicoFileName + " " + impegnoNome;
 
                 _ = studentsData.Columns.Add("1");
@@ -3865,60 +3878,80 @@ namespace ProcedureNet7
                 _ = studentsData.Rows.Add(titolo);
                 _ = studentsData.Rows.Add("ALLEGATO DETERMINA");
 
-                foreach (string codEnte in sediStudi)
+                // === Raggruppamento come in ProcessStudentsByCodEnte ===
+                // 02 => Cassino, 05 => Viterbo, Roma => tutto ciò che non è 02/05
+                var gruppoCassino = new List<string> { "02" };
+                var gruppoViterbo = new List<string> { "05" };
+                var gruppoRoma = sediStudi
+                    .Where(c => c != "02" && c != "05")
+                    .Distinct()
+                    .ToList();
+
+                // Manteniamo l’ordine: Cassino, Viterbo, Roma (come nel codice esistente)
+                var codEnteGroups = new List<(string NomeGruppo, List<string> Codes)>
                 {
-                    string sqlCodEnte = $"SELECT descrizione FROM Enti_di_gestione WHERE cod_ente = '{codEnte}'";
-                    SqlCommand cmdSede = new(sqlCodEnte, CONNECTION, sqlTransaction)
-                    {
-                        CommandTimeout = 9000000
-                    };
-                    string nomeCodEnte = (string)cmdSede.ExecuteScalar();
+                    ("Cassino", gruppoCassino),
+                    ("Viterbo", gruppoViterbo),
+                    ("Roma",    gruppoRoma)
+                };
 
+                string nomePA = categoriaPagam == "PR" ? "ACCONTO PA" : "SALDO COSTO DEL SERVIZIO";
 
-                    string nomePA = categoriaPagam == "PR" ? "ACCONTO PA" : "SALDO COSTO DEL SERVIZIO";
+                foreach (var (NomeGruppo, Codes) in codEnteGroups)
+                {
+                    // Filtra gli studenti appartenenti a QUALSIASI codice del gruppo
+                    var studentiGruppo = studentiDaGenerare
+                        .Where(s => Codes.Contains(s.InformazioniIscrizione.CodEnte))
+                        .ToList();
+
+                    if (studentiGruppo.Count == 0)
+                        continue;
 
                     _ = studentsData.Rows.Add(" ");
-                    _ = studentsData.Rows.Add(nomeCodEnte);
+                    _ = studentsData.Rows.Add(NomeGruppo);
                     _ = studentsData.Rows.Add("N.PROG.", "NUMERO DOMANDA", "CODICE FISCALE", "COGNOME", "NOME", "TOTALE LORDO", nomePA, "IMPORTO NETTO");
 
                     int progressivo = 1;
                     double totaleLordo = 0;
                     double totalePA = 0;
                     double totaleNetto = 0;
-                    foreach (StudentePagamenti s in studentiDaGenerare)
-                    {
-                        if (s.InformazioniIscrizione.CodEnte != codEnte)
-                        {
-                            continue;
-                        }
 
-                        double costoPA = categoriaPagam == "PR" ? s.InformazioniPagamento.ImportoAccontoPA : s.InformazioniPagamento.ImportoSaldoPA;
+                    foreach (StudentePagamenti s in studentiGruppo)
+                    {
+                        double costoPA = categoriaPagam == "PR"
+                            ? s.InformazioniPagamento.ImportoAccontoPA
+                            : s.InformazioniPagamento.ImportoSaldoPA;
 
                         _ = studentsData.Rows.Add(
-                            progressivo, 
-                            s.InformazioniPersonali.NumDomanda, 
-                            s.InformazioniPersonali.CodFiscale, 
-                            s.InformazioniPersonali.Cognome, 
-                            s.InformazioniPersonali.Nome, 
-                            s.InformazioniPagamento.ImportoDaPagareLordo.ToString().Replace(",", "."), 
-                            costoPA.ToString().Replace(",", "."), 
+                            progressivo,
+                            s.InformazioniPersonali.NumDomanda,
+                            s.InformazioniPersonali.CodFiscale,
+                            s.InformazioniPersonali.Cognome,
+                            s.InformazioniPersonali.Nome,
+                            s.InformazioniPagamento.ImportoDaPagareLordo.ToString().Replace(",", "."),
+                            costoPA.ToString().Replace(",", "."),
                             s.InformazioniPagamento.ImportoDaPagare.ToString().Replace(",", ".")
-                           );
+                        );
+
                         totaleLordo += s.InformazioniPagamento.ImportoDaPagareLordo;
                         totalePA += costoPA;
                         totaleNetto += s.InformazioniPagamento.ImportoDaPagare;
                         progressivo++;
                     }
+
                     _ = studentsData.Rows.Add(" ");
                     _ = studentsData.Rows.Add(" ");
-                    _ = studentsData.Rows.Add(" ", " ", " ", " ", "TOTALE", Math.Round(totaleLordo, 2).ToString().Replace(",", "."), Math.Round(totalePA, 2).ToString().Replace(",", "."), Math.Round(totaleNetto, 2).ToString().Replace(",", "."));
+                    _ = studentsData.Rows.Add(" ", " ", " ", " ", "TOTALE",
+                        Math.Round(totaleLordo, 2).ToString().Replace(",", "."),
+                        Math.Round(totalePA, 2).ToString().Replace(",", "."),
+                        Math.Round(totaleNetto, 2).ToString().Replace(",", "."));
                     _ = studentsData.Rows.Add(" ");
                     _ = studentsData.Rows.Add(" ");
                 }
 
-
                 return studentsData;
             }
+
             DataTable GenerareExcelDataTableNoDetrazioni(List<StudentePagamenti> studentiDaGenerare, string impegno)
             {
                 if (!studentiDaGenerare.Any())
@@ -3964,13 +3997,13 @@ namespace ProcedureNet7
                     double importoAcconto = 0;
 
                     _ = studentsData.Rows.Add(
-                        progressivo, 
-                        s.InformazioniPersonali.NumDomanda, 
-                        s.InformazioniPersonali.CodFiscale, 
-                        s.InformazioniPersonali.Cognome, 
-                        s.InformazioniPersonali.Nome, 
-                        s.InformazioniPagamento.ImportoDaPagareLordo.ToString().Replace(",", "."), 
-                        importoAcconto.ToString().Replace(",", "."), 
+                        progressivo,
+                        s.InformazioniPersonali.NumDomanda,
+                        s.InformazioniPersonali.CodFiscale,
+                        s.InformazioniPersonali.Cognome,
+                        s.InformazioniPersonali.Nome,
+                        s.InformazioniPagamento.ImportoDaPagareLordo.ToString().Replace(",", "."),
+                        importoAcconto.ToString().Replace(",", "."),
                         s.InformazioniPagamento.ImportoDaPagare.ToString().Replace(",", ".")
                        );
                     totaleLordo += s.InformazioniPagamento.ImportoDaPagareLordo;
@@ -4456,5 +4489,487 @@ namespace ProcedureNet7
                 }
             }
         }
+
+        private DeterminaDati BuildDeterminaDatiFromAccumulator(
+                    DeterminaAccumulator acc,
+                    string pagamentoDescrizione,
+                    IEnumerable<string> impegnoList,
+                    string aa,
+                    string tipoBeneficio,
+                    string categoriaPagam,
+                    string tipoStudente,
+                    string selectedDataRiferimento,
+                    string? overrideTipoFondo // "DISCO" or "PNRR"
+                )
+        {
+            var tabella = acc.ToDataTable();
+
+            var (numeroStudenti, importoTotaleLordo, importoTotalePA, importoTotaleNetto) = acc.TotalsAll();
+            importoTotale = importoTotaleLordo;
+            string tipoIscrizioneTxt = tipoStudente switch
+            {
+                "0" => "Solo Matricole",
+                "1" => "Solo Anni Successivi",
+                "2" => "Matricole e Anni Successivi",
+                _ => "Tutti"
+            };
+
+            string tipoFondo = overrideTipoFondo ?? categoriaPagam;
+
+            var impegniHash = new HashSet<string>(impegnoList ?? Enumerable.Empty<string>());
+            string esercizio = TryGetUniqueEsercizioPerImpegni(impegniHash) ?? DateTime.Now.ToString("yyyy");
+            string listaImpegniConEsercizio = string.Join(Environment.NewLine,
+                impegniHash.OrderBy(x => x).Select(i => $"Esercizio {esercizio} - Impegno {i}"));
+
+            string tipoBando = MapTipoBando(tipoBeneficio);
+            List<string> determinazioni = LoadRichiami(aa, tipoBando, tipoFondo);
+            List<string> visti = LoadVisti(aa, tipoBando);
+            string vistiTesto = visti.Count > 0 ? string.Join(Environment.NewLine, visti)
+                                                : $"Vista la data del {selectedDataRiferimento}";
+
+            (string? cap, string? desc) = TryGetCapitolo(tipoFondo);
+            string tipoFondoCompleto = !string.IsNullOrWhiteSpace(cap)
+                ? $"{tipoFondo} — Cap. {cap}: {desc}"
+                : $"{tipoFondo} - {pagamentoDescrizione}";
+
+            return new DeterminaDati
+            {
+                TipoPagamento = pagamentoDescrizione,
+                TipoBeneficio = tipoBeneficio,
+                NumeroStudenti = numeroStudenti.ToString(),
+                AnnoAccademico = aa.Insert(4, "/"),
+                ImportoDaPagare = importoTotaleLordo.ToString("N2", new System.Globalization.CultureInfo("it-IT")),
+                TipoIscrizione = tipoIscrizioneTxt,
+                TipoFondo = tipoFondo,
+                TipoFondoCompleto = tipoFondoCompleto,
+                VistoEstratto = vistiTesto,
+                DeterminazioniEstratte = determinazioni,
+                ListaImpegniConEsercizio = listaImpegniConEsercizio,
+                EsercizioFinanziario = esercizio,
+                TabellaRiepilogo = tabella
+            };
+        }
+
+
+
+        /// <summary>
+        /// Prova a ricavare un Esercizio per gli impegni correnti. Se non presente o colonna assente, ritorna null.
+        /// </summary>
+        private string? TryGetUniqueEsercizioPerImpegni(HashSet<string> impegni)
+        {
+            if (impegni == null || impegni.Count == 0) return null;
+
+            try
+            {
+                // Se la colonna 'esercizio' non esiste, questa query fallirà: fallback gestito dal catch.
+                string sql = $@"
+            SELECT DISTINCT esercizio
+            FROM Impegni
+            WHERE anno_accademico = @aa
+              AND categoria_pagamento = @cat
+              AND num_impegno IN ({string.Join(",", impegni.Select((_, i) => "@p" + i))})
+        ";
+
+                using var cmd = new SqlCommand(sql, CONNECTION, sqlTransaction) { CommandTimeout = 120000 };
+                cmd.Parameters.AddWithValue("@aa", selectedAA);
+                cmd.Parameters.AddWithValue("@cat", categoriaPagam);
+                int idx = 0;
+                foreach (var imp in impegni)
+                    cmd.Parameters.AddWithValue("@p" + (idx++), imp);
+
+                using var rdr = cmd.ExecuteReader();
+                var vals = new List<string>();
+                while (rdr.Read())
+                {
+                    if (rdr[0] != DBNull.Value) vals.Add(rdr[0].ToString()!);
+                }
+                rdr.Close();
+
+                if (vals.Count == 1) return vals[0];
+                if (vals.Count > 1) return string.Join("/", vals.Distinct());
+                return null;
+            }
+            catch
+            {
+                // Tabella o colonna non disponibile: lascia null, verrà fatto fallback al corrente
+                return null;
+            }
+        }
+        private readonly DeterminaAccumulator _detAccDisco = new();
+        private readonly DeterminaAccumulator _detAccPnrr = new();
+
+
+
+        // === Added helpers for per-fondo Determina ===
+
+        private static string NormalizeFondo(string? f)
+        {
+            return string.IsNullOrWhiteSpace(f) ? "DISCO" : f.Trim().ToUpperInvariant();
+        }
+
+        private string ResolveTipoFondoForImpegno(string impegno)
+        {
+            try
+            {
+                using var cmd = new SqlCommand(@"
+            SELECT TOP 1 tipo_fondo
+            FROM Impegni
+            WHERE anno_accademico = @aa
+              AND categoria_pagamento = @cat
+              AND num_impegno = @imp
+        ", CONNECTION, sqlTransaction) { CommandTimeout = 120000 };
+
+                cmd.Parameters.AddWithValue("@aa", selectedAA);
+                cmd.Parameters.AddWithValue("@cat", categoriaPagam);
+                cmd.Parameters.AddWithValue("@imp", impegno);
+
+                var v = cmd.ExecuteScalar() as string;
+                return NormalizeFondo(v);
+            }
+            catch
+            {
+                return "DISCO";
+            }
+        }
+
+        private List<string> LoadRichiami(string aa, string tipoBando, string? tipoFondo)
+        {
+            var result = new List<string>();
+            string sql = @"
+        SELECT testo_richiamo_determina
+        FROM Autocompilazione_Richiami_determine_liquidazione
+        WHERE Anno_accademico = @aa
+          AND tipo_bando = @tb
+          AND (@tf IS NULL OR tipo_fondo IS NULL OR tipo_fondo = @tf)
+        ORDER BY indice_ordinamento
+    ";
+
+            using var cmd = new SqlCommand(sql, CONNECTION, sqlTransaction) { CommandTimeout = 120000 };
+            cmd.Parameters.AddWithValue("@aa", aa);
+            cmd.Parameters.AddWithValue("@tb", tipoBando);
+            cmd.Parameters.AddWithValue("@tf", (object?)tipoFondo ?? DBNull.Value);
+
+            using var rdr = cmd.ExecuteReader();
+            while (rdr.Read())
+            {
+                if (rdr[0] != DBNull.Value)
+                {
+                    var text = rdr[0].ToString();
+                    if (!string.IsNullOrWhiteSpace(text)) result.Add(text!);
+                }
+            }
+            return result;
+        }
+
+        private List<string> LoadVisti(string aa, string tipoBando)
+        {
+            var result = new List<string>();
+            string sql = @"
+        SELECT testo_visto_determina
+        FROM Autocompilazione_Visti_determine_liquidazione
+        WHERE Anno_accademico = @aa AND tipo_bando = @tb
+        ORDER BY indice_ordinamento
+    ";
+
+            using var cmd = new SqlCommand(sql, CONNECTION, sqlTransaction) { CommandTimeout = 120000 };
+            cmd.Parameters.AddWithValue("@aa", aa);
+            cmd.Parameters.AddWithValue("@tb", tipoBando);
+
+            using var rdr = cmd.ExecuteReader();
+            while (rdr.Read())
+            {
+                if (rdr[0] != DBNull.Value)
+                {
+                    var text = rdr[0].ToString();
+                    if (!string.IsNullOrWhiteSpace(text)) result.Add(text!);
+                }
+            }
+            return result;
+        }
+
+        private (string? capitolo, string? descrizione) TryGetCapitolo(string? tipoFondo)
+        {
+            if (string.IsNullOrWhiteSpace(tipoFondo)) return (null, null);
+
+            try
+            {
+                using var cmd = new SqlCommand(@"
+            SELECT TOP 1 Capitolo, Descrizione_capitolo
+            FROM Capitoli
+            WHERE Tipo_fondo = @tf
+        ", CONNECTION, sqlTransaction) { CommandTimeout = 120000 };
+                cmd.Parameters.AddWithValue("@tf", tipoFondo);
+
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read())
+                {
+                    string? cap = rdr["Capitolo"] as string;
+                    string? desc = rdr["Descrizione_capitolo"] as string;
+                    return (cap, desc);
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+
+            return (null, null);
+        }
+
+        private string MapTipoBando(string tipoBeneficioCode)
+        {
+            if (string.IsNullOrWhiteSpace(tipoBeneficioCode)) return "LZ";
+            tipoBeneficioCode = tipoBeneficioCode.ToUpperInvariant();
+            if (tipoBeneficioCode.StartsWith("BS")) return "LZ";
+            if (tipoBeneficioCode.StartsWith("CS")) return "CS";
+            if (tipoBeneficioCode.StartsWith("PL")) return "PL";
+            if (tipoBeneficioCode.StartsWith("BL")) return "BL";
+            return "LZ";
+        }
+
     }
+    // Sums collected only from ProcessCategory calls actually executed
+    sealed class DeterminaAccumulator
+    {
+        // map: impegno -> categoriaCU -> (gruppo -> totals)
+        private readonly Dictionary<string, Dictionary<string, Dictionary<string, Totals>>> _map
+            = new(StringComparer.Ordinal);
+
+        private struct Totals
+        {
+            public int Count;
+            public double Lordo;
+            public double PA;
+            public double Netto;
+        }
+
+        public void Reset() => _map.Clear();
+
+        // ===== API: now requires impegnoId =====
+        public void AddWithoutPA(string impegnoId, string categoriaCU, IEnumerable<StudentePagamenti> students)
+            => AddInternal(impegnoId, categoriaCU, "Senza detrazioni", students, withPA: false, categoriaPagam: null);
+
+        public void AddWithPA(string impegnoId, string categoriaCU, IEnumerable<StudentePagamenti> students, string categoriaPagam)
+        {
+            var list = students?.ToList() ?? new List<StudentePagamenti>();
+            if (list.Count == 0) return;
+
+            // Group once by normalized ente bucket: Cassino / Viterbo / Roma
+            var byBucket = list.GroupBy(s => EnteBucket(s?.InformazioniIscrizione?.CodEnte))
+                               .ToDictionary(g => g.Key, g => (IEnumerable<StudentePagamenti>)g);
+
+            if (byBucket.TryGetValue("Cassino", out var cassino) && cassino.Any())
+                AddInternal(impegnoId, categoriaCU, "Cassino", cassino, withPA: true, categoriaPagam);
+
+            if (byBucket.TryGetValue("Viterbo", out var viterbo) && viterbo.Any())
+                AddInternal(impegnoId, categoriaCU, "Viterbo", viterbo, withPA: true, categoriaPagam);
+
+            if (byBucket.TryGetValue("Roma", out var roma) && roma.Any())
+                AddInternal(impegnoId, categoriaCU, "Roma", roma, withPA: true, categoriaPagam);
+        }
+
+        // Normalizes CodEnte into one of the three buckets we use everywhere else
+        private static string EnteBucket(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "Roma";
+
+            var s = raw.Trim();
+
+            // If it's numeric like "2" or "05", normalize to 2 digits
+            if (int.TryParse(s, out var n))
+                s = n.ToString("00");
+
+            var u = s.ToUpperInvariant();
+
+            if (u == "02" || u.Contains("CASS")) return "Cassino";
+            if (u == "05" || u.Contains("VIT")) return "Viterbo";
+
+            return "Roma";
+        }
+
+
+        private void AddInternal(string impegnoId, string catCU, string group, IEnumerable<StudentePagamenti> students, bool withPA, string? categoriaPagam)
+        {
+            var chunk = students?.ToList() ?? new List<StudentePagamenti>();
+            if (chunk.Count == 0) return;
+
+            if (!_map.TryGetValue(impegnoId, out var perCU))
+            {
+                perCU = new(StringComparer.Ordinal);
+                _map[impegnoId] = perCU;
+            }
+            if (!perCU.TryGetValue(catCU, out var perGroup))
+            {
+                perGroup = new(StringComparer.Ordinal);
+                perCU[catCU] = perGroup;
+            }
+            if (!perGroup.TryGetValue(group, out var t))
+                t = new Totals();
+
+            // Deduplicate conservatively by CodFiscale
+            var uniq = chunk
+                .GroupBy(s => s.InformazioniPersonali.CodFiscale)
+                .Select(g => g.First())
+                .ToList();
+
+            t.Count += uniq.Count;
+            t.Lordo += uniq.Sum(s => s.InformazioniPagamento.ImportoDaPagareLordo);
+            t.Netto += uniq.Sum(s => s.InformazioniPagamento.ImportoDaPagare);
+
+            if (withPA)
+            {
+                t.PA += uniq.Sum(s => (categoriaPagam == "PR")
+                    ? s.InformazioniPagamento.ImportoAccontoPA
+                    : s.InformazioniPagamento.ImportoSaldoPA);
+            }
+
+            perGroup[group] = t;
+        }
+
+        public (int count, double lordo, double pa, double netto) TotalsAll()
+        {
+            int c = 0; double l = 0, p = 0, n = 0;
+            foreach (var perCU in _map.Values)
+                foreach (var perGroup in perCU.Values)
+                    foreach (var t in perGroup.Values)
+                    { c += t.Count; l += t.Lordo; p += t.PA; n += t.Netto; }
+            return (c, l, p, n);
+        }
+
+        public DataTable ToDataTable()
+        {
+            var it = new CultureInfo("it-IT");
+
+            var dt = new DataTable();
+            dt.Columns.Add("IMPEGNO");
+            dt.Columns.Add("DESCRIZIONE");
+            dt.Columns.Add("N. STUDENTI", typeof(int));
+            dt.Columns.Add("TOTALE LORDO");
+            dt.Columns.Add("TOTALE PA");
+            dt.Columns.Add("TOTALE NETTO");
+
+            foreach (var impegno in _map.Keys.OrderBy(x => x, StringComparer.Ordinal))
+            {
+                var perCU = _map[impegno];
+
+                foreach (var cat in perCU.Keys.OrderBy(x => x, StringComparer.Ordinal))
+                {
+                    var groups = perCU[cat];
+
+                    // helpers scoped to this loop
+                    Totals SumOf(Dictionary<string, Totals> g, string? onlyGroup = null, string? excludeGroup = null)
+                    {
+                        var acc = new Totals();
+                        foreach (var kv in g)
+                        {
+                            var name = kv.Key;
+                            if (onlyGroup != null && !StringComparer.Ordinal.Equals(name, onlyGroup)) continue;
+                            if (excludeGroup != null && StringComparer.Ordinal.Equals(name, excludeGroup)) continue;
+
+                            var t = kv.Value;
+                            acc.Count += t.Count;
+                            acc.Lordo += t.Lordo;
+                            acc.PA += t.PA;
+                            acc.Netto += t.Netto;
+                        }
+                        return acc;
+                    }
+
+                    Totals SumGroup(string groupName) =>
+                        groups.TryGetValue(groupName, out var t) ? t : default;
+
+                    switch (cat)
+                    {
+                        case "111":
+                            {
+                                // --- no PA (single row) ---
+                                var noPA = SumOf(groups, onlyGroup: "Senza detrazioni");
+                                if (noPA.Count > 0)
+                                    AddRow(dt, impegno, "TOTALE SENZA MENSA", noPA, it);
+
+                                // --- with PA (split per ente: Cassino, Viterbo, Roma) ---
+                                foreach (var grp in new[] { "Cassino", "Viterbo", "Roma" })
+                                {
+                                    var t = SumGroup(grp);
+                                    if (t.Count <= 0) continue;
+
+                                    var grpLabel = grp.ToLowerInvariant(); // roma, cassino, viterbo
+                                    var descr = $"TOTALE SENZA MENSA CON PA ({grpLabel})";
+                                    AddRow(dt, impegno, descr, t, it);
+                                }
+                                break;
+                            }
+
+                        case "211":
+                            {
+                                // They don't have PA
+                                var noPA = SumOf(groups, onlyGroup: "Senza detrazioni");
+                                if (noPA.Count > 0)
+                                    AddRow(dt, impegno, "TOTALE CON MENSA", noPA, it);
+                                break;
+                            }
+
+                        case "311":
+                            {
+                                // Spec unchanged: aggregate all with-PA groups into one line
+                                var withPA = SumOf(groups, excludeGroup: "Senza detrazioni");
+                                if (withPA.Count > 0)
+                                    AddRow(dt, impegno, "TOTALE CON MENSA CON PA", withPA, it);
+                                break;
+                            }
+
+                        default:
+                            {
+                                // Fallback behaviour
+                                var noPA = SumOf(groups, onlyGroup: "Senza detrazioni");
+                                var withPA = SumOf(groups, excludeGroup: "Senza detrazioni");
+                                if (noPA.Count > 0)
+                                    AddRow(dt, impegno, $"CATEGORIA {cat} (senza PA)", noPA, it);
+                                // Also split with-PA per-group for visibility
+                                foreach (var grp in new[] { "Cassino", "Viterbo", "Roma" })
+                                {
+                                    var t = SumGroup(grp);
+                                    if (t.Count <= 0) continue;
+                                    AddRow(dt, impegno, $"CATEGORIA {cat} CON PA ({grp.ToLowerInvariant()} – {Fmt(t.PA, it)})", t, it);
+                                }
+                                break;
+                            }
+                    }
+                }
+
+                // --- Subtotal per impegno ---
+                var (ic, il, ip, inetto) = TotalsForImpegno(impegno);
+                if (ic > 0)
+                    dt.Rows.Add(impegno, "SUBTOTALE IMPEGNO", ic, Fmt(il, it), Fmt(ip, it), Fmt(inetto, it));
+            }
+
+            // --- Grand total ---
+            var (c, l, p, n) = TotalsAll();
+            if (c > 0)
+                dt.Rows.Add("", "TOTALE GENERALE", c, Fmt(l, it), Fmt(p, it), Fmt(n, it));
+
+            return dt;
+
+            // ===== helpers (static) =====
+            (int c, double l, double p, double n) TotalsForImpegno(string impegnoId)
+            {
+                int c = 0; double l = 0, p = 0, n = 0;
+                var perCU = _map[impegnoId];
+                foreach (var perGroup in perCU.Values)
+                    foreach (var t in perGroup.Values)
+                    { c += t.Count; l += t.Lordo; p += t.PA; n += t.Netto; }
+                return (c, l, p, n);
+            }
+
+            static void AddRow(DataTable dt, string impegno, string descr, Totals t, CultureInfo it)
+            {
+                dt.Rows.Add(impegno, descr, t.Count, Fmt(t.Lordo, it), Fmt(t.PA, it), Fmt(t.Netto, it));
+            }
+
+            static string Fmt(double v, CultureInfo it) => "€ " + v.ToString("N2", it);
+        }
+
+    }
+
+
 }
