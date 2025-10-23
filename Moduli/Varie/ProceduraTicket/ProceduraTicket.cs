@@ -1,28 +1,48 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Linq;
 using System.Net;
 using System.Net.Mail;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
-using Excel = Microsoft.Office.Interop.Excel;
+using System.IO;
 
 namespace ProcedureNet7
 {
+    // ====== ENGINE PORTED FROM TicketCFMenu ======
+    internal sealed class YearInfo
+    {
+        public HashSet<string> BlocchiParts { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> EsitiBS { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> EsitiPA { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> SediStudi { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> SediDescrizioni { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public string BlocchiJoined => BlocchiParts.Count == 0 ? "" : string.Join(" | ", BlocchiParts.OrderBy(x => x));
+        public string EsitoBSJoined => EsitiBS.Count == 0 ? "" : string.Join(" | ", EsitiBS.OrderBy(x => x));
+        public string EsitoPAJoined => EsitiPA.Count == 0 ? "" : string.Join(" | ", EsitiPA.OrderBy(x => x));
+        public string SediStudiJoined => SediStudi.Count == 0 ? "" : string.Join(" | ", SediStudi.OrderBy(x => x));
+        public string SediDescrizioniJoined => SediDescrizioni.Count == 0 ? "" : string.Join(" | ", SediDescrizioni.OrderBy(x => x));
+    }
+
     internal class ProceduraTicket : BaseProcedure<ArgsProceduraTicket>
     {
         private bool _isFileWithMessagges;
         private bool _deleteAnniPrecedenti;
         private bool _sendMail;
 
+        // anni target configurabili
+        private readonly List<int> _targetYears = new() { 20242025, 20252026 };
+
         public ProceduraTicket(MasterForm masterForm, SqlConnection mainConn) : base(masterForm, mainConn) { }
 
         public override void RunProcedure(ArgsProceduraTicket args)
         {
             _isFileWithMessagges = args._ticketChecks[0];
-            _deleteAnniPrecedenti = args._ticketChecks[1];
-            _sendMail = args._ticketChecks[2];
+            _sendMail = args._ticketChecks[0];
+
             string ticketFilePath = args._ticketFilePath;
             string mailFilePath = args._mailFilePath;
             string senderMail = string.Empty;
@@ -31,143 +51,114 @@ namespace ProcedureNet7
             _masterForm.inProcedure = true;
             try
             {
-
-                Logger.Log(1, $"Caricamento file", LogLevel.INFO);
-
+                Logger.Log(1, "Caricamento file", LogLevel.INFO);
                 DataTable tickets = Utilities.CsvToDataTable(ticketFilePath);
 
-                // 1. Build a HashSet for unwanted CATEGORIA values
                 var unwantedCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    "Contributi Alloggio",
-                    "Posti Alloggio",
-                    "MENSA",
-                    "Accettazione Posto Alloggio",
-                    "RIMBORSO DEPOSITO CAUZIONALE",
-                    "AREA 8",
-                    "Ufficio Inclusione",
-                    "URP",
-                    "CERTIFICAZIONE UNICA",
-                    "Portafuturo",
-                    "RIMBORSO DEPOSITO CAUZIONALE-Non pi� attiva",
+                    "Contributi Alloggio","Posti Alloggio","MENSA","Accettazione Posto Alloggio",
+                    "RIMBORSO DEPOSITO CAUZIONALE","AREA 8","Ufficio Inclusione","URP",
+                    "CERTIFICAZIONE UNICA","Portafuturo","RIMBORSO DEPOSITO CAUZIONALE-Non più attiva"
                 };
 
-                // 2. Filter the table in one shot
                 var filteredRows = tickets.AsEnumerable()
                     .Where(row =>
-                        // Keep row if: Stato != "CHIUSO"
-                        !row.Field<string>("STATO").Equals("CHIUSO", StringComparison.OrdinalIgnoreCase)
-
-                        // AND CATEGORIA not in the unwanted list
-                        && !unwantedCategories.Contains(row.Field<string>("CATEGORIA"))
-
-                        // AND AZIONE != "PRESA_IN_CARICO"
-                        && (!_isFileWithMessagges
-                            ? !row.Field<string>("AZIONE").Equals("PRESA_IN_CARICO", StringComparison.OrdinalIgnoreCase)
-                            : true)
-
-                    // Conditional check based on isMessage
-                        && (_isFileWithMessagges
+                        !EqualsCI(row.Field<string>("STATO"), "CHIUSO") &&
+                        !unwantedCategories.Contains(row.Field<string>("CATEGORIA")) &&
+                        (!_isFileWithMessagges ? !EqualsCI(row.Field<string>("AZIONE"), "PRESA_IN_CARICO") : true) &&
+                        (_isFileWithMessagges
                             ? string.IsNullOrWhiteSpace(row.Field<string>("PRIMO_MSG_OPERATORE"))
                             : row.Field<string>("NUM_RICHIESTE_STUDENTE") != "0")
                     );
 
-
-                // 3. Copy the filtered rows back to a DataTable
-                //    (Handle case where all rows are removed)
-                if (filteredRows.Any())
-                {
-                    tickets = filteredRows.CopyToDataTable();
-                }
-                else
-                {
+                if (!filteredRows.Any())
                     throw new Exception("Nessun ticket presente nel file che soddisfa i requisiti");
-                }
 
-                // Define an array of columns to remove
-                string[] columnsToRemove;
-                if (_isFileWithMessagges)
-                {
-                    columnsToRemove = new[]
-                    {
-                        "NREC",
-                        "PRIMO_MSG_OPERATORE",
-                        "UID",
-                        "DATA_LOG"
-                    };
-                }
-                else
-                {
-                    columnsToRemove = new[]
-                    {
-                        "NREC",
-                        "NUM_TICKET_CREATI_STUDENTE",
-                        "NUM_RICHIESTE_STUDENTE",
-                        "NUM_RISPOSTE_OPERATORE",
-                        "DATA_ULTIMO_MESSAGGIO",
-                        "AZIONE",
-                        "UID",
-                        "DATA_LOG"
-                    };
-                }
-                // Loop through each column name and remove if it exists in the DataTable
-                foreach (string columnName in columnsToRemove)
-                {
-                    if (tickets.Columns.Contains(columnName))
-                    {
-                        tickets.Columns.Remove(columnName);
-                    }
-                }
+                tickets = filteredRows.CopyToDataTable();
 
-                // Sort using the DefaultView
+                // drop colonne non necessarie
+                string[] columnsToRemove = _isFileWithMessagges
+                    ? new[] { "NREC", "PRIMO_MSG_OPERATORE", "UID", "DATA_LOG" }
+                    : new[] { "NREC", "NUM_TICKET_CREATI_STUDENTE", "NUM_RICHIESTE_STUDENTE", "NUM_RISPOSTE_OPERATORE", "DATA_ULTIMO_MESSAGGIO", "AZIONE", "UID", "DATA_LOG" };
+
+                foreach (var c in columnsToRemove)
+                    if (tickets.Columns.Contains(c)) tickets.Columns.Remove(c);
+
                 tickets.DefaultView.Sort = "CODFISC ASC";
-
-                // Convert the view back into a DataTable
                 tickets = tickets.DefaultView.ToTable();
 
-                DataTable joinedData = GetJoinedData(tickets);
+                // ===== ENRICH FROM DB =====
+                var cfList = tickets.AsEnumerable()
+                                    .Select(r => SafeStr(r, "CODFISC"))
+                                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                                    .ToList();
 
-                MergeJoinedDataAsStrings(tickets, joinedData);
-                string directoryPath = Path.GetDirectoryName(ticketFilePath);
+                var presence = GetAnnoPresenceByCF_Smart(cfList, _targetYears, CONNECTION);
+                var yearInfo = GetYearInfoByCF_Smart(cfList, _targetYears, CONNECTION);
+
+                // aggiungi colonne per anni target
+                EnsureTicketColumns(tickets, _targetYears);
+
+                // keyword labels (etichette sole)
+                EnsureTopicColumns(tickets);
+
+                foreach (DataRow r in tickets.Rows)
+                {
+                    var cf = SafeStr(r, "CODFISC");
+
+                    foreach (var y in _targetYears)
+                    {
+                        var hasYear = presence.TryGetValue(cf, out var anni) && anni.Contains(y);
+                        r[$"DOMANDA_{y}"] = hasYear ? "SI" : "NO";
+
+                        if (yearInfo.TryGetValue(cf, out var perYear) && perYear.TryGetValue(y, out var info))
+                        {
+                            r[$"BLOCCHI_{y}"] = info.BlocchiJoined;
+                            r[$"ESITO_BS_{y}"] = info.EsitoBSJoined;
+                            r[$"ESITO_PA_{y}"] = info.EsitoPAJoined;
+                            r[$"SEDE_DESCR_{y}"] = info.SediDescrizioniJoined;
+                        }
+                        else
+                        {
+                            r[$"BLOCCHI_{y}"] = "";
+                            r[$"ESITO_BS_{y}"] = "";
+                            r[$"ESITO_PA_{y}"] = "";
+                            r[$"SEDE_DESCR_{y}"] = "";
+                        }
+                    }
+
+                    // keyword engine V6: solo etichette
+                    var text = SafeStr(r, "PRIMO_MSG_STUDENTE");
+                    var ext = KeywordEngineV6.Extract(text);
+                    r["ARGOMENTO_PRIMARIO"] = ext.TopicPrimary ?? "";
+                    r["ARGOMENTO_SECONDARIO"] = ext.TopicSecondary ?? "";
+                    r["RIFERITO_A_BLOCCHI"] = ext.TopicTertiary ?? "";
+                }
+
+                // export
+                string directoryPath = Path.GetDirectoryName(ticketFilePath) ?? AppDomain.CurrentDomain.BaseDirectory;
                 string excelFile = Utilities.ExportDataTableToExcel(tickets, directoryPath);
-
-
 
                 if (_sendMail)
                 {
-                    // 1) Read mail settings from the file
                     List<string> toEmails = new();
                     List<string> ccEmails = new();
-
-                    using (StreamReader sr = new StreamReader(mailFilePath))
+                    using (var sr = new StreamReader(mailFilePath, Encoding.UTF8))
                     {
                         string? line;
                         while ((line = sr.ReadLine()) != null)
                         {
-                            if (line.StartsWith("TO#"))
-                            {
-                                toEmails.Add(line[3..]);
-                            }
-                            else if (line.StartsWith("CC#"))
-                            {
-                                ccEmails.Add(line[3..]);
-                            }
-                            else if (line.StartsWith("ID#") && string.IsNullOrEmpty(senderMail))
-                            {
-                                senderMail = line[3..];
-                            }
-                            else if (line.StartsWith("PW#") && string.IsNullOrEmpty(senderPassword))
-                            {
-                                // IMPORTANT: This should be your app password now, not the normal Gmail password
-                                senderPassword = line[3..];
-                            }
+                            if (line.StartsWith("TO#", StringComparison.OrdinalIgnoreCase)) toEmails.Add(line[3..].Trim());
+                            else if (line.StartsWith("CC#", StringComparison.OrdinalIgnoreCase)) ccEmails.Add(line[3..].Trim());
+                            else if (line.StartsWith("ID#", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(senderMail)) senderMail = line[3..].Trim();
+                            else if (line.StartsWith("PW#", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(senderPassword)) senderPassword = line[3..].Trim();
                         }
                     }
 
                     Logger.Log(97, "Preparazione mail", LogLevel.INFO);
 
-                    // 2) Configure the SMTP client for Gmail
-                    SmtpClient smtpClient = new("smtp.gmail.com")
+                    var smtpClient = new SmtpClient("smtp.gmail.com")
                     {
                         Port = 587,
                         Credentials = new NetworkCredential(senderMail, senderPassword),
@@ -177,272 +168,424 @@ namespace ProcedureNet7
 
                     string messageBody = @"
                         <p>Buongiorno,</p>
-                        <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/05/2025 
+                        <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/06/2025 
                         con gli esiti di borsa e i blocchi presenti, integrato con le università
-                        di appartenenza dello studente. In più è disponibile una colonna 
-                        aggiuntiva che indica se lo studente ha presentato domanda per il 25/26</p>";
+                        di appartenenza dello studente.</p>";
 
-                    if (_isFileWithMessagges)
-                    {
-                        messageBody += @"<p>I ticket contengono anche il primo messaggio che lo studente 
-                        ha inviato così da facilitare la lavorazione.</p>";
-                    }
+                    messageBody += @"
+                        <p>I ticket contengono anche il primo messaggio che lo studente 
+                        ha inviato, dati su blocchi ed esiti ed in più una sezione che cerca di riassumere il contenuto
+                        del ticket così da facilitare la lavorazione e migliorare la distribuzione per funzioni.</p>";
 
                     messageBody += @"
                         <p>Per domande, chiarimenti e suggerimenti resto a disposizione.</p>
                         <p>Buona giornata e buon lavoro.</p>
                         <p>Giacomo Pavone</p> ";
 
-                    // 3) Build the MailMessage
-                    MailMessage mailMessage = new()
+                    var mail = new MailMessage
                     {
-                        // You can also set From = new MailAddress(senderMail) if desired
                         From = new MailAddress(senderMail),
                         Subject = $"Estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
                         Body = messageBody,
                         IsBodyHtml = true
                     };
-
-                    // 4) Add recipients
-                    foreach (var toEmail in toEmails)
-                    {
-                        mailMessage.To.Add(toEmail);
-                    }
-
-                    foreach (var ccEmail in ccEmails)
-                    {
-                        mailMessage.CC.Add(ccEmail);
-                    }
+                    foreach (var to in toEmails) mail.To.Add(to);
+                    foreach (var cc in ccEmails) mail.CC.Add(cc);
+                    mail.Attachments.Add(new Attachment(excelFile));
 
                     Logger.Log(99, "Invio mail", LogLevel.INFO);
-
-                    // 5) Add the Excel attachment
-                    mailMessage.Attachments.Add(new Attachment(excelFile));
-
-                    // 6) Send the email
-                    try
-                    {
-                        smtpClient.Send(mailMessage);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Handle or log the error
-                        Logger.Log(0, $"Errore invio mail: {ex.Message}", LogLevel.ERROR);
-                        throw;
-                    }
-                    finally
-                    {
-                        mailMessage.Dispose();
-                    }
+                    try { smtpClient.Send(mail); }
+                    catch (Exception ex) { Logger.Log(0, $"Errore invio mail: {ex.Message}", LogLevel.ERROR); throw; }
+                    finally { mail.Dispose(); }
                 }
-
             }
-
             finally
             {
-
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 _masterForm.inProcedure = false;
-                Logger.Log(100, $"Fine Lavorazione", LogLevel.INFO);
+                Logger.Log(100, "Fine Lavorazione", LogLevel.INFO);
             }
         }
-        public DataTable GetJoinedData(DataTable tickets)
+
+        // ===== Helpers: columns =====
+        private static void EnsureTicketColumns(DataTable t, IEnumerable<int> years)
         {
-            // Create a result DataTable
-            DataTable result = new DataTable();
-
-            // 1) Build a small DataTable of distinct CODFISC values
-            DataTable codFiscTable = new DataTable();
-            codFiscTable.Columns.Add("Cod_fiscale", typeof(string));
-
-            var distinctCodFisc = tickets.AsEnumerable()
-                                         .Select(r => r.Field<string>("CODFISC"))
-                                         .Where(cf => !string.IsNullOrEmpty(cf))
-                                         .Distinct();
-
-            foreach (string cf in distinctCodFisc)
+            foreach (var y in years)
             {
-                codFiscTable.Rows.Add(cf);
+                AddStringCol(t, $"DOMANDA_{y}");
+                AddStringCol(t, $"BLOCCHI_{y}");
+                AddStringCol(t, $"ESITO_BS_{y}");
+                AddStringCol(t, $"ESITO_PA_{y}");
+                AddStringCol(t, $"SEDE_DESCR_{y}");
+            }
+        }
+
+        private static void EnsureTopicColumns(DataTable t)
+        {
+            AddStringCol(t, "ARGOMENTO_PRIMARIO");
+            AddStringCol(t, "ARGOMENTO_SECONDARIO");
+            AddStringCol(t, "RIFERITO_A_BLOCCHI");
+        }
+
+        private static void AddStringCol(DataTable t, string name)
+        {
+            if (!t.Columns.Contains(name))
+                t.Columns.Add(name, typeof(string));
+        }
+
+        private static string SafeStr(DataRow r, string col)
+        {
+            if (!r.Table.Columns.Contains(col)) return "";
+            var v = r[col];
+            return v == null || v == DBNull.Value ? "" : v.ToString() ?? "";
+        }
+
+        private static bool EqualsCI(string? a, string? b) =>
+            string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+        // ===== DB: TVP + fallback =====
+        private static DataTable ToTvp(IEnumerable<string> cfs)
+        {
+            var dt = new DataTable();
+            dt.Columns.Add("CodFiscale", typeof(string));
+            foreach (var cf in cfs.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var v = (cf ?? "").Trim();
+                if (!string.IsNullOrWhiteSpace(v)) dt.Rows.Add(v);
+            }
+            return dt;
+        }
+
+        private static Dictionary<string, HashSet<int>> GetAnnoPresenceByCF_Smart(
+            List<string> cfList, IEnumerable<int> years, SqlConnection cn)
+        {
+            try { return GetAnnoPresenceByCF_Tvp(cfList, years, cn); }
+            catch (Exception ex)
+            {
+                Logger.Log(10, "TVP Presence non disponibile. Fallback batched. " + ex.Message, LogLevel.WARN);
+                return GetAnnoPresenceByCF_Batched(cfList, years, cn);
+            }
+        }
+
+        private static Dictionary<string, Dictionary<int, YearInfo>> GetYearInfoByCF_Smart(
+            List<string> cfList, IEnumerable<int> years, SqlConnection cn)
+        {
+            try { return GetYearInfoByCF_Tvp(cfList, years, cn); }
+            catch (Exception ex)
+            {
+                Logger.Log(11, "TVP YearInfo non disponibile. Fallback batched. " + ex.Message, LogLevel.WARN);
+                return GetYearInfoByCF_Batched(cfList, years, cn);
+            }
+        }
+
+        private static Dictionary<string, HashSet<int>> GetAnnoPresenceByCF_Tvp(
+            List<string> cfList, IEnumerable<int> years, SqlConnection cnExisting)
+        {
+            var result = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+            var yearList = years.ToList();
+            if (cfList.Count == 0 || yearList.Count == 0) return result;
+
+            bool reopen = cnExisting.State != ConnectionState.Open;
+            if (reopen) cnExisting.Open();
+
+            string sql = $@"
+SELECT d.Cod_fiscale, CAST(d.Anno_accademico AS INT) AS Anno_accademico
+FROM Domanda d WITH (NOLOCK)
+JOIN @Cf TVP ON TVP.CodFiscale = d.Cod_fiscale
+WHERE CAST(d.Anno_accademico AS INT) IN ({string.Join(",", yearList)});
+";
+            using var cmd = new SqlCommand(sql, cnExisting);
+            var tvp = ToTvp(cfList);
+            var p = cmd.Parameters.AddWithValue("@Cf", tvp);
+            p.SqlDbType = SqlDbType.Structured;
+            p.TypeName = "dbo.CfList";
+
+            using var rd = cmd.ExecuteReader();
+            while (rd.Read())
+            {
+                var cf = rd.GetString(0);
+                int anno = Convert.ToInt32(rd.GetValue(1));
+                if (!result.TryGetValue(cf, out var set)) { set = new HashSet<int>(); result[cf] = set; }
+                set.Add(anno);
             }
 
-            // 2) Create a temporary table in SQL
-            using (SqlCommand cmdCreateTemp = new SqlCommand(
-                @"IF OBJECT_ID('tempdb..#tmpCodFisc') IS NOT NULL
-                     DROP TABLE #tmpCodFisc;
-
-                  CREATE TABLE #tmpCodFisc
-                  (
-                      Cod_fiscale VARCHAR(20) COLLATE Latin1_General_CI_AS NOT NULL
-                  );",
-                CONNECTION))
-            {
-                cmdCreateTemp.ExecuteNonQuery();
-            }
-
-            // 3) Bulk copy the distinct CODFISC values into the temp table
-            using (SqlBulkCopy bulkCopy = new SqlBulkCopy(CONNECTION))
-            {
-                bulkCopy.DestinationTableName = "#tmpCodFisc";
-                bulkCopy.ColumnMappings.Add("Cod_fiscale", "Cod_fiscale");
-                bulkCopy.WriteToServer(codFiscTable);
-            }
-
-            // 4) Build the SQL query that incorporates the updated temp table logic
-            string sqlQuery = @"
-                -- Materialize Temp Tables
-                SELECT Num_domanda, esito_BS
-                INTO #Temp_vEsiti_concorsiBS
-                FROM vEsiti_concorsiBS
-                WHERE Anno_accademico = '20242025';
-
-                SELECT Num_domanda, esito_PA
-                INTO #Temp_vEsiti_concorsiPA
-                FROM vEsiti_concorsiPA
-                WHERE Anno_accademico = '20242025';
-
-                SELECT Cod_fiscale, Cod_sede_studi
-                INTO #Temp_vIscrizioni
-                FROM vIscrizioni
-                WHERE Anno_accademico = '20242025' AND tipo_bando = 'lz';
-
-                SELECT
-                    MBP.num_domanda,
-                    STRING_AGG(TMP2.Descrizione, '#') AS Blocchi
-                INTO #Temp_CTE_Blocchi
-                FROM Motivazioni_blocco_pagamenti AS MBP
-                INNER JOIN Tipologie_motivazioni_blocco_pag AS TMP2
-                    ON MBP.Cod_tipologia_blocco = TMP2.Cod_tipologia_blocco
-                WHERE MBP.blocco_pagamento_attivo = '1' AND MBP.Anno_accademico = '20242025'
-                GROUP BY MBP.num_domanda;
-
-                SELECT DISTINCT Cod_fiscale
-                INTO #Tmp_Has_25_26
-                FROM Domanda
-                WHERE Anno_accademico = '20252026'
-                  AND Tipo_bando IN ('LZ', 'L2'); 
-
-                -- Final Query with temp tables
-                SELECT
-                    d.Num_domanda,
-                    d.Cod_fiscale,
-                    COALESCE(vBS.esito_BS, '')         AS Esito_BS_24_25,
-                    COALESCE(vPA.esito_PA, '')         AS Esito_PA_24_25,
-                    COALESCE(mbpagg.Blocchi, '')       AS Blocchi_24_25,
-                    ss.Descrizione                     AS Sede_Università_24_25,
-                    CASE WHEN h25.Cod_fiscale IS NULL THEN 'NO' ELSE 'SI' END
-                        AS Ha_domanda_25_26
-                FROM Domanda AS d
-                    INNER JOIN #tmpCodFisc AS t
-                        ON d.Cod_fiscale = t.Cod_fiscale
-                    LEFT JOIN #Temp_vEsiti_concorsiBS  AS vBS
-                        ON d.Num_domanda = vBS.Num_domanda
-                    LEFT JOIN #Temp_vEsiti_concorsiPA  AS vPA
-                        ON d.Num_domanda = vPA.Num_domanda
-                    INNER JOIN #Temp_vIscrizioni       AS vi
-                        ON vi.Cod_fiscale = d.Cod_fiscale
-                    INNER JOIN Sede_studi           AS ss
-                        ON ss.Cod_sede_studi = vi.Cod_sede_studi
-                    LEFT JOIN #Temp_CTE_Blocchi           AS mbpagg
-                        ON mbpagg.num_domanda = d.Num_domanda
-                    LEFT  JOIN #Tmp_Has_25_26     AS h25 ON h25.Cod_fiscale = d.Cod_fiscale
-                WHERE 
-                    d.Anno_accademico = '20242025'
-                    AND d.Tipo_bando IN ('LZ', 'L2')
-                ORDER BY 
-                    d.Cod_fiscale;
-
-                -- Clean up temporary tables
-                DROP TABLE #Temp_vEsiti_concorsiBS;
-                DROP TABLE #Temp_vEsiti_concorsiPA;
-                DROP TABLE #Temp_vIscrizioni;
-                DROP TABLE #Temp_CTE_Blocchi;                
-                DROP TABLE #Tmp_Has_25_26;
-
-            ";
-
-            // 5) Execute the query and fill result
-            using (SqlCommand cmd = new SqlCommand(sqlQuery, CONNECTION))
-            {
-                using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
-                {
-                    adapter.Fill(result);
-                }
-            }
-
+            if (reopen) cnExisting.Close();
             return result;
         }
 
-        public static void MergeJoinedDataAsStrings(
-            DataTable tickets,    // original table with "CODFISC"
-            DataTable joinedData) // from DB, with "Cod_fiscale" and other columns
+        private static Dictionary<string, Dictionary<int, YearInfo>> GetYearInfoByCF_Tvp(
+            List<string> cfList, IEnumerable<int> years, SqlConnection cnExisting)
         {
-            // 1. Add missing columns from joinedData to tickets, **always** as string
-            foreach (DataColumn dbCol in joinedData.Columns)
-            {
-                string colName = dbCol.ColumnName;
-                if (colName.Equals("Cod_fiscale", StringComparison.OrdinalIgnoreCase))
-                    continue;
+            var result = new Dictionary<string, Dictionary<int, YearInfo>>(StringComparer.OrdinalIgnoreCase);
+            var yearList = years.ToList();
+            if (cfList.Count == 0 || yearList.Count == 0) return result;
 
-                if (!tickets.Columns.Contains(colName))
+            bool reopen = cnExisting.State != ConnectionState.Open;
+            if (reopen) cnExisting.Open();
+            var tvp = ToTvp(cfList);
+
+            // Blocchi
+            string sqlBlocchi = $@"
+SELECT d.Cod_fiscale,
+       CAST(d.Anno_accademico AS INT) AS Anno,
+       d.Num_domanda,
+       dbo.SlashDescrBlocchi(d.Num_domanda, d.Anno_accademico, '') AS Blocchi
+FROM Domanda d WITH (NOLOCK)
+JOIN @Cf TVP ON TVP.CodFiscale = d.Cod_fiscale
+WHERE CAST(d.Anno_accademico AS INT) IN ({string.Join(",", yearList)});
+";
+            using (var cmdB = new SqlCommand(sqlBlocchi, cnExisting))
+            {
+                var pB = cmdB.Parameters.AddWithValue("@Cf", tvp);
+                pB.SqlDbType = SqlDbType.Structured; pB.TypeName = "dbo.CfList";
+                using var rdB = cmdB.ExecuteReader();
+                while (rdB.Read())
                 {
-                    // Force the column type to be string
-                    tickets.Columns.Add(colName, typeof(string));
+                    string cf = rdB.GetString(0);
+                    int anno = Convert.ToInt32(rdB.GetValue(1));
+                    string blocchi = rdB.IsDBNull(3) ? "" : (rdB.GetString(3) ?? "");
+                    var info = GetOrCreate(result, cf, anno);
+                    if (!string.IsNullOrWhiteSpace(blocchi))
+                        foreach (var part in blocchi.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            var token = part.Trim();
+                            if (!string.IsNullOrEmpty(token)) info.BlocchiParts.Add(token);
+                        }
                 }
             }
 
-            // 2. Build a lookup by "Cod_fiscale"
-            //    (Assuming joinedData has 'Cod_fiscale' as string.)
-            var joinedLookup = joinedData
-                .AsEnumerable()
-                .ToDictionary(
-                    row => row.Field<string>("Cod_fiscale"),
-                    row => row,
-                    StringComparer.OrdinalIgnoreCase
-                );
-
-            // 3. Fill in the data
-            foreach (DataRow ticketsRow in tickets.Rows)
+            // Esiti BS/PA
+            string sqlEsiti = $@"
+SELECT d.Cod_fiscale,
+       CAST(d.Anno_accademico AS INT) AS Anno,
+       ec.Cod_beneficio,
+       ec.Cod_tipo_esito
+FROM vEsiti_concorsi ec WITH (NOLOCK)
+JOIN Domanda d WITH (NOLOCK)
+  ON d.Num_domanda = ec.Num_domanda
+ AND CAST(d.Anno_accademico AS INT) = CAST(ec.Anno_accademico AS INT)
+JOIN @Cf TVP ON TVP.CodFiscale = d.Cod_fiscale
+WHERE CAST(d.Anno_accademico AS INT) IN ({string.Join(",", yearList)})
+  AND ec.Cod_beneficio IN ('BS','PA');
+";
+            using (var cmdE = new SqlCommand(sqlEsiti, cnExisting))
             {
-                // Our key in tickets is "CODFISC"
-                string codFisc = ticketsRow.Field<string>("CODFISC");
-                if (string.IsNullOrEmpty(codFisc)
-                    || !joinedLookup.TryGetValue(codFisc, out DataRow dbRow))
+                var pE = cmdE.Parameters.AddWithValue("@Cf", tvp);
+                pE.SqlDbType = SqlDbType.Structured; pE.TypeName = "dbo.CfList";
+                using var rdE = cmdE.ExecuteReader();
+                while (rdE.Read())
                 {
-                    // No match => fill new columns with empty string
-                    foreach (DataColumn dbCol in joinedData.Columns)
+                    string cf = rdE.GetString(0);
+                    int anno = Convert.ToInt32(rdE.GetValue(1));
+                    string codBeneficio = rdE.IsDBNull(2) ? "" : (rdE.GetString(2) ?? "");
+                    string codTipoEsito = rdE.IsDBNull(3) ? "" : (rdE.GetString(3) ?? "");
+                    string label = codTipoEsito switch
                     {
-                        string colName = dbCol.ColumnName;
-                        if (colName.Equals("Cod_fiscale", StringComparison.OrdinalIgnoreCase))
-                            continue;
+                        "0" => "Escluso",
+                        "1" => "Idoneo",
+                        "2" => "Vincitore",
+                        _ => "Non richiesto"
+                    };
+                    var info = GetOrCreate(result, cf, anno);
+                    if (string.Equals(codBeneficio, "BS", StringComparison.OrdinalIgnoreCase)) info.EsitiBS.Add(label);
+                    else if (string.Equals(codBeneficio, "PA", StringComparison.OrdinalIgnoreCase)) info.EsitiPA.Add(label);
+                }
+            }
 
-                        ticketsRow[colName] = "";
+            // Iscrizioni + Sede
+            string sqlIscrSede = $@"
+SELECT vi.Cod_fiscale,
+       CAST(vi.Anno_accademico AS INT) AS Anno,
+       vi.Cod_sede_studi,
+       ss.Descrizione
+FROM vIscrizioni AS vi WITH (NOLOCK)
+INNER JOIN Sede_studi AS ss WITH (NOLOCK)
+        ON vi.Cod_sede_studi = ss.Cod_sede_studi
+JOIN @Cf TVP ON TVP.CodFiscale = vi.Cod_fiscale
+WHERE CAST(vi.Anno_accademico AS INT) IN ({string.Join(",", yearList)});
+";
+            using (var cmdIS = new SqlCommand(sqlIscrSede, cnExisting))
+            {
+                var pIS = cmdIS.Parameters.AddWithValue("@Cf", tvp);
+                pIS.SqlDbType = SqlDbType.Structured; pIS.TypeName = "dbo.CfList";
+                using var rdIS = cmdIS.ExecuteReader();
+                while (rdIS.Read())
+                {
+                    string cf = rdIS.GetString(0);
+                    int anno = Convert.ToInt32(rdIS.GetValue(1));
+                    string codSede = rdIS.IsDBNull(2) ? "" : (rdIS.GetString(2) ?? "");
+                    string descr = rdIS.IsDBNull(3) ? "" : (rdIS.GetString(3) ?? "");
+                    var info = GetOrCreate(result, cf, anno);
+                    if (!string.IsNullOrWhiteSpace(descr)) info.SediDescrizioni.Add(descr.Trim());
+                }
+            }
+
+            if (reopen) cnExisting.Close();
+            return result;
+
+            static YearInfo GetOrCreate(Dictionary<string, Dictionary<int, YearInfo>> map, string cf, int anno)
+            {
+                if (!map.TryGetValue(cf, out var perYear)) { perYear = new Dictionary<int, YearInfo>(); map[cf] = perYear; }
+                if (!perYear.TryGetValue(anno, out var info)) { info = new YearInfo(); perYear[anno] = info; }
+                return info;
+            }
+        }
+
+        private static Dictionary<string, HashSet<int>> GetAnnoPresenceByCF_Batched(
+            List<string> cfList, IEnumerable<int> years, SqlConnection cnExisting)
+        {
+            var result = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+            var yearList = years.ToList();
+            if (cfList.Count == 0 || yearList.Count == 0) return result;
+
+            const int batchSize = 900;
+            for (int i = 0; i < cfList.Count; i += batchSize)
+            {
+                var batch = cfList.Skip(i).Take(batchSize).ToList();
+                bool reopen = cnExisting.State != ConnectionState.Open;
+                if (reopen) cnExisting.Open();
+
+                string sql = $@"
+SELECT Cod_fiscale, CAST(Anno_accademico AS INT) AS Anno_accademico
+FROM Domanda WITH (NOLOCK)
+WHERE CAST(Anno_accademico AS INT) IN ({string.Join(",", yearList)})
+  AND Cod_fiscale IN ({string.Join(",", batch.Select((cf, idx) => $"@cf{idx}"))});
+";
+                using var cmd = new SqlCommand(sql, cnExisting);
+                for (int p = 0; p < batch.Count; p++) cmd.Parameters.AddWithValue($"@cf{p}", batch[p]);
+
+                using var rd = cmd.ExecuteReader();
+                while (rd.Read())
+                {
+                    string cf = rd.GetString(0);
+                    int anno = Convert.ToInt32(rd.GetValue(1));
+                    if (!result.TryGetValue(cf, out var set)) { set = new HashSet<int>(); result[cf] = set; }
+                    set.Add(anno);
+                }
+
+                if (reopen) cnExisting.Close();
+            }
+            return result;
+        }
+
+        private static Dictionary<string, Dictionary<int, YearInfo>> GetYearInfoByCF_Batched(
+            List<string> cfList, IEnumerable<int> years, SqlConnection cnExisting)
+        {
+            var result = new Dictionary<string, Dictionary<int, YearInfo>>(StringComparer.OrdinalIgnoreCase);
+            var yearList = years.ToList();
+            if (cfList.Count == 0 || yearList.Count == 0) return result;
+
+            const int batchSize = 900;
+            for (int i = 0; i < cfList.Count; i += batchSize)
+            {
+                var batch = cfList.Skip(i).Take(batchSize).ToList();
+
+                bool reopen = cnExisting.State != ConnectionState.Open;
+                if (reopen) cnExisting.Open();
+
+                // Blocchi
+                string sqlBlocchi = $@"
+SELECT d.Cod_fiscale,
+       CAST(d.Anno_accademico AS INT) AS Anno,
+       d.Num_domanda,
+       dbo.SlashDescrBlocchi(d.Num_domanda, d.Anno_accademico, '') AS Blocchi
+FROM Domanda d WITH (NOLOCK)
+WHERE CAST(d.Anno_accademico AS INT) IN ({string.Join(",", yearList)})
+  AND d.Cod_fiscale IN ({string.Join(",", batch.Select((cf, idx) => $"@cf{idx}"))});
+";
+                using (var cmdB = new SqlCommand(sqlBlocchi, cnExisting))
+                {
+                    for (int p = 0; p < batch.Count; p++) cmdB.Parameters.AddWithValue($"@cf{p}", batch[p]);
+                    using var rdB = cmdB.ExecuteReader();
+                    while (rdB.Read())
+                    {
+                        string cf = rdB.GetString(0);
+                        int anno = Convert.ToInt32(rdB.GetValue(1));
+                        string blocchi = rdB.IsDBNull(3) ? "" : (rdB.GetString(3) ?? "");
+                        var info = GetOrCreate(result, cf, anno);
+                        if (!string.IsNullOrWhiteSpace(blocchi))
+                            foreach (var part in blocchi.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                var token = part.Trim();
+                                if (!string.IsNullOrEmpty(token)) info.BlocchiParts.Add(token);
+                            }
                     }
                 }
-                else
+
+                // Esiti
+                string sqlEsiti = $@"
+SELECT d.Cod_fiscale,
+       CAST(d.Anno_accademico AS INT) AS Anno,
+       ec.Cod_beneficio,
+       ec.Cod_tipo_esito
+FROM vEsiti_concorsi ec WITH (NOLOCK)
+JOIN Domanda d WITH (NOLOCK)
+  ON d.Num_domanda = ec.Num_domanda
+ AND CAST(d.Anno_accademico AS INT) = CAST(ec.Anno_accademico AS INT)
+WHERE CAST(d.Anno_accademico AS INT) IN ({string.Join(",", yearList)})
+  AND d.Cod_fiscale IN ({string.Join(",", batch.Select((cf, idx) => $"@cf{idx}"))})
+  AND ec.Cod_beneficio IN ('BS','PA');
+";
+                using (var cmdE = new SqlCommand(sqlEsiti, cnExisting))
                 {
-                    // Match found => copy column values as strings
-                    foreach (DataColumn dbCol in joinedData.Columns)
+                    for (int p = 0; p < batch.Count; p++) cmdE.Parameters.AddWithValue($"@cf{p}", batch[p]);
+                    using var rdE = cmdE.ExecuteReader();
+                    while (rdE.Read())
                     {
-                        string colName = dbCol.ColumnName;
-                        if (colName.Equals("Cod_fiscale", StringComparison.OrdinalIgnoreCase))
-                            continue;
-
-                        object value = dbRow[colName];
-
-                        // Convert everything to string
-                        // If value is null or DBNull, use empty string
-                        if (value == null || value == DBNull.Value)
+                        string cf = rdE.GetString(0);
+                        int anno = Convert.ToInt32(rdE.GetValue(1));
+                        string codBeneficio = rdE.IsDBNull(2) ? "" : (rdE.GetString(2) ?? "");
+                        string codTipoEsito = rdE.IsDBNull(3) ? "" : (rdE.GetString(3) ?? "");
+                        string label = codTipoEsito switch
                         {
-                            ticketsRow[colName] = "";
-                        }
-                        else
-                        {
-                            // Convert to string
-                            ticketsRow[colName] = value.ToString();
-                        }
+                            "0" => "Escluso",
+                            "1" => "Idoneo",
+                            "2" => "Vincitore",
+                            _ => "Non richiesto"
+                        };
+                        var info = GetOrCreate(result, cf, anno);
+                        if (string.Equals(codBeneficio, "BS", StringComparison.OrdinalIgnoreCase)) info.EsitiBS.Add(label);
+                        else if (string.Equals(codBeneficio, "PA", StringComparison.OrdinalIgnoreCase)) info.EsitiPA.Add(label);
                     }
                 }
+
+                // Iscrizioni + Sede
+                string sqlIscrSede = $@"
+SELECT vi.Cod_fiscale,
+       CAST(vi.Anno_accademico AS INT) AS Anno,
+       vi.Cod_sede_studi,
+       ss.Descrizione
+FROM vIscrizioni AS vi WITH (NOLOCK)
+INNER JOIN Sede_studi AS ss WITH (NOLOCK)
+        ON vi.Cod_sede_studi = ss.Cod_sede_studi
+WHERE CAST(vi.Anno_accademico AS INT) IN ({string.Join(",", yearList)})
+  AND vi.Cod_fiscale IN ({string.Join(",", batch.Select((cf, idx) => $"@cf{idx}"))});
+";
+                using (var cmdIS = new SqlCommand(sqlIscrSede, cnExisting))
+                {
+                    for (int p = 0; p < batch.Count; p++) cmdIS.Parameters.AddWithValue($"@cf{p}", batch[p]);
+                    using var rdIS = cmdIS.ExecuteReader();
+                    while (rdIS.Read())
+                    {
+                        string cf = rdIS.GetString(0);
+                        int anno = Convert.ToInt32(rdIS.GetValue(1));
+                        string codSede = rdIS.IsDBNull(2) ? "" : (rdIS.GetString(2) ?? "");
+                        string descr = rdIS.IsDBNull(3) ? "" : (rdIS.GetString(3) ?? "");
+                        var info = GetOrCreate(result, cf, anno);
+                        if (!string.IsNullOrWhiteSpace(descr)) info.SediDescrizioni.Add(descr.Trim());
+                    }
+                }
+
+                if (reopen) cnExisting.Close();
+            }
+            return result;
+
+            static YearInfo GetOrCreate(Dictionary<string, Dictionary<int, YearInfo>> map, string cf, int anno)
+            {
+                if (!map.TryGetValue(cf, out var perYear)) { perYear = new Dictionary<int, YearInfo>(); map[cf] = perYear; }
+                if (!perYear.TryGetValue(anno, out var info)) { info = new YearInfo(); perYear[anno] = info; }
+                return info;
             }
         }
     }

@@ -31,13 +31,11 @@
             ticketSendMailCheck = new CheckBox();
             ticketMaillbl = new Label();
             ticketMailFilebtn = new Button();
-            ticketHasMessages = new CheckBox();
             ticketFilelbl = new Label();
             ticketFileBtn = new Button();
             label1 = new Label();
             button1 = new Button();
             openFileDialog = new OpenFileDialog();
-            ticketDeleteRedCheck = new CheckBox();
             SuspendLayout();
             // 
             // ticketSendMailCheck
@@ -72,17 +70,6 @@
             ticketMailFilebtn.UseVisualStyleBackColor = true;
             ticketMailFilebtn.Click += TicketMailFilebtn_Click;
             // 
-            // ticketHasMessages
-            // 
-            ticketHasMessages.AutoSize = true;
-            ticketHasMessages.Location = new Point(51, 83);
-            ticketHasMessages.Margin = new Padding(4, 3, 4, 3);
-            ticketHasMessages.Name = "ticketHasMessages";
-            ticketHasMessages.Size = new Size(160, 19);
-            ticketHasMessages.TabIndex = 13;
-            ticketHasMessages.Text = "File contenente messaggi";
-            ticketHasMessages.UseVisualStyleBackColor = true;
-            // 
             // ticketFilelbl
             // 
             ticketFilelbl.AutoSize = true;
@@ -107,7 +94,7 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
+            label1.Font = new Font("Segoe UI", 15F);
             label1.Location = new Point(51, 9);
             label1.Name = "label1";
             label1.Size = new Size(246, 28);
@@ -116,7 +103,7 @@
             // 
             // button1
             // 
-            button1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
+            button1.Font = new Font("Segoe UI", 15F);
             button1.Location = new Point(476, 289);
             button1.Name = "button1";
             button1.Size = new Size(312, 49);
@@ -128,18 +115,6 @@
             // openFileDialog
             // 
             openFileDialog.FileName = "openFileDialog1";
-            // 
-            // ticketDeleteRedCheck
-            // 
-            ticketDeleteRedCheck.AutoSize = true;
-            ticketDeleteRedCheck.Location = new Point(51, 108);
-            ticketDeleteRedCheck.Margin = new Padding(4, 3, 4, 3);
-            ticketDeleteRedCheck.Name = "ticketDeleteRedCheck";
-            ticketDeleteRedCheck.Size = new Size(156, 19);
-            ticketDeleteRedCheck.TabIndex = 14;
-            ticketDeleteRedCheck.Text = "Cancella anni precedenti";
-            ticketDeleteRedCheck.UseVisualStyleBackColor = true;
-            ticketDeleteRedCheck.Visible = false;
             // 
             // FormProceduraTicket
             // 
@@ -153,8 +128,6 @@
             Controls.Add(ticketSendMailCheck);
             Controls.Add(ticketMaillbl);
             Controls.Add(ticketMailFilebtn);
-            Controls.Add(ticketDeleteRedCheck);
-            Controls.Add(ticketHasMessages);
             Controls.Add(ticketFilelbl);
             Controls.Add(ticketFileBtn);
             FormBorderStyle = FormBorderStyle.None;
@@ -168,12 +141,10 @@
         private CheckBox ticketSendMailCheck;
         private Label ticketMaillbl;
         private Button ticketMailFilebtn;
-        private CheckBox ticketHasMessages;
         private Label ticketFilelbl;
         private Button ticketFileBtn;
         private Label label1;
         private Button button1;
         private OpenFileDialog openFileDialog;
-        private CheckBox ticketDeleteRedCheck;
     }
 }

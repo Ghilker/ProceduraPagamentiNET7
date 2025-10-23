@@ -53,7 +53,7 @@ namespace ProcedureNet7
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
                 ArgsValidation argsValidation = new();
-                List<bool> ticketCheckList = new() { ticketHasMessages.Checked, ticketDeleteRedCheck.Checked, ticketSendMailCheck.Checked };
+                List<bool> ticketCheckList = new() { ticketSendMailCheck.Checked };
                 ArgsProceduraTicket argsProceduraTicket = new()
                 {
                     _mailFilePath = selectedMailFilePath,

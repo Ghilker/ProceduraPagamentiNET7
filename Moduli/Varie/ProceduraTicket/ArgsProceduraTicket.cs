@@ -31,7 +31,7 @@ namespace ProcedureNet7
 
             bool mailFilePathLoaded = !string.IsNullOrWhiteSpace(_mailFilePath);
 
-            if (!(mailFilePathLoaded && _ticketChecks[2]))
+            if (!(mailFilePathLoaded && _ticketChecks[0]))
             {
                 yield return new ValidationResult("Indicare il file mail.");
             }

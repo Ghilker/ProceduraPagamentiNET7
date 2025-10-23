@@ -71,6 +71,7 @@ namespace ProcedureNet7
             string pattern2b = @"^\d{1,20}([/\s\-]\d{1,20})+$";
             string pattern3 = @"(?i)^(.*\b(serie\s*3\s*T|serie\s*3T|serie\s*T3|serie\s*T|serie\s*IT|3\s*T|3T|T3|3/T)\b.*)$";
             string pattern4 = @"^QC([\s/]*\w+)+$";
+            string pattern4qc = @"^QC\s*/\s*\d{2,4}\s*N\.?\s*\d{1,10}$";
             string pattern5 = @"(?i)^(.*\b(Protocollo|PROT\.?|prot\.?n?\.?|Protocol-?)\b.*\d+.*)$";
             string pattern6 = @"^(RA/|RM|FC/)\s*\S+$";
             // At least one digit, one letter, can include slash/hyphen/spaces, 5-50 in length
@@ -86,6 +87,7 @@ namespace ProcedureNet7
             if (Regex.IsMatch(serie, pattern2b, options)) return true;
             if (Regex.IsMatch(serie, pattern3, options)) return true;
             if (Regex.IsMatch(serie, pattern4, options)) return true;
+            if (Regex.IsMatch(serie, pattern4qc, options)) return true;
             if (Regex.IsMatch(serie, pattern5, options)) return true;
             if (Regex.IsMatch(serie, pattern6, options)) return true;
             if (Regex.IsMatch(serie, pattern7, options)) return true;

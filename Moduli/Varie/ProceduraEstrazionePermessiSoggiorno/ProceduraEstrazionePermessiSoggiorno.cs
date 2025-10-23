@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Mail;
 
@@ -35,26 +36,90 @@ namespace ProcedureNet7
 
                 // =================== Estrazioni ===================
                 var dtBs = ExecuteQuery(@"
-select distinct s.Cod_fiscale, s.Nome, s.Cognome, s.Codice_Studente
-from vSpecifiche_permesso_soggiorno vs
-inner join VStatus_Allegati va on vs.id_allegato = va.id_allegato
-inner join Domanda d on vs.Cod_fiscale = d.Cod_fiscale and d.Anno_accademico in (20252026, 20242025, 20232024) and d.Tipo_bando = 'lz'
-inner join vEsiti_concorsi ve on d.Num_domanda = ve.Num_domanda and ve.Cod_beneficio = 'bs' and ve.Cod_tipo_esito <> 0
-inner join Studente s on d.Cod_fiscale = s.Cod_fiscale
-where va.cod_status = '01' and va.data_fine_validita is null
+WITH base AS (
+    SELECT
+        vs.Cod_fiscale,
+        va.cod_status,
+        ROW_NUMBER() OVER (
+            PARTITION BY vs.Cod_fiscale, vs.Tipo_documento, vs.Tipo_permesso
+            ORDER BY vs.Id_allegato DESC
+        ) AS rn
+    FROM Specifiche_permesso_soggiorno AS vs
+    INNER JOIN STATUS_ALLEGATI AS va
+        ON vs.id_allegato = va.id_allegato
+    INNER JOIN Domanda AS d
+        ON vs.Cod_fiscale = d.Cod_fiscale
+       AND d.Anno_accademico IN (20252026, 20242025)
+       AND d.Tipo_bando = 'lz'
+    INNER JOIN vEsiti_concorsi AS ve
+        ON d.Num_domanda = ve.Num_domanda
+       AND ve.Cod_beneficio = 'bs'
+       AND ve.Cod_tipo_esito <> 0
+    INNER JOIN Studente AS s
+        ON d.Cod_fiscale = s.Cod_fiscale
+)
+SELECT DISTINCT Cod_fiscale
+FROM base
+WHERE rn = 1
+  AND cod_status = '01'
 ");
                 Logger.LogInfo(40, $"[BS] Retrieved {dtBs.Rows.Count} rows.");
 
                 var dtPa = ExecuteQuery(@"
-select distinct s.Cod_fiscale, s.Nome, s.Cognome, s.Codice_Studente
-from vSpecifiche_permesso_soggiorno vs
-inner join VStatus_Allegati va on vs.id_allegato = va.id_allegato
-inner join Domanda d on vs.Cod_fiscale = d.Cod_fiscale and d.Anno_accademico in (20252026, 20242025, 20232024) and d.Tipo_bando = 'lz'
-inner join vEsiti_concorsi ve on d.Num_domanda = ve.Num_domanda and ve.Cod_beneficio = 'pa' and ve.Cod_tipo_esito <> 0
-inner join Studente s on d.Cod_fiscale = s.Cod_fiscale
-where va.cod_status = '01' and va.data_fine_validita is null
+WITH base AS (
+    SELECT
+        vs.Cod_fiscale,
+        va.cod_status,
+        ROW_NUMBER() OVER (
+            PARTITION BY vs.Cod_fiscale, vs.Tipo_documento, vs.Tipo_permesso
+            ORDER BY vs.Id_allegato DESC
+        ) AS rn
+    FROM Specifiche_permesso_soggiorno AS vs
+    INNER JOIN STATUS_ALLEGATI AS va
+        ON vs.id_allegato = va.id_allegato
+    INNER JOIN Domanda AS d
+        ON vs.Cod_fiscale = d.Cod_fiscale
+       AND d.Anno_accademico IN (20252026, 20242025)
+       AND d.Tipo_bando = 'lz'
+    INNER JOIN vEsiti_concorsi AS ve
+        ON d.Num_domanda = ve.Num_domanda
+       AND ve.Cod_beneficio = 'pa'
+       AND ve.Cod_tipo_esito <> 0
+    INNER JOIN Studente AS s
+        ON d.Cod_fiscale = s.Cod_fiscale
+)
+SELECT DISTINCT Cod_fiscale
+FROM base
+WHERE rn = 1
+  AND cod_status = '01'
 ");
                 Logger.LogInfo(41, $"[PA] Retrieved {dtPa.Rows.Count} rows.");
+
+                // =================== Filtro BS \ PA ===================
+                var paSet = new HashSet<string>(
+                    dtPa.AsEnumerable()
+                        .Select(r => (r.Field<string>("Cod_fiscale") ?? "").Trim())
+                        .Where(cf => !string.IsNullOrEmpty(cf)),
+                    StringComparer.OrdinalIgnoreCase);
+
+                DataTable dtBsFiltered;
+                var bsRows = dtBs.AsEnumerable()
+                    .Where(r =>
+                    {
+                        var cf = (r.Field<string>("Cod_fiscale") ?? "").Trim();
+                        return !string.IsNullOrEmpty(cf) && !paSet.Contains(cf);
+                    });
+
+                if (bsRows.Any())
+                {
+                    dtBsFiltered = bsRows.CopyToDataTable();
+                    Logger.LogInfo(41, $"[BS] Filtrate {dtBs.Rows.Count - dtBsFiltered.Rows.Count} sovrapposizioni con PA. Rimasti {dtBsFiltered.Rows.Count}.");
+                }
+                else
+                {
+                    dtBsFiltered = dtBs.Clone();
+                    Logger.LogInfo(41, $"[BS] Tutti i {dtBs.Rows.Count} record erano in PA. Rimasti 0.");
+                }
 
                 if (_sendMail)
                 {
@@ -100,10 +165,10 @@ where va.cod_status = '01' and va.data_fine_validita is null
                         Logger.LogInfo(61, "[PA] Nessun record: nessun invio.");
                     }
 
-                    if (dtBs.Rows.Count > 0)
+                    if (dtBsFiltered.Rows.Count > 0)
                     {
                         SendEmailWithAttachment(
-                            toEmails, ccEmails, dtBs, currentDateFolder,
+                            toEmails, ccEmails, dtBsFiltered, currentDateFolder,
                             filePrefix: "ps_bs",
                             subject: $"Estrazione studenti per PS (BS) - {DateTime.Now:dd/MM/yyyy}",
                             htmlBody: GetMailBodyBs(),
@@ -112,7 +177,7 @@ where va.cod_status = '01' and va.data_fine_validita is null
                     }
                     else
                     {
-                        Logger.LogInfo(60, "[BS] Nessun record: nessun invio.");
+                        Logger.LogInfo(60, "[BS] Nessun record dopo filtro PA: nessun invio.");
                     }
                 }
 
@@ -181,15 +246,12 @@ In questo file potranno essere presenti studenti già lavorati per sovrapposizio
         {
             var totalRows = dataTable.Rows.Count;
 
-            // Copia la lista TO per questo invio (così PA/BS non si influenzano tra loro)
             var toEmails = new List<string>(toEmailsOriginal);
 
-            // Se possibile, riduci casualmente i destinatari per garantire >= minRowsPerEmail
             if (toEmails.Count > 0)
             {
                 int targetRecipients = Math.Max(1, totalRows / minRowsPerEmail);
-
-                if (targetRecipients == 0) targetRecipients = 1; // safety
+                if (targetRecipients == 0) targetRecipients = 1;
 
                 if (toEmails.Count > targetRecipients)
                 {
@@ -210,7 +272,6 @@ In questo file potranno essere presenti studenti già lavorati per sovrapposizio
                 if (totalRows < minRowsPerEmail)
                 {
                     Logger.LogInfo(86, $"Attenzione: solo {totalRows} righe totali — impossibile garantire {minRowsPerEmail} per email. Invio a un solo destinatario.");
-                    // già garantito targetRecipients>=1: con totalRows<min, targetRecipients=1
                 }
             }
 
@@ -220,7 +281,6 @@ In questo file potranno essere presenti studenti già lavorati per sovrapposizio
                 return;
             }
 
-            // Suddivisione righe per destinatario
             int rowsPerEmail = totalRows / toEmails.Count;
             int remainder = totalRows % toEmails.Count;
             int startIndex = 0;
@@ -230,10 +290,8 @@ In questo file potranno essere presenti studenti già lavorati per sovrapposizio
                 int rowsForThisEmail = rowsPerEmail + (remainder > 0 ? 1 : 0);
                 if (remainder > 0) remainder--;
 
-                // Evita invii vuoti (può accadere se totalRows=0)
                 if (rowsForThisEmail <= 0) continue;
 
-                // Costruisci DataTable per questo destinatario
                 DataTable emailDataTable = dataTable.Clone();
                 for (int i = startIndex; i < startIndex + rowsForThisEmail; i++)
                     emailDataTable.ImportRow(dataTable.Rows[i]);

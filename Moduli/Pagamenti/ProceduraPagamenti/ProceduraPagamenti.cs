@@ -12,7 +12,7 @@ namespace ProcedureNet7
 {
     public class ProceduraPagamenti : BaseProcedure<ArgsPagamenti>
     {
-        string debugStudente = "";
+        string debugStudente = "CRLSRA04A45F462W";
         string selectedSaveFolder = string.Empty;
         string selectedAA = string.Empty;
 
@@ -590,6 +590,8 @@ namespace ProcedureNet7
             {
                 queryBuilder.AppendLine($"      AND StatisticheTotali.Cod_fiscale = '{studenteForzatoCF}'");
             }
+  
+            
 
             string sqlQuery = queryBuilder.ToString();
             try
@@ -1240,7 +1242,7 @@ namespace ProcedureNet7
                                 (
                                     (
                                     (studenteDaControllare.InformazioniBeneficio.SuperamentoEsami || studenteDaControllare.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)
-                                    || (studenteDaControllare.InformazioniIscrizione.AnnoCorso > 1)
+                                    || (studenteDaControllare.InformazioniIscrizione.AnnoCorso > 1 || studenteDaControllare.InformazioniIscrizione.AnnoCorso < 0)
                                     )
                                     && (pagamento.codTipoPagam == "BSS0" || pagamento.codTipoPagam == "BSS1" || pagamento.codTipoPagam == "BSS2")
                                     && !pagamento.ritiratoAzienda
@@ -1802,7 +1804,7 @@ namespace ProcedureNet7
             PopulateStudentPaymentMethod();
             PopulateStudentiVecchioEsitoPA();
             PopulateStudentiIscrizioni();
-            if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR)
+            if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode())
             {
                 PopulateStudentReversali();
                 PopulateStudentDetrazioni();
@@ -2472,6 +2474,7 @@ namespace ProcedureNet7
                     // If stanza is 'XXX' or studente is null, just skip it
                     if (studente == null || assegnazione.CodStanza == "XXX")
                     {
+                        studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
                         continue;
                     }
 
@@ -2594,6 +2597,7 @@ namespace ProcedureNet7
                                 value = new List<string>();
                                 studentiConErroriPA.Add(studente, value);
                             }
+                            studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
                             value.Add(message);
                         }
                     }
@@ -2608,18 +2612,40 @@ namespace ProcedureNet7
                     studentiDaPagare.Remove(codFiscale);
                 }
 
-                // Additional fixes for students with errors
-                foreach (StudentePagamenti studente in studentiConErroriPA.Keys)
+                if (studentiConErroriPA.Count > 0)
                 {
-                    if (studente.InformazioniPagamento.Assegnazioni.Count == 1 && studente.InformazioniBeneficio.EsitoPA == 2)
+                    DataTable dtErr = new();
+                    dtErr.Columns.Add("CodFiscale");
+                    dtErr.Columns.Add("NumDomanda");
+                    dtErr.Columns.Add("Cognome");
+                    dtErr.Columns.Add("Nome");
+                    dtErr.Columns.Add("CodEnte");
+                    dtErr.Columns.Add("AnnoCorso");
+                    dtErr.Columns.Add("EsitoPA");
+                    dtErr.Columns.Add("NumAssegnazioni");
+                    dtErr.Columns.Add("Errori"); // pipe-joined list
+
+                    foreach (var kvp in studentiConErroriPA)
                     {
-                        Assegnazione vecchiaAssegnazione = studente.InformazioniPagamento.Assegnazioni[0];
-                        if (vecchiaAssegnazione.statoCorrettezzaAssegnazione == AssegnazioneDataCheck.DataUguale)
-                        {
-                            // Mark the data check differently if needed
-                            vecchiaAssegnazione.SetAssegnazioneDataCheck(AssegnazioneDataCheck.ErroreControlloData);
-                        }
+                        var s = kvp.Key;
+                        var errori = kvp.Value;
+
+                        string cf = s?.InformazioniPersonali?.CodFiscale ?? "";
+                        string numDomanda = s?.InformazioniPersonali?.NumDomanda ?? "";
+                        string cognome = s?.InformazioniPersonali?.Cognome ?? "";
+                        string nome = s?.InformazioniPersonali?.Nome ?? "";
+                        string codEnte = s?.InformazioniIscrizione?.CodEnte ?? "";
+                        string annoCorso = (s?.InformazioniIscrizione?.AnnoCorso ?? 0).ToString();
+                        string esitoPA = (s?.InformazioniBeneficio?.EsitoPA ?? 0).ToString();
+                        int nAss = s?.InformazioniPagamento?.Assegnazioni?.Count ?? 0;
+                        string msg = string.Join(" | ", errori.Distinct());
+
+                        dtErr.Rows.Add(cf, numDomanda, cognome, nome, codEnte, annoCorso, esitoPA, nAss, msg);
                     }
+
+                    // Uses your existing Excel exporter (same utility used elsewhere)
+                    Utilities.ExportDataTableToExcel(dtErr, selectedSaveFolder, fileName: "Errori Assegnazioni PA");
+                    Logger.LogInfo(60, $"Esportati {dtErr.Rows.Count} studenti con errori PA (Errori Assegnazioni PA.xlsx).");
                 }
 
                 Logger.LogInfo(50, "UPDATE:Lavorazione studenti - inserimento in assegnazioni - completato");
@@ -2666,6 +2692,7 @@ namespace ProcedureNet7
                             double.TryParse(Utilities.SafeGetString(reader, "importo_assegnato"), out double importoAssegnato);
                             var categoriaCU = Utilities.SafeGetString(reader, "categoria_CU");
 
+
                             rows.Add(new PopulateStudentiImpegniDTO
                             {
                                 CodFiscale = codFiscale,
@@ -2685,6 +2712,10 @@ namespace ProcedureNet7
                     {
                         if (studente is null) continue;
 
+                        if(studente.InformazioniPersonali.CodFiscale == debugStudente)
+                        {
+                            string test = "";
+                        }
                         // Integrations check
                         if (isIntegrazione)
                         {
@@ -2789,19 +2820,10 @@ namespace ProcedureNet7
                 {
                     StudentePagamenti studente = pair.Value;
 
-                    if (studente.InformazioniPersonali.CodFiscale == "SLMMMD03D22Z352E")
+                    if (studente.InformazioniPersonali.CodFiscale == debugStudente)
                     {
-                        string stest = "";
+                        string test = "";
                     }
-                    if (studente.InformazioniPersonali.CodFiscale == "DMGRRA99L64A271Q")
-                    {
-                        string stest = "";
-                    }
-                    if (studente.InformazioniPersonali.CodFiscale == "STNRCR01L07D972T")
-                    {
-                        string stest = "";
-                    }
-
 
                     // Initialize variables
                     double importoDaPagare = studente.InformazioniBeneficio.ImportoBeneficio;
@@ -2911,7 +2933,7 @@ namespace ProcedureNet7
                         }
 
                         // Process assegnazioni
-                        if (studente.InformazioniPagamento.Assegnazioni != null && studente.InformazioniPagamento.Assegnazioni.Count > 0)
+                        if (!isTR && studente.InformazioniPagamento.Assegnazioni != null && studente.InformazioniPagamento.Assegnazioni.Count > 0)
                         {
                             foreach (Assegnazione assegnazione in studente.InformazioniPagamento.Assegnazioni)
                             {
@@ -2920,7 +2942,7 @@ namespace ProcedureNet7
                         }
 
                         // Process reversali
-                        if (studente.InformazioniPagamento.Reversali != null && studente.InformazioniPagamento.Reversali.Count > 0)
+                        if (!isTR && studente.InformazioniPagamento.Reversali != null && studente.InformazioniPagamento.Reversali.Count > 0)
                         {
                             foreach (Reversale reversale in studente.InformazioniPagamento.Reversali)
                             {
@@ -2942,7 +2964,7 @@ namespace ProcedureNet7
                         }
 
                         // Process detrazioni
-                        if (studente.InformazioniPagamento.Detrazioni != null && studente.InformazioniPagamento.Detrazioni.Count > 0)
+                        if (!isTR && studente.InformazioniPagamento.Detrazioni != null && studente.InformazioniPagamento.Detrazioni.Count > 0)
                         {
                             foreach (Detrazione detrazione in studente.InformazioniPagamento.Detrazioni)
                             {
@@ -3220,30 +3242,29 @@ namespace ProcedureNet7
 
         }
 
+        private readonly HashSet<string> _flussoWrittenCF = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<string>> _flussoFilesByCF = new(StringComparer.OrdinalIgnoreCase);
         private void GenerateOutputFiles()
         {
             _detAccDisco.Reset();
             _detAccPnrr.Reset();
+            _flussoWrittenCF.Clear(); // reset tracker for this run
+            _flussoFilesByCF.Clear();
 
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files");
             string currentMonthName = DateTime.Now.ToString("MMMM").ToUpper();
             string currentYear = DateTime.Now.ToString("yyyy");
             string firstHalfAA = selectedAA.Substring(2, 2);
             string secondHalfAA = selectedAA.Substring(6, 2);
-            string baseFolderPath = Utilities.EnsureDirectory(Path.Combine(selectedSaveFolder, currentMonthName + currentYear + "_" + firstHalfAA + secondHalfAA));
+            string baseFolderPath = Utilities.EnsureDirectory(Path.Combine(
+                selectedSaveFolder, currentMonthName + currentYear + "_" + firstHalfAA + secondHalfAA));
 
-            //string currentBeneficio = isTR ? "TR" : tipoBeneficio;
             string currentCodTipoPagamento = tipoBeneficio + selectedTipoPagamento;
 
             string sqlTipoPagam = $"SELECT Descrizione FROM Tipologie_pagam WHERE Cod_tipo_pagam = '{currentCodTipoPagamento}'";
-            SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            };
+            SqlCommand cmd = new(sqlTipoPagam, CONNECTION, sqlTransaction) { CommandTimeout = 9000000 };
             string pagamentoDescrizione = (string)cmd.ExecuteScalar();
             string beneficioFolderPath = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, pagamentoDescrizione));
-
-            //EstrazioneDatiBanca(beneficioFolderPath);
 
             bool doAllImpegni = selectedImpegno == "0000";
             IEnumerable<string> impegnoList = doAllImpegni ? impegniList : new List<string> { selectedImpegno };
@@ -3257,30 +3278,25 @@ namespace ProcedureNet7
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Completato");
+
             try
             {
-
                 Logger.LogInfo(10, "Generazione documenti Word (Determinazioni per fondo)...");
-
-                // Percorsi
-                string templatePath = "D:/modello.docx"; // adattare se necessario
+                string templatePath = "D:/modello.docx";
                 string determinaFolder = Utilities.EnsureDirectory(Path.Combine(baseFolderPath, "Determinazione"));
                 string annoBreve = string.Concat(selectedAA.AsSpan(2, 2), selectedAA.AsSpan(6, 2));
 
-                // Build impegni sets per fondo
-                HashSet<string> impegniDisco = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                HashSet<string> impegniPnrr = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> impegniDisco = new(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> impegniPnrr = new(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var imp in impegnoList)
                 {
                     var f = ResolveTipoFondoForImpegno(imp);
-                    if (string.Equals(f, "PNRR", StringComparison.OrdinalIgnoreCase))
-                        impegniPnrr.Add(imp);
-                    else
-                        impegniDisco.Add(imp);
+                    if (string.Equals(f, "PNRR", StringComparison.OrdinalIgnoreCase)) impegniPnrr.Add(imp);
+                    else impegniDisco.Add(imp);
                 }
 
                 void GenerateFor(string fondo, DeterminaAccumulator acc, HashSet<string> impegniFondo)
@@ -3309,69 +3325,53 @@ namespace ProcedureNet7
 
                 GenerateFor("DISCO", _detAccDisco, impegniDisco);
                 GenerateFor("PNRR", _detAccPnrr, impegniPnrr);
-
             }
             catch (Exception ex)
             {
                 Logger.LogError(10, $"Errore generazione Determinazione Word: {ex.Message}");
-                // non rilanciare se vuoi che la pipeline prosegua comunque
             }
 
-            if (!insertInDatabase)
-            {
-                return;
-            }
+            if (!insertInDatabase) return;
 
             Logger.LogInfo(10, "Starting index optimization");
 
-            // Step to reorganize/rebuild indexes
             string rebuildIndexesSQL = @"
-                    DECLARE @TableName NVARCHAR(255);
-                    DECLARE IndexCursor CURSOR FOR
-                    SELECT DISTINCT t.name 
-                    FROM sys.indexes i 
-                    INNER JOIN sys.tables t ON i.object_id = t.object_id 
-                    WHERE t.name IN ('MOVIMENTI_CONTABILI_ELEMENTARI', 'MOVIMENTI_CONTABILI_GENERALI', 'STATI_DEL_MOVIMENTO_CONTABILE');
+        DECLARE @TableName NVARCHAR(255);
+        DECLARE IndexCursor CURSOR FOR
+        SELECT DISTINCT t.name 
+        FROM sys.indexes i 
+        INNER JOIN sys.tables t ON i.object_id = t.object_id 
+        WHERE t.name IN ('MOVIMENTI_CONTABILI_ELEMENTARI', 'MOVIMENTI_CONTABILI_GENERALI', 'STATI_DEL_MOVIMENTO_CONTABILE');
 
-                    OPEN IndexCursor;
-                    FETCH NEXT FROM IndexCursor INTO @TableName;
+        OPEN IndexCursor;
+        FETCH NEXT FROM IndexCursor INTO @TableName;
 
-                    WHILE @@FETCH_STATUS = 0
-                    BEGIN
-                        EXEC ('ALTER INDEX ALL ON ' + @TableName + ' REORGANIZE;');
-                        FETCH NEXT FROM IndexCursor INTO @TableName;
-                    END;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            EXEC ('ALTER INDEX ALL ON ' + @TableName + ' REORGANIZE;');
+            FETCH NEXT FROM IndexCursor INTO @TableName;
+        END;
 
-                    CLOSE IndexCursor;
-                    DEALLOCATE IndexCursor;
-                ";
-            SqlCommand rebuildIndexesCmd = new(rebuildIndexesSQL, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            };
+        CLOSE IndexCursor;
+        DEALLOCATE IndexCursor;";
+            SqlCommand rebuildIndexesCmd = new(rebuildIndexesSQL, CONNECTION, sqlTransaction) { CommandTimeout = 9000000 };
             _ = rebuildIndexesCmd.ExecuteNonQuery();
 
-            // Step to update statistics
             Logger.LogInfo(10, "Updating statistics");
             string updateStatisticsSQL = @"
-                    UPDATE STATISTICS [MOVIMENTI_CONTABILI_ELEMENTARI];
-                    UPDATE STATISTICS [MOVIMENTI_CONTABILI_GENERALI];
-                    UPDATE STATISTICS [STATI_DEL_MOVIMENTO_CONTABILE];
-                 ";
-            SqlCommand updateStatisticsCmd = new(updateStatisticsSQL, CONNECTION, sqlTransaction)
-            {
-                CommandTimeout = 9000000
-            };
+        UPDATE STATISTICS [MOVIMENTI_CONTABILI_ELEMENTARI];
+        UPDATE STATISTICS [MOVIMENTI_CONTABILI_GENERALI];
+        UPDATE STATISTICS [STATI_DEL_MOVIMENTO_CONTABILE];";
+            SqlCommand updateStatisticsCmd = new(updateStatisticsSQL, CONNECTION, sqlTransaction) { CommandTimeout = 9000000 };
             _ = updateStatisticsCmd.ExecuteNonQuery();
 
             Logger.LogInfo(10, "Index and statistics optimization complete.");
         }
+
         private void ProcessImpegno(string impegno, string beneficioFolderPath)
         {
             var fondo = ResolveTipoFondoForImpegno(impegno);
-            var acc = string.Equals(fondo, "PNRR", StringComparison.OrdinalIgnoreCase)
-                ? _detAccPnrr
-                : _detAccDisco;
+            var acc = string.Equals(fondo, "PNRR", StringComparison.OrdinalIgnoreCase) ? _detAccPnrr : _detAccDisco;
 
             var groupedStudents = studentiDaPagare.Values
                 .Where(s => s.InformazioniPagamento.NumeroImpegno == impegno)
@@ -3379,12 +3379,8 @@ namespace ProcedureNet7
 
             if (groupedStudents.Any())
             {
-
                 string sqlImpegno = $"SELECT Descr FROM Impegni WHERE anno_accademico = '{selectedAA}' AND num_impegno = '{impegno}' AND categoria_pagamento = '{categoriaPagam}'";
-                SqlCommand cmdImpegno = new(sqlImpegno, CONNECTION, sqlTransaction)
-                {
-                    CommandTimeout = 9000000
-                };
+                SqlCommand cmdImpegno = new(sqlImpegno, CONNECTION, sqlTransaction) { CommandTimeout = 9000000 };
                 string impegnoDescrizione = (string)cmdImpegno.ExecuteScalar();
                 string impegnoFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"));
                 impegnoAmount.Add(impegno, new Dictionary<string, Dictionary<string, int>>());
@@ -3392,35 +3388,122 @@ namespace ProcedureNet7
                 foreach (string cat in new string[] { "111", "211", "311" })
                 {
                     var studentsInCategory = groupedStudents.Where(s => s.InformazioniPagamento.CategoriaCU == cat).ToList();
+                    if (!studentsInCategory.Any()) continue;
 
-                    if (!studentsInCategory.Any())
-                    {
-                        continue;
-                    }
                     string sqlCat = $"SELECT descrizione FROM tipologie_categoria_cu WHERE categoria_CU = '{cat}'";
-                    SqlCommand cmdCat = new(sqlCat, CONNECTION, sqlTransaction)
-                    {
-                        CommandTimeout = 9000000
-                    };
+                    SqlCommand cmdCat = new(sqlCat, CONNECTION, sqlTransaction) { CommandTimeout = 9000000 };
                     string catDescrizione = (string)cmdCat.ExecuteScalar();
                     string catFolder = Utilities.EnsureDirectory(Path.Combine(impegnoFolder, catDescrizione));
 
                     ProcessCategory(cat, catDescrizione, studentsInCategory, catFolder, impegno);
                 }
 
+                try
+                {
+                    var auditDt = BuildFullAuditDataTable(groupedStudents, impegno);
+                    if (auditDt.Rows.Count > 0)
+                    {
+                        // File name: AUDIT_Studenti_Completo.xlsx
+                        Utilities.ExportDataTableToExcel(auditDt, impegnoFolder, true, "AUDIT_Studenti_Completo");
+                        Logger.LogInfo(20, $"Impegno {impegno}: esportato audit completo studenti ({auditDt.Rows.Count} righe).");
+                    }
+                    else
+                    {
+                        Logger.LogInfo(20, $"Impegno {impegno}: nessuno studente da esportare nel dump audit.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(10, $"Impegno {impegno}: errore export audit completo: {ex.Message}");
+                }
+
+                // === AFTER processing all categories for this impegno:
+                // Export Excel with CF not written in any flusso for THIS impegno
+                var allCfInImpegno = groupedStudents
+                    .Select(s => (s.InformazioniPersonali.CodFiscale, s))
+                    .GroupBy(x => x.CodFiscale, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First().s)
+                    .ToList();
+
+                var missing = allCfInImpegno
+                    .Where(s => !_flussoWrittenCF.Contains(s.InformazioniPersonali.CodFiscale))
+                    .ToList();
+
+                if (missing.Count > 0)
+                {
+                    Logger.LogInfo(20, $"Impegno {impegno}: {missing.Count} CF non presenti in alcun flusso. Esporto Excel di log dettagliato.");
+
+                    var dt = new DataTable();
+                    dt.Columns.Add("Impegno");
+                    dt.Columns.Add("CategoriaCU");
+                    dt.Columns.Add("NumDomanda");
+                    dt.Columns.Add("CodFiscale");
+                    dt.Columns.Add("Cognome");
+                    dt.Columns.Add("Nome");
+                    dt.Columns.Add("AnnoCorso");
+                    dt.Columns.Add("HasPA");                 // true/false secondo la tua logica
+                    dt.Columns.Add("TipoStudente");          // 0=matricole,1=anni succ.,2=entrambi
+                    dt.Columns.Add("SelectedRichiestoPA");   // 0/1/2/3
+                    dt.Columns.Add("CodEnte");
+                    dt.Columns.Add("CategoriaPagam");        // PR/SA/...
+                    dt.Columns.Add("Motivo");                // spiegazione in linguaggio naturale
+
+                    foreach (var s in missing)
+                    {
+                        string catCU = s.InformazioniPagamento?.CategoriaCU ?? "";
+                        bool hasPA = HasPAForStudent(s, categoriaPagam);
+                        string motivo = BuildNonFlussoReason(
+                            s,
+                            catCU,
+                            selectedRichiestoPA,
+                            tipoStudente,
+                            categoriaPagam);
+
+                        dt.Rows.Add(
+                            impegno,
+                            catCU,
+                            s.InformazioniPersonali?.NumDomanda,
+                            s.InformazioniPersonali?.CodFiscale,
+                            s.InformazioniPersonali?.Cognome,
+                            s.InformazioniPersonali?.Nome,
+                            s.InformazioniIscrizione?.AnnoCorso.ToString(),
+                            hasPA ? "true" : "false",
+                            tipoStudente,
+                            selectedRichiestoPA,
+                            s.InformazioniIscrizione?.CodEnte,
+                            categoriaPagam,
+                            motivo
+                        );
+                    }
+
+                    Utilities.ExportDataTableToExcel(
+                        dt,
+                        Path.Combine(beneficioFolderPath, $"imp-{impegno}-{impegnoDescrizione}"),
+                        true,
+                        "CF_non_in_flusso");
+                }
+                else
+                {
+                    Logger.LogInfo(20, $"Impegno {impegno}: tutti i CF risultano emessi in almeno un flusso.");
+                }
             }
+
             void ProcessCategory(string categoriaCU, string catDescrizione, List<StudentePagamenti> students, string catFolder, string impegno)
             {
-
                 Logger.LogInfo(60, $"Lavorazione studenti - Impegno {impegno} - Categoria {catDescrizione}");
                 try
                 {
                     var studentsWithPA = students
-                    .Where(s => (s.InformazioniPagamento.Assegnazioni != null && s.InformazioniPagamento.Assegnazioni.Count > 0) || (s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
-                    .ToList();
+                        .Where(s => (s.InformazioniPagamento.Assegnazioni != null && s.InformazioniPagamento.Assegnazioni.Count > 0) ||
+                                    (s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 &&
+                                     s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
+                        .ToList();
+
                     var studentsWithoutPA = students
-                    .Where(s => (s.InformazioniPagamento.Assegnazioni == null || s.InformazioniPagamento.Assegnazioni.Count <= 0) && !(s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 && s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
-                    .ToList();
+                        .Where(s => (s.InformazioniPagamento.Assegnazioni == null || s.InformazioniPagamento.Assegnazioni.Count <= 0) &&
+                                   !(s.InformazioniPagamento.Detrazioni != null && s.InformazioniPagamento.Detrazioni.Count > 0 &&
+                                     s.InformazioniPagamento.Detrazioni.Any(d => d.codReversale == "01")))
+                        .ToList();
 
                     IEnumerable<StudentePagamenti> target;
                     switch (categoriaCU)
@@ -3446,15 +3529,11 @@ namespace ProcedureNet7
 
                                 DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), impegno);
                                 if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
-                                {
                                     Utilities.ExportDataTableToExcel(dataTableMatricole, catFolder, false, "Matricole");
-                                }
 
                                 DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), impegno);
                                 if (dataTableASuccessivi != null && dataTableASuccessivi.Rows.Count > 0)
-                                {
                                     Utilities.ExportDataTableToExcel(dataTableASuccessivi, catFolder, false, "AnniSuccessivi");
-                                }
                             }
 
                             if (studentsWithPA.Count > 0 && (selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
@@ -3487,15 +3566,11 @@ namespace ProcedureNet7
 
                                 DataTable dataTableMatricole = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), impegno);
                                 if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
-                                {
                                     Utilities.ExportDataTableToExcel(dataTableMatricole, catFolder, false, "Matricole");
-                                }
 
                                 DataTable dataTableASuccessivi = GenerareExcelDataTableNoDetrazioni(studentsWithoutPA.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), impegno);
                                 if (dataTableASuccessivi != null && dataTableASuccessivi.Rows.Count > 0)
-                                {
                                     Utilities.ExportDataTableToExcel(dataTableASuccessivi, catFolder, false, "AnniSuccessivi");
-                                }
                             }
                             break;
 
@@ -3515,11 +3590,10 @@ namespace ProcedureNet7
                             break;
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    throw ex;
+                    throw;
                 }
-
             }
 
             void ProcessStudentsByAnnoCorso(List<StudentePagamenti> students, string folderPath, bool processMatricole, bool processAnniSuccessivi, string nomeFileInizio, string codEnteFlusso, string impegnoFlusso)
@@ -3531,30 +3605,22 @@ namespace ProcedureNet7
                 else
                 {
                     if (processMatricole)
-                    {
                         ProcessAndWriteStudents(students.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), folderPath, $"{nomeFileInizio}_Matricole", codEnteFlusso, impegnoFlusso);
-                    }
+
                     if (processAnniSuccessivi)
-                    {
                         ProcessAndWriteStudents(students.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), folderPath, $"{nomeFileInizio}_AnniSuccessivi", codEnteFlusso, impegnoFlusso);
-                    }
                 }
             }
+
             void ProcessStudentsByCodEnte(string selectedCodEnte, List<StudentePagamenti> studentsWithPA, string newFolderPath, string impegno, string categoriaCU)
             {
-                if (studentsWithPA.Count <= 0)
-                {
-                    return;
-                }
+                if (studentsWithPA.Count <= 0) return;
 
                 bool allCodEnte = selectedCodEnte == "00";
-
-                // Create a dictionary to hold the groups
-                Dictionary<string, List<string>> codEnteGroups = new Dictionary<string, List<string>>();
+                Dictionary<string, List<string>> codEnteGroups = new();
 
                 if (allCodEnte)
                 {
-                    // Define the three main groups
                     codEnteGroups.Add("02", new List<string> { "02" });
                     codEnteGroups.Add("05", new List<string> { "05" });
                     var otherCodEntes = studentsWithPA.Select(s => s.InformazioniIscrizione.CodEnte).Distinct().Where(c => c != "02" && c != "05").ToList();
@@ -3571,11 +3637,7 @@ namespace ProcedureNet7
                     List<string> groupCodEntes = group.Value;
 
                     var studentsInGroup = studentsWithPA.Where(s => groupCodEntes.Contains(s.InformazioniIscrizione.CodEnte)).ToList();
-
-                    if (studentsInGroup.Count == 0)
-                    {
-                        continue;
-                    }
+                    if (studentsInGroup.Count == 0) continue;
 
                     string nomeCodEnte = "";
 
@@ -3607,19 +3669,14 @@ namespace ProcedureNet7
                     }
                 }
 
-                // Collect all codEnte codes for the final processing
                 List<string> sediStudi = studentsWithPA.Select(s => s.InformazioniIscrizione.CodEnte).Distinct().ToList();
                 DataTable dataTableMatricole = GenerareExcelDataTableConDetrazioni(studentsWithPA.Where(s => s.InformazioniIscrizione.AnnoCorso == 1).ToList(), sediStudi, impegno);
                 DataTable dataTableASuccessivi = GenerareExcelDataTableConDetrazioni(studentsWithPA.Where(s => s.InformazioniIscrizione.AnnoCorso != 1).ToList(), sediStudi, impegno);
 
                 if (dataTableMatricole != null && dataTableMatricole.Rows.Count > 0)
-                {
                     Utilities.ExportDataTableToExcel(dataTableMatricole, newFolderPath, false, "Matricole");
-                }
                 if (dataTableASuccessivi != null && dataTableASuccessivi.Rows.Count > 0)
-                {
                     Utilities.ExportDataTableToExcel(dataTableASuccessivi, newFolderPath, false, "AnniSuccessivi");
-                }
             }
 
             void ProcessAndWriteStudents(List<StudentePagamenti> students, string folderPath, string fileName, string codEnteFlusso, string impegnoFlusso)
@@ -3627,9 +3684,26 @@ namespace ProcedureNet7
                 if (students.Any())
                 {
                     DataTable dataTableFlusso = GenerareFlussoDataTable(students, codEnteFlusso);
+
+                    // mark CFs as written + remember which flusso file
+                    string baseName = $"flusso_{fileName}_{impegnoFlusso}";
+                    foreach (var st in students)
+                    {
+                        var cf = st.InformazioniPersonali.CodFiscale;
+                        if (string.IsNullOrWhiteSpace(cf)) continue;
+
+                        _flussoWrittenCF.Add(cf);
+                        if (!_flussoFilesByCF.TryGetValue(cf, out var list))
+                        {
+                            list = new List<string>();
+                            _flussoFilesByCF[cf] = list;
+                        }
+                        list.Add(baseName);
+                    }
+
                     if (dataTableFlusso != null && dataTableFlusso.Rows.Count > 0)
                     {
-                        Utilities.WriteDataTableToTextFile(dataTableFlusso, folderPath, $"flusso_{fileName}_{impegnoFlusso}");
+                        Utilities.WriteDataTableToTextFile(dataTableFlusso, folderPath, baseName);
                     }
                     if (insertInDatabase)
                     {
@@ -3639,6 +3713,7 @@ namespace ProcedureNet7
                 }
             }
 
+
             static void GenerateGiuliaFile(string newFolderPath, List<StudentePagamenti> studentsWithPA, string impegno)
             {
                 DataTable dataTable = GenerareGiuliaDataTable(studentsWithPA, impegno);
@@ -3647,6 +3722,7 @@ namespace ProcedureNet7
                     Utilities.ExportDataTableToExcel(dataTable, newFolderPath, true, "Dettaglio PA");
                 }
             }
+
             static DataTable GenerareGiuliaDataTable(List<StudentePagamenti> studentsWithPA, string impegno)
             {
                 Logger.LogInfo(60, $"Lavorazione studenti - impegno n°{impegno} - Generazione Dettaglio PA");
@@ -4018,6 +4094,335 @@ namespace ProcedureNet7
                 _ = studentsData.Rows.Add(" ");
                 return studentsData;
             }
+
+            bool HasPAForStudent(StudentePagamenti s, string categoriaPagam)
+            {
+                bool hasAssegnazioni = s.InformazioniPagamento.Assegnazioni != null &&
+                                        s.InformazioniPagamento.Assegnazioni.Count > 0;
+
+                return hasAssegnazioni;
+            }
+            string BuildNonFlussoReason(
+                StudentePagamenti s,
+                string categoriaCU,
+                string selectedRichiestoPA,
+                string tipoStudente,
+                string categoriaPagam)
+            {
+                // Basic validation
+                if (s == null)
+                    return "Oggetto Studente nullo o non inizializzato.";
+
+                if (s.InformazioniPersonali == null)
+                    return "Dati anagrafici mancanti.";
+
+                if (s.InformazioniPagamento == null)
+                    return "Dati pagamento mancanti.";
+
+                if (s.InformazioniIscrizione == null)
+                    return "Dati iscrizione mancanti.";
+
+                bool hasPA = HasPAForStudent(s, categoriaPagam);
+                bool hasIBAN = !string.IsNullOrWhiteSpace(s.InformazioniConto?.IBAN);
+                bool hasImporto = s.InformazioniPagamento.ImportoDaPagare > 0;
+                int annoCorso = s.InformazioniIscrizione.AnnoCorso;
+                string codEnte = s.InformazioniIscrizione.CodEnte ?? "??";
+
+                // TipoStudente meaning:
+                // 0 = solo matricole (AnnoCorso=1)
+                // 1 = solo anni successivi (AnnoCorso>1)
+                // 2 = entrambi
+                if (tipoStudente == "0" && annoCorso != 1)
+                    return $"Studente di anno {annoCorso}, ma tipoStudente=0 (solo matricole).";
+                if (tipoStudente == "1" && annoCorso == 1)
+                    return $"Studente matricola (AnnoCorso=1), ma tipoStudente=1 (solo anni successivi).";
+
+                // Missing IBAN or importi zero are common reasons for exclusion
+                if (!hasIBAN)
+                    return "IBAN mancante o non valido: lo studente non può essere incluso nel flusso.";
+                if (!hasImporto)
+                    return $"Importo da pagare pari a zero ({s.InformazioniPagamento.ImportoDaPagare}).";
+
+                // Now analyze based on categoriaCU:
+                switch (categoriaCU)
+                {
+                    case "111":
+                        // everyone can go, but let's detect if excluded by PA config
+                        if (hasPA && !(selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
+                            return $"Categoria 111 con PA, ma selectedRichiestoPA={selectedRichiestoPA} non consente flussi CON PA.";
+                        if (!hasPA && !(selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
+                            return $"Categoria 111 senza PA, ma selectedRichiestoPA={selectedRichiestoPA} non consente flussi SENZA PA.";
+                        return "Categoria 111: regole generali rispettate, ma non scritto probabilmente per esclusione tecnica o errore successivo.";
+
+                    case "211":
+                        // Only WITHOUT PA are valid
+                        if (hasPA)
+                            return "Categoria 211 ma lo studente HA PA: non compatibile, deve andare nella categoria 311 o 111 con PA.";
+                        if (!(selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
+                            return $"Categoria 211 (senza PA) ma selectedRichiestoPA={selectedRichiestoPA} non consente flussi SENZA PA.";
+                        return "Categoria 211 corretta ma non emesso per motivi ignoti (forse importi, filtro studente, o errore tecnico).";
+
+                    case "311":
+                        // Only WITH PA are valid
+                        if (!hasPA)
+                            return "Categoria 311 ma lo studente NON HA PA: deve essere in 211 o 111 senza PA.";
+                        if (!(selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
+                            return $"Categoria 311 con PA ma selectedRichiestoPA={selectedRichiestoPA} non consente flussi CON PA.";
+                        return "Categoria 311 corretta ma non emesso per motivi ignoti (probabile filtro per tipoStudente o errore tecnico).";
+
+                    default:
+                        return $"CategoriaCU {categoriaCU} non riconosciuta o non gestita dai flussi.";
+                }
+            }
+            DataTable BuildFullAuditDataTable(IEnumerable<StudentePagamenti> students, string impegno)
+            {
+                var dt = new DataTable();
+
+                // === Identificativi / Contesto
+                dt.Columns.Add("Impegno");
+                dt.Columns.Add("CategoriaPagam");           // PR/SA/...
+                dt.Columns.Add("CategoriaCU");
+                dt.Columns.Add("TipoStudente");             // 0=matricole, 1=anni successivi, 2=entrambi
+                dt.Columns.Add("SelectedRichiestoPA");      // 0/1/2/3
+
+                // === Personali (InformazioniPersonali)
+                dt.Columns.Add("NumDomanda");
+                dt.Columns.Add("CodFiscale");
+                dt.Columns.Add("Cognome");
+                dt.Columns.Add("Nome");
+                dt.Columns.Add("Sesso");
+                dt.Columns.Add("DataNascita");
+                dt.Columns.Add("Disabile");
+                dt.Columns.Add("CodCittadinanza");
+                dt.Columns.Add("Telefono");
+                dt.Columns.Add("Email");
+                dt.Columns.Add("Rifugiato");
+
+                // === Iscrizione (InformazioniIscrizione)
+                dt.Columns.Add("AnnoCorso");
+                dt.Columns.Add("TipoCorso");
+                dt.Columns.Add("CodCorsoLaurea");
+                dt.Columns.Add("CodSedeStudi");
+                dt.Columns.Add("CodFacolta");
+                dt.Columns.Add("CodEnte");
+                dt.Columns.Add("ComuneSedeStudi");
+
+                // === Conto (InformazioniConto)
+                dt.Columns.Add("IBAN");
+                dt.Columns.Add("Swift");
+                dt.Columns.Add("BonificoEstero");
+
+                // === Sede (InformazioniSede + Residenza + Domicilio)
+                dt.Columns.Add("ContrattoValido");
+                dt.Columns.Add("ProrogaValido");
+                dt.Columns.Add("ContrattoEnte");
+                dt.Columns.Add("DomicilioDefinito");
+                dt.Columns.Add("DomicilioCheck");
+                dt.Columns.Add("StatusSede");
+                dt.Columns.Add("ForzaturaStatusSede");
+                dt.Columns.Add("PrevScadenza");
+                dt.Columns.Add("GiorniDallaScad");
+                dt.Columns.Add("CodBlocchi");
+
+                // Residenza (se disponibile dai tuoi oggetti)
+                dt.Columns.Add("Res_Indirizzo");
+                dt.Columns.Add("Res_CAP");
+                dt.Columns.Add("Res_CodComune");
+                dt.Columns.Add("Res_Provincia");
+                dt.Columns.Add("Res_NomeComune");
+
+                // Domicilio (riassunto)
+                dt.Columns.Add("Dom_Possiede");
+                dt.Columns.Add("Dom_CodComune");
+                dt.Columns.Add("Dom_TitoloOneroso");
+                dt.Columns.Add("Dom_ContrOneroso");
+                dt.Columns.Add("Dom_ContrLocazione");
+                dt.Columns.Add("Dom_ContrEnte");
+                dt.Columns.Add("Dom_ConoscenzaDatiContratto");
+                dt.Columns.Add("Dom_DataReg");
+                dt.Columns.Add("Dom_DataDecorrenza");
+                dt.Columns.Add("Dom_DataScadenza");
+                dt.Columns.Add("Dom_SerieLocazione");
+                dt.Columns.Add("Dom_DurataMesi");
+                dt.Columns.Add("Dom_Prorogato");
+                dt.Columns.Add("Dom_DurataMesiProroga");
+                dt.Columns.Add("Dom_SerieProroga");
+                dt.Columns.Add("Dom_TipologiaIstituto");
+                dt.Columns.Add("Dom_DenomIstituto");
+                dt.Columns.Add("Dom_ImportoMensileIstituto");
+
+                // === Pagamento (InformazioniPagamento)
+                dt.Columns.Add("NumeroImpegno");
+                dt.Columns.Add("ImportoLordo");
+                dt.Columns.Add("ImportoNetto");
+                dt.Columns.Add("ImportoAccontoPA");
+                dt.Columns.Add("ImportoSaldoPA");
+                dt.Columns.Add("MandatoProvvisorio");
+                dt.Columns.Add("PagatoPendolare");
+                dt.Columns.Add("HasPA"); // calcolato con HasPAForStudent
+
+                // === Beneficio (InformazioniBeneficio)
+                dt.Columns.Add("EsitoPA");
+                dt.Columns.Add("EraVincitorePA");
+                dt.Columns.Add("VincitorePA");
+                dt.Columns.Add("RichiestaPA");
+                dt.Columns.Add("RinunciaPA");
+                dt.Columns.Add("SuperamentoEsami");
+                dt.Columns.Add("SuperamentoEsamiTassaRegionale");
+                dt.Columns.Add("ImportoBeneficio");
+
+                // === Riassunti liste / conteggi
+                dt.Columns.Add("NumAssegnazioni");
+                dt.Columns.Add("NumDetrazioni");
+                dt.Columns.Add("NumReversali");
+                dt.Columns.Add("NumPagamentiEffettuati");
+
+                dt.Columns.Add("Assegnazioni_Sintesi"); // "codPensionato:YYYY-MM-DD→YYYY-MM-DD (€mensile=..); ..."
+                dt.Columns.Add("Detrazioni_Sintesi");    // "codRev:importo (causale); ..."
+                dt.Columns.Add("Reversali_Sintesi");     // opzionale se hai il tipo
+                dt.Columns.Add("Pagamenti_Sintesi");     // opzionale se hai il tipo
+
+                foreach (var s in students)
+                {
+                    // Shortcuts (null-safe)
+                    var p = s.InformazioniPersonali;
+                    var i = s.InformazioniIscrizione;
+                    var c = s.InformazioniConto;
+                    var se = s.InformazioniSede;
+                    var pay = s.InformazioniPagamento;
+                    var ben = s.InformazioniBeneficio;
+
+                    string resIndirizzo = se?.Residenza?.indirizzo ?? "";
+                    string resCAP = se?.Residenza?.CAP ?? "";
+                    string resCodComune = se?.Residenza?.codComune ?? "";
+                    string resProvincia = se?.Residenza?.provincia ?? "";
+                    string resNomeComune = se?.Residenza?.nomeComune ?? "";
+
+                    var dom = se?.Domicilio;
+                    string domTipologia = dom?.tipologiaEnteIstituto.ToString() ?? "";
+
+                    // Liste
+                    var assegnazioni = pay?.Assegnazioni ?? new List<Assegnazione>();      // :contentReference[oaicite:8]{index=8}
+                    var detrazioni = pay?.Detrazioni ?? new List<Detrazione>();        // :contentReference[oaicite:9]{index=9}
+                    var reversali = pay?.Reversali ?? new List<Reversale>();
+                    var pagEff = pay?.PagamentiEffettuati ?? new List<Pagamento>();
+
+                    // Sintesi liste
+                    string assSint = (assegnazioni.Count == 0)
+                        ? ""
+                        : string.Join(" | ", assegnazioni.Select(a =>
+                            $"{a.idAssegnazione}:{a.codPensionato} {a.dataDecorrenza:yyyy-MM-dd}→{a.dataFineAssegnazione:yyyy-MM-dd} (€/m {a.costoMensile})"));
+
+                    string detSint = (detrazioni.Count == 0)
+                        ? ""
+                        : string.Join(" | ", detrazioni.Select(d => $"{d.codReversale}:{d.importo} ({d.causale})"));
+
+                    // NB: Reversale/Pagamento types not provided here; if you have basic props, summarize similarly
+                    string revSint = (reversali.Count == 0) ? "" : $"Tot={reversali.Count}";
+                    string paysSint = (pagEff.Count == 0) ? "" : $"Tot={pagEff.Count}";
+
+                    bool hasPA = HasPAForStudent(s, categoriaPagam); // tua logica consolidata
+
+                    dt.Rows.Add(
+                        impegno,
+                        categoriaPagam,
+                        pay?.CategoriaCU ?? "",
+                        tipoStudente,
+                        selectedRichiestoPA,
+
+                        p?.NumDomanda ?? "",
+                        p?.CodFiscale ?? "",
+                        p?.Cognome ?? "",
+                        p?.Nome ?? "",
+                        p?.Sesso ?? "",
+                        p?.DataNascita ?? "",
+                        p?.Disabile == true ? "1" : "0",
+                        p?.CodCittadinanza ?? "",
+                        p?.Telefono.ToString(),
+                        p?.IndirizzoEmail ?? "",
+                        p?.Rifugiato == true ? "1" : "0",
+
+                        i?.AnnoCorso.ToString(),
+                        i?.TipoCorso.ToString(),
+                        i?.CodCorsoLaurea ?? "",
+                        i?.CodSedeStudi ?? "",
+                        i?.CodFacolta ?? "",
+                        i?.CodEnte ?? "",
+                        i?.ComuneSedeStudi ?? "",
+
+                        c?.IBAN ?? "",
+                        c?.Swift ?? "",
+                        c?.BonificoEstero == true ? "1" : "0",
+
+                        se?.ContrattoValido == true ? "1" : "0",
+                        se?.ProrogaValido == true ? "1" : "0",
+                        se?.ContrattoEnte == true ? "1" : "0",
+                        se?.DomicilioDefinito == true ? "1" : "0",
+                        se?.DomicilioCheck == true ? "1" : "0",
+                        se?.StatusSede ?? "",
+                        se?.ForzaturaStatusSede ?? "",
+                        se?.PrevScadenza?.ToString("yyyy-MM-dd") ?? "",
+                        se?.GiorniDallaScad.ToString(),
+                        se?.CodBlocchi ?? "",
+
+                        resIndirizzo,
+                        resCAP,
+                        resCodComune,
+                        resProvincia,
+                        resNomeComune,
+
+                        dom?.possiedeDomicilio == true ? "1" : "0",
+                        dom?.codComuneDomicilio ?? "",
+                        dom?.titoloOneroso == true ? "1" : "0",
+                        dom?.contrOneroso == true ? "1" : "0",
+                        dom?.contrLocazione == true ? "1" : "0",
+                        dom?.contrEnte == true ? "1" : "0",
+                        dom?.conoscenzaDatiContratto == true ? "1" : "0",
+                        dom?.dataRegistrazioneLocazione == default ? "" : dom.dataRegistrazioneLocazione.ToString("yyyy-MM-dd"),
+                        dom?.dataDecorrenzaLocazione == default ? "" : dom.dataDecorrenzaLocazione.ToString("yyyy-MM-dd"),
+                        dom?.dataScadenzaLocazione == default ? "" : dom.dataScadenzaLocazione.ToString("yyyy-MM-dd"),
+                        dom?.codiceSerieLocazione ?? "",
+                        dom?.durataMesiLocazione.ToString(),
+                        dom?.prorogatoLocazione == true ? "1" : "0",
+                        dom?.durataMesiProrogaLocazione.ToString(),
+                        dom?.codiceSerieProrogaLocazione ?? "",
+                        domTipologia,
+                        dom?.denominazioneIstituto ?? "",
+                        dom?.importoMensileRataIstituto.ToString(),
+
+                        pay?.NumeroImpegno ?? "",
+                        pay?.ImportoDaPagareLordo.ToString(),
+                        pay?.ImportoDaPagare.ToString(),
+                        pay?.ImportoAccontoPA.ToString(),
+                        pay?.ImportoSaldoPA.ToString(),
+                        pay?.MandatoProvvisorio ?? "",
+                        pay?.PagatoPendolare == true ? "1" : "0",
+                        hasPA ? "1" : "0",
+
+                        ben?.EsitoPA.ToString(),
+                        ben?.EraVincitorePA == true ? "1" : "0",
+                        ben?.VincitorePA == true ? "1" : "0",
+                        ben?.RichiestaPA == true ? "1" : "0",
+                        ben?.RinunciaPA == true ? "1" : "0",
+                        ben?.SuperamentoEsami == true ? "1" : "0",
+                        ben?.SuperamentoEsamiTassaRegionale == true ? "1" : "0",
+                        ben?.ImportoBeneficio.ToString(),
+
+                        assegnazioni.Count.ToString(),
+                        detrazioni.Count.ToString(),
+                        reversali.Count.ToString(),
+                        pagEff.Count.ToString(),
+
+                        assSint,
+                        detSint,
+                        revSint,
+                        paysSint
+                    );
+                }
+
+                return dt;
+            }
+
         }
         private void InsertIntoMovimentazioni(List<StudentePagamenti> studentiDaProcessare, string impegno)
         {
