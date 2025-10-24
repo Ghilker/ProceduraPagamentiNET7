@@ -228,6 +228,10 @@ namespace ProcedureNet7
                             FormGeneratoreFlussi generatoreFlussi = new FormGeneratoreFlussi(this);
                             ShowFormInPanel(generatoreFlussi);
                             break;
+                        case ProcedureVarie.ProceduraPremiLaurea:
+                            FormPremiLaurea premiLaurea = new FormPremiLaurea(this);
+                            ShowFormInPanel(premiLaurea);
+                            break;
                     }
                 }
 #endif
@@ -347,7 +351,9 @@ namespace ProcedureNet7
             [ProcedureCategory("Varie", "Funzionario")]
             ProceduraRendicontoMiur,
             [ProcedureCategory("Varie", "Funzionario")]
-            ProceduraGeneratoreFlussi
+            ProceduraGeneratoreFlussi,
+            [ProcedureCategory("Varie", "Funzionario")]
+            ProceduraPremiLaurea
 
         }
 
