@@ -10,7 +10,7 @@ using static System.ComponentModel.Design.ObjectSelectorEditor;
 
 namespace ProcedureNet7
 {
-    public class RecordExcel
+    public class RecordExcelGeneratoreFlussi
     {
         public string CodiceFiscale { get; set; } = string.Empty;
         public decimal TotaleLordo { get; set; }
@@ -70,11 +70,10 @@ namespace ProcedureNet7
                 INNER JOIN Comuni AS Comuni_1 ON Studente.Cod_comune_nasc = Comuni_1.Cod_comune
                 WHERE 
                     Domanda.cod_fiscale IN (" + cfstring + @") 
-                    AND Domanda.Tipo_bando = @tipoBando 
+                    AND Domanda.Tipo_bando = 'LZ';
                 ";
 
             using SqlCommand readData = new SqlCommand(sql, CONNECTION);
-            readData.Parameters.AddWithValue("@tipoBando", "lz");
 
             using SqlDataReader reader = readData.ExecuteReader();
             while (reader.Read())
