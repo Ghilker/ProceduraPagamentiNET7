@@ -175,7 +175,9 @@ namespace ProcedureNet7
                     messageBody += @"
                         <p>I ticket contengono anche il primo messaggio che lo studente 
                         ha inviato, dati su blocchi ed esiti ed in più una sezione che cerca di riassumere il contenuto
-                        del ticket così da facilitare la lavorazione e migliorare la distribuzione per funzioni.</p>";
+                        del ticket così da facilitare la lavorazione e migliorare la distribuzione per funzioni.
+                        Queste nuove colonne con gli argomenti sono indicative ma non del tutto precise, se doveste trovare 
+                        errori o incongruenze fatemi sapere.</p>";
 
                     messageBody += @"
                         <p>Per domande, chiarimenti e suggerimenti resto a disposizione.</p>
@@ -185,7 +187,7 @@ namespace ProcedureNet7
                     var mail = new MailMessage
                     {
                         From = new MailAddress(senderMail),
-                        Subject = $"Estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
+                        Subject = $"Aggioranta estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
                         Body = messageBody,
                         IsBodyHtml = true
                     };
