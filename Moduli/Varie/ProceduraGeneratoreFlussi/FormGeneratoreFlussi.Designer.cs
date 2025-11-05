@@ -36,6 +36,7 @@
             GenflussiSavebtn = new Button();
             GenflussiSavelbl = new Label();
             saveFolderDialog = new FolderBrowserDialog();
+            DownloadmdlBtn = new Button();
             SuspendLayout();
             // 
             // label1
@@ -103,12 +104,23 @@
             GenflussiSavelbl.TabIndex = 39;
             GenflussiSavelbl.Text = "_____";
             // 
+            // DownloadmdlBtn
+            // 
+            DownloadmdlBtn.Location = new Point(607, 56);
+            DownloadmdlBtn.Name = "DownloadmdlBtn";
+            DownloadmdlBtn.Size = new Size(165, 27);
+            DownloadmdlBtn.TabIndex = 40;
+            DownloadmdlBtn.Text = "Scarica modello excel";
+            DownloadmdlBtn.UseVisualStyleBackColor = true;
+            DownloadmdlBtn.Click += DownloadmdlBtn_Click;
+            // 
             // FormGeneratoreFlussi
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
+            Controls.Add(DownloadmdlBtn);
             Controls.Add(GenflussiSavelbl);
             Controls.Add(GenflussiSavebtn);
             Controls.Add(GenflussiFilelbl);
@@ -132,5 +144,6 @@
         private Button GenflussiSavebtn;
         private Label GenflussiSavelbl;
         private FolderBrowserDialog saveFolderDialog;
+        private Button DownloadmdlBtn;
     }
 }
