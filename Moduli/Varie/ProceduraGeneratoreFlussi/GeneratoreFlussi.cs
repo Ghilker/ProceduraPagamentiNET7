@@ -2,11 +2,8 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Globalization;
-using System.IO;
 using System.Linq;
 using OfficeOpenXml;
-using static System.ComponentModel.Design.ObjectSelectorEditor;
 
 namespace ProcedureNet7
 {
@@ -20,7 +17,8 @@ namespace ProcedureNet7
 
     internal class ProceduraGeneratoreFlussi : BaseProcedure<ArgsProceduraGeneratoreFlussi>
     {
-        public ProceduraGeneratoreFlussi(MasterForm? masterForm, SqlConnection? connection) : base(masterForm, connection) { }
+        public ProceduraGeneratoreFlussi(MasterForm? masterForm, SqlConnection? connection)
+            : base(masterForm, connection) { }
 
         public override void RunProcedure(ArgsProceduraGeneratoreFlussi args)
         {
@@ -31,19 +29,22 @@ namespace ProcedureNet7
             if (records.Rows.Count == 0)
                 return;
 
-            List<string> codiciFiscali = new List<string>();
-
-            foreach (DataRow row in records.Rows) {
-                codiciFiscali.Add(row[0].ToString());
-            }
+            List<string> codiciFiscali = records.AsEnumerable()
+                .Select(r => (r[0]?.ToString() ?? string.Empty).Trim().ToUpperInvariant())
+                .Where(cf => !string.IsNullOrEmpty(cf))
+                .ToList();
 
             string cfstring = string.Join(", ", codiciFiscali.Select(cf => $"'{cf}'"));
 
             List<StudentePagamenti> studentiDaGenerare = new();
 
             string sql = @"
-                 WITH UltimaResidenza AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY cod_fiscale ORDER BY anno_accademico DESC) AS rn FROM vResidenza)
-                 SELECT distinct
+                WITH UltimaResidenza AS (
+                    SELECT *, 
+                           ROW_NUMBER() OVER (PARTITION BY cod_fiscale ORDER BY anno_accademico DESC) AS rn 
+                    FROM vResidenza
+                )
+                SELECT DISTINCT
                     Domanda.Cod_fiscale, 
                     Studente.Cognome,
                     Studente.Nome, 
@@ -53,39 +54,49 @@ namespace ProcedureNet7
                     vResidenza.INDIRIZZO, 
                     vResidenza.COD_COMUNE,
                     vResidenza.CAP, 
-                    Comuni.Descrizione as Comune_residenza, 
+                    Comuni.Descrizione AS Comune_residenza, 
                     Studente.Sesso,
                     Studente.Data_nascita, 
                     Comuni_1.Descrizione AS Comune_nascita, 
                     Studente.Cod_comune_nasc, 
-                    Comuni_1.Cod_provincia as Provincia_nascita, 
-                    studente.indirizzo_e_mail,
-                    studente.telefono_cellulare
+                    Comuni_1.Cod_provincia AS Provincia_nascita, 
+                    Studente.indirizzo_e_mail,
+                    Studente.telefono_cellulare
                 FROM 
                     Domanda 
                 INNER JOIN Studente ON Domanda.Cod_fiscale = Studente.Cod_fiscale 
                 INNER JOIN vMODALITA_PAGAMENTO ON Studente.Cod_fiscale = vMODALITA_PAGAMENTO.Cod_fiscale 
-                INNER JOIN UltimaResidenza vResidenza ON Studente.Cod_fiscale = vResidenza.COD_FISCALE AND vResidenza.rn = 1
+                INNER JOIN UltimaResidenza vResidenza 
+                    ON Studente.Cod_fiscale = vResidenza.COD_FISCALE AND vResidenza.rn = 1
                 INNER JOIN Comuni ON vResidenza.COD_COMUNE = Comuni.Cod_comune 
                 INNER JOIN Comuni AS Comuni_1 ON Studente.Cod_comune_nasc = Comuni_1.Cod_comune
                 WHERE 
                     Domanda.cod_fiscale IN (" + cfstring + @") 
                     AND Domanda.Tipo_bando = 'LZ';
-                ";
+            ";
 
             using SqlCommand readData = new SqlCommand(sql, CONNECTION);
-
             using SqlDataReader reader = readData.ExecuteReader();
+
             while (reader.Read())
             {
-                string codFiscaleEstratto = Utilities.SafeGetString(reader, "cod_fiscale");
+                string codFiscaleEstratto = Utilities.SafeGetString(reader, "cod_fiscale").Trim().ToUpperInvariant();
 
-
-                DataRow? recordRow = records.AsEnumerable().FirstOrDefault(r => r[0].ToString() == codFiscaleEstratto);
+                // Trova la riga corrispondente nel DataTable Excel (ignorando maiuscole/minuscole e spazi)
+                DataRow? recordRow = records.AsEnumerable()
+                    .FirstOrDefault(r =>
+                        (r[0]?.ToString() ?? string.Empty).Trim().ToUpperInvariant() == codFiscaleEstratto);
 
                 if (recordRow == null)
+                {
+                    // Log opzionale per debugging
+                    Console.WriteLine($"[ATTENZIONE] Codice fiscale {codFiscaleEstratto} non trovato nel file Excel.");
                     continue;
+                }
 
+                // Parsing sicuro del telefono
+                string telefonoStr = Utilities.SafeGetString(reader, "telefono_cellulare");
+                long.TryParse(telefonoStr, out long telefono);
 
                 StudentePagamenti studente = new StudentePagamenti
                 {
@@ -94,19 +105,24 @@ namespace ProcedureNet7
                         CodFiscale = codFiscaleEstratto,
                         Cognome = Utilities.SafeGetString(reader, "cognome"),
                         Nome = Utilities.SafeGetString(reader, "nome"),
-                        DataNascita = Utilities.SafeGetDateTime(reader, "data_nascita") is DateTime dataNascita ? dataNascita.ToString("dd/MM/yyyy") : string.Empty,
+                        DataNascita = Utilities.SafeGetDateTime(reader, "data_nascita") is DateTime dataNascita
+                            ? dataNascita.ToString("dd/MM/yyyy")
+                            : string.Empty,
                         Sesso = Utilities.SafeGetString(reader, "sesso"),
-                        LuogoNascita = new LuogoNascita { nomeComune = Utilities.SafeGetString(reader, "Comune_nascita"), 
-                        codComune = Utilities.SafeGetString(reader, "Cod_comune_nasc"), 
-                        provincia = Utilities.SafeGetString(reader, "Provincia_nascita") },
+                        LuogoNascita = new LuogoNascita
+                        {
+                            nomeComune = Utilities.SafeGetString(reader, "Comune_nascita"),
+                            codComune = Utilities.SafeGetString(reader, "Cod_comune_nasc"),
+                            provincia = Utilities.SafeGetString(reader, "Provincia_nascita")
+                        },
                         IndirizzoEmail = Utilities.SafeGetString(reader, "indirizzo_e_mail"),
-                        Telefono = long.Parse(Utilities.SafeGetString(reader, "telefono_cellulare"))
+                        Telefono = telefono
                     },
                     InformazioniPagamento = new InformazioniPagamento
                     {
-                        ImportoDaPagare = double.Parse(recordRow[3].ToString()),
-                        ImportoDaPagareLordo = double.Parse(recordRow[1].ToString()),
-                        GeneratoreFlussoReversaleNONLOTOCCAREGIACOMOTIAMMAZZO = double.Parse(recordRow[2].ToString())
+                        ImportoDaPagare = double.TryParse(recordRow[3]?.ToString(), out double impNetto) ? impNetto : 0,
+                        ImportoDaPagareLordo = double.TryParse(recordRow[1]?.ToString(), out double lordo) ? lordo : 0,
+                        GeneratoreFlussoReversaleNONLOTOCCAREGIACOMOTIAMMAZZO = double.TryParse(recordRow[2]?.ToString(), out double rev) ? rev : 0
                     },
                     InformazioniConto = new InformazioniConto
                     {
@@ -121,15 +137,17 @@ namespace ProcedureNet7
                             CAP = Utilities.SafeGetString(reader, "CAP"),
                             provincia = Utilities.SafeGetString(reader, "provincia_residenza"),
                             nomeComune = Utilities.SafeGetString(reader, "Comune_residenza"),
-                            codComune = Utilities.SafeGetString(reader, "COD_COMUNE"),
+                            codComune = Utilities.SafeGetString(reader, "COD_COMUNE")
                         }
                     }
                 };
-                
+
                 studentiDaGenerare.Add(studente);
             }
 
+            // Generazione flusso finale
             DataTable flusso = GenerareFlussoDataTable(studentiDaGenerare);
+
             // Salvataggio su file opzionale
             if (flusso != null && flusso.Rows.Count > 0)
             {
@@ -165,9 +183,13 @@ namespace ProcedureNet7
             foreach (var studente in studentiDaGenerare)
             {
                 int straniero = studente.InformazioniSede.Residenza.provincia == "EE" ? 0 : 1;
-                string indirizzoResidenza = straniero == 0 ? studente.InformazioniSede.Residenza.indirizzo.Replace("//", "-") : studente.InformazioniSede.Residenza.indirizzo;
+                string indirizzoResidenza = straniero == 0
+                    ? studente.InformazioniSede.Residenza.indirizzo.Replace("//", "-")
+                    : studente.InformazioniSede.Residenza.indirizzo;
+
                 string capResidenza = straniero == 0 ? "00000" : studente.InformazioniSede.Residenza.CAP;
                 string dataSenzaSlash = studente.InformazioniPersonali.DataNascita.Replace("/", "");
+
                 table.Rows.Add(
                     incrementale++,
                     studente.InformazioniPersonali.CodFiscale,
@@ -199,7 +221,5 @@ namespace ProcedureNet7
 
             return table;
         }
-
     }
-
 }
