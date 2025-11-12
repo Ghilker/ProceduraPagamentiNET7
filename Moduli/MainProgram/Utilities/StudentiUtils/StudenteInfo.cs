@@ -98,5 +98,10 @@ namespace ProcedureNet7
         {
             InformazioniBeneficio.EsitoPA = esito;
         }
+
+        public void SetServizioSanitario(bool check)
+        {
+            InformazioniBeneficio.HaServizioSanitario = check;
+        }
     }
 }

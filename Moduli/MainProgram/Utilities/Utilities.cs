@@ -685,6 +685,17 @@ namespace ProcedureNet7
             return defaultValue;
         }
 
+        public static int SafeGetInt(this IDataRecord record, int index, int defaultValue = 0)
+        {
+            if (record[index] is DBNull or null)
+                return defaultValue;
+
+            if (int.TryParse(record[index].ToString(), out int result))
+                return result;
+
+            return defaultValue;
+        }
+
         public static DateTime SafeGetDateTime(this IDataRecord record, string fieldName, DateTime? defaultValue = null)
         {
             if (record[fieldName] is DBNull or null)

@@ -43,6 +43,7 @@ namespace ProcedureNet7
             InformazioniIscrizione.AnnoCorso = annoCorso;
             InformazioniIscrizione.TipoCorso = tipoCorso;
             InformazioniBeneficio.EsitoPA = esitoPA;
+            InformazioniBeneficio.VincitorePA = esitoPA == 2 ? true : false;
             InformazioniBeneficio.EraVincitorePA = false;
             InformazioniBeneficio.SuperamentoEsami = superamentoEsami;
             InformazioniBeneficio.SuperamentoEsamiTassaRegionale = superamentoEsamiTassaRegionale;

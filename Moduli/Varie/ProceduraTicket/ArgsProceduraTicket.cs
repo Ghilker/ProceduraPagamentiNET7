@@ -29,9 +29,9 @@ namespace ProcedureNet7
                 yield return new ValidationResult("Errore nella costruzione della lista.");
             }
 
-            bool mailFilePathLoaded = !string.IsNullOrWhiteSpace(_mailFilePath);
+            bool mailFilePathLoaded = string.IsNullOrWhiteSpace(_mailFilePath);
 
-            if (!(mailFilePathLoaded && _ticketChecks[0]))
+            if (mailFilePathLoaded && _ticketChecks[0])
             {
                 yield return new ValidationResult("Indicare il file mail.");
             }

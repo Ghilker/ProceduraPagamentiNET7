@@ -47,6 +47,8 @@ WITH base AS (
     FROM Specifiche_permesso_soggiorno AS vs
     INNER JOIN STATUS_ALLEGATI AS va
         ON vs.id_allegato = va.id_allegato
+    INNER JOIN ALLEGATI AS al
+        ON al.id_allegato = vs.id_allegato and al.data_fine_validita is null
     INNER JOIN Domanda AS d
         ON vs.Cod_fiscale = d.Cod_fiscale
        AND d.Anno_accademico IN (20252026, 20242025)
@@ -54,9 +56,10 @@ WITH base AS (
     INNER JOIN vEsiti_concorsi AS ve
         ON d.Num_domanda = ve.Num_domanda
        AND ve.Cod_beneficio = 'bs'
-       AND ve.Cod_tipo_esito <> 0
+       AND ve.Cod_tipo_esito = 2
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
+	where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
 )
 SELECT DISTINCT Cod_fiscale
 FROM base
@@ -77,6 +80,8 @@ WITH base AS (
     FROM Specifiche_permesso_soggiorno AS vs
     INNER JOIN STATUS_ALLEGATI AS va
         ON vs.id_allegato = va.id_allegato
+    INNER JOIN ALLEGATI AS al
+        ON al.id_allegato = vs.id_allegato and al.data_fine_validita is null
     INNER JOIN Domanda AS d
         ON vs.Cod_fiscale = d.Cod_fiscale
        AND d.Anno_accademico IN (20252026, 20242025)
@@ -84,9 +89,10 @@ WITH base AS (
     INNER JOIN vEsiti_concorsi AS ve
         ON d.Num_domanda = ve.Num_domanda
        AND ve.Cod_beneficio = 'pa'
-       AND ve.Cod_tipo_esito <> 0
+       AND ve.Cod_tipo_esito = 2
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
+	where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
 )
 SELECT DISTINCT Cod_fiscale
 FROM base
