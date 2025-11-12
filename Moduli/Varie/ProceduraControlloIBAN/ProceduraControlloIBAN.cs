@@ -241,7 +241,7 @@ namespace ProcedureNet7
                         string messaggioPersonalizzato =
                             $"Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>" +
                             $"IBAN: {wrongIban}#<br>" +
-                            "La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
+                            "La invitiamo ad aggiornare la modalità prescelta.";
 
                         // Add the message to the dictionary
                         personalizedMessages[cf] = messaggioPersonalizzato;
@@ -369,7 +369,7 @@ namespace ProcedureNet7
                                 string messaggioPersonalizzato =
                                     $"Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>" +
                                     $"IBAN: {ibanCurrent}#<br>" +
-                                    "La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
+                                    "La invitiamo ad aggiornare la modalità prescelta.";
 
                                 MessageUtils.InsertMessages(
                                     CONNECTION,

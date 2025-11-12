@@ -17,7 +17,8 @@ namespace ProcedureNet7
         public double ISEEUP;
         public double ISPEU;
         public double ISPEUP;
-        public double SEQ;
+        public double SEQU;
+        public double SEQUP;
 
         public List<string> incongruenzePresenti = new();
         public List<string> incongruenzeDaTogliere = new();

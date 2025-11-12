@@ -20,6 +20,9 @@ namespace ProcedureNet7
         public HashSet<string> SediStudi { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> SediDescrizioni { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        public bool HasSaldo { get; set; }
+        public bool HasRimborso { get; set; }
+
         public string BlocchiJoined => BlocchiParts.Count == 0 ? "" : string.Join(" | ", BlocchiParts.OrderBy(x => x));
         public string EsitoBSJoined => EsitiBS.Count == 0 ? "" : string.Join(" | ", EsitiBS.OrderBy(x => x));
         public string EsitoPAJoined => EsitiPA.Count == 0 ? "" : string.Join(" | ", EsitiPA.OrderBy(x => x));
@@ -27,10 +30,10 @@ namespace ProcedureNet7
         public string SediDescrizioniJoined => SediDescrizioni.Count == 0 ? "" : string.Join(" | ", SediDescrizioni.OrderBy(x => x));
     }
 
+
     internal class ProceduraTicket : BaseProcedure<ArgsProceduraTicket>
     {
-        private bool _isFileWithMessagges;
-        private bool _deleteAnniPrecedenti;
+        private bool _isFileWithMessagges = true;
         private bool _sendMail;
 
         // anni target configurabili
@@ -40,7 +43,6 @@ namespace ProcedureNet7
 
         public override void RunProcedure(ArgsProceduraTicket args)
         {
-            _isFileWithMessagges = args._ticketChecks[0];
             _sendMail = args._ticketChecks[0];
 
             string ticketFilePath = args._ticketFilePath;
@@ -118,6 +120,8 @@ namespace ProcedureNet7
                             r[$"ESITO_BS_{y}"] = info.EsitoBSJoined;
                             r[$"ESITO_PA_{y}"] = info.EsitoPAJoined;
                             r[$"SEDE_DESCR_{y}"] = info.SediDescrizioniJoined;
+                            r[$"HA_SALDO_{y}"] = info.HasSaldo ? "SI" : "";
+                            r[$"HA_RIMBORSO_{y}"] = info.HasRimborso ? "SI" : "";
                         }
                         else
                         {
@@ -125,8 +129,11 @@ namespace ProcedureNet7
                             r[$"ESITO_BS_{y}"] = "";
                             r[$"ESITO_PA_{y}"] = "";
                             r[$"SEDE_DESCR_{y}"] = "";
+                            r[$"HA_SALDO_{y}"] = "";
+                            r[$"HA_RIMBORSO_{y}"] = "";
                         }
                     }
+
 
                     // keyword engine V6: solo etichette
                     var text = SafeStr(r, "PRIMO_MSG_STUDENTE");
@@ -187,7 +194,7 @@ namespace ProcedureNet7
                     var mail = new MailMessage
                     {
                         From = new MailAddress(senderMail),
-                        Subject = $"Aggioranta estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
+                        Subject = $"Aggiornata estrazione tickets con esiti e blocchi {DateTime.Now:dd/MM}",
                         Body = messageBody,
                         IsBodyHtml = true
                     };
@@ -200,6 +207,10 @@ namespace ProcedureNet7
                     catch (Exception ex) { Logger.Log(0, $"Errore invio mail: {ex.Message}", LogLevel.ERROR); throw; }
                     finally { mail.Dispose(); }
                 }
+            }
+            catch(Exception ex)
+            {
+                Logger.LogError(null, "Errore: " + ex);
             }
             finally
             {
@@ -220,8 +231,11 @@ namespace ProcedureNet7
                 AddStringCol(t, $"ESITO_BS_{y}");
                 AddStringCol(t, $"ESITO_PA_{y}");
                 AddStringCol(t, $"SEDE_DESCR_{y}");
+                AddStringCol(t, $"HA_SALDO_{y}");
+                AddStringCol(t, $"HA_RIMBORSO_{y}");
             }
         }
+
 
         private static void EnsureTopicColumns(DataTable t)
         {
@@ -423,6 +437,51 @@ WHERE CAST(vi.Anno_accademico AS INT) IN ({string.Join(",", yearList)});
                 }
             }
 
+
+            // dopo Iscrizioni+Sede, stesso using della connessione aperta
+            string sqlPay = $@"
+SELECT d.Cod_fiscale,
+       CAST(d.Anno_accademico AS INT) AS Anno,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BSS0' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BSS0_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BSS1' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BSS1_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BSS2' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BSS2_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BST0' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BST0_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BST1' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BST1_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BST2' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BST2_OK
+FROM Domanda d WITH (NOLOCK)
+LEFT JOIN Pagamenti p WITH (NOLOCK)
+  ON p.Num_domanda = d.Num_domanda
+ AND CAST(p.Anno_accademico AS INT) = CAST(d.Anno_accademico AS INT)
+JOIN @Cf TVP ON TVP.CodFiscale = d.Cod_fiscale
+WHERE CAST(d.Anno_accademico AS INT) IN ({string.Join(",", yearList)})
+GROUP BY d.Cod_fiscale, CAST(d.Anno_accademico AS INT);";
+
+            using (var cmdP = new SqlCommand(sqlPay, cnExisting))
+            {
+                var pTv = cmdP.Parameters.AddWithValue("@Cf", tvp);
+                pTv.SqlDbType = SqlDbType.Structured; pTv.TypeName = "dbo.CfList";
+                using var rdP = cmdP.ExecuteReader();
+                while (rdP.Read())
+                {
+                    string cf = rdP.GetString(0);
+                    int anno = Convert.ToInt32(rdP.GetValue(1));
+                    int bss0 = rdP.IsDBNull(2) ? 0 : rdP.GetInt32(2);
+                    int bss1 = rdP.IsDBNull(3) ? 0 : rdP.GetInt32(3);
+                    int bss2 = rdP.IsDBNull(4) ? 0 : rdP.GetInt32(4);
+                    int bst0 = rdP.IsDBNull(5) ? 0 : rdP.GetInt32(5);
+                    int bst1 = rdP.IsDBNull(6) ? 0 : rdP.GetInt32(6);
+                    int bst2 = rdP.IsDBNull(7) ? 0 : rdP.GetInt32(7);
+
+                    bool hasSaldo = (bss0 == 1) || (bss0 == 0 && (bss1 == 1 || (bss1 == 0 && bss2 == 1)));
+                    bool hasRimborso = (bst0 == 1) || (bst0 == 0 && (bst1 == 1 || (bst1 == 0 && bst2 == 1)));
+
+                    var info = GetOrCreate(result, cf, anno);
+                    info.HasSaldo = info.HasSaldo || hasSaldo;
+                    info.HasRimborso = info.HasRimborso || hasRimborso;
+                }
+            }
+
+
             if (reopen) cnExisting.Close();
             return result;
 
@@ -576,6 +635,46 @@ WHERE CAST(vi.Anno_accademico AS INT) IN ({string.Join(",", yearList)})
                         string descr = rdIS.IsDBNull(3) ? "" : (rdIS.GetString(3) ?? "");
                         var info = GetOrCreate(result, cf, anno);
                         if (!string.IsNullOrWhiteSpace(descr)) info.SediDescrizioni.Add(descr.Trim());
+                    }
+                }
+                string sqlPay = $@"
+SELECT d.Cod_fiscale,
+       CAST(d.Anno_accademico AS INT) AS Anno,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BSS0' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BSS0_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BSS1' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BSS1_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BSS2' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BSS2_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BST0' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BST0_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BST1' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BST1_OK,
+       MAX(CASE WHEN p.Cod_tipo_pagam='BST2' AND ISNULL(p.Ritirato_azienda,0)=0 THEN 1 ELSE 0 END) AS BST2_OK
+FROM Domanda d WITH (NOLOCK)
+LEFT JOIN Pagamenti p WITH (NOLOCK)
+  ON p.Num_domanda = d.Num_domanda
+ AND CAST(p.Anno_accademico AS INT) = CAST(d.Anno_accademico AS INT)
+WHERE CAST(d.Anno_accademico AS INT) IN ({string.Join(",", yearList)})
+  AND d.Cod_fiscale IN ({string.Join(",", batch.Select((cf, idx) => $"@cf{idx}"))})
+GROUP BY d.Cod_fiscale, CAST(d.Anno_accademico AS INT);";
+
+                using (var cmdP = new SqlCommand(sqlPay, cnExisting))
+                {
+                    for (int p = 0; p < batch.Count; p++) cmdP.Parameters.AddWithValue($"@cf{p}", batch[p]);
+                    using var rdP = cmdP.ExecuteReader();
+                    while (rdP.Read())
+                    {
+                        string cf = rdP.GetString(0);
+                        int anno = Convert.ToInt32(rdP.GetValue(1));
+                        int bss0 = rdP.IsDBNull(2) ? 0 : rdP.GetInt32(2);
+                        int bss1 = rdP.IsDBNull(3) ? 0 : rdP.GetInt32(3);
+                        int bss2 = rdP.IsDBNull(4) ? 0 : rdP.GetInt32(4);
+                        int bst0 = rdP.IsDBNull(5) ? 0 : rdP.GetInt32(5);
+                        int bst1 = rdP.IsDBNull(6) ? 0 : rdP.GetInt32(6);
+                        int bst2 = rdP.IsDBNull(7) ? 0 : rdP.GetInt32(7);
+
+                        bool hasSaldo = (bss0 == 1) || (bss0 == 0 && (bss1 == 1 || (bss1 == 0 && bss2 == 1)));
+                        bool hasRimborso = (bst0 == 1) || (bst0 == 0 && (bst1 == 1 || (bst1 == 0 && bst2 == 1)));
+
+                        var info = GetOrCreate(result, cf, anno);
+                        info.HasSaldo = info.HasSaldo || hasSaldo;
+                        info.HasRimborso = info.HasRimborso || hasRimborso;
                     }
                 }
 
