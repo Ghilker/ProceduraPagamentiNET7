@@ -272,6 +272,7 @@ namespace ProcedureNet7
 
             using (SqlCommand cmdWhoGotAdded = new SqlCommand(whoGotAddedSql, conn, transaction))
             {
+                cmdWhoGotAdded.CommandTimeout = 999999999;
                 cmdWhoGotAdded.Parameters.AddWithValue("@annoAccademico", annoAccademico);
                 cmdWhoGotAdded.Parameters.AddWithValue("@blockCode", blockCode);
 
@@ -292,16 +293,6 @@ namespace ProcedureNet7
         }
 
 
-        /// <summary>
-        /// Removes a payment block for the given list of num_domanda.
-        /// </summary>
-        /// <param name="conn">Open SqlConnection</param>
-        /// <param name="transaction">Active SqlTransaction</param>
-        /// <param name="numDomandaList">List of num_domanda</param>
-        /// <param name="blockCode">Block code (Cod_tipologia_blocco)</param>
-        /// <param name="annoAccademico">Anno Accademico</param>
-        /// <param name="utente">Utente</param>
-        /// <returns>A BlockRemoveResult with details of the removal.</returns>
         /// <summary>
         /// Removes a payment block for the given list of num_domanda (as strings).
         /// </summary>

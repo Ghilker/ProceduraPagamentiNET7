@@ -108,12 +108,21 @@ namespace ProcedureNet7
 
             try
             {
-                using (TextFieldParser parser = new TextFieldParser(csvFilePath))
+                // Scegli la codifica giusta:
+                // - se il CSV viene da Excel (salvato come "CSV (delimitato da ;)")
+                //   di solito è Windows-1252
+                // - se lo generi tu in UTF-8, usa Encoding.UTF8
+                Encoding enc = Encoding.GetEncoding(1252); // oppure Encoding.UTF8 se sai che è UTF8
+
+                using (var fs = new FileStream(csvFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var reader = new StreamReader(fs, enc, detectEncodingFromByteOrderMarks: true))
+                using (TextFieldParser parser = new TextFieldParser(reader))
                 {
                     parser.Delimiters = new[] { ";" };
                     parser.HasFieldsEnclosedInQuotes = true;
+                    parser.TextFieldType = FieldType.Delimited;
 
-                    // Assume first row is header
+                    // Header
                     string[] headers = parser.ReadFields();
                     if (headers != null)
                     {
@@ -124,16 +133,15 @@ namespace ProcedureNet7
                         }
                     }
 
-                    // Read remaining rows
+                    // Righe
                     while (!parser.EndOfData)
                     {
-                        string[] fields = parser.ReadFields();
-                        // Ensure the row has the same number of columns
-                        // (in case CSV lines have varying columns)
-                        while (fields.Length < returnDataTable.Columns.Count)
+                        string[] fields = parser.ReadFields() ?? Array.Empty<string>();
+
+                        // Se la riga ha meno colonne, completa con stringhe vuote
+                        if (fields.Length < returnDataTable.Columns.Count)
                         {
-                            // Add empty values for missing columns
-                            fields = fields.Concat(new[] { string.Empty }).ToArray();
+                            Array.Resize(ref fields, returnDataTable.Columns.Count);
                         }
 
                         returnDataTable.Rows.Add(fields);

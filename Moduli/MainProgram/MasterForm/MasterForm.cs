@@ -212,6 +212,10 @@ namespace ProcedureNet7
                             FormProceduraEstrazionePermessiSoggiorno estrazionePermessiSoggiorno = new FormProceduraEstrazionePermessiSoggiorno(this);
                             ShowFormInPanel(estrazionePermessiSoggiorno);
                             break;
+                        case ProcedureVarie.EstrazioneIstanze:
+                            FormEstrazioneIstanze estrazioneIstanze = new FormEstrazioneIstanze(this);
+                            ShowFormInPanel(estrazioneIstanze);
+                            break;
                         case ProcedureVarie.ControlloISEEUP:
                             FormControlloISEEUP controlloISEEUP = new FormControlloISEEUP(this);
                             ShowFormInPanel(controlloISEEUP);
@@ -252,9 +256,9 @@ namespace ProcedureNet7
                             FormElaborazioneFileUni formElaborazioneFileUni = new FormElaborazioneFileUni(this);
                             ShowFormInPanel(formElaborazioneFileUni);
                             break;
-                        case ProcedureVerifiche.ControlloID:
-                            FormControlloID controlloID = new FormControlloID(this);
-                            ShowFormInPanel(controlloID);
+                        case ProcedureVerifiche.ControlloPEC:
+                            FormControlloPEC ControlloPEC = new FormControlloPEC(this);
+                            ShowFormInPanel(ControlloPEC);
                             break;
                         case ProcedureVerifiche.ControlloIBAN:
                             FormControlloIBAN controlloIBAN = new FormControlloIBAN(this);
@@ -263,6 +267,10 @@ namespace ProcedureNet7
                         case ProcedureVerifiche.ControlloStatusSede:
                             FormControlloStatusSede controlloStatusSede = new FormControlloStatusSede(this);
                             ShowFormInPanel(controlloStatusSede);
+                            break;
+                        case ProcedureVerifiche.ControlloDomicilio:
+                            FormControlloDomicilio controlloDomicilio = new FormControlloDomicilio(this);
+                            ShowFormInPanel(controlloDomicilio);
                             break;
                     }
                 }
@@ -345,6 +353,8 @@ namespace ProcedureNet7
             [ProcedureCategory("Varie", "Funzionario")]
             EstrazionePermessiSoggiorno,
             [ProcedureCategory("Varie", "Funzionario")]
+            EstrazioneIstanze,
+            [ProcedureCategory("Varie", "Funzionario")]
             ControlloISEEUP,
             [ProcedureCategory("Varie", "Funzionario")]
             ProceduraControlloPS,
@@ -354,7 +364,6 @@ namespace ProcedureNet7
             ProceduraGeneratoreFlussi,
             [ProcedureCategory("Varie", "Funzionario")]
             ProceduraPremiLaurea
-
         }
 
         public enum ProcedureVerifiche
@@ -366,11 +375,13 @@ namespace ProcedureNet7
             [ProcedureCategory("Verifiche", "Programmatore")]
             ElaborazioneFileUni,
             [ProcedureCategory("Verifiche", "Programmatore")]
-            ControlloID,
+            ControlloPEC,
             [ProcedureCategory("Verifiche", "Programmatore")]
             ControlloIBAN,
             [ProcedureCategory("Verifiche", "Programmatore")]
             ControlloStatusSede,
+            [ProcedureCategory("Verifiche", "Programmatore")]
+            ControlloDomicilio,
         }
 
     }

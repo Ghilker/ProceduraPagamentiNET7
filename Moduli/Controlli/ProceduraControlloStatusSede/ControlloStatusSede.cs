@@ -1,7 +1,4 @@
-﻿// ControlloStatusSede.cs — versione completa con RunProcedure ripristinato e logiche VB integrate
-// Solo logica. Dipendenze attese: BaseProcedure<T>, ArgsControlloStatusSede, MasterForm, Logger, Utilities.
-
-using ProcedureNet7.Verifica;
+﻿using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -23,6 +20,11 @@ namespace ProcedureNet7
         private readonly Dictionary<string, string> _provCache = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _forcedStatusByCF = new(StringComparer.OrdinalIgnoreCase);
 
+        private readonly Dictionary<string, DomicilioEvaluator.ContractInput> _openIstanzaByCf =
+    new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, DomicilioEvaluator.LastWorkedIstanza> _lastRejectByCf =
+    new(StringComparer.OrdinalIgnoreCase);
+
         private static readonly Dictionary<string, int> _comuneCompatGroup = new()
         {
             ["G954"] = 1,
@@ -35,6 +37,7 @@ namespace ProcedureNet7
             ["F880"] = 4
         };
 
+        // ===== Calcolo_ComuneSedeStudi (VB) =====
         private static readonly Dictionary<string, string> _distCassino = new(StringComparer.OrdinalIgnoreCase)
         {
             ["CL17"] = "L120",
@@ -89,9 +92,9 @@ namespace ProcedureNet7
 
         private static readonly HashSet<string> _forceAByCorso = new(StringComparer.OrdinalIgnoreCase)
         {
-            // VB + estensioni telematiche/casi storici
             "29386","29400","129618","129618_1","12961_1","DPTEA_57","ECOLUISS_52","04UUTK42",
-            // facoltà-corso storici (replicati via helper IsTelematicoOrForcedA)
+            // nuovi dal VB (>= 20252026)
+            "V89_1","V86"
         };
 
         private static readonly string[] _dateFormats = new[]
@@ -144,19 +147,36 @@ namespace ProcedureNet7
             var esitiBS = new HashSet<int>();
             var esitiPA = new HashSet<int>();
             var dg = new Dictionary<int, (bool Rifugiato, bool Detenuto)>();
-            var iscr = new Dictionary<int, (string CodTipol, string ComuneSede, string CodSedeStudi, string CodCorso, string CodFacolta)>();
+            var iscr = new Dictionary<int, IscrRow>();
             var resComune = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var resProv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var lrs = new Dictionary<string, LrsDomRow>(StringComparer.OrdinalIgnoreCase);
             var codBlocchi = new Dictionary<int, string>();
             var nucleo = new Dictionary<int, (int NumComp, int ConvEstero, string TipoNucleo)>();
             var tipRed = new Dictionary<int, (string? Integr, string? Origine)>();
+            var paRichiestaAttiva = new HashSet<int>();
+            // tabelle comuni
             var inSedeMap = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var pendolariMap = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            var fuoriSedeMap = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            var inSedeDistPairs = new HashSet<(string ComuneSede, string ComuneRes)>(new PairComparer());
+
+            // fuori sede (prioritario) — VB usa sia globale che per sede/distaccata
+            var fuoriSedeGlobal = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var fuoriSedeBySede = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var fuoriSedeByDist = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+            // Estrai_ComuniLimitrofi (VB)
+            var inSedeDistPairs = new HashSet<(string CodSedeDistaccata, string ComuneRes)>(new DistPairComparer());
+
+            // posto alloggio / PA
             var prolungamentiCF = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var terminePAByEnte = new Dictionary<string, DateTime>();
+            var enteByCF = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            var richiestePA = new HashSet<int>();
+            var rinunciaPA = new HashSet<int>();
+            var idoneoPA2Assegn = new HashSet<int>();
+            var vincitorePA = new HashSet<int>();
+            var vincitorePANoAss = new HashSet<int>();
 
             using (var cmd = new SqlCommand("", CONNECTION))
             {
@@ -177,7 +197,7 @@ SELECT Num_domanda, Cod_fiscale, Tipo_bando
 FROM d
 WHERE rn = 1;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                 {
                     while (rd.Read())
@@ -225,7 +245,7 @@ FROM vValori_calcolati v
 JOIN #domande t ON t.Num_domanda = v.Num_domanda
 WHERE v.Anno_accademico = @AA AND v.Status_sede IN ('A','B','C','D');";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read()) vv[rd.GetInt32(0)] = Utilities.SafeGetString(rd, 1);
 
@@ -235,7 +255,7 @@ FROM vEsiti_concorsiBS e
 JOIN #domande t ON t.Num_domanda = e.Num_domanda
 WHERE e.Anno_accademico = @AA AND e.Cod_tipo_esito <> 0;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read()) esitiBS.Add(rd.GetInt32(0));
 
@@ -245,7 +265,7 @@ FROM vEsiti_concorsiPA e
 JOIN #domande t ON t.Num_domanda = e.Num_domanda
 WHERE e.Anno_accademico = @AA AND e.Cod_tipo_esito <> 0;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read()) esitiPA.Add(rd.GetInt32(0));
 
@@ -256,7 +276,7 @@ SELECT CAST(d.Num_domanda AS INT) AS Num_domanda,
 FROM #domande d
 JOIN vDATIGENERALI_dom v ON v.Anno_accademico = @AA AND v.Num_domanda = d.Num_domanda;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read())
                         dg[rd.GetInt32(0)] = (Utilities.SafeGetInt(rd, 1) == 1, Utilities.SafeGetInt(rd, 2) == 1);
@@ -267,7 +287,8 @@ SELECT CAST(d.Num_domanda AS INT) AS Num_domanda,
        cl.Comune_Sede_studi,
        i.Cod_sede_studi,
        i.Cod_corso_laurea,
-       i.Cod_facolta
+       i.Cod_facolta,
+       ISNULL(cl.Cod_sede_distaccata,'') AS Cod_sede_distaccata
 FROM #domande d
 JOIN vIscrizioni i
   ON i.Anno_accademico = @AA AND i.Cod_fiscale = d.Cod_fiscale AND i.tipo_bando = d.Tipo_bando
@@ -280,21 +301,30 @@ JOIN Corsi_laurea cl
  And i.Cod_tipologia_studi  = cl.Cod_tipologia_studi
 WHERE i.Cod_tipologia_studi <> '06';";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
+                {
                     while (rd.Read())
-                        iscr[rd.GetInt32(0)] = (Utilities.SafeGetString(rd, 1),
-                                                Utilities.SafeGetString(rd, 2),
-                                                Utilities.SafeGetString(rd, 3),
-                                                Utilities.SafeGetString(rd, 4),
-                                                Utilities.SafeGetString(rd, 5));
+                    {
+                        var num = rd.GetInt32(0);
+                        iscr[num] = new IscrRow
+                        {
+                            CodTipologia = Utilities.SafeGetString(rd, 1),
+                            ComuneSede = Utilities.SafeGetString(rd, 2),
+                            CodSedeStudi = Utilities.SafeGetString(rd, 3),
+                            CodCorso = Utilities.SafeGetString(rd, 4),
+                            CodFacolta = Utilities.SafeGetString(rd, 5),
+                            CodSedeDistaccata = Utilities.SafeGetString(rd, 6),
+                        };
+                    }
+                }
 
                 cmd.CommandText = @"
 SELECT DISTINCT d.Cod_fiscale, r.Cod_comune, r.provincia_residenza
 FROM #domande d
 JOIN vResidenza r ON r.Cod_fiscale = d.Cod_fiscale AND r.Anno_accademico = @AA;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                 {
                     while (rd.Read())
@@ -305,7 +335,6 @@ JOIN vResidenza r ON r.Cod_fiscale = d.Cod_fiscale AND r.Anno_accademico = @AA;"
                     }
                 }
 
-                // Forzature: carica status destinazione (logica VB)
                 cmd.CommandText = @"
 SELECT DISTINCT f.Cod_Fiscale, f.Status_sede
 FROM Forzature_StatusSede f
@@ -314,7 +343,7 @@ WHERE f.Anno_Accademico = @AA
   AND f.Data_fine_validita IS NULL
   AND f.Status_sede IN ('A','B','C','D');";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read())
                         _forcedStatusByCF[Utilities.SafeGetString(rd, 0)] = Utilities.SafeGetString(rd, 1);
@@ -333,7 +362,7 @@ WITH x AS (
 )
 SELECT * FROM x WHERE rn = 1;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                 {
                     while (rd.Read())
@@ -366,7 +395,7 @@ FROM vValori_calcolati v
 JOIN #domande t ON t.Num_domanda = v.Num_domanda
 WHERE v.Anno_accademico = @AA;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read()) codBlocchi[rd.GetInt32(0)] = Utilities.SafeGetString(rd, 1);
 
@@ -379,7 +408,7 @@ FROM VNUCLEO_FAMILIARE
 WHERE Anno_accademico = @AA
   AND Num_domanda IN (SELECT Num_domanda FROM #domande);";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read())
                         nucleo[rd.GetInt32(0)] = (Utilities.SafeGetInt(rd, 1),
@@ -400,7 +429,7 @@ WITH x AS (
 SELECT Num_domanda, TIPO_REDD_NUCLEO_FAM_INTEGR, TIPO_REDD_NUCLEO_FAM_ORIGINE
 FROM x WHERE rn = 1;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read())
                         tipRed[rd.GetInt32(0)] = (Utilities.SafeGetString(rd, 1), Utilities.SafeGetString(rd, 2));
@@ -416,26 +445,57 @@ FROM x WHERE rn = 1;";
                     while (rd.Read())
                         AddToMap(pendolariMap, Utilities.SafeGetString(rd, 0), Utilities.SafeGetString(rd, 1));
 
-                cmd.CommandText = @"SELECT cod_sede_studi, Cod_comune FROM COMUNI_FUORISEDE;";
+                cmd.CommandText = @"SELECT ISNULL(cod_sede_studi,'') as cod_sede_studi,
+                                           ISNULL(cod_sede_distaccata,'') as cod_sede_distaccata,
+                                           cod_comune
+                                    FROM COMUNI_FUORISEDE;";
                 using (var rd = cmd.ExecuteReader())
+                {
                     while (rd.Read())
-                        AddToMap(fuoriSedeMap, Utilities.SafeGetString(rd, 0), Utilities.SafeGetString(rd, 1));
+                    {
+                        var sede = (Utilities.SafeGetString(rd, 0) ?? "").Trim();
+                        var dist = (Utilities.SafeGetString(rd, 1) ?? "").Trim();
+                        var comune = (Utilities.SafeGetString(rd, 2) ?? "").Trim();
+                        if (string.IsNullOrWhiteSpace(comune)) continue;
 
+                        if (string.IsNullOrWhiteSpace(sede) && string.IsNullOrWhiteSpace(dist))
+                        {
+                            fuoriSedeGlobal.Add(comune);
+                            continue;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(sede))
+                            AddToMap(fuoriSedeBySede, sede, comune);
+
+                        if (!string.IsNullOrWhiteSpace(dist))
+                            AddToMap(fuoriSedeByDist, dist, comune);
+                    }
+                }
+
+                // Estrai_ComuniLimitrofi (VB)
                 cmd.CommandText = @"
-SELECT S.COD_COMUNE as ComuneSede, C.COD_COMUNE as ComuneRes
+SELECT
+    C.COD_SEDE_DISTACCATA,
+    C.COD_COMUNE as ComuneRes
 FROM COMUNI_INSEDE C
-JOIN SEDI_DISTACCATE S ON C.COD_SEDE_DISTACCATA = S.COD_SEDE_DISTACCATA
 WHERE C.COD_SEDE_DISTACCATA <> '00000';";
                 using (var rd = cmd.ExecuteReader())
+                {
                     while (rd.Read())
-                        inSedeDistPairs.Add((Utilities.SafeGetString(rd, 0), Utilities.SafeGetString(rd, 1)));
+                    {
+                        var dist = (Utilities.SafeGetString(rd, 0) ?? "").Trim();
+                        var res = (Utilities.SafeGetString(rd, 1) ?? "").Trim();
+                        if (dist.Length == 0 || res.Length == 0) continue;
+                        inSedeDistPairs.Add((dist, res));
+                    }
+                }
 
                 cmd.CommandText = @"
 SELECT DISTINCT Cod_Fiscale
 FROM Prolungamenti_posto_alloggio
 WHERE anno_accademico = @AA AND data_fine_validita IS NULL;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read()) prolungamentiCF.Add(Utilities.SafeGetString(rd, 0));
 
@@ -444,7 +504,7 @@ SELECT cod_ente, data_termine_ass_pa
 FROM termine_assegnazione_pa
 WHERE anno_accademico = @AA;";
                 cmd.Parameters.Clear();
-                cmd.Parameters.Add("@AA", System.Data.SqlDbType.VarChar, 8).Value = selectedAA;
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
                 using (var rd = cmd.ExecuteReader())
                     while (rd.Read())
                     {
@@ -453,26 +513,252 @@ WHERE anno_accademico = @AA;";
                             terminePAByEnte[ente] = dt;
                     }
 
-                // Precarica province per tutti i comuni usati — senza parametri, via temp table
+                // ESITI_CONCORSI (PA) — ultimo per domanda+beneficio
+                cmd.CommandText = @"
+WITH x AS (
+  SELECT
+    CAST(ec.Num_domanda AS INT) AS Num_domanda,
+    UPPER(ec.Cod_beneficio) AS Cod_beneficio,
+    CAST(ec.Cod_tipo_esito AS INT) AS Cod_tipo_esito,
+    ROW_NUMBER() OVER (
+      PARTITION BY ec.Num_domanda, UPPER(ec.Cod_beneficio)
+      ORDER BY ec.Data_validita DESC
+    ) AS rn
+  FROM ESITI_CONCORSI ec
+  JOIN #domande d ON d.Num_domanda = ec.Num_domanda
+  WHERE ec.Anno_accademico = @AA
+    AND UPPER(ec.Cod_beneficio) IN ('PA')
+)
+SELECT Num_domanda, Cod_beneficio, Cod_tipo_esito
+FROM x
+WHERE rn = 1;";
+                cmd.Parameters.Clear();
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
+                using (var rd = cmd.ExecuteReader())
+                {
+                    while (rd.Read())
+                    {
+                        int num = rd.GetInt32(0);
+                        string ben = Utilities.SafeGetString(rd, 1).Trim().ToUpperInvariant();
+                        int esito = Utilities.SafeGetInt(rd, 2);
+
+                        if (ben == "PA")
+                        {
+                            richiestePA.Add(num);
+                            if (esito == 1) idoneoPA2Assegn.Add(num);
+                            if (esito == 2) vincitorePA.Add(num);
+                            if (esito == 4) vincitorePANoAss.Add(num);
+                        }
+                    }
+                }
+
+                // VARIAZIONI — rinuncia PA (cod_tipo_variaz 2/9/10)
+                cmd.CommandText = @"
+SELECT DISTINCT CAST(v.Num_domanda AS INT) AS Num_domanda
+FROM VARIAZIONI v
+JOIN #domande d ON d.Num_domanda = v.Num_domanda
+WHERE v.Anno_accademico = @AA
+  AND UPPER(v.Cod_beneficio) = 'PA'
+  AND v.Cod_tipo_variaz IN (2,9,10)
+  AND v.Data_validita = (
+      SELECT MAX(v2.Data_validita)
+      FROM VARIAZIONI v2
+      WHERE v2.Anno_accademico = v.Anno_accademico
+        AND v2.Num_domanda = v.Num_domanda
+        AND UPPER(v2.Cod_beneficio) = UPPER(v.Cod_beneficio)
+        AND v2.Cod_tipo_variaz = v.Cod_tipo_variaz
+  );";
+                cmd.Parameters.Clear();
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
+                using (var rd = cmd.ExecuteReader())
+                    while (rd.Read())
+                        rinunciaPA.Add(rd.GetInt32(0));
+
+                // Appartenenza → ente (per termine assegnazione)
+                cmd.CommandText = @"
+WITH x AS (
+  SELECT
+    a.Cod_fiscale,
+    a.Cod_ente,
+    ROW_NUMBER() OVER (
+      PARTITION BY a.Anno_accademico, a.Cod_fiscale, COALESCE(a.tipo_bando,'LZ')
+      ORDER BY a.Data_validita DESC
+    ) rn
+  FROM Appartenenza a
+  JOIN #domande d
+    ON d.Cod_fiscale = a.Cod_fiscale
+   AND COALESCE(a.tipo_bando,'LZ') = COALESCE(d.Tipo_bando,'LZ')
+  WHERE a.Anno_accademico = @AA
+)
+SELECT Cod_fiscale, Cod_ente
+FROM x
+WHERE rn = 1;";
+                cmd.Parameters.Clear();
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
+                using (var rd = cmd.ExecuteReader())
+                {
+                    while (rd.Read())
+                    {
+                        var cf = Utilities.SafeGetString(rd, 0);
+                        var ente = Utilities.SafeGetString(rd, 1);
+                        if (!string.IsNullOrWhiteSpace(cf) && !string.IsNullOrWhiteSpace(ente))
+                            enteByCF[cf] = ente;
+                    }
+                }
+
+                cmd.CommandText = @"
+;WITH q AS (
+    SELECT
+        idg.Cod_fiscale,
+        icl.COD_COMUNE,
+        icl.TITOLO_ONEROSO,
+        icl.TIPO_CONTRATTO_TITOLO_ONEROSO,
+        icl.N_SERIE_CONTRATTO,
+        icl.DATA_REG_CONTRATTO,
+        icl.DATA_DECORRENZA,
+        icl.DATA_SCADENZA,
+        icl.DURATA_CONTRATTO,
+        icl.PROROGA,
+        icl.DURATA_PROROGA,
+        icl.ESTREMI_PROROGA,
+        icl.DENOM_ENTE,
+        icl.IMPORTO_RATA,
+        ROW_NUMBER() OVER (
+            PARTITION BY idg.Cod_fiscale
+            ORDER BY idg.Data_validita DESC, idg.Num_istanza DESC
+        ) rn
+    FROM Istanza_dati_generali idg
+    INNER JOIN Istanza_status iis
+        ON idg.Num_istanza = iis.Num_istanza
+       AND iis.data_fine_validita IS NULL
+    INNER JOIN Istanza_Contratto_locazione icl
+        ON idg.Num_istanza = icl.Num_istanza
+       AND icl.data_fine_validita IS NULL
+    INNER JOIN #domande d
+        ON d.Cod_fiscale = idg.Cod_fiscale
+    WHERE idg.Anno_accademico = @AA
+      AND idg.Data_fine_validita IS NULL
+      AND idg.Esito_istanza IS NULL
+)
+SELECT *
+FROM q
+WHERE rn = 1;";
+                cmd.Parameters.Clear();
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
+
+                _openIstanzaByCf.Clear();
+                using (var rd = cmd.ExecuteReader())
+                {
+                    while (rd.Read())
+                    {
+                        var cf = (Utilities.SafeGetString(rd, "Cod_fiscale") ?? "").Trim().ToUpperInvariant();
+                        if (string.IsNullOrWhiteSpace(cf)) continue;
+
+                        var input = new DomicilioEvaluator.ContractInput(
+                            CodFiscale: cf,
+                            ComuneDomicilio: Utilities.SafeGetString(rd, "COD_COMUNE"),
+                            TitoloOneroso: Utilities.SafeGetInt(rd, "TITOLO_ONEROSO") == 1,
+                            ContrattoEnte: Utilities.SafeGetInt(rd, "TIPO_CONTRATTO_TITOLO_ONEROSO") == 1,
+                            SerieContratto: Utilities.SafeGetString(rd, "N_SERIE_CONTRATTO"),
+                            DataRegistrazioneString: Utilities.SafeGetString(rd, "DATA_REG_CONTRATTO"),
+                            DataDecorrenzaString: Utilities.SafeGetString(rd, "DATA_DECORRENZA"),
+                            DataScadenzaString: Utilities.SafeGetString(rd, "DATA_SCADENZA"),
+                            DurataContratto: Utilities.SafeGetInt(rd, "DURATA_CONTRATTO"),
+                            Prorogato: Utilities.SafeGetInt(rd, "PROROGA") == 1,
+                            DurataProroga: Utilities.SafeGetInt(rd, "DURATA_PROROGA"),
+                            SerieProroga: Utilities.SafeGetString(rd, "ESTREMI_PROROGA"),
+                            DenominazioneEnte: Utilities.SafeGetString(rd, "DENOM_ENTE"),
+                            ImportoRataEnte: Utilities.SafeGetDouble(rd, "IMPORTO_RATA")
+                        );
+
+                        _openIstanzaByCf[cf] = input;
+                    }
+                }
+                cmd.CommandText = @"
+SELECT CAST(br.Num_domanda AS INT) AS Num_domanda
+FROM Benefici_richiesti br
+JOIN #domande d ON d.Num_domanda = br.Num_domanda
+WHERE br.Anno_accademico = @AA
+  AND UPPER(br.Cod_beneficio) = 'PA'
+  AND br.Data_fine_validita IS NULL;";
+                cmd.Parameters.Clear();
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
+
+                using (var rd = cmd.ExecuteReader())
+                    while (rd.Read())
+                        paRichiestaAttiva.Add(rd.GetInt32(0));
+
+
+                cmd.CommandText = @"
+;WITH lastWorked AS (
+    SELECT
+        idg.Cod_fiscale,
+        CAST(idg.Esito_istanza AS INT) AS Esito,
+        idg.Data_validita AS DataCreazione,
+        icl.DATA_SCADENZA AS ScadenzaContrattoIstanza,
+        MAX(iis.data_fine_validita) AS DataEsito,
+        ROW_NUMBER() OVER (
+            PARTITION BY idg.Cod_fiscale
+            ORDER BY MAX(iis.data_fine_validita) DESC, idg.Data_validita DESC
+        ) AS rn
+    FROM Istanza_dati_generali idg
+    JOIN Istanza_status iis
+        ON idg.Num_istanza = iis.Num_istanza
+    JOIN Istanza_Contratto_locazione icl
+        ON idg.Num_istanza = icl.Num_istanza
+       AND icl.data_fine_validita IS NOT NULL
+    JOIN #domande d
+        ON d.Cod_fiscale = idg.Cod_fiscale
+    WHERE idg.Anno_accademico = @AA
+      AND idg.Esito_istanza IS NOT NULL
+    GROUP BY
+        idg.Cod_fiscale,
+        CAST(idg.Esito_istanza AS INT),
+        idg.Data_validita,
+        icl.DATA_SCADENZA
+)
+SELECT Cod_fiscale, Esito, DataCreazione, ScadenzaContrattoIstanza, DataEsito
+FROM lastWorked
+WHERE rn = 1 AND Esito = 0 AND DataEsito IS NOT NULL;";
+                cmd.Parameters.Clear();
+                cmd.Parameters.Add("@AA", SqlDbType.VarChar, 8).Value = selectedAA;
+
+                _lastRejectByCf.Clear();
+                using (var rd = cmd.ExecuteReader())
+                {
+                    while (rd.Read())
+                    {
+                        var cf = (Utilities.SafeGetString(rd, 0) ?? "").Trim().ToUpperInvariant();
+                        if (string.IsNullOrWhiteSpace(cf)) continue;
+
+                        var esito = Utilities.SafeGetInt(rd, 1);
+                        var dataCreazione = rd.GetDateTime(2);
+                        DateTime? scad = rd.IsDBNull(3) ? (DateTime?)null : rd.GetDateTime(3);
+                        DateTime? dataEsito = rd.IsDBNull(4) ? (DateTime?)null : rd.GetDateTime(4);
+
+                        _lastRejectByCf[cf] = new DomicilioEvaluator.LastWorkedIstanza(esito, dataCreazione, scad, dataEsito);
+                    }
+                }
+                // Preload province
                 var comuniNeeded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var v in resComune.Values) if (!string.IsNullOrWhiteSpace(v)) comuniNeeded.Add(v);
                 foreach (var v in iscr.Values) if (!string.IsNullOrWhiteSpace(v.ComuneSede)) comuniNeeded.Add(v.ComuneSede);
                 PreloadProvinces(comuniNeeded, CONNECTION);
 
-
                 cmd.CommandText = "DROP TABLE #domande;";
                 cmd.Parameters.Clear();
                 cmd.ExecuteNonQuery();
 
-                var inSedeListB = inSedeMap.TryGetValue("B", out var setB) ? setB : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
                 foreach (var d in domande)
                 {
                     if (!vv.TryGetValue(d.NumDomanda, out var statusSede)) statusSede = "0";
-                    if (!esitiBS.Contains(d.NumDomanda)) continue;    // solo BS
-                    if (esitiPA.Contains(d.NumDomanda)) continue;     // escludi se ha esito PA
+                    if (!esitiBS.Contains(d.NumDomanda)) continue; // solo BS
+                    if (esitiPA.Contains(d.NumDomanda)) continue;  // escludi se ha esito PA
                     if (!iscr.TryGetValue(d.NumDomanda, out var iscrRow)) continue;
-
+                    if(d.CodFiscale == "TRNSLV03A60F839Y")
+                    {
+                        string test = "";
+                    }
                     var outRow = new OutputRow(d, statusSede)
                     {
                         ComuneResidenza = (resComune.TryGetValue(d.CodFiscale, out var cr) ? cr : "").Trim(),
@@ -481,10 +767,22 @@ WHERE anno_accademico = @AA;";
                         CodSedeStudi = iscrRow.CodSedeStudi?.Trim() ?? "",
                         CodCorso = iscrRow.CodCorso?.Trim() ?? "",
                         CodFacolta = iscrRow.CodFacolta?.Trim() ?? "",
+                        CodSedeDistaccata = iscrRow.CodSedeDistaccata?.Trim() ?? "",
                         CodBlocchi = codBlocchi.TryGetValue(d.NumDomanda, out var cb) ? cb : "",
                         ProlungamentoPA = prolungamentiCF.Contains(d.CodFiscale),
                         AnnoAccademico = selectedAA,
-                        RichiedentePA = d.IsRichiedentePA
+
+                        // Richiesta PA = beneficio PA (VB), non solo tipo_bando
+                        PaRichiestaAttiva = paRichiestaAttiva.Contains(d.NumDomanda),
+                        RichiedentePA = paRichiestaAttiva.Contains(d.NumDomanda),
+
+                        // flag PA
+                        IdoneoPA_Attesa2Assegn = idoneoPA2Assegn.Contains(d.NumDomanda),
+                        VincitorePA = vincitorePA.Contains(d.NumDomanda),
+                        VincitorePANoAssegn = vincitorePANoAss.Contains(d.NumDomanda),
+                        RinunciaPA = rinunciaPA.Contains(d.NumDomanda),
+
+                        EnteGestione = enteByCF.TryGetValue(d.CodFiscale, out var eg) ? eg : ""
                     };
 
                     if (dg.TryGetValue(d.NumDomanda, out var flags))
@@ -518,64 +816,72 @@ WHERE anno_accademico = @AA;";
                             if (n.ConvEstero >= Math.Ceiling(n.NumComp / 2.0)) famigliaItalia = false;
                         }
                     }
-                    if (tipRed.TryGetValue(d.NumDomanda, out var tr))
-                    {
-                        var useIntegr = (nucleo.TryGetValue(d.NumDomanda, out var nx) && string.Equals(nx.TipoNucleo, "I", StringComparison.OrdinalIgnoreCase));
-                        var flag = (useIntegr ? tr.Integr : tr.Origine) ?? "";
-                        if (string.Equals(flag, "EE", StringComparison.OrdinalIgnoreCase)) famigliaItalia = false;
-                    }
+                   
                     outRow.FamigliaResidenteItalia = famigliaItalia;
 
-                    ApplySedeOverrides(outRow); // distaccate + corsi → comune sede o forced A
+                    // ===== ALLINEAMENTO DISTACCATE VB: prima calcolo comune sede studi =====
+                    ApplySedeOverrides_VB(outRow);
 
-                    EvaluateAndAppend(outRow, aaStart, aaEnd, inSedeMap, inSedeListB, pendolariMap, fuoriSedeMap, inSedeDistPairs, terminePAByEnte);
+                    EvaluateAndAppend(
+                        outRow,
+                        aaStart,
+                        aaEnd,
+                        inSedeMap,
+                        pendolariMap,
+                        fuoriSedeGlobal,
+                        fuoriSedeBySede,
+                        fuoriSedeByDist,
+                        inSedeDistPairs,
+                        terminePAByEnte
+                    );
                 }
             }
         }
+
 
         private void EvaluateAndAppend(
             OutputRow row,
             DateTime aaStart,
             DateTime aaEnd,
             Dictionary<string, HashSet<string>> inSedeMap,
-            HashSet<string> inSedeListB,
             Dictionary<string, HashSet<string>> pendolariMap,
-            Dictionary<string, HashSet<string>> fuoriSedeMap,
+            HashSet<string> fuoriSedeGlobal,
+            Dictionary<string, HashSet<string>> fuoriSedeBySede,
+            Dictionary<string, HashSet<string>> fuoriSedeByDist,
             HashSet<(string ComuneSede, string ComuneRes)> inSedeDistPairs,
             Dictionary<string, DateTime> terminePAByEnte)
         {
+
+            if(row.CodFiscale == "TRNSLV03A60F839Y")
+            {
+                string test = "";
+            }
+
             // 0) forzatura tabellare
             if (_forcedStatusByCF.TryGetValue(row.CodFiscale, out var forced))
             {
-                AppendData("Forzatura tabellare", row, row.StatusSede, forced);
+                AppendDecision(row, forced, "Forzatura tabellare");
                 return;
             }
 
-            // 1) detenuto → A
+            // 1) telematici/corsi forzati → A (precedenza, VB)
+            if (row.ForcedStatus == "A" || IsTelematicoOrForcedA(row.AnnoAccademico, row.CodSedeStudi, row.CodFacolta, row.CodCorso))
+            {
+                AppendDecision(row, "A", "Telematico/corso forzato");
+                return;
+            }
+
+            // 2) detenuto → A
             if (row.Detenuto)
             {
-                AppendData("Speciale: detenuto → A", row, row.StatusSede, "A");
+                AppendDecision(row, "A", "Speciale: detenuto");
                 return;
             }
 
-            // 2) rifugiato → B
+            // 3) rifugiato → B (come prima)
             if (row.RifugiatoPolitico)
             {
-                AppendData("Speciale: rifugiato politico → B", row, row.StatusSede, "B");
-                return;
-            }
-
-            // 3) telematici/corsi forzati → A
-            if (row.ForcedStatus == "A" || IsTelematicoOrForcedA(row.CodSedeStudi, row.CodFacolta, row.CodCorso))
-            {
-                AppendData("Telematico/corso forzato → A", row, row.StatusSede, "A");
-                return;
-            }
-
-            // 4) nucleo estero prevalente o provincia estera → B
-            if (!row.FamigliaResidenteItalia || row.ProvinciaRes == "EE")
-            {
-                AppendData("Nucleo estero prevalente → B", row, row.StatusSede, "B");
+                AppendDecision(row, "B", "Speciale: rifugiato politico");
                 return;
             }
 
@@ -583,145 +889,339 @@ WHERE anno_accademico = @AA;";
             if (!string.IsNullOrEmpty(row.ComuneResidenza) &&
                 row.ComuneResidenza.Equals(row.ComuneSedeStudi, StringComparison.OrdinalIgnoreCase))
             {
-                AppendData("OK | [→A] res==sede|prio1", row, row.StatusSede, "A");
+                AppendDecision(row, "A", "res==sede|prio1");
                 return;
             }
 
-            // 6) inSede tabellare (sedi A/O/P/D con liste proprie, altrimenti uso B + distaccate)
-            bool resInSedeList;
-            string srcInSede;
-            switch ((row.CodSedeStudi ?? "").ToUpperInvariant())
+            // 4) nucleo estero prevalente e provincia estera → B
+            if (!row.FamigliaResidenteItalia && row.ProvinciaRes == "EE")
             {
-                case "A":
-                case "O":
-                case "P":
-                case "D":
-                    resInSedeList = InSet(inSedeMap, row.CodSedeStudi, row.ComuneResidenza);
-                    srcInSede = resInSedeList ? $"list:{row.CodSedeStudi}" : "";
-                    break;
-                default:
-                    var dist = inSedeDistPairs.Contains((row.ComuneSedeStudi, row.ComuneResidenza));
-                    var listB = inSedeListB.Contains(row.ComuneResidenza);
-                    resInSedeList = dist || listB;
-                    srcInSede = dist ? "distaccata" : (listB ? "list:B" : "");
-                    break;
-            }
-            if (resInSedeList)
-            {
-                AppendData($"MODIFICA | [{row.StatusSede}→A] insede:{srcInSede}→A|prio2", row, row.StatusSede, "A");
+                AppendDecision(row, "B", "Nucleo estero prevalente");
                 return;
             }
 
-            // 7) province speciali: Viterbo e Cassino → C
-            if (IsSameProvince(row.ComuneResidenza, row.ComuneSedeStudi, out var _, out var provSede))
+            // Da qui in poi: studente “italiano” ai fini logica status.
+            // Domicilio: serve per qualificare "fuori sede" (B) anche se comune è in lista prioritaria.
+            var domicilioValido = ComputeDomicilioValido_WithIstanze(row, aaStart, aaEnd, out var domicileReason);
+
+            // 7) COMUNI_FUORISEDE prioritari
+            // MODIFICA: per italiani -> B solo con domicilio valido, altrimenti NON assegno B qui (si prosegue)
+            if (IsComuneFuoriSedePrioritario_VB(row, fuoriSedeGlobal, fuoriSedeBySede, fuoriSedeByDist))
             {
-                if (row.ComuneSedeStudi == "H501" && provSede == "VT")
+                if (domicilioValido)
                 {
-                    AppendData("Viterbo: provincia VT → C", row, row.StatusSede, "C");
+                    var sug = "B";
+                    MaybeDowngradePA(ref sug, row, terminePAByEnte);
+                    AppendDecision(row, sug, $"COMUNI_FUORISEDE(prio) + domicilio valido → {sug} ({domicileReason})");
                     return;
                 }
-                if (row.ComuneSedeStudi is "C034" or "D810" or "I838")
-                {
-                    AppendData("Cassino: stessa provincia → C", row, row.StatusSede, "C");
-                    return;
-                }
+
+                // comune “fuori sede” ma senza domicilio valido: non concedere B
+                // continua nelle regole successive (PA / pendolare / fallback)
             }
 
-            // 8) PA: sede consentita → B
-            if (row.RichiedentePA && IsSedePAConsentita(row.AnnoAccademico, row.ComuneSedeStudi))
+            // 8) sede distaccata speciale (VB: F061/ISP, A462/TW8)
+            if (IsSpecialDistaccata_VB(row))
+            {
+                var sug = EvaluateSpecialDistaccata_VB(row, aaStart, aaEnd, terminePAByEnte);
+                AppendDecision(row, sug, "Sede distaccata speciale");
+                return;
+            }
+
+            // 6) COMUNI_INSEDE + Estrai_ComuniLimitrofi (VB)
+            if (IsInSede_VB(row, inSedeMap, inSedeDistPairs))
+            {
+                AppendDecision(row, "A", "COMUNI_INSEDE/limitrofi|prio2");
+                return;
+            }
+
+            // 9) PA: consentita solo se richiesta attiva e (idoneo/vincitore/noAssegn) e non rinuncia
+            if (row.PaRichiestaAttiva && HasPaAlloggioStatus(row) && IsSedePAConsentita(row.AnnoAccademico, row.ComuneSedeStudi))
             {
                 var sugPA = "B";
                 MaybeDowngradePA(ref sugPA, row, terminePAByEnte);
-                AppendData($"PA: sede consentita → {sugPA}", row, row.StatusSede, sugPA);
+                AppendDecision(row, sugPA, "PA consentita (idoneo/vincitore) + richiesta attiva");
                 return;
             }
 
-            // 9) fuoriSede tabellare → B
-            bool resInFuoriList = InSet(fuoriSedeMap, NormalizeFuoriKey(row.CodSedeStudi, row.ComuneSedeStudi), row.ComuneResidenza);
-            if (resInFuoriList)
+            // 10) pendolare VB (lista + provincia) — fuori sede tabellare già gestito prima
+            if (IsPendolare_VB(row, pendolariMap))
+            {
+                if (domicilioValido)
+                {
+                    var sug = "B";
+                    MaybeDowngradePA(ref sug, row, terminePAByEnte);
+                    AppendDecision(row, sug, $"Pendolare VB + domicilio valido → {sug} ({domicileReason})");
+                }
+                else
+                {
+                    AppendDecision(row, "C", "Pendolare VB (lista/provincia) → C");
+                }
+                return;
+            }
+
+            // 11) fallback
+            if (domicilioValido)
             {
                 var sug = "B";
                 MaybeDowngradePA(ref sug, row, terminePAByEnte);
-                AppendData($"MODIFICA | [{row.StatusSede}→{sug}] fuori:list→{sug}|prio3", row, row.StatusSede, sug);
-                return;
+                AppendDecision(row, sug, $"Fallback: domicilio valido → {sug} ({domicileReason})");
+            }
+            else
+            {
+                AppendDecision(row, "D", $"Fallback: domicilio NON valido → D ({domicileReason})");
+            }
+        }
+
+
+        // ======== ALLINEAMENTO “SEDI DISTACCATE” AL VB ========
+
+        // Calcolo_ComuneSedeStudi (VB) con exit/return per blocchi sede
+        private void ApplySedeOverrides_VB(OutputRow row)
+        {
+            var codSede = (row.CodSedeStudi ?? "").Trim().ToUpperInvariant();
+            var corso = (row.CodCorso ?? "").Trim();
+
+            // Cassino: A / O
+            if (codSede == "A" || codSede == "O")
+            {
+                if (_distCassino.TryGetValue(corso, out var com))
+                    row.ComuneSedeStudi = com;
+                // VB: Exit Sub
+                goto End;
             }
 
-            // 10) pendolari tabellare
-            bool resInPendList = InSet(pendolariMap, NormalizePendKey(row.CodSedeStudi, row.ComuneSedeStudi), row.ComuneResidenza);
+            // Tor Vergata: C
+            if (codSede == "C")
+            {
+                if (_distTorVergata.TryGetValue(corso, out var com))
+                    row.ComuneSedeStudi = com;
+                // VB: Exit Sub
+                goto End;
+            }
 
-            // normalizzazioni puntuali VB su domicilio
+            // San Pio V: W
+            if (codSede == "W")
+            {
+                if (_distSanPioV.TryGetValue(corso, out var com))
+                    row.ComuneSedeStudi = com;
+                // VB: Exit Sub
+                goto End;
+            }
+
+            // LUMSA: K
+            if (codSede == "K")
+            {
+                if (_distLumsa.TryGetValue(corso, out var com))
+                    row.ComuneSedeStudi = com;
+                // VB: Exit Sub
+                goto End;
+            }
+
+        End:
+            // Forzature A (VB) — applicate dopo il calcolo comune sede
+            if (IsTelematicoOrForcedA(row.AnnoAccademico, row.CodSedeStudi, row.CodFacolta, row.CodCorso))
+                row.ForcedStatus = "A";
+        }
+
+        // Estrai_ComuniLimitrofi + COMUNI_INSEDE (VB)
+        private bool IsInSede_VB(
+            OutputRow row,
+            Dictionary<string, HashSet<string>> inSedeMap,
+            HashSet<(string CodSedeDistaccata, string ComuneRes)> inSedeDistPairs)
+        {
+            var comuneRes = (row.ComuneResidenza ?? "").Trim();
+            var comuneSede = (row.ComuneSedeStudi ?? "").Trim();
+            var codSede = (row.CodSedeStudi ?? "").Trim().ToUpperInvariant();
+            var codDist = (row.CodSedeDistaccata ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(comuneRes) || string.IsNullOrWhiteSpace(comuneSede))
+                return false;
+
+            // VB: A/O/P/D usano lista propria; tutti gli altri usano B.
+            var key = (codSede is "A" or "O" or "P" or "D") ? codSede : "B";
+
+            // Estrai_ComuniLimitrofi SOLO se:
+            // - la sede è tra A/O/P/D/B (come prima)
+            // - lo studente studia in sede distaccata (codDist valorizzato e != '00000')
+            if (codSede is "A" or "O" or "P" or "D" or "B")
+            {
+                if (!string.IsNullOrWhiteSpace(codDist) && codDist != "00000")
+                {
+                    if (inSedeDistPairs.Contains((codDist, comuneRes)))
+                        return true;
+                }
+            }
+
+            return inSedeMap.TryGetValue(key, out var set) && set.Contains(comuneRes);
+        }
+
+        // COMUNI_FUORISEDE prioritario (VB) con match anche su cod_sede_distaccata
+        private bool IsComuneFuoriSedePrioritario_VB(
+            OutputRow row,
+            HashSet<string> fuoriSedeGlobal,
+            Dictionary<string, HashSet<string>> fuoriSedeBySede,
+            Dictionary<string, HashSet<string>> fuoriSedeByDist)
+        {
+            var comuneRes = (row.ComuneResidenza ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(comuneRes)) return false;
+
+            if (fuoriSedeGlobal.Contains(comuneRes)) return true;
+
+            var codSede = (row.CodSedeStudi ?? "").Trim().ToUpperInvariant();
+            var dist = (row.CodSedeDistaccata ?? "").Trim();
+
+            // VB: (cod_sede_studi = Cod_SedeStudi) OR (cod_sede_distaccata = cod_sede_distaccata)
+            if (!string.IsNullOrWhiteSpace(codSede) &&
+                fuoriSedeBySede.TryGetValue(codSede, out var setSede) &&
+                setSede.Contains(comuneRes))
+                return true;
+
+            if (!string.IsNullOrWhiteSpace(dist) &&
+                fuoriSedeByDist.TryGetValue(dist, out var setDist) &&
+                setDist.Contains(comuneRes))
+                return true;
+
+            // VB: default 'B' per sedi non A/O/P/D
+            if (!(codSede is "A" or "O" or "P" or "D") &&
+                fuoriSedeBySede.TryGetValue("B", out var setB) &&
+                setB.Contains(comuneRes))
+                return true;
+
+            // Latina (chiave LT) dal 20212022 in poi (VB)
+            if (string.Compare(row.AnnoAccademico, "20212022", StringComparison.Ordinal) >= 0 &&
+                row.ComuneSedeStudi == "E472")
+            {
+                if (fuoriSedeBySede.TryGetValue("LT", out var setLt) && setLt.Contains(comuneRes))
+                    return true;
+            }
+
+            // Viterbo dal 20232024: esclusi per cod_sede_studi='D' (VB)
+            if (string.Compare(row.AnnoAccademico, "20232024", StringComparison.Ordinal) >= 0 &&
+                row.ComuneSedeStudi == "H501")
+            {
+                if (fuoriSedeBySede.TryGetValue("D", out var setVt) && setVt.Contains(comuneRes))
+                    return true;
+            }
+
+            return false;
+        }
+
+        // Pendolare VB (lista + provincia) — distaccate incluse
+        private bool IsPendolare_VB(OutputRow row, Dictionary<string, HashSet<string>> pendolariMap)
+        {
+            var comuneRes = (row.ComuneResidenza ?? "").Trim();
+            var comuneSede = (row.ComuneSedeStudi ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(comuneRes) || string.IsNullOrWhiteSpace(comuneSede))
+                return false;
+
+            var codSede = (row.CodSedeStudi ?? "").Trim().ToUpperInvariant();
+
+            // VB: A/O/P/D lista propria; altrimenti 'B'
+            var keyPend = (codSede is "A" or "O" or "P" or "D") ? codSede : "B";
+            if (pendolariMap.TryGetValue(keyPend, out var setPend) && setPend.Contains(comuneRes))
+                return true;
+
+            return false;
+        }
+
+        // sede distaccata speciale (VB)
+        private static bool IsSpecialDistaccata_VB(OutputRow row)
+        {
+            var corso = (row.CodCorso ?? "").Trim().ToUpperInvariant();
+            var comuneSede = (row.ComuneSedeStudi ?? "").Trim().ToUpperInvariant();
+
+            return (comuneSede == "F061" && corso == "ISP") ||
+                   (comuneSede == "A462" && corso == "TW8");
+        }
+
+        // CalcoloSedeDistaccata (VB) — per anni recenti: TP/AP => C, altrimenti domicilio valido => B, altrimenti D
+        private string EvaluateSpecialDistaccata_VB(OutputRow row, DateTime aaStart, DateTime aaEnd, Dictionary<string, DateTime> terminePAByEnte)
+        {
+            if (!string.IsNullOrEmpty(row.ComuneResidenza) &&
+                row.ComuneResidenza.Equals(row.ComuneSedeStudi, StringComparison.OrdinalIgnoreCase))
+                return "A";
+
+            var provRes = _provCache.TryGetValue(row.ComuneResidenza ?? "", out var pr) ? pr : "";
+            if (provRes is "TP" or "AP")
+                return "C";
+
+            var domicilioValido = ComputeDomicilioValido_WithIstanze(row, aaStart, aaEnd, out var _);
+            if (domicilioValido)
+            {
+                var sug = "B";
+                MaybeDowngradePA(ref sug, row, terminePAByEnte);
+                return sug;
+            }
+
+            return "D";
+        }
+
+        private static bool HasPaAlloggioStatus(OutputRow r)
+        {
+            if (r.RinunciaPA) return false;
+            return r.IdoneoPA_Attesa2Assegn || r.VincitorePA || r.VincitorePANoAssegn;
+        }
+
+        private bool ComputeDomicilioValido_WithIstanze(
+    OutputRow row,
+    DateTime aaStart,
+    DateTime aaEnd,
+    out string reason)
+        {
+            // normalizzazioni VB già presenti nel tuo codice (le lasci identiche)
             if ((row.CodCorso is "29868" or "29868_1") && row.ComuneDomicilio == "D708")
                 row.ComuneDomicilio = row.ComuneSedeStudi;
             if (row.ComuneSedeStudi == "G954" && row.ComuneDomicilio == "L725")
                 row.ComuneDomicilio = row.ComuneSedeStudi;
 
-            // geo e contratto
-            bool domEqResCompat = AreComuniCompatible(row.ComuneDomicilio, row.ComuneResidenza);
-            bool domEqSede = string.Equals(row.ComuneDomicilio, row.ComuneSedeStudi, StringComparison.OrdinalIgnoreCase);
-
-            ParseDate(row.DataDecorrenza, out DateTime dataDec);
-            ParseDate(row.DataScadenza, out DateTime dataScad);
-            int mesiCoperti = ComputeCoveredMonths(dataDec, dataScad, aaStart, aaEnd);
-            bool durataOk = mesiCoperti >= 10;
-            bool titoloOnerosoOk = row.TitoloOneroso && durataOk;
-
-            bool contrattoEnteValido = row.ContrattoEnte &&
-                                       !string.IsNullOrWhiteSpace(row.DenomEnte) &&
-                                       row.DurataContratto >= 10 &&
-                                       row.ImportoRataEnte > 0;
-
-            bool serieContrattoValida = DomicilioUtils.IsValidSerie(row.SerieContratto);
-            bool serieProrogaValida = DomicilioUtils.IsValidSerie(row.SerieProroga);
-            if (!string.IsNullOrEmpty(row.SerieContratto) &&
-                !string.IsNullOrEmpty(row.SerieProroga) &&
-                SerieMatch(row.SerieProroga, row.SerieContratto))
+            if (row.CodCorso is "QD132" or "QD133")
             {
-                // stessa serie: proroga non valida
-                serieProrogaValida = false;
+                if (row.ComuneSedeStudi == "D539" && row.ComuneDomicilio == "D810")
+                    row.ComuneDomicilio = "D539";
             }
 
-            bool contrattoValido = contrattoEnteValido || serieContrattoValida;
-            bool geoOk = !domEqResCompat && domEqSede; // domicilio deve coincidere con sede e non con residenza
+            // main (LRS) → ContractInput
+            var main = new DomicilioEvaluator.ContractInput(
+                CodFiscale: row.CodFiscale,
+                ComuneDomicilio: row.ComuneDomicilio,
+                TitoloOneroso: row.TitoloOneroso,
+                ContrattoEnte: row.ContrattoEnte,
+                SerieContratto: row.SerieContratto,
+                DataRegistrazioneString: row.DataRegistrazione,
+                DataDecorrenzaString: row.DataDecorrenza,
+                DataScadenzaString: row.DataScadenza,
+                DurataContratto: row.DurataContratto,
+                Prorogato: row.Prorogato,
+                DurataProroga: row.DurataProroga,
+                SerieProroga: row.SerieProroga,
+                DenominazioneEnte: row.DenomEnte,
+                ImportoRataEnte: row.ImportoRataEnte
+            );
 
-            // pendolari
-            if (resInPendList)
-            {
-                bool domicilioValido = titoloOnerosoOk && contrattoValido && geoOk && (!(row.Prorogato && !serieProrogaValida));
-                if (domicilioValido)
-                {
-                    var sug = "B";
-                    MaybeDowngradePA(ref sug, row, terminePAByEnte);
-                    AppendData($"MODIFICA | [{row.StatusSede}→{sug}] pend:list + contratto10m→{sug}|prio4", row, row.StatusSede, sug);
-                }
-                else
-                {
-                    var sug = string.IsNullOrWhiteSpace(row.ComuneDomicilio) || !row.TitoloOneroso ? "D" : "C";
-                    AppendData($"MODIFICA | [{row.StatusSede}→{sug}] pendolare (contratto insufficiente)|prio4", row, row.StatusSede, sug);
-                }
-                return;
-            }
+            _openIstanzaByCf.TryGetValue(row.CodFiscale, out var istanza);
+            _lastRejectByCf.TryGetValue(row.CodFiscale, out var lastWorked);
 
-            // fallback: contratto + geo
-            {
-                bool domicilioValido = titoloOnerosoOk && contrattoValido && geoOk && (!(row.Prorogato && !serieProrogaValida));
-                if (domicilioValido)
-                {
-                    var sug = "B";
-                    MaybeDowngradePA(ref sug, row, terminePAByEnte);
-                    AppendData($"MODIFICA | [{row.StatusSede}→{sug}] geoOK + contratto10m→{sug}|prio5", row, row.StatusSede, sug);
-                }
-                else
-                {
-                    AppendData($"MODIFICA | [{row.StatusSede}→D] nessuna lista, contratto insufficiente → D|prio5", row, row.StatusSede, "D");
-                }
-            }
+            // stessa data del controller (se vuoi renderla per-AA, sostituisci qui)
+            var deadlineBase = new DateTime(2025, 12, 30, 23, 59, 59, DateTimeKind.Local);
+
+            var eval = DomicilioEvaluator.EvaluateForStatus(
+                mainLrs: main,
+                openIstanza: istanza,
+                aaStart: aaStart,
+                aaEnd: aaEnd,
+                now: DateTime.Now,
+                deadlineBase: deadlineBase,
+                lastWorked: lastWorked,
+                comuneResidenza: row.ComuneResidenza,
+                comuneSedeStudi: row.ComuneSedeStudi,
+                areComuniCompatible: AreComuniCompatible,
+                requireGeoForStatus: true
+            );
+
+            reason = eval.Reason;
+            return eval.DomicilioValidoPerStatus;
         }
-
-        private static string NormalizePendKey(string codSede, string comuneSede) => codSede ?? "B";
-        private static string NormalizeFuoriKey(string codSede, string comuneSede) => codSede ?? "B";
-
-        private static bool InSet(Dictionary<string, HashSet<string>> map, string sede, string comune)
-            => map.TryGetValue(sede ?? "", out var set) && set.Contains(comune ?? "");
 
         private static void AddToMap(Dictionary<string, HashSet<string>> map, string key, string value)
         {
@@ -731,6 +1231,24 @@ WHERE anno_accademico = @AA;";
                 map[key] = set;
             }
             set.Add(value);
+        }
+
+        private static string NormStatus(string? s)
+        {
+            var x = (s ?? "").Trim().ToUpperInvariant();
+            return (x is "A" or "B" or "C" or "D") ? x : x;
+        }
+
+        private void AppendDecision(OutputRow row, string suggestedStatus, string reason)
+        {
+            var cur = NormStatus(row.StatusSede);
+            var sug = NormStatus(suggestedStatus);
+
+            var isChange = !string.Equals(cur, sug, StringComparison.OrdinalIgnoreCase);
+            var prefix = isChange ? "MODIFICA" : "OK";
+            var tag = isChange ? $"[{cur}→{sug}]" : $"[{cur}]";
+
+            AppendData($"{prefix} | {tag} {reason}", row, cur, sug);
         }
 
         private void AppendData(string motivo, OutputRow row, string statoAttuale, string statoSuggerito)
@@ -759,6 +1277,7 @@ WHERE anno_accademico = @AA;";
                 row.CodCorso
             );
         }
+
         private void PreloadProvinces(HashSet<string> comuniNeeded, SqlConnection conn)
         {
             using var cmd = new SqlCommand(@"
@@ -767,7 +1286,6 @@ CREATE TABLE #need (COD_COMUNE VARCHAR(8) NOT NULL PRIMARY KEY);
 ", conn);
             cmd.ExecuteNonQuery();
 
-            // Bulk copy dei comuni richiesti
             var dt = new DataTable();
             dt.Columns.Add("COD_COMUNE", typeof(string));
             foreach (var c in comuniNeeded)
@@ -783,7 +1301,6 @@ CREATE TABLE #need (COD_COMUNE VARCHAR(8) NOT NULL PRIMARY KEY);
                 bulk.WriteToServer(dt);
             }
 
-            // Join su COMUNI per ottenere le province
             using var read = new SqlCommand(@"
 SELECT c.COD_COMUNE, c.COD_PROVINCIA
 FROM COMUNI c
@@ -863,32 +1380,34 @@ DROP TABLE #need;
             return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
         }
 
-        private bool IsSameProvince(string comune1, string comune2, out string prov1, out string prov2)
+        // Telematici / corsi forzati (VB) inclusi nuovi casi >= 20252026
+        private static bool IsTelematicoOrForcedA(string aa, string codSede, string fac, string corso)
         {
-            prov1 = _provCache.TryGetValue(comune1 ?? "", out var a) ? a : "";
-            prov2 = _provCache.TryGetValue(comune2 ?? "", out var b) ? b : "";
-            return !string.IsNullOrEmpty(prov1) && prov1.Equals(prov2, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsTelematicoOrForcedA(string codSede, string fac, string corso)
-        {
+            aa = (aa ?? "").Trim();
             codSede = (codSede ?? "").Trim().ToUpperInvariant();
             fac = (fac ?? "").Trim().ToUpperInvariant();
             corso = (corso ?? "").Trim().ToUpperInvariant();
 
-            // Sedi/codici telematici
             if (codSede is "TM" or "TGM" or "TUN" or "UTU" or "UTM" or "TSR" or "TUM" or "TU" or "TNC")
                 return true;
 
-            // Facoltà-corso specifici
             if (fac == "I" && (corso == "IID" || corso == "IIF" || corso == "IAJ")) return true;
             if (fac == "P" && corso == "ZAM") return true;
             if (fac == "X" && corso == "04301") return true;
 
-            // Combinazioni specifiche per sede
             if (codSede == "B" && (corso == "29386" || corso == "29400")) return true;
             if (codSede == "E" && (corso == "129618" || corso == "129618_1" || corso == "12961_1")) return true;
             if (codSede == "J" && (corso == "DPTEA_57" || corso == "ECOLUISS_52")) return true;
+
+            // VB: Cod_SedeStudi="C" AND Cod_Corso_Laurea="04UUTK42" => A
+            if (codSede == "C" && corso == "04UUTK42") return true;
+
+            // VB (nuovo): da 20252026
+            if (string.Compare(aa, "20252026", StringComparison.Ordinal) >= 0)
+            {
+                if (codSede == "C" && (corso == "V89_1" || corso == "V86")) return true;
+                if (fac == "UUTK" && corso == "V86") return true;
+            }
 
             if (_forceAByCorso.Contains(corso)) return true;
 
@@ -912,65 +1431,22 @@ DROP TABLE #need;
             if (DateTime.Today > t) sug = "D";
         }
 
-        private void ApplySedeOverrides(OutputRow row)
+        private sealed class DistPairComparer : IEqualityComparer<(string CodSedeDistaccata, string ComuneRes)>
         {
-            // Cassino
-            if (row.CodSedeStudi.Equals("A", StringComparison.OrdinalIgnoreCase) ||
-                row.CodSedeStudi.Equals("O", StringComparison.OrdinalIgnoreCase))
-            {
-                if (_distCassino.TryGetValue(row.CodCorso, out var com)) row.ComuneSedeStudi = com;
-                // telematici/casi forzati eventualmente marcati sotto
-            }
+            public bool Equals((string CodSedeDistaccata, string ComuneRes) x, (string CodSedeDistaccata, string ComuneRes) y)
+                => string.Equals(x.CodSedeDistaccata, y.CodSedeDistaccata, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(x.ComuneRes, y.ComuneRes, StringComparison.OrdinalIgnoreCase);
 
-            // Tor Vergata
-            if (row.CodSedeStudi.Equals("C", StringComparison.OrdinalIgnoreCase))
-            {
-                if (_distTorVergata.TryGetValue(row.CodCorso, out var com)) row.ComuneSedeStudi = com;
-                if (row.CodCorso.Equals("04UUTK42", StringComparison.OrdinalIgnoreCase)) row.ForcedStatus = "A";
-            }
-
-            // San Pio V
-            if (row.CodSedeStudi.Equals("W", StringComparison.OrdinalIgnoreCase))
-            {
-                if (_distSanPioV.TryGetValue(row.CodCorso, out var com)) row.ComuneSedeStudi = com;
-            }
-
-            // LUMSA
-            if (row.CodSedeStudi.Equals("K", StringComparison.OrdinalIgnoreCase))
-            {
-                if (_distLumsa.TryGetValue(row.CodCorso, out var com)) row.ComuneSedeStudi = com;
-            }
-
-            // Latina per PA/corsi specifici
-            if (row.RichiedentePA && row.ComuneSedeStudi == "G698" &&
-                (row.CodCorso.Equals("CFC", StringComparison.OrdinalIgnoreCase) ||
-                 row.CodCorso.Equals("29875", StringComparison.OrdinalIgnoreCase) ||
-                 row.CodCorso.Equals("29875_1", StringComparison.OrdinalIgnoreCase)))
-            {
-                row.ComuneSedeStudi = "E472";
-            }
-            if (row.ComuneSedeStudi == "G698" &&
-                (row.CodCorso.Equals("29875", StringComparison.OrdinalIgnoreCase) ||
-                 row.CodCorso.Equals("29875_1", StringComparison.OrdinalIgnoreCase)))
-            {
-                row.ComuneSedeStudi = "E472";
-            }
-            if (string.Compare(row.AnnoAccademico, "20092010", StringComparison.Ordinal) >= 0 &&
-                row.RichiedentePA && row.ComuneSedeStudi == "F499")
-            {
-                row.ComuneSedeStudi = "M082";
-            }
-
-            // Telematici / corsi forzati sempre in sede
-            if (IsTelematicoOrForcedA(row.CodSedeStudi, row.CodFacolta, row.CodCorso))
-                row.ForcedStatus = "A";
+            public int GetHashCode((string CodSedeDistaccata, string ComuneRes) obj)
+                => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.CodSedeDistaccata) ^
+                   StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ComuneRes);
         }
-
         private sealed class PairComparer : IEqualityComparer<(string ComuneSede, string ComuneRes)>
         {
             public bool Equals((string ComuneSede, string ComuneRes) x, (string ComuneSede, string ComuneRes) y)
                 => string.Equals(x.ComuneSede, y.ComuneSede, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(x.ComuneRes, y.ComuneRes, StringComparison.OrdinalIgnoreCase);
+
             public int GetHashCode((string ComuneSede, string ComuneRes) obj)
                 => StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ComuneSede) ^
                    StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ComuneRes);
@@ -982,6 +1458,16 @@ DROP TABLE #need;
             public string CodFiscale { get; set; } = "";
             public string TipoBando { get; set; } = "";
             public bool IsRichiedentePA { get; set; }
+        }
+
+        private sealed class IscrRow
+        {
+            public string CodTipologia { get; set; } = "";
+            public string ComuneSede { get; set; } = "";
+            public string CodSedeStudi { get; set; } = "";
+            public string CodCorso { get; set; } = "";
+            public string CodFacolta { get; set; } = "";
+            public string CodSedeDistaccata { get; set; } = "";
         }
 
         private sealed class LrsDomRow
@@ -1010,8 +1496,10 @@ DROP TABLE #need;
                 StatusSede = statusSede;
                 RichiedentePA = d.IsRichiedentePA;
             }
+
             public string CodFiscale { get; set; } = "";
             public string StatusSede { get; set; } = "";
+
             public bool TitoloOneroso { get; set; }
             public string SerieContratto { get; set; } = "";
             public string DataRegistrazione { get; set; } = "";
@@ -1024,23 +1512,29 @@ DROP TABLE #need;
             public bool ContrattoEnte { get; set; }
             public string DenomEnte { get; set; } = "";
             public double ImportoRataEnte { get; set; }
+
             public string ComuneDomicilio { get; set; } = "";
             public string ComuneResidenza { get; set; } = "";
             public string ProvinciaRes { get; set; } = "";
+
             public string ComuneSedeStudi { get; set; } = "";
             public string CodSedeStudi { get; set; } = "";
             public string CodCorso { get; set; } = "";
             public string CodFacolta { get; set; } = "";
+            public string CodSedeDistaccata { get; set; } = "";
+
             public string CodBlocchi { get; set; } = "";
+
             public bool Detenuto { get; set; }
             public bool RifugiatoPolitico { get; set; }
             public bool ProlungamentoPA { get; set; }
             public bool FamigliaResidenteItalia { get; set; } = true;
+
             public string ForcedStatus { get; set; } = "";
             public string AnnoAccademico { get; set; } = "";
-            public bool RichiedentePA { get; set; }
 
-            // campi opzionali PA per downgrade
+            public bool RichiedentePA { get; set; }
+            public bool PaRichiestaAttiva { get; set; }
             public bool IdoneoPA_Attesa2Assegn { get; set; }
             public bool VincitorePA { get; set; }
             public bool VincitorePANoAssegn { get; set; }
@@ -1054,8 +1548,7 @@ DROP TABLE #need;
             {
                 if (string.IsNullOrWhiteSpace(s)) return false;
                 var x = s.Trim();
-                if (x.Length < 3) return false;
-                return true;
+                return x.Length >= 3;
             }
         }
     }

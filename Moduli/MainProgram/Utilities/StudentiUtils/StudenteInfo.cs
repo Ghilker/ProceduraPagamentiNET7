@@ -13,6 +13,7 @@ namespace ProcedureNet7
         public InformazioniBeneficio InformazioniBeneficio { get; set; } = new InformazioniBeneficio();
         public InformazioniConto InformazioniConto { get; set; } = new InformazioniConto();
         public InformazioniSede InformazioniSede { get; set; } = new InformazioniSede();
+        public Dictionary<string, string> MessaggiErrore { get; set; } = new Dictionary<string, string>();
         public void SetLuogoNascita(string codComune, string nomeComune, string provincia)
         {
             InformazioniPersonali.LuogoNascita = new LuogoNascita(codComune, nomeComune, provincia);

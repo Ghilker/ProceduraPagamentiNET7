@@ -37,7 +37,7 @@ namespace ProcedureNet7.PagamentiProcessor
             return listaStudentiDaMantenere;
         }
 
-        public void AdjustPendolarePayment(StudentePagamenti studente, ref double importoDaPagare, ref double importoMassimo, ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari)
+        public void AdjustPendolarePayment(StudentePagamenti studente, ref double importoDaPagare, ref double importoMassimo, ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari, double sogliaISEE, double importoPendolare)
         {
             bool hasDomicilio = studente.InformazioniSede.DomicilioCheck;
             bool isMoreThanHalfAbroad = studente.InformazioniPersonali.NumeroComponentiNucleoFamiliareEstero >= (studente.InformazioniPersonali.NumeroComponentiNucleoFamiliare / 2.0);
@@ -60,9 +60,62 @@ namespace ProcedureNet7.PagamentiProcessor
             if (isDomicilioValidOrNotNeeded)
                 return;
 
-            // --- At this point, we know we must apply the pendolare reduction ---
-            importoDaPagare = importoDaPagare / 3 * 2;
-            importoMassimo = importoMassimo / 3 * 2;
+            double iseeStudente = studente.InformazioniPagamento.ValoreISEE;
+
+            double halfThreshold = sogliaISEE / 2.0;
+            double twoThirdsThreshold = sogliaISEE * 2.0 / 3.0;
+
+            double nuovoImportoMassimoPendolare;
+
+            if (iseeStudente <= halfThreshold)
+            {
+                // fascia 1: ISEE <= metà soglia → +15% sull’importo da pendolare
+                nuovoImportoMassimoPendolare = importoPendolare * 1.15;
+            }
+            else if (iseeStudente < twoThirdsThreshold)
+            {
+                // fascia 2: ISEE < 2/3 soglia → importo pendolare pieno
+                nuovoImportoMassimoPendolare = importoPendolare;
+            }
+            else
+            {
+                // fascia 3: ISEE >= 2/3 soglia
+                // importo massimo decresce gradualmente da 100% (a 2/3 soglia)
+                // fino al 50% (a soglia ISEE).
+                // Se l’ISEE supera la soglia, lo clampiamo alla soglia.
+                double iseeClamped = Math.Min(iseeStudente, sogliaISEE);
+
+                // se per qualche motivo twoThirdsThreshold == sogliaISEE, evito divisione per zero
+                if (twoThirdsThreshold >= sogliaISEE)
+                {
+                    // caso limite: prendo direttamente metà borsa pendolare
+                    nuovoImportoMassimoPendolare = importoPendolare * 0.5;
+                }
+                else
+                {
+                    double t = (iseeClamped - twoThirdsThreshold) / (sogliaISEE - twoThirdsThreshold); // 0→1
+                    double fattore = 1.0 - 0.5 * t; // 1.0 → 0.5
+                    nuovoImportoMassimoPendolare = importoPendolare * fattore;
+                }
+            }
+
+            bool studenteFuoriCorso = (studente.InformazioniIscrizione.AnnoCorso == -1 && !studente.InformazioniPersonali.Disabile);
+            bool studenteDisabileFuoriCorso = (studente.InformazioniIscrizione.AnnoCorso == -2 && studente.InformazioniPersonali.Disabile);
+
+            double importoMensa = 600;
+            if (studenteFuoriCorso || studenteDisabileFuoriCorso)
+            {
+                importoMensa = 300;
+            }
+            bool haMensa = studente.InformazioniPagamento.ConcessaMonetizzazioneMensa;
+            if (!haMensa)
+            {
+                importoMensa = 0;
+            }
+            nuovoImportoMassimoPendolare += importoMensa;
+
+            importoMassimo = nuovoImportoMassimoPendolare;
+            importoDaPagare = nuovoImportoMassimoPendolare;
 
             // Build the message for reasons why they were paid as pendolari
             string messaggio = string.Empty;

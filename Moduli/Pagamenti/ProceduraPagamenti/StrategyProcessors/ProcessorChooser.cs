@@ -12,6 +12,7 @@ namespace ProcedureNet7.PagamentiProcessor
         {
             switch (selectedAA)
             {
+                case "20212022": return new AcademicProcessor2122();
                 case "20222023": return new AcademicProcessor2223();
                 case "20232024": return new AcademicProcessor2324();
                 case "20242025": return new AcademicProcessor2425();

@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class ArgsControlloPEC
+    internal class ArgsControlloDomicilio 
     {
         [Required(ErrorMessage = "Inserire l'anno accademico")]
         [ValidAAFormat(ErrorMessage = "L'anno accademico deve essere nel formato xxxxyyyy.")]
-        public string _annoAccademico { get; set; }
+        public string _selectedAA {  get; set; }
+
+        public string _folderPath { get; set; }
     }
 }

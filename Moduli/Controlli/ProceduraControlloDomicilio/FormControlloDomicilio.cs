@@ -12,10 +12,11 @@ using System.Windows.Forms;
 
 namespace ProcedureNet7
 {
-    public partial class FormControlloPEC : Form
+    public partial class FormControlloDomicilio : Form
     {
+        string folderPath;
         MasterForm? _masterForm;
-        public FormControlloPEC(MasterForm masterForm)
+        public FormControlloDomicilio(MasterForm masterForm)
         {
             _masterForm = masterForm;
             InitializeComponent();
@@ -28,10 +29,10 @@ namespace ProcedureNet7
                 return;
             }
 
-            _masterForm.RunBackgroundWorker(RunControlloPEC);
+            _masterForm.RunBackgroundWorker(RunControlloDomicilio);
         }
 
-        private void RunControlloPEC(SqlConnection mainConnection)
+        private void RunControlloDomicilio(SqlConnection mainConnection)
         {
             try
             {
@@ -40,13 +41,14 @@ namespace ProcedureNet7
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
                 ArgsValidation argsValidation = new ArgsValidation();
-                ArgsControlloPEC _argsControlloPEC = new ArgsControlloPEC
+                ArgsControlloDomicilio _argsControlloDomicilio = new ArgsControlloDomicilio
                 {
-                    _annoAccademico = aatxt.Text
+                    _folderPath = folderPath,
+                    _selectedAA = selectedAA.Text,
                 };
-                argsValidation.Validate(_argsControlloPEC);
-                ControlloPEC ControlloPEC = new(_masterForm, mainConnection);
-                ControlloPEC.RunProcedure(_argsControlloPEC);
+                argsValidation.Validate(_argsControlloDomicilio);
+                ControlloDomicilio ControlloDomicilio = new(_masterForm, mainConnection);
+                ControlloDomicilio.RunProcedure(_argsControlloDomicilio);
             }
             catch (ValidationException ex)
             {
@@ -56,6 +58,11 @@ namespace ProcedureNet7
             {
                 throw;
             }
+        }
+
+        private void folderPathBtn_Click(object sender, EventArgs e)
+        {
+            Utilities.ChooseFolder(folderPathlbl, folderBrowserDialog1, ref folderPath);
         }
     }
 }

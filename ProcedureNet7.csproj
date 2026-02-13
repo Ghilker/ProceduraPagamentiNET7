@@ -84,6 +84,9 @@
     <Compile Update="Moduli\Controlli\ProceduraControlloStatusSede\FormControlloStatusSede.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Moduli\Controlli\ProceduraControlloDomicilio\FormControlloDomicilio.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Update="Moduli\Varie\ProceduraProvvedimenti\FormProceduraProvvedimenti.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -97,6 +100,9 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Moduli\Varie\ProceduraGeneratoreFlussi\FormGeneratoreFlussi.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Moduli\Varie\ProceduraEstrazioneIstanze\FormEstrazioneIstanze.cs">
       <SubType>Form</SubType>
     </Compile>
   </ItemGroup>

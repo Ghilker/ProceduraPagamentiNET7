@@ -28,7 +28,9 @@ namespace ProcedureNet7
     }
     public class StudentiDomicilioDTO
     {
+        public string? AnnoAccademico { get; set; }
         public string CodFiscale { get; set; } = string.Empty;
+        public int NumDomanda { get; set; }
         public bool TitoloOneroso { get; set; }
         public bool ContrattoEnte { get; set; }
         public string SerieContratto { get; set; } = string.Empty;

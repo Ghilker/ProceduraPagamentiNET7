@@ -53,7 +53,7 @@ namespace ProcedureNet7
 
             statoCorrettezzaAssegnazione = AssegnazioneDataCheck.Corretto;
 
-            costoTotale = CalculateTotalDailyCost(dataDecorrenza, dataFineAssegnazione, costoMensile, minDate, maxDate, assegnazioni, fuoriCorso);
+            costoTotale = CalculateTotalDailyCost(dataDecorrenza, dataFineAssegnazione, codFineAssegnazione, costoMensile, minDate, maxDate, assegnazioni, fuoriCorso);
 
             return statoCorrettezzaAssegnazione;
         }
@@ -63,7 +63,7 @@ namespace ProcedureNet7
             this.statoCorrettezzaAssegnazione = toSet;
         }
 
-        public double CalculateTotalDailyCost(DateTime startDate, DateTime endDate, double monthlyCost, DateTime minDate, DateTime maxDate, List<Assegnazione> assegnazioni, bool fuoriCorso)
+        public double CalculateTotalDailyCost(DateTime startDate, DateTime endDate, string codFineAssegnazione, double monthlyCost, DateTime minDate, DateTime maxDate, List<Assegnazione> assegnazioni, bool fuoriCorso)
         {
             if (endDate == DateTime.MaxValue)
             {
@@ -95,7 +95,9 @@ namespace ProcedureNet7
                 statoCorrettezzaAssegnazione = AssegnazioneDataCheck.DataFineAssMaggioreMax;
             }
 
-            int currentAssegnazioneDays = (endDate - startDate).Days + 1;
+            int addDay = (codFineAssegnazione == "02" || codFineAssegnazione == "03") ? 1 : 0;
+
+            int currentAssegnazioneDays = (endDate - startDate).Days + addDay;
             int previousAssegnazioniDays = 0;
 
             // If assegnazioni are provided and the user is fuoriCorso, adjust the days calculation
@@ -103,8 +105,10 @@ namespace ProcedureNet7
             {
                 foreach (Assegnazione assegnazione in assegnazioni)
                 {
+                    addDay = (assegnazione.codFineAssegnazione == "02" || assegnazione.codFineAssegnazione == "03") ? 1 : 0;
+
                     // Calculate the days for this particular Assegnazione
-                    int assegnazioneDays = (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days + 1;
+                    int assegnazioneDays = (assegnazione.dataFineAssegnazione - assegnazione.dataDecorrenza).Days + addDay;
 
                     // Accumulate the days from previous assegnazioni
                     previousAssegnazioniDays += assegnazioneDays;
