@@ -268,9 +268,9 @@ namespace ProcedureNet7
                             FormControlloStatusSede controlloStatusSede = new FormControlloStatusSede(this);
                             ShowFormInPanel(controlloStatusSede);
                             break;
-                        case ProcedureVerifiche.ControlloDomicilio:
-                            FormControlloDomicilio controlloDomicilio = new FormControlloDomicilio(this);
-                            ShowFormInPanel(controlloDomicilio);
+                        case ProcedureVerifiche.ControlloDatiEconomici:
+                            FormProceduraControlloDatiEconomici controlloDatiEconomici = new FormProceduraControlloDatiEconomici(this);
+                            ShowFormInPanel(controlloDatiEconomici);
                             break;
                     }
                 }
@@ -381,7 +381,7 @@ namespace ProcedureNet7
             [ProcedureCategory("Verifiche", "Programmatore")]
             ControlloStatusSede,
             [ProcedureCategory("Verifiche", "Programmatore")]
-            ControlloDomicilio,
+            ControlloDatiEconomici,
         }
 
     }
