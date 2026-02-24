@@ -87,56 +87,6 @@ namespace ProcedureNet7
             return result;
         }
 
-        private static int ReadInt(SqlDataReader rdr, string col)
-        {
-            object o = rdr[col];
-            if (o == DBNull.Value) return 0;
-
-            if (o is int i) return i;
-            if (o is short s) return s;
-            if (o is long l) return (l > int.MaxValue) ? int.MaxValue : (int)l;
-
-            var str = (Convert.ToString(o) ?? "").Trim();
-            if (str.Length == 0) return 0;
-            return int.TryParse(str, out var v) ? v : 0;
-        }
-
-        private static double ReadDouble(SqlDataReader rdr, string col)
-        {
-            object o = rdr[col];
-            if (o == DBNull.Value) return 0.0;
-
-            if (o is double d) return d;
-            if (o is float f) return f;
-            if (o is decimal m) return (double)m;
-
-            var str = (Convert.ToString(o) ?? "").Trim();
-            if (str.Length == 0) return 0.0;
-
-            return double.TryParse(str, NumberStyles.Any, CultureInfo.InvariantCulture, out var v)
-                ? v
-                : (double.TryParse(str, NumberStyles.Any, CultureInfo.CurrentCulture, out v) ? v : 0.0);
-        }
-
-        private static string ReadString(SqlDataReader rdr, string col)
-        {
-            object o = rdr[col];
-            return o == DBNull.Value ? string.Empty : (Convert.ToString(o) ?? string.Empty);
-        }
-
-        private static DateTime? ReadDateTimeNullable(SqlDataReader rdr, string col)
-        {
-            object o = rdr[col];
-            if (o == DBNull.Value) return null;
-
-            if (o is DateTime dt) return dt;
-
-            var str = (Convert.ToString(o) ?? "").Trim();
-            if (str.Length == 0) return null;
-
-            return DateTime.TryParse(str, out var parsed) ? parsed : (DateTime?)null;
-        }
-
         public override void RunProcedure(ArgsControlloDomicilio args)
         {
             selectedAA = args._selectedAA;
@@ -309,38 +259,38 @@ namespace ProcedureNet7
                 cmdIst.CommandTimeout = 900000;
                 cmdIst.Parameters.AddWithValue("@aa", selectedAA);
 
-                using (SqlDataReader r = cmdIst.ExecuteReader())
+                using (SqlDataReader readerInst = cmdIst.ExecuteReader())
                 {
-                    while (r.Read())
+                    while (readerInst.Read())
                     {
-                        var cf = Utilities.RemoveAllSpaces(ReadString(r, "Cod_fiscale")).ToUpper();
+                        var cf = Utilities.RemoveAllSpaces(Utilities.SafeGetString(readerInst, "Cod_fiscale")).ToUpper();
                         if (string.IsNullOrWhiteSpace(cf))
                             continue;
 
                         var dto = new IstanzaDomicilioOpenDTO
                         {
-                            AnnoAccademico = ReadString(r, "Anno_accademico"),
+                            AnnoAccademico = Utilities.SafeGetString(readerInst, "Anno_accademico"),
                             CodFiscale = cf,
-                            NumDomanda = ReadInt(r, "Num_domanda"),
-                            NumIstanza = ReadInt(r, "Num_istanza"),
-                            DataValiditaIstanza = ReadDateTimeNullable(r, "DataValiditaIstanza"),
+                            NumDomanda = Utilities.SafeGetInt(readerInst, "Num_domanda"),
+                            NumIstanza = Utilities.SafeGetInt(readerInst, "Num_istanza"),
+                            DataValiditaIstanza = Utilities.SafeGetDateTime(readerInst, "DataValiditaIstanza"),
 
-                            ComuneDomicilio = ReadString(r, "COD_COMUNE"),
-                            TitoloOneroso = ReadInt(r, "TITOLO_ONEROSO") == 1,
-                            ContrattoEnte = ReadInt(r, "TIPO_CONTRATTO_TITOLO_ONEROSO") == 1,
+                            ComuneDomicilio = Utilities.SafeGetString(readerInst, "COD_COMUNE"),
+                            TitoloOneroso = Utilities.SafeGetInt(readerInst, "TITOLO_ONEROSO") == 1,
+                            ContrattoEnte = Utilities.SafeGetInt(readerInst, "TIPO_CONTRATTO_TITOLO_ONEROSO") == 1,
 
-                            SerieContratto = ReadString(r, "N_SERIE_CONTRATTO"),
-                            DataRegistrazioneString = ReadString(r, "DATA_REG_CONTRATTO"),
-                            DataDecorrenzaString = ReadString(r, "DATA_DECORRENZA"),
-                            DataScadenzaString = ReadString(r, "DATA_SCADENZA"),
+                            SerieContratto = Utilities.SafeGetString(readerInst, "N_SERIE_CONTRATTO"),
+                            DataRegistrazioneString = Utilities.SafeGetString(readerInst, "DATA_REG_CONTRATTO"),
+                            DataDecorrenzaString = Utilities.SafeGetString(readerInst, "DATA_DECORRENZA"),
+                            DataScadenzaString = Utilities.SafeGetString(readerInst, "DATA_SCADENZA"),
 
-                            DurataContratto = ReadInt(r, "DURATA_CONTRATTO"),
-                            Prorogato = ReadInt(r, "PROROGA") == 1,
-                            DurataProroga = ReadInt(r, "DURATA_PROROGA"),
-                            SerieProroga = ReadString(r, "ESTREMI_PROROGA"),
+                            DurataContratto = Utilities.SafeGetInt(readerInst, "DURATA_CONTRATTO"),
+                            Prorogato = Utilities.SafeGetInt(readerInst, "PROROGA") == 1,
+                            DurataProroga = Utilities.SafeGetInt(readerInst, "DURATA_PROROGA"),
+                            SerieProroga = Utilities.SafeGetString(readerInst, "ESTREMI_PROROGA"),
 
-                            DenominazioneEnte = ReadString(r, "DENOM_ENTE"),
-                            ImportoRataEnte = ReadDouble(r, "IMPORTO_RATA")
+                            DenominazioneEnte = Utilities.SafeGetString(readerInst, "DENOM_ENTE"),
+                            ImportoRataEnte = Utilities.SafeGetDouble(readerInst, "IMPORTO_RATA")
                         };
 
                         if (!istanzeOpenByCf.ContainsKey(cf))

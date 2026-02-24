@@ -20,6 +20,7 @@ namespace ProcedureNet7
             string codEnte,
             string codCittadinanza,
             bool disabile,
+            bool esoneroTassaRegionale,
             double importoBeneficio,
             int annoCorso,
             int tipoCorso,
@@ -39,6 +40,7 @@ namespace ProcedureNet7
             InformazioniIscrizione.CodEnte = codEnte;
             InformazioniPersonali.CodCittadinanza = codCittadinanza;
             InformazioniPersonali.Disabile = disabile;
+            InformazioniPersonali.EsoneroTassaRegionale = esoneroTassaRegionale;
             InformazioniBeneficio.ImportoBeneficio = importoBeneficio;
             InformazioniIscrizione.AnnoCorso = annoCorso;
             InformazioniIscrizione.TipoCorso = tipoCorso;
