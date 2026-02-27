@@ -294,6 +294,7 @@ namespace ProcedureNet7
                                     ,COALESCE(EsitiTotali.EsitoPA, 0) as EsitoPA
 		                            ,EsitiTotali.Anno_corso
 		                            ,invalido AS disabile
+		                            ,esonero_pag_tassa_reg AS esonero_tassa_regionale
 		                            ,imp_beneficio AS imp_beneficio
 		                            ,iscrizione_fuoritermine AS iscrizione_fuoritermine
 		                            ,pagamento_tassareg AS pagamento_tassareg

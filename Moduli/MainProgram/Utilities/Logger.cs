@@ -1,72 +1,78 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Threading;
-using System.Windows.Forms; // Required for working with WinForms UI components
+using System.Windows.Forms;
 
-public class Logger : IDisposable
+public sealed class Logger : IDisposable
 {
-    private readonly LogLevel logLevelThreshold;
-    private static readonly object lockObject = new();
+    private static readonly object instanceLock = new();
     private static Logger? instance;
-    private readonly AutoResetEvent logSignal = new(false);
-    private readonly Thread logThread;
-    private bool isRunning = true;
+
+    private readonly object queueLock = new();
+
+    private readonly LogLevel logLevelThreshold;
+    private readonly CircularBuffer<(LogLevel level, string message, Color? textColor)> logQueue;
+    private readonly List<string> allLogEntries = new();
+
     private readonly Form mainForm;
     private readonly ProgressBar progressBar;
     private readonly RichTextBox logTextBox;
-    private readonly System.Timers.Timer uiUpdateTimer;
-    private readonly CircularBuffer<(int sequence, LogLevel level, string message, Color? textColor)> logQueue;
-    private int logSequence = 0;
+
+    private int logSequence;
     private readonly bool verbose;
+    private bool isDisposed;
+    private int uiFlushPending;
 
-    // List to store all log entries for the log dump
-    private readonly List<string> allLogEntries = new List<string>();
+    private const int MaxTextLength = 500_000;
 
-    private Logger(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold, bool verbose)
+    private Logger(
+        Form mainForm,
+        ProgressBar progressBar,
+        RichTextBox logTextBox,
+        LogLevel logLevelThreshold,
+        bool verbose)
     {
-        this.mainForm = mainForm;
-        this.progressBar = progressBar;
-        this.logTextBox = logTextBox;
+        this.mainForm = mainForm ?? throw new ArgumentNullException(nameof(mainForm));
+        this.progressBar = progressBar ?? throw new ArgumentNullException(nameof(progressBar));
+        this.logTextBox = logTextBox ?? throw new ArgumentNullException(nameof(logTextBox));
         this.verbose = verbose;
 
-        // Set log level threshold based on verbose option
         this.logLevelThreshold = verbose ? LogLevel.DEBUG : logLevelThreshold;
 
-        // Initialize the circular buffer with a size of 1024 (can be adjusted based on performance needs)
-        logQueue = new CircularBuffer<(int sequence, LogLevel level, string message, Color? textColor)>(1024);
+        logQueue = new CircularBuffer<(LogLevel level, string message, Color? textColor)>(2048);
 
-        uiUpdateTimer = new System.Timers.Timer(100);
-        uiUpdateTimer.Elapsed += (sender, e) => FlushLogQueueToUI();
-        uiUpdateTimer.Start();
-
-        logThread = new Thread(LoggingThreadMethod) { IsBackground = true };
-        logThread.Start();
-
-        // Subscribe to application exit and unhandled exception events
         Application.ApplicationExit += Application_ApplicationExit;
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+    }
+
+    public static Logger GetInstance(
+        Form mainForm,
+        ProgressBar progressBar,
+        RichTextBox logTextBox,
+        LogLevel logLevelThreshold = LogLevel.INFO,
+        bool verbose = false)
+    {
+        if (instance != null)
+            return instance;
+
+        lock (instanceLock)
+        {
+            instance ??= new Logger(mainForm, progressBar, logTextBox, logLevelThreshold, verbose);
+            return instance;
+        }
     }
 
     public void Dispose()
     {
         Stop();
-        WriteLogDump();
     }
 
-    public static Logger GetInstance(Form mainForm, ProgressBar progressBar, RichTextBox logTextBox, LogLevel logLevelThreshold = LogLevel.INFO, bool verbose = false)
-    {
-        if (instance == null)
-        {
-            lock (lockObject)
-            {
-                instance ??= new Logger(mainForm, progressBar, logTextBox, logLevelThreshold, verbose);
-            }
-        }
-        return instance;
-    }
+    // ============================
+    //   METODI STATICI DI LOG
+    // ============================
 
-    // Static method to log messages
     public static void Log(int? progress, string message, LogLevel level = LogLevel.INFO, Color? textColor = null)
     {
         instance?.LogInstance(message, progress, level, textColor);
@@ -92,107 +98,177 @@ public class Logger : IDisposable
         Log(progress, message, LogLevel.ERROR);
     }
 
-    private void LoggingThreadMethod()
-    {
-        while (isRunning)
-        {
-            if (logSignal.WaitOne(1000) || logQueue.Count > 0)
-            {
-                FlushLogQueue();
-            }
-        }
-    }
+    // ============================
+    //   LOG INSTANCE
+    // ============================
 
     public void LogInstance(string message, int? progress = null, LogLevel level = LogLevel.INFO, Color? textColor = null)
     {
-        int currentSequence = Interlocked.Increment(ref logSequence);
+        if (isDisposed || message == null)
+            return;
+
+        Interlocked.Increment(ref logSequence);
         string timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
         string logEntry = $"{timestamp} - {message}";
 
-        // Store all log entries for the log dump
         lock (allLogEntries)
         {
             allLogEntries.Add(logEntry);
         }
 
-        // Only process log entries above the threshold for UI display
-        if (level < logLevelThreshold) return;
+        if (level < logLevelThreshold)
+            return;
 
-        logQueue.Enqueue((currentSequence, level, logEntry, textColor));
+        lock (queueLock)
+        {
+            logQueue.Enqueue((level, logEntry, textColor));
+        }
 
         if (progress.HasValue)
         {
-            mainForm.BeginInvoke((MethodInvoker)delegate { progressBar.Value = progress.Value; });
+            UpdateProgressSafe(progress.Value);
         }
 
-        logSignal.Set();
-        AdjustTimerInterval();
+        RequestFlush();
     }
 
-    private void AdjustTimerInterval()
+    private void UpdateProgressSafe(int value)
     {
-        int queueCount = logQueue.Count;
-        uiUpdateTimer.Interval = queueCount <= 100 ? 100 : 100 + (queueCount - 100) / 10;
+        if (isDisposed)
+            return;
+
+        if (mainForm.IsDisposed || !mainForm.IsHandleCreated)
+            return;
+
+        try
+        {
+            mainForm.BeginInvoke((MethodInvoker)delegate
+            {
+                if (progressBar.IsDisposed)
+                    return;
+
+                int clamped = Math.Max(progressBar.Minimum, Math.Min(value, progressBar.Maximum));
+                if (clamped != progressBar.Value)
+                    progressBar.Value = clamped;
+            });
+        }
+        catch
+        {
+        }
+    }
+
+    private int QueueCount
+    {
+        get
+        {
+            lock (queueLock)
+            {
+                return logQueue.Count;
+            }
+        }
+    }
+
+    // ============================
+    //   FLUSH SU UI (COALESCED)
+    // ============================
+
+    private void RequestFlush()
+    {
+        if (isDisposed)
+            return;
+
+        if (mainForm.IsDisposed || !mainForm.IsHandleCreated)
+            return;
+
+        if (Interlocked.Exchange(ref uiFlushPending, 1) == 1)
+            return;
+
+        try
+        {
+            mainForm.BeginInvoke((MethodInvoker)delegate
+            {
+                uiFlushPending = 0;
+                FlushLogQueueToUI();
+            });
+        }
+        catch
+        {
+            uiFlushPending = 0;
+        }
     }
 
     private void FlushLogQueueToUI()
     {
-        if (!mainForm.IsDisposed)
-        {
-            mainForm.BeginInvoke((MethodInvoker)delegate
-            {
-                // Dequeue messages in a thread-safe manner and ensure they're processed sequentially
-                var sortedLogs = new SortedList<int, (int sequence, LogLevel level, string message, Color? textColor)>();
-
-                while (sortedLogs.Count < CalculateDynamicBatchSize() && logQueue.TryDequeue(out var logEntry))
-                {
-                    sortedLogs.Add(logEntry.sequence, logEntry);
-                }
-
-                foreach (var logEntry in sortedLogs.Values)
-                {
-                    ProcessLogEntry(logEntry);
-                }
-            });
-        }
-    }
-
-
-    private int CalculateDynamicBatchSize()
-    {
-        int queueCount = logQueue.Count;
-        return queueCount <= 100 ? 1 : 10 + (queueCount - 100) / 100 * 10;
-    }
-
-    private void FlushLogQueue()
-    {
-        while (logQueue.TryDequeue(out var logEntry))
-        {
-            ProcessLogEntry(logEntry);
-        }
-    }
-
-    private void ProcessLogEntry((int sequence, LogLevel level, string message, Color? textColor) logEntry)
-    {
-        // Ensure any UI updates are done on the UI thread
-        if (mainForm.InvokeRequired)
-        {
-            mainForm.Invoke((MethodInvoker)delegate { ProcessLogEntry(logEntry); });
+        if (isDisposed || mainForm.IsDisposed || logTextBox.IsDisposed)
             return;
+
+        var batch = DequeueAll();
+        if (batch.Count == 0)
+            return;
+
+        logTextBox.SuspendLayout();
+        try
+        {
+            TrimLogIfNeeded();
+
+            foreach (var entry in batch)
+            {
+                ProcessLogEntry(entry);
+            }
         }
+        finally
+        {
+            logTextBox.ResumeLayout();
+        }
+    }
+
+    private List<(LogLevel level, string message, Color? textColor)> DequeueAll()
+    {
+        var result = new List<(LogLevel level, string message, Color? textColor)>();
+
+        lock (queueLock)
+        {
+            while (logQueue.TryDequeue(out var item))
+            {
+                result.Add(item);
+            }
+        }
+
+        return result;
+    }
+
+    private void TrimLogIfNeeded()
+    {
+        if (logTextBox.TextLength <= MaxTextLength)
+            return;
+
+        int excess = logTextBox.TextLength - MaxTextLength;
+        if (excess <= 0)
+            return;
+
+        try
+        {
+            logTextBox.Select(0, excess);
+            logTextBox.SelectedText = string.Empty;
+        }
+        catch
+        {
+        }
+    }
+
+    private void ProcessLogEntry((LogLevel level, string message, Color? textColor) logEntry)
+    {
+        if (isDisposed || logTextBox.IsDisposed)
+            return;
 
         string messageText = logEntry.message;
-
         if (messageText == null)
-        {
             return;
-        }
 
-        Color textColor = logEntry.textColor ?? GetColorForLogLevel(logEntry.level);
+        Color color = logEntry.textColor ?? GetColorForLogLevel(logEntry.level);
 
         if (messageText.Contains("UPDATE:"))
         {
-            // For "UPDATE:", modify the last line without appending a new line
             string updatedMessage = messageText.Replace("UPDATE:", "").Trim();
             string[] lines = logTextBox.Lines;
 
@@ -201,42 +277,47 @@ public class Logger : IDisposable
                 int lastLineStartIndex = logTextBox.GetFirstCharIndexFromLine(lines.Length - 1);
                 int lastLineLength = lines[^1].Length;
 
-                // Select the last line and replace it with the updated message
                 logTextBox.Select(lastLineStartIndex, lastLineLength);
                 logTextBox.SelectedText = updatedMessage;
-
-                // Set the color for the updated line
-                logTextBox.SelectionColor = textColor;
+                logTextBox.Select(lastLineStartIndex, updatedMessage.Length);
+                logTextBox.SelectionColor = color;
             }
 
-            // Scroll to the end to ensure the updated line is visible
-            logTextBox.SelectionStart = logTextBox.Text.Length;
+            logTextBox.SelectionStart = logTextBox.TextLength;
             logTextBox.ScrollToCaret();
         }
         else
         {
-            // Append a new line before the message if the last character isn't a newline (and the textbox isn't empty)
             if (logTextBox.TextLength > 0 && !logTextBox.Text.EndsWith(Environment.NewLine))
             {
-                logTextBox.AppendText(Environment.NewLine); // Add a new line before appending the message
+                logTextBox.AppendText(Environment.NewLine);
             }
 
             int start = logTextBox.TextLength;
             logTextBox.AppendText(messageText);
 
-            // Select the appended text to set its color
             logTextBox.Select(start, messageText.Length);
-            logTextBox.SelectionColor = textColor;
+            logTextBox.SelectionColor = color;
 
-            // Ensure the caret is at the end and the last line is visible
-            logTextBox.SelectionStart = logTextBox.Text.Length;
+            logTextBox.SelectionStart = logTextBox.TextLength;
             logTextBox.ScrollToCaret();
         }
     }
 
     public void ClearLogs()
     {
-        logTextBox.Clear();
+        if (isDisposed)
+            return;
+
+        if (!logTextBox.IsDisposed)
+        {
+            logTextBox.Clear();
+        }
+
+        lock (queueLock)
+        {
+            logQueue.Clear();
+        }
     }
 
     private static Color GetColorForLogLevel(LogLevel level)
@@ -247,39 +328,59 @@ public class Logger : IDisposable
             LogLevel.INFO => Color.Black,
             LogLevel.WARN => Color.Orange,
             LogLevel.ERROR => Color.Red,
-            _ => Color.Black,
+            _ => Color.Black
         };
     }
 
+    // ============================
+    //   STOP / EXIT / DUMP
+    // ============================
+
     public void Stop()
     {
-        isRunning = false;
-        logSignal.Set(); // Ensure the logging thread can exit
-        logThread.Join();
-        uiUpdateTimer.Stop();
-        uiUpdateTimer.Dispose();
-        FlushLogQueueToUI(); // Flush remaining messages
-        logSignal.Dispose();
-    }
+        if (isDisposed)
+            return;
 
-    // Event handler for application exit
-    private void Application_ApplicationExit(object sender, EventArgs e)
-    {
-        WriteLogDump();
-    }
+        isDisposed = true;
 
-    // Event handler for unhandled exceptions
-    private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
-    {
-        WriteLogDump();
-    }
-
-    // Method to write the log dump to a file
-    private void WriteLogDump()
-    {
         try
         {
-            // Determine the log file path
+            FlushLogQueueToUI();
+        }
+        catch
+        {
+        }
+
+        WriteLogDump();
+
+        Application.ApplicationExit -= Application_ApplicationExit;
+        AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_UnhandledException;
+    }
+
+    private void Application_ApplicationExit(object? sender, EventArgs e)
+    {
+        Stop();
+    }
+
+    private void CurrentDomain_UnhandledException(object? sender, UnhandledExceptionEventArgs e)
+    {
+        WriteLogDump();
+    }
+
+    private void WriteLogDump()
+    {
+        List<string> snapshot;
+
+        lock (allLogEntries)
+        {
+            if (allLogEntries.Count == 0)
+                return;
+
+            snapshot = new List<string>(allLogEntries);
+        }
+
+        try
+        {
             string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string logFolderPath = Path.Combine(documentsPath, "procedure", "logs");
             Directory.CreateDirectory(logFolderPath);
@@ -287,63 +388,46 @@ public class Logger : IDisposable
             string logFileName = $"log_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
             string logFilePath = Path.Combine(logFolderPath, logFileName);
 
-            // Write all log entries to the file
-            lock (allLogEntries)
-            {
-                File.WriteAllLines(logFilePath, allLogEntries);
-            }
+            File.WriteAllLines(logFilePath, snapshot);
 
-            // Limit the number of log files to a maximum of 10
             LimitLogFiles(logFolderPath, maxFiles: 10);
         }
-        catch (Exception ex)
+        catch
         {
-            // Handle exceptions if necessary (e.g., log to Event Viewer)
         }
     }
 
-    // Helper method to limit the number of log files
     private void LimitLogFiles(string logFolderPath, int maxFiles)
     {
         try
         {
             var logFiles = Directory.GetFiles(logFolderPath, "log_*.txt");
+            if (logFiles.Length <= maxFiles)
+                return;
 
-            if (logFiles.Length > maxFiles)
+            Array.Sort(logFiles, (a, b) =>
             {
-                // Order files by the timestamp in the filename
-                var orderedFiles = logFiles.OrderBy(f =>
-                {
-                    string fileName = Path.GetFileNameWithoutExtension(f); // e.g., "log_20231017_124500"
-                    string timestampPart = fileName.Substring(4); // Remove "log_"
-                    if (DateTime.TryParseExact(timestampPart, "yyyyMMdd_HHmmss", null, System.Globalization.DateTimeStyles.None, out DateTime timestamp))
-                    {
-                        return timestamp;
-                    }
-                    else
-                    {
-                        // If parsing fails, use file creation time
-                        return File.GetCreationTime(f);
-                    }
-                }).ToList();
+                DateTime ta = File.GetCreationTime(a);
+                DateTime tb = File.GetCreationTime(b);
+                return ta.CompareTo(tb);
+            });
 
-                int filesToDelete = orderedFiles.Count - maxFiles;
-
-                // Delete the oldest files
-                for (int i = 0; i < filesToDelete; i++)
-                {
-                    File.Delete(orderedFiles[i]);
-                }
+            int toDelete = logFiles.Length - maxFiles;
+            for (int i = 0; i < toDelete; i++)
+            {
+                File.Delete(logFiles[i]);
             }
         }
-        catch (Exception ex)
+        catch
         {
-            // Handle exceptions if necessary
         }
     }
 }
 
-// Circular buffer implementation
+// ============================
+//   CIRCULAR BUFFER
+// ============================
+
 public class CircularBuffer<T>
 {
     private readonly T[] buffer;
@@ -353,6 +437,9 @@ public class CircularBuffer<T>
 
     public CircularBuffer(int capacity)
     {
+        if (capacity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(capacity));
+
         buffer = new T[capacity];
         head = 0;
         tail = 0;
@@ -365,13 +452,14 @@ public class CircularBuffer<T>
     {
         buffer[tail] = item;
         tail = (tail + 1) % buffer.Length;
+
         if (size < buffer.Length)
         {
             size++;
         }
         else
         {
-            head = (head + 1) % buffer.Length; // Overwrite the oldest item if full
+            head = (head + 1) % buffer.Length;
         }
     }
 
@@ -379,7 +467,7 @@ public class CircularBuffer<T>
     {
         if (size == 0)
         {
-            item = default;
+            item = default!;
             return false;
         }
 
@@ -388,6 +476,19 @@ public class CircularBuffer<T>
         size--;
         return true;
     }
+
+    public void Clear()
+    {
+        head = 0;
+        tail = 0;
+        size = 0;
+    }
 }
 
-public enum LogLevel { DEBUG, INFO, WARN, ERROR }
+public enum LogLevel
+{
+    DEBUG,
+    INFO,
+    WARN,
+    ERROR
+}

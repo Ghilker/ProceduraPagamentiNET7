@@ -1,517 +1,571 @@
-﻿using ProcedureNet7.Verifica;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class ControlloStatusSede : BaseProcedure<ArgsControlloStatusSede>
+    internal sealed class ControlloStatusSede : BaseProcedure<ArgsControlloStatusSede>
     {
-        public ControlloStatusSede(MasterForm? _masterForm, SqlConnection? connection_string) : base(_masterForm, connection_string) { }
+        public ControlloStatusSede(MasterForm? masterForm, SqlConnection? connection) : base(masterForm, connection) { }
 
+        private string _aa = "";
+        private string _folderPath = "";
 
-        public string selectedAA = string.Empty;
-        public string folderPath = string.Empty;
-        public DataTable studentiPendolari = new();
-        private static readonly Dictionary<string, int> _comuneCompatGroup = new()
-        {
-            // group 1
-            ["G954"] = 1,
-            ["L725"] = 1,
-
-            // group 2
-            ["G698"] = 2,
-            ["E472"] = 2,
-
-            // group 3
-            ["D708"] = 3,
-            ["D843"] = 3,
-
-            // group 4
-            ["A323"] = 4,
-            ["F880"] = 4
-        };
+        public DataTable OutputStatusSede { get; private set; } = BuildOutputTable();
 
         public override void RunProcedure(ArgsControlloStatusSede args)
         {
-            selectedAA = args._selectedAA;
-            folderPath = args._folderPath;
+            var totalSw = Stopwatch.StartNew();
 
-            studentiPendolari.Columns.Add("CodFiscale");
-            studentiPendolari.Columns.Add("TitoloOneroso");
-            studentiPendolari.Columns.Add("SerieContratto");
-            studentiPendolari.Columns.Add("DataRegistrazione");
-            studentiPendolari.Columns.Add("DataDecorrenza");
-            studentiPendolari.Columns.Add("DataScadenza");
-            studentiPendolari.Columns.Add("DurataContratto");
-            studentiPendolari.Columns.Add("Prorogato");
-            studentiPendolari.Columns.Add("DurataProroga");
-            studentiPendolari.Columns.Add("SerieProroga");
-            studentiPendolari.Columns.Add("ContrattoEnte");
-            studentiPendolari.Columns.Add("DenomEnte");
-            studentiPendolari.Columns.Add("ImportoRataEnte");
-            studentiPendolari.Columns.Add("Motivo");
-            studentiPendolari.Columns.Add("StatoAttuale");
-            studentiPendolari.Columns.Add("StatoSuggerito");
-            studentiPendolari.Columns.Add("ComuneDom");
-            studentiPendolari.Columns.Add("ComuneRes");
-            studentiPendolari.Columns.Add("ComuneSede");
+            _aa = (args._selectedAA ?? "").Trim();
+            _folderPath = (args._folderPath ?? "").Trim();
 
-            PopulateStudentDomicilio();
+            Log(0, $"ControlloStatusSede.RunProcedure - START | AA={_aa} | Folder='{_folderPath}'");
 
-            Utilities.ExportDataTableToExcel(studentiPendolari, folderPath);
-            Logger.LogInfo(100, "Fine lavorazione");
+            try
+            {
+                ValidateSelectedAA(_aa);
+                if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
+
+                Log(5, "Validazione parametri completata.");
+
+                // calcolo (standard: non include esclusi / non trasmesse)
+                var output = Compute(_aa, includeEsclusi: false, includeNonTrasmesse: false);
+
+                OutputStatusSede = output;
+
+                Log(95, $"Export Excel START | Righe={output.Rows.Count} | Path='{_folderPath}'");
+                Utilities.ExportDataTableToExcel(output, _folderPath);
+                Log(98, "Export Excel END.");
+
+                Log(100, $"ControlloStatusSede.RunProcedure - END | ms={totalSw.ElapsedMilliseconds} | Righe={output.Rows.Count}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(null, $"ControlloStatusSede.RunProcedure - ERROR: {ex.Message}");
+                throw;
+            }
         }
-        void PopulateStudentDomicilio()
+
+        // =========================
+        // OUTPUT
+        // =========================
+        public DataTable Compute(string aa) => Compute(aa, includeEsclusi: false, includeNonTrasmesse: false);
+
+        public DataTable Compute(string aa, bool includeEsclusi, bool includeNonTrasmesse)
         {
-            // -----------------------
-            // 0) Parse the academic year
-            // -----------------------
-            int startYear = int.Parse(selectedAA.Substring(0, 4));
-            int endYear = int.Parse(selectedAA.Substring(4, 4));
-            DateTime dateRangeStart = new DateTime(startYear, 10, 1);
-            DateTime dateRangeEnd = new DateTime(endYear, 9, 30);
+            var totalSw = Stopwatch.StartNew();
 
-            // -----------------------
-            // 1) Prepare the query
-            // -----------------------
-            string dataQuery = $@"
-            SELECT
-                LRS.COD_FISCALE, 
-	            LRS.TITOLO_ONEROSO, 
-	            LRS.N_SERIE_CONTRATTO, 
-	            LRS.DATA_REG_CONTRATTO,  
-	            LRS.DATA_DECORRENZA, 
-	            LRS.DATA_SCADENZA, 
-	            LRS.DURATA_CONTRATTO, 
-	            LRS.PROROGA, 
-	            LRS.DURATA_PROROGA, 
-	            LRS.ESTREMI_PROROGA,
-	            LRS.TIPO_CONTRATTO_TITOLO_ONEROSO,
-	            LRS.DENOM_ENTE,
-	            LRS.IMPORTO_RATA,
-                LRS.COD_COMUNE  AS CodComuneDom,
-                vr.Cod_comune   AS CodComuneRes,
-                cl.Comune_Sede_studi AS CodComuneSede,
-                vv.Status_sede,
-                prev.DATA_SCADENZA AS PrevScadenza,
-                DATEDIFF(day, prev.DATA_SCADENZA, LRS.DATA_REG_CONTRATTO) AS GiorniDallaScad,
-	            dbo.SlashBlocchi(vv.Num_domanda, vv.Anno_accademico, '') as cod_blocchi
-            FROM 
-                LUOGO_REPERIBILITA_STUDENTE AS LRS
-                OUTER APPLY (
-                    SELECT TOP 1
-                            prev.DATA_SCADENZA
-                    FROM   LUOGO_REPERIBILITA_STUDENTE prev
-                    WHERE  prev.COD_FISCALE      = LRS.COD_FISCALE
-                        AND  prev.ANNO_ACCADEMICO  = LRS.ANNO_ACCADEMICO
-                        AND  prev.TIPO_LUOGO       = 'DOM'
-                        AND  prev.PROROGA          = 0                -- original contract
-                        AND  prev.DATA_VALIDITA    < LRS.DATA_VALIDITA
-                    ORDER BY prev.DATA_VALIDITA DESC
-                ) AS prev
-                INNER JOIN Comuni 
-                    ON LRS.COD_COMUNE = Comuni.Cod_comune
-                INNER JOIN Domanda
-                    ON LRS.ANNO_ACCADEMICO = Domanda.Anno_accademico
-                    AND LRS.COD_FISCALE     = Domanda.Cod_fiscale
-                    AND LRS.tipo_bando      = Domanda.Tipo_bando
+            Log(0, $"ControlloStatusSede.Compute - START | AA={aa} | IncludeEsclusi={includeEsclusi} | IncludeNonTrasmesse={includeNonTrasmesse}");
 
-                -- Must be Status_sede = 'B'
-                INNER JOIN vValori_calcolati AS vv
-                    ON Domanda.Anno_accademico = vv.Anno_accademico
-                    AND Domanda.Num_domanda     = vv.Num_domanda
-                    AND vv.Status_sede in ('B', 'D')
+            ValidateSelectedAA(aa);
+            if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
 
-                -- Must have tipo esito BS != 0
-                INNER JOIN vEsiti_concorsiBS AS vb
-                    ON Domanda.Anno_accademico = vb.Anno_accademico
-                    AND Domanda.Num_domanda     = vb.Num_domanda
-                    AND vb.Cod_tipo_esito <> 0
+            var repo = new SqlStatusSedeRepository(CONNECTION);
 
-                -- Must not be rifug politico
-                INNER JOIN vDATIGENERALI_dom AS vd
-                    ON Domanda.Anno_accademico = vd.Anno_accademico
-                    AND Domanda.Num_domanda     = vd.Num_domanda
-                    AND vd.Rifug_politico <> 1
+            // LOAD INPUTS
+            var loadSw = Stopwatch.StartNew();
+            Log(10, "Esecuzione stored dbo.sp_StatusSede_GetInputs - START.");
+            var inputs = repo.LoadInputs(aa, includeEsclusi, includeNonTrasmesse);
+            Log(20, $"Esecuzione stored dbo.sp_StatusSede_GetInputs - END | Righe={inputs.Count} | ms={loadSw.ElapsedMilliseconds}");
 
-                -- Additional constraints for vIscrizioni
-                INNER JOIN vIscrizioni AS vi
-                    ON Domanda.Anno_accademico = vi.Anno_accademico
-                    AND Domanda.Cod_fiscale     = vi.Cod_fiscale
-                    AND Domanda.Tipo_bando      = vi.tipo_bando
-                    AND vi.Cod_tipologia_studi <> '06'
+            // EVAL
+            var evalSw = Stopwatch.StartNew();
+            Log(25, "Valutazione regole status sede - START.");
 
-                INNER JOIN Corsi_laurea           AS cl
-                        ON vi.Cod_corso_laurea     = cl.Cod_corso_laurea
-                        AND vi.Anno_accad_inizio    = cl.Anno_accad_inizio
-                        AND vi.Cod_tipo_ordinamento = cl.Cod_tipo_ordinamento
-                        AND vi.Cod_facolta          = cl.Cod_facolta
-                        AND vi.Cod_sede_studi       = cl.Cod_sede_studi
-                        AND vi.Cod_tipologia_studi  = cl.Cod_tipologia_studi
+            var evaluator = new StatusSedeEvaluator();
+            var output = BuildOutputTable();
+            var (aaStart, aaEnd) = GetAaDateRange(aa);
 
-                -- Join to vResidenza to handle the 'EE' logic
-                INNER JOIN vResidenza AS vr
-                    ON vr.Cod_fiscale      = Domanda.Cod_fiscale
-                    AND vr.Anno_accademico = Domanda.Anno_accademico
-                    -- Adjust if necessary to match the rest of your keys
-            WHERE
-                -- Same check for LUOGO_REPERIBILITA_STUDENTE
-                LRS.ANNO_ACCADEMICO = '{selectedAA}'
-                AND LRS.TIPO_LUOGO = 'DOM'
-                AND LRS.DATA_VALIDITA = (
-                        SELECT MAX(DATA_VALIDITA) 
-                        FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
-                        WHERE rsd.COD_FISCALE      = LRS.COD_FISCALE
-                        AND rsd.ANNO_ACCADEMICO = LRS.ANNO_ACCADEMICO
-                        AND rsd.TIPO_LUOGO      = 'DOM'
-                )
+            var stats = new DecisionStats();
 
-                -- Must NOT be in forzature as B
-                AND Domanda.Cod_fiscale NOT IN (
-                        SELECT Cod_Fiscale
-                        FROM Forzature_StatusSede
-                        WHERE Data_fine_validita IS NULL
-                        AND Status_sede = 'B'
-                        AND Anno_Accademico = '{selectedAA}'
-                )
+            int n = inputs.Count;
+            int progressStep = Math.Max(1, n / 20); // max 20 update
+            for (int idx = 0; idx < n; idx++)
+            {
+                var row = inputs[idx];
+                var decision = evaluator.Evaluate(row, aaStart, aaEnd);
+                AppendOutput(output, row, decision);
 
-                AND Domanda.Cod_fiscale NOT IN (
-                        SELECT Cod_Fiscale
-                        FROM Forzature_StatusSede
-                        WHERE Data_fine_validita IS NULL
-                        AND Status_sede = 'D'
-                        AND Anno_Accademico = '{selectedAA}'
-                )
+                stats.Add(decision);
 
-                -- Must NOT have tipo esito PA <> 0
-                AND Domanda.Num_domanda NOT IN (
-                        SELECT Num_domanda
-                        FROM vEsiti_concorsiPA
-                        WHERE (Cod_tipo_esito <> 0)
-                        AND (Anno_accademico = '{selectedAA}')
-                )
+                if ((idx + 1) % progressStep == 0 || (idx + 1) == n)
+                {
+                    int pct = 25 + (n == 0 ? 60 : (int)Math.Round(((idx + 1) * 60.0) / n));
+                    pct = ClampPct(pct);
+                    Log(pct, $"Valutazione in corso... {idx + 1}/{n}");
+                }
+            }
 
-                -- Now handle the ""EE"" logic via 'NOT' approach:
-                AND NOT (
-                    vr.provincia_residenza = 'EE'
-                    AND Domanda.Num_domanda IN
-                    (
-                            SELECT d1.Num_domanda
-                            FROM Domanda d1
-                            INNER JOIN vNucleo_familiare vn1
-                                ON d1.Anno_accademico = vn1.Anno_accademico
-                                AND d1.Num_domanda     = vn1.Num_domanda
-                            WHERE vn1.Numero_conviventi_estero >= vn1.Num_componenti / 2
-                    )
+            Log(88, $"Valutazione regole status sede - END | ms={evalSw.ElapsedMilliseconds}");
+            Log(100, $"ControlloStatusSede.Compute - END | ms={totalSw.ElapsedMilliseconds} | RigheOutput={output.Rows.Count}");
+
+            return output;
+        }
+
+        private static DataTable BuildOutputTable()
+        {
+            var dt = new DataTable();
+            dt.Columns.Add("CodFiscale");
+            dt.Columns.Add("NumDomanda", typeof(string));
+            dt.Columns.Add("Motivo");
+            dt.Columns.Add("StatoAttuale");
+            dt.Columns.Add("StatoSuggerito");
+            dt.Columns.Add("ComuneRes");
+            dt.Columns.Add("ProvRes");
+            dt.Columns.Add("ComuneSede");
+            dt.Columns.Add("ProvSede");
+            dt.Columns.Add("CodSede");
+            dt.Columns.Add("CodCorso");
+            dt.Columns.Add("ComuneDom");
+            dt.Columns.Add("DomicilioPresente", typeof(bool));
+            dt.Columns.Add("DomicilioValido", typeof(bool));
+            dt.Columns.Add("HasAlloggio12", typeof(bool));
+            return dt;
+        }
+
+        private static void AppendOutput(DataTable dt, StatusSedeStudent row, StatusSedeDecision d)
+        {
+            var info = row.Info;
+
+            string cf = (info.InformazioniPersonali.CodFiscale ?? "").Trim().ToUpperInvariant();
+            string numDomanda = (info.InformazioniPersonali.NumDomanda ?? "").Trim();
+
+            string comuneRes = GetComuneResidenza(info);
+            string provRes = (info.InformazioniSede.Residenza.provincia ?? "").Trim().ToUpperInvariant();
+
+            string comuneSede = (info.InformazioniIscrizione.ComuneSedeStudi ?? "").Trim();
+            string provSede = (row.ProvinciaSede ?? "").Trim().ToUpperInvariant();
+
+            string codSede = (info.InformazioniIscrizione.CodSedeStudi ?? "").Trim().ToUpperInvariant();
+            string codCorso = (info.InformazioniIscrizione.CodCorsoLaurea ?? "").Trim();
+
+            string comuneDom = (info.InformazioniSede.Domicilio?.codComuneDomicilio ?? "").Trim();
+
+            dt.Rows.Add(
+                cf,
+                numDomanda,
+                d.Reason,
+                (info.InformazioniSede.StatusSede ?? "").Trim().ToUpperInvariant(),
+                d.Suggested,
+                comuneRes,
+                provRes,
+                comuneSede,
+                provSede,
+                codSede,
+                codCorso,
+                comuneDom,
+                d.DomicilioPresente,
+                d.DomicilioValido,
+                row.HasAlloggio12
+            );
+        }
+
+        private static string GetComuneResidenza(StudenteInfo info)
+        {
+            // I dati possono essere codice o nome comune: mantieni in uscita quello valorizzato.
+            var c1 = (info.InformazioniSede.Residenza.codComune ?? "").Trim();
+            if (c1.Length > 0) return c1;
+
+            var c2 = (info.InformazioniSede.Residenza.nomeComune ?? "").Trim();
+            if (c2.Length > 0) return c2;
+
+            return "";
+        }
+
+        // =========================
+        // REPOSITORY
+        // =========================
+        private sealed class SqlStatusSedeRepository
+        {
+            private readonly SqlConnection _conn;
+            public SqlStatusSedeRepository(SqlConnection conn) => _conn = conn;
+
+            public System.Collections.Generic.List<StatusSedeStudent> LoadInputs(
+                string aa,
+                bool includeEsclusi = false,
+                bool includeNonTrasmesse = false)
+            {
+                var result = new System.Collections.Generic.List<StatusSedeStudent>();
+
+                using var cmd = new SqlCommand("dbo.sp_StatusSede_GetInputs", _conn)
+                {
+                    CommandType = CommandType.StoredProcedure,
+                    CommandTimeout = 9999999,
+                };
+
+                cmd.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
+                cmd.Parameters.Add("@IncludeEsclusi", SqlDbType.Bit).Value = includeEsclusi;
+                cmd.Parameters.Add("@IncludeNonTrasmesse", SqlDbType.Bit).Value = includeNonTrasmesse;
+
+                Logger.LogInfo(null, $"[Repo] sp_StatusSede_GetInputs | AA={aa} | IncludeEsclusi={includeEsclusi} | IncludeNonTrasmesse={includeNonTrasmesse}");
+
+                using var reader = cmd.ExecuteReader();
+
+                int readCount = 0;
+                while (reader.Read())
+                {
+                    result.Add(StatusSedeStudent.FromRecord(reader));
+                    readCount++;
+
+                    if (readCount % 5000 == 0)
+                        Logger.LogInfo(null, $"[Repo] Lettura righe... {readCount}");
+                }
+
+                Logger.LogInfo(null, $"[Repo] Lettura completata. Righe={readCount}");
+                return result;
+            }
+        }
+
+        private sealed class StatusSedeStudent
+        {
+            public StudenteInfo Info { get; init; } = new StudenteInfo();
+
+            public bool AlwaysA { get; init; }
+
+            public bool InSedeList { get; init; }
+            public bool PendolareList { get; init; }
+            public bool FuoriSedeList { get; init; }
+
+            public bool HasAlloggio12 { get; init; }
+
+            public string ProvinciaSede { get; init; } = string.Empty;
+
+            public int MinMesiDomicilioFuoriSede { get; init; }
+
+            public static StatusSedeStudent FromRecord(IDataRecord record)
+            {
+                var studenteInfo = new StudenteInfo();
+
+                int numDomanda = record.SafeGetInt("NumDomanda");
+                string codFiscale = record.SafeGetString("CodFiscale").Trim().ToUpperInvariant();
+
+                studenteInfo.InformazioniPersonali.NumDomanda = numDomanda <= 0
+                    ? string.Empty
+                    : numDomanda.ToString(CultureInfo.InvariantCulture);
+
+                studenteInfo.InformazioniPersonali.CodFiscale = codFiscale;
+
+                studenteInfo.InformazioniSede.StatusSede = record.SafeGetString("StatusSedeAttuale").Trim().ToUpperInvariant();
+                studenteInfo.InformazioniSede.ForzaturaStatusSede = record.SafeGetString("ForcedStatus").Trim().ToUpperInvariant();
+
+                bool alwaysA = record.SafeGetBool("AlwaysA");
+
+                bool rifugiatoPolitico = record.SafeGetBool("RifugiatoPolitico");
+                studenteInfo.InformazioniPersonali.Rifugiato = rifugiatoPolitico;
+
+                int numeroComponentiNucleo = record.SafeGetInt("NumComponenti");
+                int numeroComponentiNucleoEstero = record.SafeGetInt("NumConvEstero");
+                studenteInfo.SetNucleoFamiliare(numeroComponentiNucleo, numeroComponentiNucleoEstero);
+
+                string comuneResidenza = record.SafeGetString("ComuneResidenza").Trim();
+                string provinciaResidenza = record.SafeGetString("ProvinciaResidenza").Trim().ToUpperInvariant();
+                studenteInfo.SetResidenza(
+                    indirizzo: string.Empty,
+                    codComune: comuneResidenza,
+                    provincia: provinciaResidenza,
+                    CAP: string.Empty,
+                    nomeComune: comuneResidenza
                 );
-            ";
 
-            // -----------------------
-            // 2) Read data into DTOs
-            // -----------------------
-            var domicilioRows = new List<StudentiDomicilioDTO>();
-            Logger.LogInfo(35, "Lavorazione studenti - inserimento in domicilio");
+                studenteInfo.InformazioniIscrizione.CodSedeStudi = record.SafeGetString("CodSedeStudi").Trim().ToUpperInvariant();
+                studenteInfo.InformazioniIscrizione.CodCorsoLaurea = record.SafeGetString("CodCorso").Trim();
+                studenteInfo.InformazioniIscrizione.CodFacolta = record.SafeGetString("CodFacolta").Trim();
+                studenteInfo.InformazioniIscrizione.ComuneSedeStudi = record.SafeGetString("ComuneSedeStudi").Trim();
 
-            using (SqlCommand readData = new SqlCommand(dataQuery, CONNECTION))
-            {
-                readData.CommandTimeout = 9000000;
+                string provinciaSede = record.SafeGetString("ProvinciaSede").Trim().ToUpperInvariant();
 
-                using (SqlDataReader reader = readData.ExecuteReader())
+                bool inSedeList = record.SafeGetBool("InSedeList");
+                bool pendolareList = record.SafeGetBool("PendolareList");
+                bool fuoriSedeList = record.SafeGetBool("FuoriSedeList");
+
+                bool hasAlloggio12 = record.SafeGetBool("HasAlloggio12");
+
+                string comuneDomicilio = record.SafeGetString("ComuneDomicilio").Trim();
+                bool titoloOneroso = record.SafeGetBool("TitoloOneroso");
+                bool contrattoEnte = record.SafeGetBool("ContrattoEnte");
+                string serieContratto = record.SafeGetString("SerieContratto").Trim();
+
+                DateTime dataRegistrazione = record.SafeGetDateTime("DataRegistrazione");
+                DateTime dataDecorrenza = record.SafeGetDateTime("DataDecorrenza");
+                DateTime dataScadenza = record.SafeGetDateTime("DataScadenza");
+
+                int durataContratto = record.SafeGetInt("DurataContratto");
+                bool prorogato = record.SafeGetBool("Prorogato");
+                int durataProroga = record.SafeGetInt("DurataProroga");
+                string serieProroga = record.SafeGetString("SerieProroga").Trim();
+
+                string denomEnte = record.SafeGetString("DenomEnte").Trim();
+                double importoRataEnte = record.SafeGetDouble("ImportoRataEnte");
+
+                int minMesiDomicilioFuoriSede = record.SafeGetInt("MinMesiDomicilioFuoriSede");
+
+                // Domicilio dentro classi informazione
+                studenteInfo.InformazioniSede.Domicilio.codComuneDomicilio = comuneDomicilio;
+                studenteInfo.InformazioniSede.Domicilio.titoloOneroso = titoloOneroso;
+                studenteInfo.InformazioniSede.Domicilio.codiceSerieLocazione = serieContratto;
+                studenteInfo.InformazioniSede.Domicilio.dataRegistrazioneLocazione = dataRegistrazione;
+                studenteInfo.InformazioniSede.Domicilio.dataDecorrenzaLocazione = dataDecorrenza;
+                studenteInfo.InformazioniSede.Domicilio.dataScadenzaLocazione = dataScadenza;
+                studenteInfo.InformazioniSede.Domicilio.durataMesiLocazione = durataContratto;
+                studenteInfo.InformazioniSede.Domicilio.prorogatoLocazione = prorogato;
+                studenteInfo.InformazioniSede.Domicilio.durataMesiProrogaLocazione = durataProroga;
+                studenteInfo.InformazioniSede.Domicilio.codiceSerieProrogaLocazione = serieProroga;
+
+                studenteInfo.InformazioniSede.ContrattoEnte = contrattoEnte;
+                studenteInfo.InformazioniSede.Domicilio.contrEnte = contrattoEnte;
+                studenteInfo.InformazioniSede.Domicilio.denominazioneIstituto = denomEnte;
+                studenteInfo.InformazioniSede.Domicilio.importoMensileRataIstituto = importoRataEnte;
+
+                return new StatusSedeStudent
                 {
-                    while (reader.Read())
-                    {
-                        var codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
-
-                        domicilioRows.Add(new StudentiDomicilioDTO
-                        {
-                            CodFiscale = codFiscale,
-                            TitoloOneroso = (Utilities.SafeGetInt(reader, "TITOLO_ONEROSO") == 1),
-                            ContrattoEnte = (Utilities.SafeGetInt(reader, "TIPO_CONTRATTO_TITOLO_ONEROSO") == 1),
-                            SerieContratto = Utilities.SafeGetString(reader, "N_SERIE_CONTRATTO"),
-                            DataRegistrazioneString = Utilities.SafeGetString(reader, "DATA_REG_CONTRATTO"),
-                            DataDecorrenzaString = Utilities.SafeGetString(reader, "DATA_DECORRENZA"),
-                            DataScadenzaString = Utilities.SafeGetString(reader, "DATA_SCADENZA"),
-                            DurataContratto = Utilities.SafeGetInt(reader, "DURATA_CONTRATTO"),
-                            Prorogato = (Utilities.SafeGetInt(reader, "PROROGA") == 1),
-                            DurataProroga = Utilities.SafeGetInt(reader, "DURATA_PROROGA"),
-                            SerieProroga = Utilities.SafeGetString(reader, "ESTREMI_PROROGA"),
-                            DenominazioneEnte = Utilities.SafeGetString(reader, "DENOM_ENTE"),
-                            ImportoRataEnte = Utilities.SafeGetDouble(reader, "IMPORTO_RATA"),
-                            StatusSede = Utilities.SafeGetString(reader, "Status_sede"),
-                            CodBlocchi = Utilities.SafeGetString(reader, "cod_blocchi"),
-                            ComuneDomicilio = Utilities.SafeGetString(reader, "CodComuneDom"),
-                            ComuneResidenza = Utilities.SafeGetString(reader, "CodComuneRes"),
-                            ComuneSedeStudi = Utilities.SafeGetString(reader, "CodComuneSede"),
-                            GiorniDallaScad = Utilities.SafeGetInt(reader, "GiorniDallaScad"),
-                            PrevScadenza = Utilities.SafeGetDateTime(reader, "PrevScadenza"),
-
-
-                        });
-                    }
-                }
-            }
-
-            // -----------------------
-            // 3) Process the rows
-            // -----------------------
-            foreach (var row in domicilioRows)
-            {
-
-                if (row.CodFiscale == "MLNNNL04M44F839V")
-                {
-                    string test = "";
-                }
-                bool studenteDomicilioOK = false;
-                bool hasVccBlock = !string.IsNullOrWhiteSpace(row.CodBlocchi) &&
-                   row.CodBlocchi.IndexOf("/VVC", StringComparison.OrdinalIgnoreCase) >= 0;
-
-                bool domEqualsRes = AreComuniCompatible(row.ComuneDomicilio,
-                                        row.ComuneResidenza);
-
-
-                bool domEqualsSeat = string.Equals(row.ComuneDomicilio,
-                                                    row.ComuneSedeStudi,
-                                                    StringComparison.OrdinalIgnoreCase);
-
-                bool geoOk = !domEqualsRes && domEqualsSeat;
-
-
-                Domicilio domicilio = new Domicilio();
-
-                // ----- TITOLO ONEROSO -----
-                bool titoloOneroso = row.TitoloOneroso;
-                DateTime.TryParse(row.DataRegistrazioneString, out DateTime dataRegistrazione);
-                DateTime.TryParse(row.DataDecorrenzaString, out DateTime dataDecorrenza);
-                DateTime.TryParse(row.DataScadenzaString, out DateTime dataScadenza);
-
-                // Only if there's a real contract
-                if (titoloOneroso)
-                {
-                    // Calculate the overlap between the contract and the academic year period
-                    DateTime effectiveStart = (dataDecorrenza > dateRangeStart) ? dataDecorrenza : dateRangeStart;
-                    DateTime effectiveEnd = (dataScadenza < dateRangeEnd) ? dataScadenza : dateRangeEnd;
-
-                    if (effectiveStart <= effectiveEnd)
-                    {
-                        int monthsCovered = 0;
-
-                        // Start from the 1st day of the month of 'effectiveStart'
-                        DateTime currentMonthStart = new DateTime(effectiveStart.Year, effectiveStart.Month, 1);
-
-                        // Iterate while the start of the month is within the effective coverage
-                        while (currentMonthStart <= effectiveEnd)
-                        {
-                            // End of the current month
-                            DateTime currentMonthEnd = currentMonthStart.AddMonths(1).AddDays(-1);
-
-                            // Determine the portion of this month actually covered
-                            // Coverage starts on the later of (effectiveStart or currentMonthStart)
-                            DateTime coverageStart = (currentMonthStart < effectiveStart) ? effectiveStart : currentMonthStart;
-                            // Coverage ends on the earlier of (effectiveEnd or currentMonthEnd)
-                            DateTime coverageEnd = (currentMonthEnd > effectiveEnd) ? effectiveEnd : currentMonthEnd;
-
-                            // Calculate how many days are covered in this month
-                            double daysCovered = (coverageEnd - coverageStart).TotalDays + 1;
-
-                            // If coverage in this calendar month is at least 15 days, consider it a "full month"
-                            if (daysCovered >= 15)
-                            {
-                                monthsCovered++;
-                            }
-
-                            // Move to the next month
-                            currentMonthStart = currentMonthStart.AddMonths(1);
-                        }
-
-                        // Check if there are at least 10 months fully covered (>=25 days each)
-                        if (monthsCovered >= 10)
-                        {
-                            studenteDomicilioOK = true;
-                        }
-                    }
-                }
-
-
-                // ----- CONTRATTO ENTE -----
-                bool contrattoEnte = row.ContrattoEnte;
-                string denominazioneEnte = row.DenominazioneEnte;
-                int durataContratto = row.DurataContratto;
-                double importoRataEnte = row.ImportoRataEnte;
-                bool contrattoEnteValido = false;
-
-                if (contrattoEnte)
-                {
-                    if (string.IsNullOrWhiteSpace(denominazioneEnte))
-                    {
-                        // If there's no "Ente" name, consider invalid
-                        studenteDomicilioOK = false;
-                    }
-                    else
-                    {
-                        // Must have at least 10 months and a rate > 0
-                        if (durataContratto < 10 || importoRataEnte <= 0)
-                        {
-                            studenteDomicilioOK = false;
-                        }
-                        else
-                        {
-                            studenteDomicilioOK = true;
-                            contrattoEnteValido = true;
-                        }
-                    }
-                }
-
-                // ----- Serie Contratto & Serie Proroga -----
-                string serieContratto = row.SerieContratto;
-                string serieProroga = row.SerieProroga;
-
-                bool contrattoValido = contrattoEnteValido || DomicilioUtils.IsValidSerie(serieContratto);
-                bool prorogaValido = DomicilioUtils.IsValidSerie(serieProroga);
-
-                // If the proroga contains the same base as the contract, we consider that invalid
-                if (!string.IsNullOrEmpty(serieContratto)
-                    && !string.IsNullOrEmpty(serieProroga)
-                    && serieProroga.IndexOf(serieContratto, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    prorogaValido = false;
-                }
-
-                bool prorogaTempisticaOK =
-                    !(row.Prorogato ?? false)            // nothing to check if no proroga
-                    || row.GiorniDallaScad <= 30;        // filed within 30 days
-
-                // final validity
-                bool isDomicilioValidOrNotNeeded =
-                        studenteDomicilioOK
-                     && contrattoValido
-                     && !(row.Prorogato == true && !prorogaValido)
-                     && prorogaTempisticaOK              // ← NEW
-                     && geoOk;
-
-                // Build the message for reasons why they were paid as pendolari
-                string messaggio = string.Empty;
-                if (!geoOk)
-                {
-                    messaggio += "#Comune domicilio/residenza/sede non coerenti";
-                }
-                if (!studenteDomicilioOK)
-                {
-                    messaggio += "#Durata contratto minore dieci mesi";
-                }
-                if (!contrattoValido)
-                {
-                    messaggio += $"#Serie contratto non valida: {serieContratto}";
-                }
-                if (row.Prorogato == true && !prorogaValido)
-                {
-                    messaggio +=
-                        $"#Serie proroga non valida: Contratto {serieContratto} " +
-                        $"- Proroga {serieProroga}";
-                }
-
-                if (row.Prorogato == true && !prorogaTempisticaOK)
-                {
-                    messaggio += $"#Proroga inserita dopo {row.GiorniDallaScad} giorni (limite 30)";
-                }
-
-                if (row.StatusSede == "B" && !isDomicilioValidOrNotNeeded)
-                {
-                    studentiPendolari.Rows.Add(
-                        row.CodFiscale,
-                        row.TitoloOneroso,
-                        row.SerieContratto,
-                        row.DataRegistrazioneString,
-                        row.DataDecorrenzaString,
-                        row.DataScadenzaString,
-                        row.DurataContratto,
-                        row.Prorogato,
-                        row.DurataProroga,
-                        row.SerieProroga,
-                        row.ContrattoEnte,
-                        row.DenominazioneEnte,
-                        row.ImportoRataEnte,
-                        messaggio,
-                        "B",                            // StatoAttuale
-                        "D",                             // StatoSuggerito
-                        row.ComuneDomicilio,
-                        row.ComuneResidenza,
-                        row.ComuneSedeStudi
-                    );
-                    continue;
-                }
-
-                if (row.StatusSede == "B" && isDomicilioValidOrNotNeeded && hasVccBlock)
-                {
-                    string motivoVcc = "#Rimuovere blocco VVC";
-                    studentiPendolari.Rows.Add(
-                        row.CodFiscale,
-                        row.TitoloOneroso,
-                        row.SerieContratto,
-                        row.DataRegistrazioneString,
-                        row.DataDecorrenzaString,
-                        row.DataScadenzaString,
-                        row.DurataContratto,
-                        row.Prorogato,
-                        row.DurataProroga,
-                        row.SerieProroga,
-                        row.ContrattoEnte,
-                        row.DenominazioneEnte,
-                        row.ImportoRataEnte,
-                        motivoVcc,
-                        "B",
-                        "B",
-                        row.ComuneDomicilio,
-                        row.ComuneResidenza,
-                        row.ComuneSedeStudi
-                    );
-                    continue;
-                }
-
-                // ─── D ➜ B ────────────────────────────────────────────────────────────────
-                if (row.StatusSede == "D" && isDomicilioValidOrNotNeeded)
-                {
-                    string motivazione = "#Contratto valido almeno 10 mesi";
-                    // (aggiungi eventuali altri motivi se utili)
-
-                    studentiPendolari.Rows.Add(
-                        row.CodFiscale,
-                        row.TitoloOneroso,
-                        row.SerieContratto,
-                        row.DataRegistrazioneString,
-                        row.DataDecorrenzaString,
-                        row.DataScadenzaString,
-                        row.DurataContratto,
-                        row.Prorogato,
-                        row.DurataProroga,
-                        row.SerieProroga,
-                        row.ContrattoEnte,
-                        row.DenominazioneEnte,
-                        row.ImportoRataEnte,
-                        motivazione,
-                        "D",                            // StatoAttuale
-                        "B",                             // StatoSuggerito
-                        row.ComuneDomicilio,
-                        row.ComuneResidenza,
-                        row.ComuneSedeStudi
-                    );
-                }
-
+                    Info = studenteInfo,
+                    AlwaysA = alwaysA,
+                    InSedeList = inSedeList,
+                    PendolareList = pendolareList,
+                    FuoriSedeList = fuoriSedeList,
+                    HasAlloggio12 = hasAlloggio12,
+                    ProvinciaSede = provinciaSede,
+                    MinMesiDomicilioFuoriSede = minMesiDomicilioFuoriSede
+                };
             }
         }
-        private static bool AreComuniCompatible(string? c1, string? c2)
-        {
-            if (string.Equals(c1, c2, StringComparison.OrdinalIgnoreCase))
-                return true;
 
-            return _comuneCompatGroup.TryGetValue(c1 ?? string.Empty, out int g1) &&
-                   _comuneCompatGroup.TryGetValue(c2 ?? string.Empty, out int g2) &&
-                   g1 == g2;
+        // =========================
+        // EVALUATOR (usa StudenteInfo)
+        // =========================
+        private sealed class StatusSedeEvaluator
+        {
+            public StatusSedeDecision Evaluate(StatusSedeStudent row, DateTime aaStart, DateTime aaEnd)
+            {
+                var info = row.Info;
+
+                var forced = (info.InformazioniSede.ForzaturaStatusSede ?? "").Trim().ToUpperInvariant();
+                if (IsValidStatus(forced))
+                    return StatusSedeDecision.Fixed(forced, "Forzatura manuale (primaria)");
+
+                if (row.AlwaysA)
+                    return StatusSedeDecision.Fixed("A", "Sempre A (telematico / non in presenza) [DB]");
+
+                if (info.InformazioniPersonali.Rifugiato)
+                    return StatusSedeDecision.Fixed("B", "Rifugiato politico");
+
+                if (IsNucleoEsteroOver50(info))
+                    return StatusSedeDecision.Fixed("B", "Nucleo familiare con >50% componenti all'estero");
+
+                var comuneRes = GetComuneResidenza(info);
+                var comuneSede = (info.InformazioniIscrizione.ComuneSedeStudi ?? "").Trim();
+
+                if (Eq(comuneRes, comuneSede))
+                    return StatusSedeDecision.Fixed("A", "Comune residenza = Comune sede studi");
+
+                if (row.HasAlloggio12)
+                    return StatusSedeDecision.Fixed("B", "PA: idoneo/vincitore (1/2) => fuori sede");
+
+                bool pendolareDefaultSameProvNoLists = false;
+
+                if (row.InSedeList)
+                    return StatusSedeDecision.Fixed("A", "COMUNI_INSEDE (stessa provincia)");
+
+                if (row.PendolareList && !row.FuoriSedeList)
+                    return StatusSedeDecision.Fixed("C", "COMUNI_PENDOLARI (stessa provincia, non in COMUNI_FUORISEDE)");
+
+                var provRes = (info.InformazioniSede.Residenza.provincia ?? "").Trim().ToUpperInvariant();
+                var provSede = (row.ProvinciaSede ?? "").Trim().ToUpperInvariant();
+
+                if (Eq(provRes, provSede))
+                {
+                    if (!row.InSedeList && !row.PendolareList && !row.FuoriSedeList)
+                        pendolareDefaultSameProvNoLists = true;
+                }
+
+                if (pendolareDefaultSameProvNoLists)
+                    return StatusSedeDecision.Fixed("C", "Stessa provincia ma assente da COMUNI_INSEDE/COMUNI_PENDOLARI/COMUNI_FUORISEDE => pendolare default");
+
+                var dom = DomicilioValidator.Validate(row, aaStart, aaEnd);
+                if (!dom.Presente)
+                    return StatusSedeDecision.WithDom("D", "Dati domicilio non presenti => pendolare calcolato (D)", dom);
+
+                var comuneDom = (info.InformazioniSede.Domicilio?.codComuneDomicilio ?? "").Trim();
+
+                if (dom.Valido)
+                {
+                    if (Eq(comuneDom, comuneSede))
+                        return StatusSedeDecision.WithDom("B", $"Domicilio presente, valido e nel comune sede studi => fuori sede (B) | {dom.Reason}", dom);
+
+                    return StatusSedeDecision.WithDom("D", $"Domicilio valido ma comune domicilio diverso da comune sede studi => pendolare calcolato (D) | {dom.Reason}", dom);
+                }
+
+                return StatusSedeDecision.WithDom("D", $"Domicilio presente ma non valido => pendolare calcolato (D) | {dom.Reason}", dom);
+            }
+
+            private static bool IsNucleoEsteroOver50(StudenteInfo info)
+            {
+                var provRes = (info.InformazioniSede.Residenza.provincia ?? "").Trim().ToUpperInvariant();
+                if (!Eq(provRes, "EE")) return false;
+
+                int comp = info.InformazioniPersonali.NumeroComponentiNucleoFamiliare;
+                if (comp <= 0) return false;
+
+                int estero = info.InformazioniPersonali.NumeroComponentiNucleoFamiliareEstero;
+                var soglia = (int)Math.Ceiling(comp / 2.0);
+                return estero >= soglia;
+            }
+
+            private static bool IsValidStatus(string? s) => s is "A" or "B" or "C" or "D";
+
+            private static bool Eq(string? a, string? b)
+                => string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        // =========================
+        // DOMICILIO (usa classi informazione)
+        // =========================
+        private static class DomicilioValidator
+        {
+            public static DomResult Validate(StatusSedeStudent row, DateTime aaStart, DateTime aaEnd)
+            {
+                var info = row.Info;
+                var dom = info.InformazioniSede.Domicilio ?? new Domicilio();
+
+                var comuneDom = (dom.codComuneDomicilio ?? "").Trim();
+
+                bool titoloOneroso = dom.titoloOneroso;
+                bool contrattoEnte = dom.contrEnte || info.InformazioniSede.ContrattoEnte;
+
+                var presente = comuneDom.Length > 0 && (titoloOneroso || contrattoEnte);
+                if (!presente)
+                    return new DomResult(false, false, "Dati domicilio non presenti");
+
+                var dec = dom.dataDecorrenzaLocazione;
+                var scad = dom.dataScadenzaLocazione;
+
+                if (!HasValidDate(dec))
+                    return new DomResult(true, false, "Data decorrenza non valida");
+
+                if (!HasValidDate(scad))
+                    return new DomResult(true, false, "Data scadenza non valida");
+
+                if (scad < dec)
+                    return new DomResult(true, false, "Scadenza < decorrenza");
+
+                var effStart = dec > aaStart ? dec : aaStart;
+                var effEnd = scad < aaEnd ? scad : aaEnd;
+                if (effStart > effEnd)
+                    return new DomResult(true, false, "Contratto fuori dall'intervallo AA");
+
+                var mesi = CoveredMonths(effStart, effEnd);
+                var min = row.MinMesiDomicilioFuoriSede;
+
+                if (min > 0 && mesi < min)
+                    return new DomResult(true, false, $"Mesi coperti {mesi} < minimo {min} (DB)");
+
+                var serie = (dom.codiceSerieLocazione ?? "").Trim();
+                if (serie.Length < 3)
+                    return new DomResult(true, false, "Serie contratto assente/corta");
+
+                return new DomResult(true, true, $"OK (mesi coperti={mesi}, minimo={min})");
+            }
+
+            private static bool HasValidDate(DateTime dt)
+            {
+                if (dt == DateTime.MinValue) return false;
+                if (dt.Year < 1900) return false;
+                return true;
+            }
+
+            private static int CoveredMonths(DateTime start, DateTime end)
+            {
+                int count = 0;
+                var cur = new DateTime(start.Year, start.Month, 1);
+                while (cur <= end)
+                {
+                    var monthStart = cur;
+                    var monthEnd = cur.AddMonths(1).AddDays(-1);
+
+                    var covStart = monthStart < start ? start : monthStart;
+                    var covEnd = monthEnd > end ? end : monthEnd;
+
+                    var days = (covEnd - covStart).TotalDays + 1;
+                    if (days >= 15) count++;
+
+                    cur = cur.AddMonths(1);
+                }
+                return count;
+            }
+        }
+
+        private readonly record struct DomResult(bool Presente, bool Valido, string Reason);
+
+        private sealed class StatusSedeDecision
+        {
+            public string Suggested { get; }
+            public string Reason { get; }
+            public bool DomicilioPresente { get; }
+            public bool DomicilioValido { get; }
+
+            private StatusSedeDecision(string suggested, string reason, bool domPres, bool domVal)
+            {
+                Suggested = suggested;
+                Reason = reason;
+                DomicilioPresente = domPres;
+                DomicilioValido = domVal;
+            }
+
+            public static StatusSedeDecision Fixed(string suggested, string reason)
+                => new StatusSedeDecision(suggested, reason, domPres: false, domVal: false);
+
+            public static StatusSedeDecision WithDom(string suggested, string reason, DomResult dom)
+                => new StatusSedeDecision(suggested, reason, dom.Presente, dom.Valido);
+        }
+
+        // =========================
+        // UTIL
+        // =========================
+        private static void ValidateSelectedAA(string aa)
+        {
+            if (aa.Length != 8 || !aa.All(char.IsDigit))
+                throw new ArgumentException("Anno accademico non valido. Atteso formato YYYYYYYY.");
+
+            int start = int.Parse(aa.Substring(0, 4), CultureInfo.InvariantCulture);
+            int end = int.Parse(aa.Substring(4, 4), CultureInfo.InvariantCulture);
+            if (end != start + 1)
+                throw new ArgumentException("Anno accademico incoerente. Fine ≠ inizio+1.");
+        }
+
+        private static (DateTime aaStart, DateTime aaEnd) GetAaDateRange(string aa)
+        {
+            int startYear = int.Parse(aa.Substring(0, 4), CultureInfo.InvariantCulture);
+            int endYear = int.Parse(aa.Substring(4, 4), CultureInfo.InvariantCulture);
+            return (new DateTime(startYear, 10, 1), new DateTime(endYear, 9, 30));
+        }
+
+        private static int ClampPct(int pct) => pct < 0 ? 0 : (pct > 100 ? 100 : pct);
+
+        private static void Log(int pct, string msg) => Logger.LogInfo(ClampPct(pct), msg);
+
+        private sealed class DecisionStats
+        {
+            public int A, B, C, D;
+            public int DomPres, DomVal;
+
+            public void Add(StatusSedeDecision d)
+            {
+                switch (d.Suggested)
+                {
+                    case "A": A++; break;
+                    case "B": B++; break;
+                    case "C": C++; break;
+                    case "D": D++; break;
+                }
+
+                if (d.DomicilioPresente) DomPres++;
+                if (d.DomicilioValido) DomVal++;
+            }
         }
     }
 }

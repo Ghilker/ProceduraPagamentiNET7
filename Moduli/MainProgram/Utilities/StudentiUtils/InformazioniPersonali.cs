@@ -15,6 +15,7 @@ namespace ProcedureNet7
         public string DataNascita { get; set; } = string.Empty;  // or DateTime
         public string Sesso { get; set; } = string.Empty;
         public bool Disabile { get; set; }
+        public bool EsoneroTassaRegionale { get; set; }
         public string CodCittadinanza { get; set; } = string.Empty;
         public long Telefono { get; set; }
         public string IndirizzoEmail { get; set; } = string.Empty;

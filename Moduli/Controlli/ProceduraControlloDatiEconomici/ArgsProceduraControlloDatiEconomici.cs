@@ -7,10 +7,13 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7
 {
-    internal class ArgsControlloPEC
+    internal class ArgsProceduraControlloDatiEconomici 
     {
+
         [Required(ErrorMessage = "Inserire l'anno accademico")]
         [ValidAAFormat(ErrorMessage = "L'anno accademico deve essere nel formato xxxxyyyy.")]
-        public string _annoAccademico { get; set; }
+        public string _selectedAA { get; set; } = string.Empty;
+
+        public List<string>? _codiciFiscali { get; set; }
     }
 }

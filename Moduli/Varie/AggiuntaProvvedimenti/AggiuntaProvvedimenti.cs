@@ -422,35 +422,36 @@ namespace ProcedureNet7
                 //    We'll do a single INSERT for those new records in PROVVEDIMENTI
                 //    We can do this in a single statement with a LEFT JOIN filter, or by
                 //    using a NOT EXISTS sub-select. For example:
+                // 6) Inserimento nuovi provvedimenti
                 string insertNewProvvedimenti = @"
-                        INSERT INTO [dbo].[PROVVEDIMENTI] (
-                            [Num_domanda],
-                            [tipo_provvedimento],
-                            [data_provvedimento],
-                            [Anno_accademico],
-                            [note],
-                            [num_provvedimento],
-                            [riga_valida],
-                            [data_validita]
-                        )
-                        SELECT d.num_domanda,
-                               @provvedimentoSelezionato,
-                               @dataProvvedimento,
-                               @aaProvvedimento,
-                               @notaProvvedimento,
-                               @numProvvedimento,
-                               1,
-                               CURRENT_TIMESTAMP
-                        FROM Domanda d
-                        INNER JOIN #TempNumDom t
-                            ON d.Num_domanda = t.NumDomanda
-                        WHERE d.Anno_accademico = @aaProvvedimento
-                          AND d.Tipo_bando = 'lz'
-                          AND NOT EXISTS (
-                              SELECT 1 FROM #TempCommonCodes c
-                              WHERE c.NumDomanda = d.Num_domanda
-                          )
-                    ";
+    INSERT INTO [dbo].[PROVVEDIMENTI] (
+        [Num_domanda],
+        [tipo_provvedimento],
+        [data_provvedimento],
+        [Anno_accademico],
+        [note],
+        [num_provvedimento],
+        [riga_valida],
+        [data_validita]
+    )
+    SELECT d.num_domanda,
+           @provvedimentoSelezionato,
+           @dataProvvedimento,
+           @aaProvvedimento,
+           @notaProvvedimento,
+           @numProvvedimento,
+           1,
+           CURRENT_TIMESTAMP
+    FROM Domanda d
+    INNER JOIN #TempNumDom t
+        ON d.Num_domanda = t.NumDomanda
+    WHERE d.Anno_accademico = @aaProvvedimento
+      AND d.Tipo_bando = 'lz'
+      AND NOT EXISTS (
+          SELECT 1 FROM #TempCommonCodes c
+          WHERE c.NumDomanda = d.Num_domanda
+      )
+";
 
                 int affectedRows;
                 using (var cmd = new SqlCommand(insertNewProvvedimenti, CONNECTION, sqlTransaction))
@@ -468,16 +469,43 @@ namespace ProcedureNet7
                 {
                     Logger.Log(60, $"Modificati: {affectedRows} studenti", LogLevel.INFO);
 
-                    // If you want to list them, you can SELECT them right back out:
+                    // 6b) chiusura delle righe aperte in Decadenze_tracciabilita_bs
+                    //     per le sole domande a cui è stato appena aggiunto il provvedimento
+                    string updateDecadenzeSql = @"
+        UPDATE dt
+        SET data_fine_validita = CURRENT_TIMESTAMP
+        FROM Decadenze_tracciabilita_bs dt
+        INNER JOIN Domanda d
+            ON dt.Anno_accademico = d.Anno_accademico
+           AND dt.Cod_fiscale    = d.Cod_fiscale
+        INNER JOIN #TempNumDom t
+            ON d.Num_domanda = t.NumDomanda
+        LEFT JOIN #TempCommonCodes c
+            ON c.NumDomanda = d.Num_domanda
+        WHERE d.Anno_accademico      = @aaProvvedimento
+          AND dt.Cod_beneficio       = @beneficioProvvedimento
+          AND c.NumDomanda IS NULL          -- solo quelli appena inseriti
+          AND dt.data_fine_validita IS NULL -- solo righe ancora aperte
+    ";
+
+                    using (var cmd = new SqlCommand(updateDecadenzeSql, CONNECTION, sqlTransaction))
+                    {
+                        cmd.Parameters.AddWithValue("@aaProvvedimento", aaProvvedimento);
+                        cmd.Parameters.AddWithValue("@beneficioProvvedimento", beneficioProvvedimento);
+                        var updated = cmd.ExecuteNonQuery();
+                        Logger.Log(70, $"Aggiornate data_fine_validita in Decadenze_tracciabilita_bs: {updated} righe.", LogLevel.INFO);
+                    }
+
+                    // Se vuoi ancora la lista delle nuove domande:
                     var newCodes = new List<string>();
                     string selectNewlyInserted = @"
-                            SELECT t.NumDomanda
-                            FROM #TempNumDom t
-                            WHERE NOT EXISTS (
-                                SELECT 1 FROM #TempCommonCodes c
-                                WHERE c.NumDomanda = t.NumDomanda
-                            )
-                        ";
+        SELECT t.NumDomanda
+        FROM #TempNumDom t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM #TempCommonCodes c
+            WHERE c.NumDomanda = t.NumDomanda
+        )
+    ";
 
                     using (var cmd = new SqlCommand(selectNewlyInserted, CONNECTION, sqlTransaction))
                     using (var reader = cmd.ExecuteReader())
@@ -488,13 +516,11 @@ namespace ProcedureNet7
                         }
                     }
 
-                    // Log the newly inserted
                     foreach (string code in newCodes)
                     {
                         Logger.Log(40, code + ": aggiunto provvedimento #" + numProvvedimento, LogLevel.INFO);
                     }
 
-                    // If needed, also update DatiGeneraliDom for these newly inserted codes
                     if (provvedimentoSelezionato == "01" || provvedimentoSelezionato == "02")
                     {
                         BlocksUtil.RemoveBlockNumDomanda(CONNECTION, sqlTransaction, newCodes, "BRM", aaProvvedimento, "Area4");
@@ -505,9 +531,7 @@ namespace ProcedureNet7
                     Logger.Log(100, "Nessun provvedimento da aggiungere", LogLevel.INFO);
                 }
 
-                // 7) Log the total number of students in the original file
                 Logger.Log(80, "Studenti nel file: " + _studentInformation.Count.ToString(), LogLevel.INFO);
-
 
             }
             catch

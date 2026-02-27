@@ -9,7 +9,7 @@ namespace ProcedureNet7
 {
    public static class DomicilioUtils
     {
-       public static bool IsValidSerie(string serie)
+        public static bool IsValidSerie(string serie)
         {
             if (string.IsNullOrWhiteSpace(serie))
                 return false;
@@ -19,7 +19,7 @@ namespace ProcedureNet7
             serie = serie.TrimEnd('.');
 
             // Case-insensitive matching
-            RegexOptions options = RegexOptions.IgnoreCase;
+            RegexOptions options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
 
             // Exclude date-only entries or date ranges
             string dateOnlyPattern1 = @"^\d{1,2}/\d{1,2}/\d{2,4}$";
@@ -64,6 +64,29 @@ namespace ProcedureNet7
                 return false;
             }
 
+            // ----------------------------------------------------------------------
+            // NUOVO CONTROLLO: se lo STESSO codice T/TRF/TEL è presente più volte
+            // nella stringa (duplicato), considera la serie non valida.
+            // Se i codici sono diversi fra loro, passa.
+            // ----------------------------------------------------------------------
+            var strongCodeMatches = Regex.Matches(serie, @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b", options);
+            if (strongCodeMatches.Count > 1)
+            {
+                var strongCodes = strongCodeMatches
+                    .Cast<Match>()
+                    .Select(m => m.Value.ToUpperInvariant())
+                    .ToList();
+
+                var distinctCodes = strongCodes.Distinct().ToList();
+
+                // esempio: "Contratto: 3t/TJQ25T011013000SJ Proroga: TJQ25T011013000SJ"
+                // strongCodes = [TJQ25T011013000SJ, TJQ25T011013000SJ]
+                // distinctCodes.Count == 1 -> duplicato -> false
+                if (distinctCodes.Count == 1)
+                    return false;
+            }
+            // ----------------------------------------------------------------------
+
             // Patterns for valid codes
             string pattern1 = @"^(T|TRF|TEL)\s?[A-Z0-9]{10,50}\.?$";
             string pattern1b = @"\b(T|TRF|TEL)[A-Z0-9]{10,50}\b";
@@ -93,7 +116,6 @@ namespace ProcedureNet7
             if (Regex.IsMatch(serie, pattern7, options)) return true;
             if (Regex.IsMatch(serie, pattern8, options)) return true;
 
-            // If none match, it's invalid
             return false;
         }
     }

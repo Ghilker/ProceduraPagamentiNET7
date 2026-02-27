@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace ProcedureNet7.PagamentiProcessor
 {
-    public class AcademicProcessor2324 : IAcademicYearProcessor
+    public class AcademicProcessor2122 : IAcademicYearProcessor
     {
         string IAcademicYearProcessor.GetProvvedimentiQuery(string selectedAA, string tipoBeneficio)
         {

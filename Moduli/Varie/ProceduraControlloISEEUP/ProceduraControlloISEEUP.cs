@@ -47,7 +47,8 @@ namespace ProcedureNet7
                         Domanda.Num_domanda,
                         Domanda.Id_domanda,
                         CONVERT(MONEY, SommaRedditiProdotti, 0) AS sommaredd,
-                        CONVERT(MONEY, SEQU, 0) AS seq,
+                        CONVERT(MONEY, SEQU, 0) AS sequ,                        
+                        CONVERT(MONEY, SEQUP, 0) AS sequp,
                         CONVERT(MONEY, ISEEU, 0) AS ISEEU,
                         CONVERT(MONEY, ISPEU, 0) AS ISPEU,
                         CONVERT(MONEY, ISEEUP, 0) AS ISEEUP,
@@ -69,7 +70,8 @@ namespace ProcedureNet7
                         studente.numDomanda = Utilities.SafeGetString(reader, "Num_domanda");
                         studente.id_domanda = Utilities.SafeGetString(reader, "id_domanda");
                         studente.sommaRedditi = Utilities.SafeGetDouble(reader, "sommaredd");
-                        studente.SEQ = Utilities.SafeGetDouble(reader, "SEQ");
+                        studente.SEQU = Utilities.SafeGetDouble(reader, "SEQU");
+                        studente.SEQUP = Utilities.SafeGetDouble(reader, "SEQUP");
                         studente.ISEEU = Utilities.SafeGetDouble(reader, "ISEEU");
                         studente.ISPEU = Utilities.SafeGetDouble(reader, "ISPEU");
                         studente.ISEEUP = Utilities.SafeGetDouble(reader, "ISEEUP");
@@ -101,13 +103,24 @@ namespace ProcedureNet7
                 // Step 3: Process each student to determine inconsistencies to add or remove
                 foreach (StudenteControlloISEEUP studente in studentiDaControllare)
                 {
-                    if (studente.SEQ != 0)
+                    if (studente.SEQU != 0 || studente.SEQUP != 0)
                     {
                         studente.incongruenzeDaTogliere.Add("28");
                         studente.blocchiDaTogliere.Add("BDR");
                     }
 
-                    if (studente.ISEEU + studente.ISEEUP > sogliaISEE || studente.ISPEU + studente.ISPEUP > sogliaISPE)
+                    // Precedenza ai valori *UP* se esistono (SEQUP > 1)
+                    bool usaUP = studente.SEQUP > 1;
+
+                    bool superaISEE = usaUP
+                        ? studente.ISEEUP > sogliaISEE
+                        : studente.ISEEU > sogliaISEE;
+
+                    bool superaISPE = usaUP
+                        ? studente.ISPEUP > sogliaISPE
+                        : studente.ISPEU > sogliaISPE;
+
+                    if (superaISEE || superaISPE)
                     {
                         studente.incongruenzeDaMettere.Add("77");
                         studente.blocchiDaMettere.Add("BVE");
@@ -118,7 +131,8 @@ namespace ProcedureNet7
                         studente.blocchiDaTogliere.Add("BVE");
                     }
 
-                    if (studente.SEQ == 1)
+
+                    if (studente.SEQU == 1 && !(studente.SEQUP > 1))
                     {
                         if (studente.sommaRedditi < 9000)
                         {

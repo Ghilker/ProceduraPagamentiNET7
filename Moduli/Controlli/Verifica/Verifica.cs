@@ -1,75 +1,164 @@
-﻿using DocumentFormat.OpenXml.Spreadsheet;
-using DocumentFormat.OpenXml.Wordprocessing;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ProceduraVerifica = ProcedureNet7.Verifica;
 
 namespace ProcedureNet7.Verifica
 {
-    internal class Verifica : BaseProcedure<ArgsVerifica>
+    internal sealed class Verifica : BaseProcedure<ArgsVerifica>
     {
-        DatiVerifica _datiVerifica;
-        string selectedAA = "20232024";
+        public DataTable OutputVerifica { get; private set; } = new DataTable("Verifica");
 
-        public Verifica(MasterForm? _masterForm, SqlConnection? connection_string) : base(_masterForm, connection_string) { }
+        public Verifica(MasterForm? masterForm, SqlConnection? connection) : base(masterForm, connection) { }
 
         public override void RunProcedure(ArgsVerifica args)
         {
-            AddDatiVerifica();
+            if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
+
+            string aa = "20252026";
+
+            string folderPath = (args._folderPath ?? "").Trim();
+
+            // 1) Economici
+            var procEco = new ProcedureNet7.ProceduraControlloDatiEconomici(_masterForm, CONNECTION)
+            {
+                ExportToExcel = false // evita file extra, export finale lo fa Verifica
+            };
+
+            procEco.RunProcedure(new ArgsProceduraControlloDatiEconomici
+            {
+                _selectedAA = aa,
+                _codiciFiscali = null
+            });
+
+            var dtEco = procEco.OutputEconomici;
+
+            // 2) Status sede (solo calcolo)
+            var procSede = new ProcedureNet7.ControlloStatusSede(_masterForm, CONNECTION);
+            var dtSede = procSede.Compute(aa, includeEsclusi: true, includeNonTrasmesse: true);
+
+            // 3) Merge
+            OutputVerifica = MergeEconomiciStatus(dtEco, dtSede);
+
+            // 4) Export unico
+            Utilities.ExportDataTableToExcel(OutputVerifica, "D://");
+
+            Logger.LogInfo(100, $"Verifica completata. Record output: {OutputVerifica.Rows.Count}");
         }
 
-        void AddDatiVerifica()
+        private static DataTable MergeEconomiciStatus(DataTable economici, DataTable status)
         {
-            string dataQuery = $"SELECT top(1) Cod_tipo_graduat from graduatorie where anno_accademico = '{selectedAA}' and Cod_beneficio = 'bs' order by Cod_tipo_graduat desc";
-            SqlCommand readData = new(dataQuery, CONNECTION);
-            Logger.LogInfo(45, "Verifica - estrazione dati generali");
-            bool graduatoriaDefinitiva = false;
+            var result = new DataTable("Verifica");
 
-            using (SqlDataReader reader = readData.ExecuteReader())
+            // 1) Schema: colonne economici
+            foreach (DataColumn c in economici.Columns)
+                result.Columns.Add(c.ColumnName, c.DataType);
+
+            // 2) Schema: colonne status (evita duplicati; rinomina Motivo)
+            var statusColMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (DataColumn c in status.Columns)
             {
-                while (reader.Read())
-                {
-                    graduatoriaDefinitiva = Utilities.SafeGetInt(reader, "Cod_tipo_graduat") == 1;
-                }
+                if (c.ColumnName.Equals("CodFiscale", StringComparison.OrdinalIgnoreCase)) continue;
+                if (c.ColumnName.Equals("NumDomanda", StringComparison.OrdinalIgnoreCase)) continue;
+
+                var dst = c.ColumnName.Equals("Motivo", StringComparison.OrdinalIgnoreCase)
+                    ? "MotivoStatusSede"
+                    : c.ColumnName;
+
+                statusColMap[c.ColumnName] = dst;
+
+                if (!result.Columns.Contains(dst))
+                    result.Columns.Add(dst, c.DataType);
             }
 
-            dataQuery = $@"
-                select 
-                Soglia_Isee,
-                Soglia_Ispe, 
-                Importo_borsa_A, 
-                Importo_borsa_B, 
-                Importo_borsa_C,
-                quota_mensa  
-                from DatiGenerali_con 
-                where Anno_accademico = '{selectedAA}'
-            ";
+            // helpers
+            static string S(object? v) => (v == null || v == DBNull.Value) ? "" : v.ToString()!.Trim();
+            static string MakeKey(string cf, string numDomanda) => $"{cf}|{numDomanda}";
 
-            readData = new(dataQuery, CONNECTION);
-            Logger.LogInfo(45, "Verifica - estrazione dati generali");
-
-            using (SqlDataReader reader = readData.ExecuteReader())
+            // 3) Gruppi per chiave (gestisce anche duplicati senza perdere righe)
+            var econByKey = new Dictionary<string, List<DataRow>>(StringComparer.OrdinalIgnoreCase);
+            foreach (DataRow er in economici.Rows)
             {
-                while (reader.Read())
+                var cf = economici.Columns.Contains("CodFiscale") ? S(er["CodFiscale"]) : "";
+                var nd = economici.Columns.Contains("NumDomanda") ? S(er["NumDomanda"]) : "";
+                var key = MakeKey(cf, nd);
+
+                if (!econByKey.TryGetValue(key, out var list))
+                    econByKey[key] = list = new List<DataRow>();
+
+                list.Add(er);
+            }
+
+            var statusByKey = new Dictionary<string, List<DataRow>>(StringComparer.OrdinalIgnoreCase);
+            foreach (DataRow sr in status.Rows)
+            {
+                var cf = status.Columns.Contains("CodFiscale") ? S(sr["CodFiscale"]) : "";
+                var nd = status.Columns.Contains("NumDomanda") ? S(sr["NumDomanda"]) : "";
+                var key = MakeKey(cf, nd);
+
+                if (!statusByKey.TryGetValue(key, out var list))
+                    statusByKey[key] = list = new List<DataRow>();
+
+                list.Add(sr);
+            }
+
+            // 4) Full outer join: unione chiavi
+            var allKeys = new HashSet<string>(econByKey.Keys, StringComparer.OrdinalIgnoreCase);
+            allKeys.UnionWith(statusByKey.Keys);
+
+            foreach (var key in allKeys)
+            {
+                econByKey.TryGetValue(key, out var eList);
+                statusByKey.TryGetValue(key, out var sList);
+
+                eList ??= new List<DataRow>();
+                sList ??= new List<DataRow>();
+
+                var n = Math.Max(eList.Count, sList.Count);
+                if (n == 0) continue;
+
+                for (int i = 0; i < n; i++)
                 {
-                    _datiVerifica = new DatiVerifica()
+                    var er = i < eList.Count ? eList[i] : null;
+                    var sr = i < sList.Count ? sList[i] : null;
+
+                    var nr = result.NewRow();
+
+                    // Copia economici (se presenti)
+                    if (er != null)
                     {
-                        sogliaISEE = Utilities.SafeGetDouble(reader, "Soglia_Isee"),
-                        sogliaISPE = Utilities.SafeGetDouble(reader, "Soglia_Ispe"),
-                        importoBorsaA = Utilities.SafeGetDouble(reader, "Importo_borsa_A"),
-                        importoBorsaB = Utilities.SafeGetDouble(reader, "Importo_borsa_B"),
-                        importoBorsaC = Utilities.SafeGetDouble(reader, "Importo_borsa_C"),
-                        quotaMensa = Utilities.SafeGetDouble(reader, "quota_mensa"),
-                        graduatoriaDefinitiva = graduatoriaDefinitiva
-                    };
+                        foreach (DataColumn c in economici.Columns)
+                            nr[c.ColumnName] = er[c] ?? DBNull.Value;
+                    }
+
+                    // Copia status (se presenti) + riempi anche CodFiscale/NumDomanda se economici mancanti
+                    if (sr != null)
+                    {
+                        if (result.Columns.Contains("CodFiscale") && (er == null || S(nr["CodFiscale"]) == ""))
+                            nr["CodFiscale"] = status.Columns.Contains("CodFiscale") ? (object?)S(sr["CodFiscale"]) ?? "" : "";
+
+                        if (result.Columns.Contains("NumDomanda") && (er == null || S(nr["NumDomanda"]) == ""))
+                            nr["NumDomanda"] = status.Columns.Contains("NumDomanda") ? (object?)S(sr["NumDomanda"]) ?? "" : "";
+
+                        foreach (DataColumn sc in status.Columns)
+                        {
+                            if (sc.ColumnName.Equals("CodFiscale", StringComparison.OrdinalIgnoreCase)) continue;
+                            if (sc.ColumnName.Equals("NumDomanda", StringComparison.OrdinalIgnoreCase)) continue;
+
+                            var dst = statusColMap[sc.ColumnName];
+                            nr[dst] = sr[sc] ?? DBNull.Value;
+                        }
+                    }
+
+                    result.Rows.Add(nr);
                 }
             }
+
+            return result;
         }
 
+        private static string MakeKey(string cf, string numDomanda) => $"{cf}|{numDomanda}";
     }
+
 }

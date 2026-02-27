@@ -12,10 +12,10 @@ using System.Windows.Forms;
 
 namespace ProcedureNet7
 {
-    public partial class FormControlloPEC : Form
+    public partial class FormProceduraControlloDatiEconomici : Form
     {
         MasterForm? _masterForm;
-        public FormControlloPEC(MasterForm masterForm)
+        public FormProceduraControlloDatiEconomici(MasterForm masterForm)
         {
             _masterForm = masterForm;
             InitializeComponent();
@@ -28,10 +28,10 @@ namespace ProcedureNet7
                 return;
             }
 
-            _masterForm.RunBackgroundWorker(RunControlloPEC);
+            _masterForm.RunBackgroundWorker(RunProceduraControlloDatiEconomici);
         }
 
-        private void RunControlloPEC(SqlConnection mainConnection)
+        private void RunProceduraControlloDatiEconomici(SqlConnection mainConnection)
         {
             try
             {
@@ -40,13 +40,13 @@ namespace ProcedureNet7
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
                 ArgsValidation argsValidation = new ArgsValidation();
-                ArgsControlloPEC _argsControlloPEC = new ArgsControlloPEC
+                ArgsProceduraControlloDatiEconomici _argsProceduraControlloDatiEconomici = new ArgsProceduraControlloDatiEconomici
                 {
-                    _annoAccademico = aatxt.Text
+                    _selectedAA = ControlloEcoAATxt.Text
                 };
-                argsValidation.Validate(_argsControlloPEC);
-                ControlloPEC ControlloPEC = new(_masterForm, mainConnection);
-                ControlloPEC.RunProcedure(_argsControlloPEC);
+                argsValidation.Validate(_argsProceduraControlloDatiEconomici);
+                ProceduraControlloDatiEconomici ProceduraControlloDatiEconomici = new(_masterForm, mainConnection);
+                ProceduraControlloDatiEconomici.RunProcedure(_argsProceduraControlloDatiEconomici);
             }
             catch (ValidationException ex)
             {

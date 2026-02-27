@@ -12,10 +12,12 @@ using System.Windows.Forms;
 
 namespace ProcedureNet7
 {
-    public partial class FormControlloPEC : Form
+    public partial class FormEstrazioneIstanze : Form
     {
         MasterForm? _masterForm;
-        public FormControlloPEC(MasterForm masterForm)
+        string mailFilePath = string.Empty;
+        string saveFolderPath = string.Empty;
+        public FormEstrazioneIstanze(MasterForm masterForm)
         {
             _masterForm = masterForm;
             InitializeComponent();
@@ -28,10 +30,10 @@ namespace ProcedureNet7
                 return;
             }
 
-            _masterForm.RunBackgroundWorker(RunControlloPEC);
+            _masterForm.RunBackgroundWorker(RunEstrazioneIstanze);
         }
 
-        private void RunControlloPEC(SqlConnection mainConnection)
+        private void RunEstrazioneIstanze(SqlConnection mainConnection)
         {
             try
             {
@@ -40,13 +42,14 @@ namespace ProcedureNet7
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
                 ArgsValidation argsValidation = new ArgsValidation();
-                ArgsControlloPEC _argsControlloPEC = new ArgsControlloPEC
+                ArgsEstrazioneIstanze _argsEstrazioneIstanze = new ArgsEstrazioneIstanze
                 {
-                    _annoAccademico = aatxt.Text
+                    _mailFilePath = mailFilePath,
+                    _savePath = saveFolderPath
                 };
-                argsValidation.Validate(_argsControlloPEC);
-                ControlloPEC ControlloPEC = new(_masterForm, mainConnection);
-                ControlloPEC.RunProcedure(_argsControlloPEC);
+                argsValidation.Validate(_argsEstrazioneIstanze);
+                ProceduraEstrazioneIstanze EstrazioneIstanze = new(_masterForm, mainConnection);
+                EstrazioneIstanze.RunProcedure(_argsEstrazioneIstanze);
             }
             catch (ValidationException ex)
             {
@@ -56,6 +59,16 @@ namespace ProcedureNet7
             {
                 throw;
             }
+        }
+
+        private void SavePathButtonClick(object sender, EventArgs e)
+        {
+            Utilities.ChooseFolder(savePathlbl, folderBrowserDialog1, ref saveFolderPath);
+        }
+
+        private void MailPathButtonClick(object sender, EventArgs e)
+        {
+            Utilities.ChooseFileAndSetPath(mailPathlbl, openFileDialog1, ref mailFilePath);
         }
     }
 }

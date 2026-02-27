@@ -762,7 +762,7 @@ namespace ProcedureNet7
                     ISNULL(iab.importo_borsa, 0) AS detrazioniAltreBorse,
                     cteISP.ISP,
                     cteISP.ISR,
-                    cteISP.Scala_equivalenza as SEQ
+                    cteISP.Scala_equivalenza as SEQU
                 FROM Domanda d
                 INNER JOIN #CFEstrazione cfe on d.cod_fiscale = cfe.cod_fiscale
                 INNER JOIN vCertificaz_ISEE_CO cteISP ON d.Anno_accademico = cteISP.Anno_accademico AND d.Num_domanda = cteISP.Num_domanda
@@ -793,7 +793,7 @@ namespace ProcedureNet7
                             ISR = ISRdb,
                             ISP = ISPdb,
                             ISPDSU = ISPdb,
-                            SEQ = Utilities.SafeGetDouble(reader, "SEQ"),
+                            SEQ = Utilities.SafeGetDouble(reader, "SEQU"),
                             detrazioni = Utilities.SafeGetDouble(reader, "detrazioniADISU") + Utilities.SafeGetDouble(reader, "detrazioniAltreBorse")
                         };
                     }
@@ -1090,7 +1090,7 @@ namespace ProcedureNet7
                     ISNULL(iab.importo_borsa, 0) AS detrazioniAltreBorse,
                     cteISP.ISP,
                     cteISP.ISR,
-                    cteISP.Scala_equivalenza as SEQ
+                    cteISP.Scala_equivalenza as SEQU
                 FROM Domanda d
                 INNER JOIN #CFEstrazione cfe on d.cod_fiscale = cfe.cod_fiscale
                 INNER JOIN vCertificaz_ISEE_CI cteISP ON d.Anno_accademico = cteISP.Anno_accademico AND d.Num_domanda = cteISP.Num_domanda
@@ -1129,7 +1129,7 @@ namespace ProcedureNet7
                                 ISR = ISRdb,
                                 ISP = ISPdb,
                                 ISPDSU = ISPdb,
-                                SEQ = Utilities.SafeGetDouble(reader, "SEQ"),
+                                SEQ = Utilities.SafeGetDouble(reader, "SEQU"),
                                 detrazioni = Utilities.SafeGetDouble(reader, "detrazioniADISU") + Utilities.SafeGetDouble(reader, "detrazioniAltreBorse")
                             };
                         }

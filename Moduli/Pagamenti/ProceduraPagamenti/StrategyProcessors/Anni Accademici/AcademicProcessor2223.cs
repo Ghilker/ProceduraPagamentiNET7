@@ -37,6 +37,6 @@ namespace ProcedureNet7.PagamentiProcessor
             return listaStudentiDaMantenere;
         }
 
-        public void AdjustPendolarePayment(StudentePagamenti studente, ref double importoDaPagare, ref double importoMassimo, ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari) { }
+        public void AdjustPendolarePayment(StudentePagamenti studente, ref double importoDaPagare, ref double importoMassimo, ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari, double sogliaISEE, double importoPendolare) { }
     }
 }

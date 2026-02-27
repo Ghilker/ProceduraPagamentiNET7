@@ -36,12 +36,13 @@ namespace ProcedureNet7
                     INNER JOIN 
                         vMODALITA_PAGAMENTO ON Domanda.Cod_fiscale = vMODALITA_PAGAMENTO.Cod_fiscale 
                     INNER JOIN 
-                        vEsiti_concorsiBS vb ON Domanda.Anno_accademico = vb.Anno_accademico 
+                        vEsiti_concorsi vb ON Domanda.Anno_accademico = vb.Anno_accademico 
                                               AND Domanda.Num_domanda = vb.Num_domanda
                     WHERE 
                         Domanda.Anno_accademico >= '{selectedAA}' 
                         AND Domanda.Tipo_bando = 'lz' 
                         AND vb.Cod_tipo_esito <> 0
+						AND vb.Cod_beneficio = 'BS'
                     ORDER BY Domanda.cod_fiscale
                 ";
 
@@ -241,7 +242,7 @@ namespace ProcedureNet7
                         string messaggioPersonalizzato =
                             $"Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>" +
                             $"IBAN: {wrongIban}#<br>" +
-                            "La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
+                            "La invitiamo ad aggiornare la modalità prescelta.";
 
                         // Add the message to the dictionary
                         personalizedMessages[cf] = messaggioPersonalizzato;
@@ -369,7 +370,7 @@ namespace ProcedureNet7
                                 string messaggioPersonalizzato =
                                     $"Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>" +
                                     $"IBAN: {ibanCurrent}#<br>" +
-                                    "La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
+                                    "La invitiamo ad aggiornare la modalità prescelta.";
 
                                 MessageUtils.InsertMessages(
                                     CONNECTION,
