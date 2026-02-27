@@ -727,6 +727,38 @@ namespace ProcedureNet7
             return defaultValue;
         }
 
+        public static decimal SafeGetDecimal(this IDataRecord record, string fieldName, decimal defaultValue = 0m)
+        {
+            if (record[fieldName] is DBNull or null)
+                return defaultValue;
+
+            if (decimal.TryParse(record[fieldName].ToString(), out decimal result))
+                return result;
+
+            return defaultValue;
+        }
+
+        public static bool SafeGetBool(this IDataRecord record, string fieldName, bool defaultValue = false)
+        {
+            if (record[fieldName] is DBNull or null)
+                return defaultValue;
+
+            object value = record[fieldName];
+
+            if (value is bool boolValue)
+                return boolValue;
+
+            string text = value.ToString()!.Trim();
+
+            if (bool.TryParse(text, out bool parsedBool))
+                return parsedBool;
+
+            if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedInt))
+                return parsedInt != 0;
+
+            return defaultValue;
+        }
+
         public static string SafeGetString(this IDataRecord record, int index)
         {
             if (record[index] is DBNull or null)

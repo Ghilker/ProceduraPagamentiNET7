@@ -1,7 +1,4 @@
-﻿// =====================
-// 1) FUNZIONE STATICA RIUSABILE (domicilio + istanze)
-// =====================
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
