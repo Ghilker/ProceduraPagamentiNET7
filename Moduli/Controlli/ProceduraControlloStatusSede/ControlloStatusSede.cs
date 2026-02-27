@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ProcedureNet7.Storni;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -16,6 +17,8 @@ namespace ProcedureNet7
         private string _folderPath = "";
 
         public DataTable OutputStatusSede { get; private set; } = BuildOutputTable();
+
+        public IReadOnlyList<ValutazioneStatusSede> OutputStatusSedeList { get; private set; } = Array.Empty<ValutazioneStatusSede>();
 
         public override void RunProcedure(ArgsControlloStatusSede args)
         {
@@ -57,54 +60,86 @@ namespace ProcedureNet7
         public DataTable Compute(string aa) => Compute(aa, includeEsclusi: false, includeNonTrasmesse: false);
 
         public DataTable Compute(string aa, bool includeEsclusi, bool includeNonTrasmesse)
+    => ToDataTable(ComputeList(aa, includeEsclusi, includeNonTrasmesse, iseeByKey: null));
+
+        /// <summary>
+        /// Variante "object-first": ritorna la lista di studenti con valutazione, da usare in Verifica e in altre strutture.
+        /// </summary>
+        public List<ValutazioneStatusSede> ComputeList(
+            string aa,
+            bool includeEsclusi,
+            bool includeNonTrasmesse,
+            IReadOnlyDictionary<StudentKey, ValutazioneEconomici>? iseeByKey)
         {
-            var totalSw = Stopwatch.StartNew();
-
-            Log(0, $"ControlloStatusSede.Compute - START | AA={aa} | IncludeEsclusi={includeEsclusi} | IncludeNonTrasmesse={includeNonTrasmesse}");
-
-            ValidateSelectedAA(aa);
             if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
 
             var repo = new SqlStatusSedeRepository(CONNECTION);
-
-            // LOAD INPUTS
-            var loadSw = Stopwatch.StartNew();
-            Log(10, "Esecuzione stored dbo.sp_StatusSede_GetInputs - START.");
-            var inputs = repo.LoadInputs(aa, includeEsclusi, includeNonTrasmesse);
-            Log(20, $"Esecuzione stored dbo.sp_StatusSede_GetInputs - END | Righe={inputs.Count} | ms={loadSw.ElapsedMilliseconds}");
-
-            // EVAL
-            var evalSw = Stopwatch.StartNew();
-            Log(25, "Valutazione regole status sede - START.");
+            var inputs = repo.LoadInputs(aa, includeEsclusi, includeNonTrasmesse, iseeByKey);
 
             var evaluator = new StatusSedeEvaluator();
-            var output = BuildOutputTable();
             var (aaStart, aaEnd) = GetAaDateRange(aa);
 
-            var stats = new DecisionStats();
+            var results = new List<ValutazioneStatusSede>(inputs.Count);
 
-            int n = inputs.Count;
-            int progressStep = Math.Max(1, n / 20); // max 20 update
-            for (int idx = 0; idx < n; idx++)
+            foreach (var inputRow in inputs)
             {
-                var row = inputs[idx];
-                var decision = evaluator.Evaluate(row, aaStart, aaEnd);
-                AppendOutput(output, row, decision);
+                var decision = evaluator.Evaluate(inputRow, aaStart, aaEnd);
 
-                stats.Add(decision);
+                // Scrivo anche su StudenteInfo, così le informazioni restano nello stesso posto.
+                inputRow.Info.InformazioniSede.StatusSedeSuggerito = decision.SuggestedStatus;
 
-                if ((idx + 1) % progressStep == 0 || (idx + 1) == n)
-                {
-                    int pct = 25 + (n == 0 ? 60 : (int)Math.Round(((idx + 1) * 60.0) / n));
-                    pct = ClampPct(pct);
-                    Log(pct, $"Valutazione in corso... {idx + 1}/{n}");
-                }
+                results.Add(CreateResult(inputRow, decision));
             }
 
-            Log(88, $"Valutazione regole status sede - END | ms={evalSw.ElapsedMilliseconds}");
-            Log(100, $"ControlloStatusSede.Compute - END | ms={totalSw.ElapsedMilliseconds} | RigheOutput={output.Rows.Count}");
+            return results;
+        }
 
-            return output;
+        private static ValutazioneStatusSede CreateResult(StatusSedeStudent row, StatusSedeDecision decision)
+        {
+            return new ValutazioneStatusSede
+            {
+                Info = row.Info,
+                StatoSuggerito = decision.SuggestedStatus,
+                Motivo = decision.Reason,
+                DomicilioPresente = decision.DomicilioPresente,
+                DomicilioValido = decision.DomicilioValido,
+                HasAlloggio12 = row.HasAlloggio12
+            };
+        }
+
+        private static DataTable ToDataTable(IReadOnlyList<ValutazioneStatusSede> items)
+        {
+            var dt = BuildOutputTable();
+
+            foreach (var v in items)
+            {
+                var info = v.Info;
+
+                var r = dt.NewRow();
+                r["CodFiscale"] = info.InformazioniPersonali.CodFiscale;
+                r["NumDomanda"] = info.InformazioniPersonali.NumDomanda;
+
+                r["StatusSedeAttuale"] = info.InformazioniSede.StatusSede;
+                r["StatusSedeSuggerito"] = v.StatoSuggerito;
+                r["Motivo"] = v.Motivo;
+
+                r["ComuneResidenza"] = info.InformazioniSede.Residenza.codComune;
+                r["ProvinciaResidenza"] = info.InformazioniSede.Residenza.provincia;
+
+                r["ComuneSedeStudi"] = info.InformazioniIscrizione.ComuneSedeStudi;
+                r["ProvinciaSede"] = info.InformazioniIscrizione.ProvinciaSedeStudi;
+
+                r["ComuneDomicilio"] = info.InformazioniSede.Domicilio.codComuneDomicilio;
+
+                r["DomicilioPresente"] = v.DomicilioPresente;
+                r["DomicilioValido"] = v.DomicilioValido;
+
+                r["HasAlloggio12"] = v.HasAlloggio12;
+
+                dt.Rows.Add(r);
+            }
+
+            return dt;
         }
 
         private static DataTable BuildOutputTable()
@@ -139,7 +174,7 @@ namespace ProcedureNet7
             string provRes = (info.InformazioniSede.Residenza.provincia ?? "").Trim().ToUpperInvariant();
 
             string comuneSede = (info.InformazioniIscrizione.ComuneSedeStudi ?? "").Trim();
-            string provSede = (row.ProvinciaSede ?? "").Trim().ToUpperInvariant();
+            string provSede = (info.InformazioniIscrizione.ProvinciaSedeStudi ?? "").Trim().ToUpperInvariant();
 
             string codSede = (info.InformazioniIscrizione.CodSedeStudi ?? "").Trim().ToUpperInvariant();
             string codCorso = (info.InformazioniIscrizione.CodCorsoLaurea ?? "").Trim();
@@ -151,7 +186,7 @@ namespace ProcedureNet7
                 numDomanda,
                 d.Reason,
                 (info.InformazioniSede.StatusSede ?? "").Trim().ToUpperInvariant(),
-                d.Suggested,
+                d.SuggestedStatus,
                 comuneRes,
                 provRes,
                 comuneSede,
@@ -188,7 +223,8 @@ namespace ProcedureNet7
             public System.Collections.Generic.List<StatusSedeStudent> LoadInputs(
                 string aa,
                 bool includeEsclusi = false,
-                bool includeNonTrasmesse = false)
+                bool includeNonTrasmesse = false,
+                IReadOnlyDictionary<StudentKey, ValutazioneEconomici>? iseeByKey = null)
             {
                 var result = new System.Collections.Generic.List<StatusSedeStudent>();
 
@@ -209,7 +245,7 @@ namespace ProcedureNet7
                 int readCount = 0;
                 while (reader.Read())
                 {
-                    result.Add(StatusSedeStudent.FromRecord(reader));
+                    result.Add(StatusSedeStudent.FromRecord(reader, iseeByKey));
                     readCount++;
 
                     if (readCount % 5000 == 0)
@@ -224,7 +260,7 @@ namespace ProcedureNet7
         private sealed class StatusSedeStudent
         {
             public StudenteInfo Info { get; init; } = new StudenteInfo();
-
+            public ValutazioneEconomici? IseeEconomici { get; init; }
             public bool AlwaysA { get; init; }
 
             public bool InSedeList { get; init; }
@@ -233,23 +269,32 @@ namespace ProcedureNet7
 
             public bool HasAlloggio12 { get; init; }
 
-            public string ProvinciaSede { get; init; } = string.Empty;
-
             public int MinMesiDomicilioFuoriSede { get; init; }
 
-            public static StatusSedeStudent FromRecord(IDataRecord record)
+            public static StatusSedeStudent FromRecord(IDataRecord record, IReadOnlyDictionary<StudentKey, ValutazioneEconomici>? iseeByKey)
             {
-                var studenteInfo = new StudenteInfo();
-
                 int numDomanda = record.SafeGetInt("NumDomanda");
                 string codFiscale = record.SafeGetString("CodFiscale").Trim().ToUpperInvariant();
-
-                studenteInfo.InformazioniPersonali.NumDomanda = numDomanda <= 0
+                string numDomandaTxt = numDomanda <= 0
                     ? string.Empty
                     : numDomanda.ToString(CultureInfo.InvariantCulture);
 
-                studenteInfo.InformazioniPersonali.CodFiscale = codFiscale;
+                ValutazioneEconomici? iseeEconomici = null;
+                StudenteInfo studenteInfo;
 
+                var key = new StudentKey(codFiscale, numDomandaTxt);
+                if (iseeByKey != null && iseeByKey.TryGetValue(key, out var foundEconomici))
+                {
+                    iseeEconomici = foundEconomici;
+                    studenteInfo = foundEconomici.Info;
+                }
+                else
+                {
+                    studenteInfo = new StudenteInfo();
+                }
+
+                studenteInfo.InformazioniPersonali.NumDomanda = numDomandaTxt;
+                studenteInfo.InformazioniPersonali.CodFiscale = codFiscale;
                 studenteInfo.InformazioniSede.StatusSede = record.SafeGetString("StatusSedeAttuale").Trim().ToUpperInvariant();
                 studenteInfo.InformazioniSede.ForzaturaStatusSede = record.SafeGetString("ForcedStatus").Trim().ToUpperInvariant();
 
@@ -278,6 +323,7 @@ namespace ProcedureNet7
                 studenteInfo.InformazioniIscrizione.ComuneSedeStudi = record.SafeGetString("ComuneSedeStudi").Trim();
 
                 string provinciaSede = record.SafeGetString("ProvinciaSede").Trim().ToUpperInvariant();
+                studenteInfo.InformazioniIscrizione.ProvinciaSedeStudi = provinciaSede;
 
                 bool inSedeList = record.SafeGetBool("InSedeList");
                 bool pendolareList = record.SafeGetBool("PendolareList");
@@ -324,12 +370,12 @@ namespace ProcedureNet7
                 return new StatusSedeStudent
                 {
                     Info = studenteInfo,
+                    IseeEconomici = iseeEconomici,
                     AlwaysA = alwaysA,
                     InSedeList = inSedeList,
                     PendolareList = pendolareList,
                     FuoriSedeList = fuoriSedeList,
                     HasAlloggio12 = hasAlloggio12,
-                    ProvinciaSede = provinciaSede,
                     MinMesiDomicilioFuoriSede = minMesiDomicilioFuoriSede
                 };
             }
@@ -357,6 +403,17 @@ namespace ProcedureNet7
                 if (IsNucleoEsteroOver50(info))
                     return StatusSedeDecision.Fixed("B", "Nucleo familiare con >50% componenti all'estero");
 
+                var eco = row.IseeEconomici;
+                if (eco != null
+                    && string.Equals((eco.TipoRedditoOrigine ?? "").Trim(), "EE", StringComparison.OrdinalIgnoreCase)
+                    && IsSeqOne(eco.SEQ)
+                    && eco.ISR >= 9000m)
+                {
+                    return StatusSedeDecision.Fixed(
+                        "B",
+                        "Economici: TipoReddito=EE, SEQ=1, ISR>=9000 => fuori sede (B)"
+                    );
+                }
                 var comuneRes = GetComuneResidenza(info);
                 var comuneSede = (info.InformazioniIscrizione.ComuneSedeStudi ?? "").Trim();
 
@@ -375,7 +432,7 @@ namespace ProcedureNet7
                     return StatusSedeDecision.Fixed("C", "COMUNI_PENDOLARI (stessa provincia, non in COMUNI_FUORISEDE)");
 
                 var provRes = (info.InformazioniSede.Residenza.provincia ?? "").Trim().ToUpperInvariant();
-                var provSede = (row.ProvinciaSede ?? "").Trim().ToUpperInvariant();
+                var provSede = (info.InformazioniIscrizione.ProvinciaSedeStudi ?? "").Trim().ToUpperInvariant();
 
                 if (Eq(provRes, provSede))
                 {
@@ -417,7 +474,7 @@ namespace ProcedureNet7
             }
 
             private static bool IsValidStatus(string? s) => s is "A" or "B" or "C" or "D";
-
+            private static bool IsSeqOne(decimal seq) => Math.Abs(seq - 1m) < 0.0001m;
             private static bool Eq(string? a, string? b)
                 => string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
         }
@@ -503,14 +560,14 @@ namespace ProcedureNet7
 
         private sealed class StatusSedeDecision
         {
-            public string Suggested { get; }
+            public string SuggestedStatus { get; }
             public string Reason { get; }
             public bool DomicilioPresente { get; }
             public bool DomicilioValido { get; }
 
             private StatusSedeDecision(string suggested, string reason, bool domPres, bool domVal)
             {
-                Suggested = suggested;
+                SuggestedStatus = suggested;
                 Reason = reason;
                 DomicilioPresente = domPres;
                 DomicilioValido = domVal;
@@ -555,7 +612,7 @@ namespace ProcedureNet7
 
             public void Add(StatusSedeDecision d)
             {
-                switch (d.Suggested)
+                switch (d.SuggestedStatus)
                 {
                     case "A": A++; break;
                     case "B": B++; break;

@@ -18,9 +18,13 @@ namespace ProcedureNet7
         public Residenza Residenza { get; set; } = new Residenza();
 
         public string StatusSede { get; set; } = string.Empty;
+        public string StatusSedeSuggerito { get; set; } = string.Empty;
         public string ForzaturaStatusSede { get; set; } = string.Empty;
         public DateTime? PrevScadenza { get; set; }
         public int GiorniDallaScad { get; set; }
         public string CodBlocchi { get; set; } = string.Empty;
+
+        public string CodComuneSedeStudi {  get; set; } = string.Empty;
+        public string CodProvinciaSedeStudi {  get; set; } = string.Empty;
     }
 }

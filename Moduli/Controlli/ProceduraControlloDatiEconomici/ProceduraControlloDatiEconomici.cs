@@ -23,6 +23,8 @@ namespace ProcedureNet7
 
         public DataTable OutputEconomici { get; private set; } = BuildOutputTable();
 
+        public IReadOnlyList<ValutazioneEconomici> OutputEconomiciList { get; private set; } = Array.Empty<ValutazioneEconomici>();
+
         public bool ExportToExcel { get; set; } = true;
         public string ExportFolderPath { get; set; } = "D://";
 
@@ -276,8 +278,13 @@ INNER JOIN vNucleo_familiare nf
             {
                 if (!_rows.ContainsKey(target.CodFiscale))
                 {
+                    var studenteInfo = new StudenteInfo();
+                    studenteInfo.InformazioniPersonali.CodFiscale = target.CodFiscale;
+                    studenteInfo.InformazioniPersonali.NumDomanda = target.NumDomanda;
+
                     _rows[target.CodFiscale] = new EconomicRow
                     {
+                        Info = studenteInfo,
                         CodFiscale = target.CodFiscale,
                         NumDomanda = target.NumDomanda
                     };
@@ -343,6 +350,35 @@ INNER JOIN vNucleo_familiare nf
 
                 OutputEconomici.Rows.Add(outputRow);
             }
+
+            // Lista output (oggetti) per utilizzi successivi (no DataTable).
+            OutputEconomiciList = _rows.Values
+                .OrderBy(e => e.CodFiscale)
+                .Select(e => new ValutazioneEconomici
+                {
+                    Info = e.Info,
+                    TipoRedditoOrigine = e.TipoRedditoOrigine ?? string.Empty,
+                    TipoRedditoIntegrazione = e.TipoRedditoIntegrazione ?? string.Empty,
+                    CodTipoEsitoBS = e.CodTipoEsitoBS,
+
+                    ISR = RoundSql(e.ISRDSU, 2),
+                    ISP = RoundSql(e.ISPDSU, 2),
+                    Detrazioni = RoundSql(e.Detrazioni, 2),
+
+                    ISEDSU = RoundSql(e.ISEDSU, 2),
+                    ISEEDSU = RoundSql(e.ISEEDSU, 2),
+                    ISPEDSU = RoundSql(e.ISPEDSU, 2),
+
+                    ISPDSU = RoundSql(e.ISPDSU, 2),
+                    SEQ = RoundSql(e.SEQ, 2),
+
+                    ISEDSU_Attuale = (decimal)e.ISEDSU_Attuale,
+                    ISEEDSU_Attuale = (decimal)e.ISEEDSU_Attuale,
+                    ISPEDSU_Attuale = (decimal)e.ISPEDSU_Attuale,
+                    ISPDSU_Attuale = (decimal)e.ISPDSU_Attuale,
+                    SEQ_Attuale = (decimal)e.SEQ_Attuale
+                })
+                .ToList();
 
             if (ExportToExcel)
                 Utilities.ExportDataTableToExcel(OutputEconomici, ExportFolderPath);
@@ -1222,6 +1258,8 @@ END;";
 
         private sealed class EconomicRow
         {
+            public StudenteInfo Info { get; set; } = new StudenteInfo();
+
             public string CodFiscale { get; set; } = "";
             public string? NumDomanda { get; set; }
 
