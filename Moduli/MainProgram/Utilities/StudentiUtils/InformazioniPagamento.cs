@@ -17,6 +17,7 @@ namespace ProcedureNet7
         public double ImportoSaldoPA { get; set; }
         public string MandatoProvvisorio { get; set; } = string.Empty;
         public bool PagatoPendolare { get; set; }
+        public double ImportoReversale { get; set; }
         public double ValoreISEE { get; set; }
         public bool ConcessaMonetizzazioneMensa { get; set; }
 
