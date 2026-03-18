@@ -236,6 +236,10 @@ namespace ProcedureNet7
                             FormPremiLaurea premiLaurea = new FormPremiLaurea(this);
                             ShowFormInPanel(premiLaurea);
                             break;
+                        case ProcedureVarie.GenerazioneFileRevoche:
+                            FormGenerazioneFileRevoche generazioneFileRevoche = new FormGenerazioneFileRevoche(this);
+                            ShowFormInPanel(generazioneFileRevoche);
+                            break;
                     }
                 }
 #endif
@@ -363,7 +367,9 @@ namespace ProcedureNet7
             [ProcedureCategory("Varie", "Funzionario")]
             ProceduraGeneratoreFlussi,
             [ProcedureCategory("Varie", "Funzionario")]
-            ProceduraPremiLaurea
+            ProceduraPremiLaurea,
+            [ProcedureCategory("Varie", "Programmatore")]
+            GenerazioneFileRevoche,
         }
 
         public enum ProcedureVerifiche
@@ -382,6 +388,8 @@ namespace ProcedureNet7
             ControlloStatusSede,
             [ProcedureCategory("Verifiche", "Programmatore")]
             ControlloDatiEconomici,
+            
+
         }
 
     }

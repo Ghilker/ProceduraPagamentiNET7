@@ -70,6 +70,16 @@ namespace ProcedureNet7
         public bool HasAlloggio12 { get; init; }
 
         public StudentKey Key => StudentKey.From(Info);
+
+        public bool HasIstanzaDomicilio { get; set; }
+        public string CodTipoIstanzaDomicilio { get; set; } = "";
+        public int NumIstanzaDomicilio { get; set; }
+
+        public bool HasUltimaIstanzaChiusaDomicilio { get; set; }
+        public string CodTipoUltimaIstanzaChiusaDomicilio { get; set; } = "";
+        public int NumUltimaIstanzaChiusaDomicilio { get; set; }
+        public string EsitoUltimaIstanzaChiusaDomicilio { get; set; } = "";
+        public string UtentePresaCaricoUltimaIstanzaChiusaDomicilio { get; set; } = "";
     }
 
     public sealed class ValutazioneVerifica

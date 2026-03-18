@@ -16,5 +16,6 @@ namespace ProcedureNet7
         public string CodEnte { get; set; } = string.Empty;
         public string ComuneSedeStudi { get; set; } = string.Empty;
         public string ProvinciaSedeStudi { get; set; } = string.Empty;
+        public int ConfermaSemestreFiltro { get; set; }
     }
 }

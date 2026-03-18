@@ -108,6 +108,9 @@
     <Compile Update="Moduli\Varie\ProceduraEstrazioneIstanze\FormEstrazioneIstanze.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="Moduli\Varie\ProceduraGenerazioneFileRevoche\FormGenerazioneFileRevoche.cs">
+      <SubType>Form</SubType>
+    </Compile>
   </ItemGroup>
 
 </Project>

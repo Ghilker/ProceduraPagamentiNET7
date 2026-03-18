@@ -65,14 +65,14 @@ namespace ProcedureNet7
                 Logger.LogInfo(77, "Aggiornamento mandati");
                 UpdateMandato(CONNECTION, sqlTransaction);
 
-                Logger.LogInfo(82, "Inserimento messaggi");
-                InsertMessaggio(CONNECTION, sqlTransaction);
-
                 if (!ignoraFlussi1)
                 {
-                    Logger.LogInfo(88, "Annullamento pagamenti scartati");
+                    Logger.LogInfo(82, "Annullamento pagamenti scartati");
                     Scartati(CONNECTION, sqlTransaction);
                 }
+
+                Logger.LogInfo(88, "Inserimento messaggi ai soli studenti effettivamente pagati");
+                InsertMessaggio(CONNECTION, sqlTransaction);
 
                 _ = _masterForm.Invoke((MethodInvoker)delegate
                 {
@@ -616,22 +616,49 @@ namespace ProcedureNet7
             cmd1.Parameters.AddWithValue("@tipo", tipo);
             string pagamentoDescrizione = Convert.ToString(cmd1.ExecuteScalar()) ?? "il pagamento";
 
+            // Solo studenti con pagamento effettivo:
+            // - esclude gli scartati del flusso
+            // - esclude quelli senza codMovimentoGenerale, quindi saltati nelle operazioni DB
+            var studentiPagati = studenteRitornoList
+                .Where(s => !s.pagamentoScartato)
+                .Where(s => !string.IsNullOrWhiteSpace(s.codMovimentoGenerale))
+                .ToList();
+
+            int esclusiScartati = studenteRitornoList.Count(s => s.pagamentoScartato);
+            int esclusiSenzaMovimento = studenteRitornoList.Count(s => !s.pagamentoScartato && string.IsNullOrWhiteSpace(s.codMovimentoGenerale));
+
+            Logger.LogInfo(88,
+                $"InsertMessaggio: candidati={studenteRitornoList.Count}, " +
+                $"esclusi_scartati={esclusiScartati}, " +
+                $"esclusi_senza_movimento={esclusiSenzaMovimento}, " +
+                $"destinatari_lordi={studentiPagati.Count}");
+
+            if (studentiPagati.Count == 0)
+            {
+                Logger.LogInfo(88, "InsertMessaggio: nessun destinatario valido");
+                return;
+            }
+
+            string annoAccademicoMessaggio = GetAnnoAccademicoPerMessaggio(CONNECTION, sqlTransaction, studentiPagati);
+            string suffixAnno = string.IsNullOrWhiteSpace(annoAccademicoMessaggio)
+                ? ""
+                : $" riferito all''anno accademico {annoAccademicoMessaggio}";
+
             string messaggioBase =
-                $@"Gentile studente/ssa, il pagamento riguardante ''{pagamentoDescrizione}'' è avvenuto con successo. <br>Puoi trovare il dettaglio nella sezione pagamenti della tua area riservata";
+                $@"Gentile studente/ssa, il pagamento riguardante ''{pagamentoDescrizione}''{suffixAnno} è avvenuto con successo. <br>Puoi trovare il dettaglio nella sezione pagamenti della tua area riservata";
 
             string messaggioPendolare =
-                $@"Gentile studente/ssa, il pagamento relativo a ''{pagamentoDescrizione}'' è stato eseguito correttamente, ma è stato effettuato come pendolare poiché, al momento dell'estrazione, non risultavano soddisfatti i requisiti di fuori sede (anche se era presente un'istanza non ancora lavorata).<br>Puoi consultare il dettaglio del pagamento nella sezione Pagamenti della tua area riservata.";
+                $@"Gentile studente/ssa, il pagamento relativo a ''{pagamentoDescrizione}''{suffixAnno} è stato eseguito correttamente, ma è stato effettuato come pendolare poiché, al momento dell'estrazione, non risultavano soddisfatti i requisiti di fuori sede (anche se era presente un'istanza non ancora lavorata).<br>Puoi consultare il dettaglio del pagamento nella sezione Pagamenti della tua area riservata.";
 
-            // recupera le NOTE_VALIDAZIONE_MOVIMENTO per i movimenti coinvolti (NO limite 2100 parametri)
-            var noteByMovimento = GetNoteValidazionePerMovimento(CONNECTION, sqlTransaction);
-            Logger.LogInfo(82, $"InsertMessaggio: note_validazione_lette={noteByMovimento.Count}");
+            var noteByMovimento = GetNoteValidazionePerMovimento(CONNECTION, sqlTransaction, studentiPagati);
+            Logger.LogInfo(88, $"InsertMessaggio: note_validazione_lette={noteByMovimento.Count}");
 
             var messages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             int duplicateCf = 0;
             int pendolareMsg = 0;
 
-            foreach (var studente in studenteRitornoList)
+            foreach (var studente in studentiPagati)
             {
                 if (messages.ContainsKey(studente.codFiscale))
                 {
@@ -652,17 +679,21 @@ namespace ProcedureNet7
                 messages.Add(studente.codFiscale, messaggioDaInviare);
             }
 
-            Logger.LogInfo(82, $"InsertMessaggio: CF_unici={messages.Count}, duplicati_saltati={duplicateCf}, msg_pendolare={pendolareMsg}");
+            Logger.LogInfo(88,
+                $"InsertMessaggio: CF_unici={messages.Count}, duplicati_saltati={duplicateCf}, msg_pendolare={pendolareMsg}");
 
-            MessageUtils.InsertMessages(CONNECTION, sqlTransaction, messages);
+            if (messages.Count > 0)
+                MessageUtils.InsertMessages(CONNECTION, sqlTransaction, messages);
         }
 
-        // temp table + bulk (evita limite 2100 parametri)
-        private Dictionary<string, string> GetNoteValidazionePerMovimento(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
+        private Dictionary<string, string> GetNoteValidazionePerMovimento(
+            SqlConnection CONNECTION,
+            SqlTransaction sqlTransaction,
+            IEnumerable<StudenteRitorno> studenti)
         {
             var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            var movimenti = studenteRitornoList
+            var movimenti = studenti
                 .Select(s => s.codMovimentoGenerale)
                 .Where(c => !string.IsNullOrWhiteSpace(c))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -676,11 +707,11 @@ namespace ProcedureNet7
             try
             {
                 string createTemp = $@"
-                    IF OBJECT_ID('tempdb..{tempName}') IS NOT NULL DROP TABLE {tempName};
-                    CREATE TABLE {tempName}
-                    (
-                        CodMovimentoGenerale VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL PRIMARY KEY
-                    );";
+            IF OBJECT_ID('tempdb..{tempName}') IS NOT NULL DROP TABLE {tempName};
+            CREATE TABLE {tempName}
+            (
+                CodMovimentoGenerale VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL PRIMARY KEY
+            );";
 
                 using (var createCmd = new SqlCommand(createTemp, CONNECTION, sqlTransaction))
                     createCmd.ExecuteNonQuery();
@@ -693,10 +724,10 @@ namespace ProcedureNet7
                 BulkInsertIntoSqlTable(CONNECTION, dt, tempName, sqlTransaction);
 
                 string sql = $@"
-                    SELECT mcg.CODICE_MOVIMENTO, mcg.NOTE_VALIDAZIONE_MOVIMENTO
-                    FROM MOVIMENTI_CONTABILI_GENERALI mcg
-                    INNER JOIN {tempName} t
-                        ON t.CodMovimentoGenerale = mcg.CODICE_MOVIMENTO;";
+            SELECT mcg.CODICE_MOVIMENTO, mcg.NOTE_VALIDAZIONE_MOVIMENTO
+            FROM MOVIMENTI_CONTABILI_GENERALI mcg
+            INNER JOIN {tempName} t
+                ON t.CodMovimentoGenerale = mcg.CODICE_MOVIMENTO;";
 
                 using var cmd = new SqlCommand(sql, CONNECTION, sqlTransaction);
                 using var reader = cmd.ExecuteReader();
@@ -716,11 +747,108 @@ namespace ProcedureNet7
             {
                 try
                 {
-                    using var drop = new SqlCommand($"IF OBJECT_ID('tempdb..{tempName}') IS NOT NULL DROP TABLE {tempName};", CONNECTION, sqlTransaction);
+                    using var drop = new SqlCommand(
+                        $"IF OBJECT_ID('tempdb..{tempName}') IS NOT NULL DROP TABLE {tempName};",
+                        CONNECTION,
+                        sqlTransaction);
                     drop.ExecuteNonQuery();
                 }
                 catch { /* ignore */ }
             }
+        }
+
+        private string GetAnnoAccademicoPerMessaggio(
+    SqlConnection CONNECTION,
+    SqlTransaction sqlTransaction,
+    IEnumerable<StudenteRitorno> studenti)
+        {
+            var movimenti = studenti
+                .Select(s => s.codMovimentoGenerale)
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (movimenti.Count == 0)
+                return "";
+
+            const string tempName = "#TempMovAnnoMsg";
+
+            try
+            {
+                string createTemp = $@"
+            IF OBJECT_ID('tempdb..{tempName}') IS NOT NULL DROP TABLE {tempName};
+            CREATE TABLE {tempName}
+            (
+                CodMovimentoGenerale VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL PRIMARY KEY
+            );";
+
+                using (var createCmd = new SqlCommand(createTemp, CONNECTION, sqlTransaction))
+                    createCmd.ExecuteNonQuery();
+
+                var dt = new DataTable();
+                dt.Columns.Add("CodMovimentoGenerale", typeof(string));
+                foreach (var m in movimenti)
+                    dt.Rows.Add(m);
+
+                BulkInsertIntoSqlTable(CONNECTION, dt, tempName, sqlTransaction);
+
+                string sql = $@"
+            SELECT DISTINCT mce.ANNO_ACCADEMICO
+            FROM MOVIMENTI_CONTABILI_ELEMENTARI mce
+            INNER JOIN {tempName} t
+                ON t.CodMovimentoGenerale = mce.CODICE_MOVIMENTO
+            WHERE mce.ANNO_ACCADEMICO IS NOT NULL
+              AND LTRIM(RTRIM(mce.ANNO_ACCADEMICO)) <> '';";
+
+                var anni = new List<string>();
+
+                using (var cmd = new SqlCommand(sql, CONNECTION, sqlTransaction))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string aa = Utilities.SafeGetString(reader, "ANNO_ACCADEMICO").Trim();
+                        if (!string.IsNullOrWhiteSpace(aa) && !anni.Contains(aa, StringComparer.OrdinalIgnoreCase))
+                            anni.Add(aa);
+                    }
+                }
+
+                if (anni.Count == 0)
+                    return "";
+
+                if (anni.Count > 1)
+                    Logger.LogWarning(null, $"GetAnnoAccademicoPerMessaggio: trovati più anni accademici: {string.Join(", ", anni)}. Verrà usato il primo.");
+
+                return FormatAnnoAccademico(anni[0]);
+            }
+            finally
+            {
+                try
+                {
+                    using var drop = new SqlCommand(
+                        $"IF OBJECT_ID('tempdb..{tempName}') IS NOT NULL DROP TABLE {tempName};",
+                        CONNECTION,
+                        sqlTransaction);
+                    drop.ExecuteNonQuery();
+                }
+                catch { /* ignore */ }
+            }
+        }
+
+        private static string FormatAnnoAccademico(string aa)
+        {
+            aa = (aa ?? "").Trim();
+
+            if (aa.Length == 4 && aa.All(char.IsDigit))
+                return aa.Substring(0, 2) + aa.Substring(2, 2) + "/" + (int.Parse(aa.Substring(0, 2)) + 2001).ToString();
+
+            if (aa.Length == 6 && aa.All(char.IsDigit))
+                return aa.Substring(0, 4) + "/" + aa.Substring(4, 2);
+
+            if (aa.Length == 9 && aa[4] == '/')
+                return aa;
+
+            return aa;
         }
 
         // ─────────────────────────────────────────────────────────────────────────────

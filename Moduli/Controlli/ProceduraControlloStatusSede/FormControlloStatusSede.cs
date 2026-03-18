@@ -47,8 +47,7 @@ namespace ProcedureNet7
                     _selectedAA = selectedAAText.Text
                 };
                 argsValidation.Validate(_argsControlloStatusSede);
-                ControlloStatusSede ControlloStatusSede = new(_masterForm, mainConnection);
-                ControlloStatusSede.RunProcedure(_argsControlloStatusSede);
+                
             }
             catch (ValidationException ex)
             {

@@ -45,8 +45,7 @@ namespace ProcedureNet7
                     _selectedAA = ControlloEcoAATxt.Text
                 };
                 argsValidation.Validate(_argsProceduraControlloDatiEconomici);
-                ProceduraControlloDatiEconomici ProceduraControlloDatiEconomici = new(_masterForm, mainConnection);
-                ProceduraControlloDatiEconomici.RunProcedure(_argsProceduraControlloDatiEconomici);
+               
             }
             catch (ValidationException ex)
             {

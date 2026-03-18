@@ -7,8 +7,15 @@ using System.Linq;
 
 namespace ProcedureNet7
 {
-    internal sealed class ProceduraControlloDatiEconomici : BaseProcedure<ArgsProceduraControlloDatiEconomici>
+    internal sealed class ProceduraControlloDatiEconomici
     {
+        private readonly SqlConnection _conn;
+
+        public ProceduraControlloDatiEconomici(SqlConnection conn)
+        {
+            _conn = conn ?? throw new ArgumentNullException(nameof(conn));
+        }
+
         private const string TempCfTable = "#CFEstrazione";
         private const string TempTargetsTable = "#TargetsEconomici";
 
@@ -23,12 +30,7 @@ namespace ProcedureNet7
 
         public DataTable OutputEconomici { get; private set; } = BuildOutputTable();
 
-        public IReadOnlyList<ValutazioneEconomici> OutputEconomiciList { get; private set; } = Array.Empty<ValutazioneEconomici>();
-
-        public bool ExportToExcel { get; set; } = true;
-        public string ExportFolderPath { get; set; } = "D://";
-
-        private string _aa = "";
+        public IReadOnlyList<ValutazioneEconomici> OutputEconomiciList { get; private set; } = Array.Empty<ValutazioneEconomici>(); private string _aa = "";
 
         private sealed class CalcParams
         {
@@ -41,8 +43,6 @@ namespace ProcedureNet7
 
         private void LoadInpsAndAttestazioni_StoredLike(string aa, List<Target> targets)
         {
-            if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
-
             EnsureTempTargetsTableAndFill(targets);
 
             _statusInpsOrigineByCf.Clear();
@@ -62,7 +62,7 @@ LEFT JOIN vStatus_INPS si
    AND si.data_fine_validita IS NULL
    AND si.tipo_certificaz NOT IN ('CI','DI');";
 
-            using (var command = new SqlCommand(sqlOrig, CONNECTION))
+            using (var command = new SqlCommand(sqlOrig, _conn))
             {
                 command.Parameters.AddWithValue("@AA", aa);
 
@@ -89,7 +89,7 @@ LEFT JOIN vStatus_INPS si
    AND si.data_fine_validita IS NULL
    AND si.tipo_certificaz IN ('CI','DI');";
 
-            using (var command = new SqlCommand(sqlInt, CONNECTION))
+            using (var command = new SqlCommand(sqlInt, _conn))
             {
                 command.Parameters.AddWithValue("@AA", aa);
 
@@ -115,7 +115,7 @@ LEFT JOIN vCertificaz_ISEE cte
    AND cte.Num_domanda     = t.Num_domanda
    AND cte.tipologia_certificazione = 'CO';";
 
-            using (var command = new SqlCommand(sqlAtt, CONNECTION))
+            using (var command = new SqlCommand(sqlAtt, _conn))
             {
                 command.Parameters.AddWithValue("@AA", aa);
 
@@ -170,7 +170,7 @@ SELECT Franchigia, tasso_rendimento_pat_mobiliare, franchigia_pat_mobiliare
 FROM DatiGenerali_con
 WHERE Anno_accademico = @AA;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             using var reader = command.ExecuteReader();
@@ -195,7 +195,7 @@ INNER JOIN vNucleo_familiare nf
     ON nf.Anno_accademico = @AA
    AND nf.Num_domanda     = t.Num_domanda;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             using var reader = command.ExecuteReader();
@@ -246,19 +246,11 @@ INNER JOIN vNucleo_familiare nf
 
             return RoundSql(seq <= 0 ? 1m : seq, 2);
         }
-
-        public ProceduraControlloDatiEconomici(MasterForm? masterForm, SqlConnection? connection)
-            : base(masterForm, connection) { }
-
-        public override void RunProcedure(ArgsProceduraControlloDatiEconomici args)
+        public void Compute(string aa, IReadOnlyCollection<string>? codiciFiscali = null, IReadOnlyDictionary<string, StudenteInfo>? infoByCf = null)
         {
             void Log(int pct, string msg) => Logger.LogInfo(Math.Max(0, Math.Min(100, pct)), msg);
 
-            Log(0, "Avvio procedura ProceduraControlloDatiEconomici");
-
-            if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
-
-            string aa = (args._selectedAA ?? "").Trim();
+            Log(0, "Avvio procedura ProceduraControlloDatiEconomici"); aa = (aa ?? "").Trim();
             if (string.IsNullOrWhiteSpace(aa) || aa.Length != 8)
                 throw new ArgumentException("Anno accademico non valido (atteso char(8), es: 20232024).");
 
@@ -268,17 +260,23 @@ INNER JOIN vNucleo_familiare nf
 
             Log(5, $"Parametri validati. AA={aa}");
 
-            var targets = (args._codiciFiscali != null && args._codiciFiscali.Count > 0)
-                ? LoadTargetsFromCfList(aa, args._codiciFiscali)
+            var targets = (codiciFiscali != null && codiciFiscali.Count > 0)
+                ? LoadTargetsFromCfList(aa, codiciFiscali.ToList())
                 : LoadTargetsAll(aa);
-
             Log(15, $"Targets caricati: {targets.Count}");
 
             foreach (var target in targets)
             {
                 if (!_rows.ContainsKey(target.CodFiscale))
                 {
-                    var studenteInfo = new StudenteInfo();
+                    StudenteInfo studenteInfo;
+
+                    if (infoByCf != null && infoByCf.TryGetValue(target.CodFiscale, out var existingInfo) && existingInfo != null)
+                        studenteInfo = existingInfo;
+                    else
+                        studenteInfo = new StudenteInfo();
+
+                    // Normalizzo sempre CF/NumDomanda sulla "source of truth".
                     studenteInfo.InformazioniPersonali.CodFiscale = target.CodFiscale;
                     studenteInfo.InformazioniPersonali.NumDomanda = target.NumDomanda;
 
@@ -379,10 +377,6 @@ INNER JOIN vNucleo_familiare nf
                     SEQ_Attuale = (decimal)e.SEQ_Attuale
                 })
                 .ToList();
-
-            if (ExportToExcel)
-                Utilities.ExportDataTableToExcel(OutputEconomici, ExportFolderPath);
-
             Log(100, $"Completato. Record output: {OutputEconomici.Rows.Count}");
         }
 
@@ -419,7 +413,7 @@ FROM D
 WHERE rn = 1
 ORDER BY Cod_fiscale;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             var list = new List<Target>(capacity: 8192);
@@ -481,7 +475,7 @@ FROM D
 WHERE rn = 1
 ORDER BY Cod_fiscale;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             var list = new List<Target>(capacity: codiciFiscaliNormalizzati.Count);
@@ -505,8 +499,6 @@ ORDER BY Cod_fiscale;";
 
         private void EnsureTempTargetsTableAndFill(List<Target> targets)
         {
-            if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
-
             var list = targets
                 .Where(target => !string.IsNullOrWhiteSpace(target.CodFiscale) && !string.IsNullOrWhiteSpace(target.NumDomanda))
                 .Select(target => new Target(
@@ -552,12 +544,12 @@ BEGIN
     CREATE INDEX ix_TargetsEconomici_ND ON #TargetsEconomici (Num_domanda);
 END;";
 
-            using (var command = new SqlCommand(ensureSql, CONNECTION))
+            using (var command = new SqlCommand(ensureSql, _conn))
                 command.ExecuteNonQuery();
 
             if (list.Count == 0)
             {
-                using var statsCommand = new SqlCommand("UPDATE STATISTICS #TargetsEconomici;", CONNECTION);
+                using var statsCommand = new SqlCommand("UPDATE STATISTICS #TargetsEconomici;", _conn);
                 statsCommand.ExecuteNonQuery();
                 return;
             }
@@ -570,7 +562,7 @@ END;";
                 foreach (var target in list)
                     dataTable.Rows.Add(target.CodFiscale, target.NumDomanda);
 
-                using var bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.TableLock, null)
+                using var bulkCopy = new SqlBulkCopy(_conn, SqlBulkCopyOptions.TableLock, null)
                 {
                     DestinationTableName = TempTargetsTable,
                     BatchSize = 10000,
@@ -579,14 +571,12 @@ END;";
                 bulkCopy.WriteToServer(dataTable);
             }
 
-            using (var statsCommand = new SqlCommand("UPDATE STATISTICS #TargetsEconomici;", CONNECTION))
+            using (var statsCommand = new SqlCommand("UPDATE STATISTICS #TargetsEconomici;", _conn))
                 statsCommand.ExecuteNonQuery();
         }
 
         private void LoadValoriCalcolatiAttuali(string aa, List<Target> targets)
         {
-            if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
-
             EnsureTempTargetsTableAndFill(targets);
 
             const string sql = @"
@@ -602,7 +592,7 @@ LEFT JOIN vValori_calcolati vv
     ON vv.Anno_accademico = @AA
    AND vv.Num_domanda     = t.Num_domanda;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             using var reader = command.ExecuteReader();
@@ -629,8 +619,6 @@ LEFT JOIN vValori_calcolati vv
 
         private void LoadEsitoBorsaStudio(string aa, List<Target> targets)
         {
-            if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
-
             EnsureTempTargetsTableAndFill(targets);
 
             const string sql = @"
@@ -653,7 +641,7 @@ LEFT JOIN EsitoBS e
     ON e.Anno_accademico = @AA
    AND e.Num_domanda     = t.Num_domanda;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             using var reader = command.ExecuteReader();
@@ -709,7 +697,7 @@ WHERE d.Anno_accademico = @AA
   AND d.Tipo_bando = 'lz'
 ORDER BY d.Cod_fiscale;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             int readCount = 0;
@@ -831,7 +819,7 @@ INNER JOIN vCertificaz_ISEE cte
 LEFT JOIN sumPagamenti sp ON t.Cod_fiscale = sp.Cod_fiscale
 LEFT JOIN impAltreBorse iab ON t.Num_domanda = iab.num_domanda AND @AA = iab.anno_accademico;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
             command.Parameters.AddWithValue("@EseFin", eseFin);
 
@@ -895,7 +883,7 @@ INNER JOIN vNucleo_fam_stranieri_DO nf
     ON nf.Anno_accademico = @AA
    AND nf.Num_domanda     = t.Num_domanda;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             using var reader = command.ExecuteReader();
@@ -953,7 +941,7 @@ INNER JOIN vCertificaz_ISEE cte
    AND cte.Num_domanda     = t.Num_domanda
    AND cte.tipologia_certificazione = 'DO';";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             using var reader = command.ExecuteReader();
@@ -1017,7 +1005,7 @@ INNER JOIN vCertificaz_ISEE cte
    AND cte.Num_domanda     = t.Num_domanda
    AND cte.tipologia_certificazione = 'CI';";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             using var reader = command.ExecuteReader();
@@ -1077,7 +1065,7 @@ INNER JOIN vNucleo_fam_stranieri_DI nf
     ON nf.Anno_accademico = @AA
    AND nf.Num_domanda     = t.Num_domanda;";
 
-            using var command = new SqlCommand(sql, CONNECTION);
+            using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
 
             using var reader = command.ExecuteReader();
@@ -1154,8 +1142,6 @@ INNER JOIN vNucleo_fam_stranieri_DI nf
 
         private void EnsureTempCfTableAndFill(IEnumerable<string> codiciFiscali)
         {
-            if (CONNECTION == null) throw new InvalidOperationException("CONNECTION null");
-
             var codiciFiscaliDistinct = codiciFiscali
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Select(value => Utilities.RemoveAllSpaces(value).ToUpperInvariant())
@@ -1185,12 +1171,12 @@ BEGIN
     CREATE INDEX idx_Cod_fiscale ON #CFEstrazione (Cod_fiscale);
 END;";
 
-            using (var command = new SqlCommand(ensureSql, CONNECTION))
+            using (var command = new SqlCommand(ensureSql, _conn))
                 command.ExecuteNonQuery();
 
             if (codiciFiscaliDistinct.Count == 0)
             {
-                using var statsCommand = new SqlCommand("UPDATE STATISTICS #CFEstrazione;", CONNECTION);
+                using var statsCommand = new SqlCommand("UPDATE STATISTICS #CFEstrazione;", _conn);
                 statsCommand.ExecuteNonQuery();
                 Logger.LogInfo(21, "CF table aggiornata (vuota) + statistiche.");
                 return;
@@ -1203,7 +1189,7 @@ END;";
                 dataTable.Columns.Add("Cod_fiscale", typeof(string));
                 foreach (var codFiscale in codiciFiscaliDistinct) dataTable.Rows.Add(codFiscale);
 
-                using var bulkCopy = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.TableLock, null)
+                using var bulkCopy = new SqlBulkCopy(_conn, SqlBulkCopyOptions.TableLock, null)
                 {
                     DestinationTableName = TempCfTable,
                     BatchSize = 10000,
@@ -1212,7 +1198,7 @@ END;";
                 bulkCopy.WriteToServer(dataTable);
             }
 
-            using (var statsCommand = new SqlCommand("UPDATE STATISTICS #CFEstrazione;", CONNECTION))
+            using (var statsCommand = new SqlCommand("UPDATE STATISTICS #CFEstrazione;", _conn))
                 statsCommand.ExecuteNonQuery();
 
             Logger.LogInfo(25, "Bulk copy completato + statistiche aggiornate.");
