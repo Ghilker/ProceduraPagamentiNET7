@@ -26,11 +26,10 @@ namespace ProcedureNet7
         {
             { "-1", "Tutti gli enti e sedi" },
             { "0", "Roma 1" },
-            { "1", "Roma 2" },
-            { "2", "Roma 3" },
-            { "3", "Cassino" },
-            { "4", "Viterbo" },
-        };
+            { "1", "Roma 2/ Roma 3" },
+            { "2", "Cassino" },
+            { "3", "Viterbo" },
+            };
         void Initialize()
         {
             genRevEnteComboBox.Items.Clear();
