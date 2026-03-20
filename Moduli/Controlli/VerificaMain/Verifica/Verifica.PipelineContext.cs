@@ -23,7 +23,6 @@ namespace ProcedureNet7.Verifica
         public List<VerificaCandidate> Candidates { get; } = new();
         public Dictionary<StudentKey, StudenteInfo> Students { get; } = new();
         public HashSet<StudentKey> CandidateKeys { get; } = new();
-        public List<string> CandidateCfs { get; } = new();
 
         public IReadOnlyList<StudenteInfo> OrderedStudents =>
             Students
@@ -39,7 +38,6 @@ namespace ProcedureNet7.Verifica
 
             Students.Clear();
             CandidateKeys.Clear();
-            CandidateCfs.Clear();
 
             foreach (var candidate in Candidates)
             {
@@ -54,12 +52,6 @@ namespace ProcedureNet7.Verifica
                 info.InformazioniPersonali.NumDomanda = numDomanda;
                 Students[key] = info;
             }
-
-            CandidateCfs.AddRange(
-                Candidates
-                    .Select(candidate => NormalizeCf(candidate.CodFiscale))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
         }
 
         private static string NormalizeCf(string? value)

@@ -16,10 +16,7 @@ namespace ProcedureNet7.Verifica.Modules
 
         public void Collect(VerificaPipelineContext context)
         {
-            _service.Collect(
-                context.AnnoAccademico,
-                context.CandidateCfs,
-                context.Students);
+            _service.Collect(context.AnnoAccademico, context.Students);
         }
 
         public void Calculate(VerificaPipelineContext context)

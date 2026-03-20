@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Globalization;
 using System.Linq;
 
 namespace ProcedureNet7
@@ -73,10 +72,6 @@ END;";
             Logger.LogInfo(25, "Bulk copy completato + statistiche aggiornate.");
         }
 
-        // =========================
-        //  OUTPUT TABLE
-        // =========================
-
         private static DataTable BuildOutputTable()
         {
             var dt = new DataTable("DatiEconomici");
@@ -84,9 +79,7 @@ END;";
             dt.Columns.Add("NumDomanda", typeof(string));
             dt.Columns.Add("TipoRedditoOrigine", typeof(string));
             dt.Columns.Add("TipoRedditoIntegrazione", typeof(string));
-
             dt.Columns.Add("CodTipoEsitoBS", typeof(int));
-
             dt.Columns.Add("ISR", typeof(double));
             dt.Columns.Add("ISP", typeof(double));
             dt.Columns.Add("Detrazioni", typeof(double));
@@ -95,59 +88,176 @@ END;";
             dt.Columns.Add("ISPEDSU", typeof(double));
             dt.Columns.Add("ISPDSU", typeof(double));
             dt.Columns.Add("SEQ", typeof(double));
-
             dt.Columns.Add("ISEDSU_Attuale", typeof(double));
             dt.Columns.Add("ISEEDSU_Attuale", typeof(double));
             dt.Columns.Add("ISPEDSU_Attuale", typeof(double));
             dt.Columns.Add("ISPDSU_Attuale", typeof(double));
             dt.Columns.Add("SEQ_Attuale", typeof(double));
-
             return dt;
         }
-
-        // =========================
-        //  DTO
-        // =========================
 
         private readonly record struct Target(string CodFiscale, string NumDomanda);
 
         private sealed class EconomicRow
         {
-            public StudenteInfo Info { get; set; } = new StudenteInfo();
+            public EconomicRow(StudenteInfo info)
+            {
+                Info = info ?? throw new ArgumentNullException(nameof(info));
+            }
 
-            public string CodFiscale { get; set; } = "";
-            public string? NumDomanda { get; set; }
+            public StudenteInfo Info { get; }
+            private InformazioniEconomiche Eco => Info.InformazioniEconomiche;
+            private InformazioniPersonali Pers => Info.InformazioniPersonali;
 
-            public string? TipoRedditoOrigine { get; set; }
-            public string? TipoRedditoIntegrazione { get; set; }
+            public string CodFiscale
+            {
+                get => Pers.CodFiscale ?? "";
+                set => Pers.CodFiscale = value ?? "";
+            }
 
-            public int? CodTipoEsitoBS { get; set; }
+            public string? NumDomanda
+            {
+                get => Pers.NumDomanda;
+                set => Pers.NumDomanda = value ?? "";
+            }
 
-            public int NumeroComponenti { get; set; }
-            public int NumeroConviventiEstero { get; set; }
-            public int NumeroComponentiIntegrazione { get; set; }
-            public string? TipoNucleo { get; set; }
+            public string? TipoRedditoOrigine
+            {
+                get => Eco.TipoRedditoOrigine;
+                set => Eco.TipoRedditoOrigine = value ?? "";
+            }
 
-            public decimal AltriMezzi { get; set; }
+            public string? TipoRedditoIntegrazione
+            {
+                get => Eco.TipoRedditoIntegrazione;
+                set => Eco.TipoRedditoIntegrazione = value ?? "";
+            }
 
-            public decimal SEQ_Origine { get; set; }
-            public decimal SEQ_Integrazione { get; set; }
+            public int? CodTipoEsitoBS
+            {
+                get => Eco.CodTipoEsitoBS;
+                set => Eco.CodTipoEsitoBS = value;
+            }
 
-            public decimal ISRDSU { get; set; }
-            public decimal ISPDSU { get; set; }
-            public decimal SEQ { get; set; }
-            public decimal Detrazioni { get; set; }
-            public decimal SommaRedditiStud { get; set; }
+            public int NumeroComponenti
+            {
+                get => Eco.NumeroComponenti;
+                set => Eco.NumeroComponenti = value;
+            }
 
-            public decimal ISEDSU { get; set; }
-            public decimal ISEEDSU { get; set; }
-            public decimal ISPEDSU { get; set; }
+            public int NumeroConviventiEstero
+            {
+                get => Eco.NumeroConviventiEstero;
+                set => Eco.NumeroConviventiEstero = value;
+            }
 
-            public double ISEDSU_Attuale { get; set; }
-            public double ISEEDSU_Attuale { get; set; }
-            public double ISPEDSU_Attuale { get; set; }
-            public double ISPDSU_Attuale { get; set; }
-            public double SEQ_Attuale { get; set; }
+            public int NumeroComponentiIntegrazione
+            {
+                get => Eco.NumeroComponentiIntegrazione;
+                set => Eco.NumeroComponentiIntegrazione = value;
+            }
+
+            public string? TipoNucleo
+            {
+                get => Eco.TipoNucleo;
+                set => Eco.TipoNucleo = value ?? "";
+            }
+
+            public decimal AltriMezzi
+            {
+                get => Eco.AltriMezzi;
+                set => Eco.AltriMezzi = value;
+            }
+
+            public decimal SEQ_Origine
+            {
+                get => Eco.SEQ_Origine;
+                set => Eco.SEQ_Origine = value;
+            }
+
+            public decimal SEQ_Integrazione
+            {
+                get => Eco.SEQ_Integrazione;
+                set => Eco.SEQ_Integrazione = value;
+            }
+
+            public decimal ISRDSU
+            {
+                get => Eco.ISRDSU;
+                set => Eco.ISRDSU = value;
+            }
+
+            public decimal ISPDSU
+            {
+                get => Eco.ISPDSU;
+                set => Eco.ISPDSU = value;
+            }
+
+            public decimal SEQ
+            {
+                get => Eco.SEQ;
+                set => Eco.SEQ = value;
+            }
+
+            public decimal Detrazioni
+            {
+                get => Eco.Detrazioni;
+                set => Eco.Detrazioni = value;
+            }
+
+            public decimal SommaRedditiStud
+            {
+                get => Eco.SommaRedditiStud;
+                set => Eco.SommaRedditiStud = value;
+            }
+
+            public decimal ISEDSU
+            {
+                get => Eco.ISEDSU;
+                set => Eco.ISEDSU = value;
+            }
+
+            public decimal ISEEDSU
+            {
+                get => Eco.ISEEDSU;
+                set => Eco.ISEEDSU = value;
+            }
+
+            public decimal ISPEDSU
+            {
+                get => Eco.ISPEDSU;
+                set => Eco.ISPEDSU = value;
+            }
+
+            public double ISEDSU_Attuale
+            {
+                get => Eco.ISEDSU_Attuale;
+                set => Eco.ISEDSU_Attuale = value;
+            }
+
+            public double ISEEDSU_Attuale
+            {
+                get => Eco.ISEEDSU_Attuale;
+                set => Eco.ISEEDSU_Attuale = value;
+            }
+
+            public double ISPEDSU_Attuale
+            {
+                get => Eco.ISPEDSU_Attuale;
+                set => Eco.ISPEDSU_Attuale = value;
+            }
+
+            public double ISPDSU_Attuale
+            {
+                get => Eco.ISPDSU_Attuale;
+                set => Eco.ISPDSU_Attuale = value;
+            }
+
+            public double SEQ_Attuale
+            {
+                get => Eco.SEQ_Attuale;
+                set => Eco.SEQ_Attuale = value;
+            }
         }
     }
 }
