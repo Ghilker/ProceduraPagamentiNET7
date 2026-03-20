@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DocumentFormat.OpenXml.Spreadsheet;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
@@ -12,27 +13,17 @@ using System.Windows.Forms;
 
 namespace ProcedureNet7
 {
-    public partial class FormControlloStatusSede : Form
+    public partial class FormVerifica : Form
     {
         MasterForm? _masterForm;
         string selectedFolderPath = string.Empty;
-        public FormControlloStatusSede(MasterForm masterForm)
+        public FormVerifica(MasterForm masterForm)
         {
             _masterForm = masterForm;
             InitializeComponent();
         }
 
-        private void RunProcedureBtnClick(object sender, EventArgs e)
-        {
-            if (_masterForm == null)
-            {
-                return;
-            }
-
-            _masterForm.RunBackgroundWorker(RunControlloStatusSede);
-        }
-
-        private void RunControlloStatusSede(SqlConnection mainConnection)
+        private void RunVerifica(SqlConnection mainConnection)
         {
             try
             {
@@ -41,13 +32,13 @@ namespace ProcedureNet7
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
                 ArgsValidation argsValidation = new ArgsValidation();
-                ArgsControlloStatusSede _argsControlloStatusSede = new ArgsControlloStatusSede
+                ArgsVerifica argsVerifica = new ArgsVerifica
                 {
-                    _folderPath = selectedFolderPath,
-                    _selectedAA = selectedAAText.Text
+                    _selectedAA = verificaAAText.Text
                 };
-                argsValidation.Validate(_argsControlloStatusSede);
-                
+                argsValidation.Validate(argsVerifica);
+                ProcedureNet7.Verifica.Verifica verifica = new(_masterForm, mainConnection);
+                verifica.RunProcedure(argsVerifica);
             }
             catch (ValidationException ex)
             {
@@ -59,9 +50,14 @@ namespace ProcedureNet7
             }
         }
 
-        private void saveFolderBTN_Click(object sender, EventArgs e)
+        private void circularButton1_Click(object sender, EventArgs e)
         {
-            Utilities.ChooseFolder(saveFolderLbl, folderBrowserDialog1, ref selectedFolderPath);
+            if (_masterForm == null)
+            {
+                return;
+            }
+
+            _masterForm.RunBackgroundWorker(RunVerifica);
         }
     }
 }

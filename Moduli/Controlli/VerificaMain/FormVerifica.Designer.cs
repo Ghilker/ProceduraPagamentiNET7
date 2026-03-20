@@ -1,6 +1,6 @@
 ﻿namespace ProcedureNet7
-{ 
-    partial class FormProceduraControlloDatiEconomici
+{
+    partial class FormVerifica
     {
         /// <summary>
         /// Required designer variable.
@@ -29,61 +29,65 @@
         private void InitializeComponent()
         {
             label1 = new Label();
-            button1 = new Button();
-            ControlloEcoAATxt = new TextBox();
+            circularButton1 = new CircularButton();
             label2 = new Label();
+            verificaAAText = new TextBox();
             SuspendLayout();
             // 
             // label1
             // 
             label1.AutoSize = true;
             label1.Font = new Font("Segoe UI", 15F);
-            label1.Location = new Point(29, 11);
+            label1.Location = new Point(12, 9);
             label1.Name = "label1";
-            label1.Size = new Size(397, 28);
-            label1.TabIndex = 33;
-            label1.Text = "PROCEDURA CONTROLLO DATI ECONOMICI";
+            label1.Size = new Size(119, 28);
+            label1.TabIndex = 59;
+            label1.Text = "LA VERIFICA";
             // 
-            // button1
+            // circularButton1
             // 
-            button1.Font = new Font("Segoe UI", 15F);
-            button1.Location = new Point(460, 291);
-            button1.Name = "button1";
-            button1.Size = new Size(312, 49);
-            button1.TabIndex = 32;
-            button1.Text = "AVVIA LA PROCEDURA";
-            button1.UseVisualStyleBackColor = true;
-            button1.Click += RunProcedureBtnClick;
-            // 
-            // ControlloEcoAATxt
-            // 
-            ControlloEcoAATxt.Location = new Point(138, 52);
-            ControlloEcoAATxt.Name = "ControlloEcoAATxt";
-            ControlloEcoAATxt.Size = new Size(100, 23);
-            ControlloEcoAATxt.TabIndex = 34;
+            circularButton1.BackColor = Color.FromArgb(210, 40, 10);
+            circularButton1.FlatAppearance.BorderSize = 0;
+            circularButton1.FlatStyle = FlatStyle.Flat;
+            circularButton1.Font = new Font("Impact", 27.75F);
+            circularButton1.ForeColor = Color.White;
+            circularButton1.Location = new Point(595, 145);
+            circularButton1.Name = "circularButton1";
+            circularButton1.Size = new Size(193, 193);
+            circularButton1.TabIndex = 60;
+            circularButton1.Text = "VERIFICA";
+            circularButton1.UseVisualStyleBackColor = false;
+            circularButton1.Click += circularButton1_Click;
             // 
             // label2
             // 
             label2.AutoSize = true;
-            label2.Location = new Point(29, 60);
+            label2.Location = new Point(12, 61);
             label2.Name = "label2";
             label2.Size = new Size(103, 15);
-            label2.TabIndex = 35;
+            label2.TabIndex = 61;
             label2.Text = "Anno accademico";
             // 
-            // FormProceduraControlloDatiEconomici
+            // verificaAAText
+            // 
+            verificaAAText.Location = new Point(121, 53);
+            verificaAAText.Name = "verificaAAText";
+            verificaAAText.Size = new Size(100, 23);
+            verificaAAText.TabIndex = 62;
+            // 
+            // FormVerifica
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
+            Controls.Add(verificaAAText);
             Controls.Add(label2);
-            Controls.Add(ControlloEcoAATxt);
+            Controls.Add(circularButton1);
             Controls.Add(label1);
-            Controls.Add(button1);
             FormBorderStyle = FormBorderStyle.None;
-            Name = "FormProceduraControlloDatiEconomici";
-            Text = "FormProceduraControlloDatiEconomici";
+            Name = "FormVerifica";
+            Text = "FormVerifica";
             ResumeLayout(false);
             PerformLayout();
         }
@@ -91,8 +95,8 @@
         #endregion
 
         private Label label1;
-        private Button button1;
-        private TextBox ControlloEcoAATxt;
+        private CircularButton circularButton1;
         private Label label2;
+        private TextBox verificaAAText;
     }
 }

@@ -36,6 +36,8 @@ namespace ProcedureNet7
 
         public TipologiaEnteIstituto tipologiaEnteIstituto;
         public string denominazioneIstituto;
+        public string TipoEnte { get; set; } = string.Empty;
+
         public double importoMensileRataIstituto;
     }
 }

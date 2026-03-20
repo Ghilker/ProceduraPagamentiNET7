@@ -81,13 +81,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Moduli\Controlli\ProceduraControlloStatusSede\FormControlloStatusSede.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Update="Moduli\Controlli\ProceduraControlloDomicilio\FormControlloDomicilio.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Moduli\Controlli\ProceduraControlloDatiEconomici\FormProceduraControlloDatiEconomici.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Update="Moduli\Varie\ProceduraProvvedimenti\FormProceduraProvvedimenti.cs">

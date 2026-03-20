@@ -37,16 +37,16 @@ namespace ProcedureNet7
         public string TipoRedditoIntegrazione { get; init; } = string.Empty;
         public int? CodTipoEsitoBS { get; init; }
 
-        public decimal ISR { get; init; }
-        public decimal ISP { get; init; }
-        public decimal Detrazioni { get; init; }
+        public decimal? ISR { get; init; }
+        public decimal? ISP { get; init; }
+        public decimal? Detrazioni { get; init; }
 
-        public decimal ISEDSU { get; init; }
-        public decimal ISEEDSU { get; init; }
-        public decimal ISPEDSU { get; init; }
+        public decimal? ISEDSU { get; init; }
+        public decimal? ISEEDSU { get; init; }
+        public decimal? ISPEDSU { get; init; }
 
-        public decimal ISPDSU { get; init; }
-        public decimal SEQ { get; init; }
+        public decimal? ISPDSU { get; init; }
+        public decimal? SEQ { get; init; }
 
         public decimal? ISEDSU_Attuale { get; init; }
         public decimal? ISEEDSU_Attuale { get; init; }

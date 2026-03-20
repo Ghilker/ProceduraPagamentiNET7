@@ -8,8 +8,8 @@ namespace ProcedureNet7
 {
     public class ArgsVerifica
     {
-        public string? _selectedAA;
-        public string? _folderPath;
+        public string? _selectedAA = "20242025";
+        public string? _folderPath = "D://";
 
         // stesso input di ProceduraControlloDatiEconomici (opzionale)
         public List<string>? _codiciFiscali;

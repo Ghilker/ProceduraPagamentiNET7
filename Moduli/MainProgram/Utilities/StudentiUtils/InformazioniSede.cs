@@ -26,5 +26,18 @@ namespace ProcedureNet7
 
         public string CodComuneSedeStudi {  get; set; } = string.Empty;
         public string CodProvinciaSedeStudi {  get; set; } = string.Empty;
+
+        public string MotivoStatusSede { get; set; } = "";
+        public bool DomicilioPresente { get; set; }
+        public bool DomicilioValido { get; set; }
+        public bool HasAlloggio12 { get; set; }
+        public bool HasIstanzaDomicilio { get; set; }
+        public string CodTipoIstanzaDomicilio { get; set; } = "";
+        public int NumIstanzaDomicilio { get; set; }
+        public bool HasUltimaIstanzaChiusaDomicilio { get; set; }
+        public string CodTipoUltimaIstanzaChiusaDomicilio { get; set; } = "";
+        public int NumUltimaIstanzaChiusaDomicilio { get; set; }
+        public string EsitoUltimaIstanzaChiusaDomicilio { get; set; } = "";
+        public string UtentePresaCaricoUltimaIstanzaChiusaDomicilio { get; set; } = "";
     }
 }
