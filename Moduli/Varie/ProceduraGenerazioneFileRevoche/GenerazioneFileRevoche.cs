@@ -50,8 +50,8 @@ namespace ProcedureNet7
         // =========================
         private static string GetQuery(string enteFilterSql)
         {
-            return $@" 
-                        ;WITH Domande AS (
+            return $@"
+                    ;WITH Domande AS (
                         SELECT 
                             d.Anno_accademico,
                             d.Tipo_bando,
@@ -59,7 +59,8 @@ namespace ProcedureNet7
                             d.Cod_fiscale
                         FROM Domanda d
                         WHERE d.Anno_accademico = @AA
-                          AND d.Tipo_bando = 'LZ'),
+                          AND d.Tipo_bando = 'LZ'
+                    ),
 
                     PagamentiAgg AS (
                         SELECT 
@@ -73,7 +74,7 @@ namespace ProcedureNet7
                         WHERE p.Ritirato_azienda = 0
                           AND (
                                 p.cod_tipo_pagam IN (
-                                    SELECT DISTINCT dpn.Cod_tipo_pagam_new
+                                    SELECT dpn.Cod_tipo_pagam_new
                                     FROM Decod_pagam_new dpn
                                     INNER JOIN Tipologie_pagam tp 
                                         ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
@@ -88,7 +89,8 @@ namespace ProcedureNet7
                                       AND tp.visibile = 1))
                         GROUP BY 
                             p.Anno_accademico,
-                            p.Num_domanda),
+                            p.Num_domanda
+                    ),
 
                     AssegnazioniRanked AS (
                         SELECT 
@@ -112,7 +114,8 @@ namespace ProcedureNet7
                           AND ap.Status_Assegnazione = 0
                           AND ap.Data_Accettazione IS NOT NULL
                           AND ap.Data_Decorrenza IS NOT NULL
-                          AND ap.Data_Fine_Assegnazione IS NOT NULL),
+                          AND ap.Data_Fine_Assegnazione IS NOT NULL
+                    ),
 
                     AssegnazioniDettaglio AS (
                         SELECT 
@@ -133,7 +136,8 @@ namespace ProcedureNet7
                             ON cs.Anno_accademico = ap.Anno_Accademico
                            AND cs.Cod_pensionato = ap.Cod_Pensionato
                            AND cs.Cod_periodo = 'M'
-                           AND cs.Tipo_stanza = vzCosto.Tipo_Costo_Stanza),
+                           AND cs.Tipo_stanza = vzCosto.Tipo_Costo_Stanza
+                    ),
 
                     AssegnPAAgg AS (
                         SELECT 
@@ -146,7 +150,21 @@ namespace ProcedureNet7
                         FROM AssegnazioniDettaglio a
                         GROUP BY 
                             a.Anno_Accademico,
-                            a.Cod_Fiscale)
+                            a.Cod_Fiscale
+                    ),
+
+                    ReversaliAgg AS (
+                        SELECT
+                            r.Anno_accademico,
+                            r.Num_domanda,
+                            SUM(r.Importo) AS Importo,
+                            STRING_AGG(r.num_reversale, '/') AS Num_reversale
+                        FROM Reversali r
+                        WHERE r.Cod_reversale in ('01','03')
+                        GROUP BY
+                            r.Anno_accademico,
+                            r.Num_domanda
+                    )
 
                     SELECT 
                         d.Anno_accademico,
@@ -207,7 +225,7 @@ namespace ProcedureNet7
                         p.Mandati AS Mandati_pagamento,
                         p.Ese_finanziari AS Esercizio_finanziario_mandato,
 
-                        r.Cod_reversale,
+                        r.Num_reversale,
                         si.Esercizio_prima_rata AS Ese_finanziario_reversale,
                         si.Determina_conferimento
 
@@ -272,10 +290,9 @@ namespace ProcedureNet7
                         ON p.Anno_accademico = d.Anno_accademico
                        AND p.Num_domanda = d.Num_domanda
 
-                    LEFT JOIN Reversali r 
+                    LEFT JOIN ReversaliAgg r 
                         ON r.Anno_accademico = d.Anno_accademico
                        AND r.Num_domanda = d.Num_domanda
-                       AND r.Cod_reversale = '01'
 
                     LEFT JOIN vDomicilio dom 
                         ON dom.ANNO_ACCADEMICO = d.Anno_accademico
@@ -301,7 +318,8 @@ namespace ProcedureNet7
                     ORDER BY 
                         app.Cod_ente,
                         ss.Descrizione,
-                        d.Cod_fiscale;";
+                        d.Cod_fiscale;
+                    ";
 
 
         }

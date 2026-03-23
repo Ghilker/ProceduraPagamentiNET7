@@ -136,10 +136,13 @@ namespace ProcedureNet7
         // MAPPING OGGETTO
         // ===============================
         private StudentePagamenti CreaStudente(SqlDataReader reader, DataRow excelRow)
+
         {
-            double.TryParse(excelRow[1]?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double lordo);
-            double.TryParse(excelRow[2]?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double reversali);
-            double.TryParse(excelRow[3]?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double netto);
+            var culturaIt = new CultureInfo("it-IT");
+
+            double.TryParse(excelRow[1]?.ToString(), NumberStyles.Any, culturaIt, out double lordo);
+            double.TryParse(excelRow[2]?.ToString(), NumberStyles.Any, culturaIt, out double reversali);
+            double.TryParse(excelRow[3]?.ToString(), NumberStyles.Any, culturaIt, out double netto);
 
             long.TryParse(Utilities.SafeGetString(reader, "telefono_cellulare"), out long telefono);
 
