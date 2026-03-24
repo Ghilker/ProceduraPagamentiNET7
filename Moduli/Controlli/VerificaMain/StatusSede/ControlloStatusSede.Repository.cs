@@ -54,6 +54,7 @@ BS_LAST AS
     SELECT
         CAST(ec.Num_domanda AS INT) AS NumDomanda,
         CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsitoBS,
+        ec.Imp_beneficio AS ImportoAssegnato,
         ROW_NUMBER() OVER
         (
             PARTITION BY ec.Num_domanda
@@ -66,7 +67,7 @@ BS_LAST AS
 ),
 BS AS
 (
-    SELECT NumDomanda, CodTipoEsitoBS
+    SELECT NumDomanda, CodTipoEsitoBS, ImportoAssegnato
     FROM BS_LAST
     WHERE rn = 1
 ),
@@ -79,6 +80,7 @@ D AS
         d0.CodFiscale,
         d0.TipoBando,
         ISNULL(bs.CodTipoEsitoBS,0) AS CodTipoEsitoBS,
+        ISNULL(bs.ImportoAssegnato,0) AS ImportoAssegnato,
         ISNULL(sc.StatusCompilazione,0) AS StatusCompilazione
     FROM D0 d0
     LEFT JOIN BS bs ON bs.NumDomanda = d0.NumDomanda
@@ -346,6 +348,7 @@ SELECT
 
     -- utili per debug/filtri
     D.CodTipoEsitoBS,
+    D.ImportoAssegnato,
     D.StatusCompilazione,
 
     ISNULL(vv.Status_sede,'') AS StatusSedeAttuale,
@@ -505,6 +508,7 @@ D AS
         UPPER(LTRIM(RTRIM(CodFiscale))) AS CodFiscale,
         COALESCE(TipoBando,'') AS TipoBando,
         CAST(ISNULL(CodTipoEsitoBS,0) AS INT) AS CodTipoEsitoBS,
+        CAST(ISNULL(ImportoAssegnato,0) AS INT) AS ImportoAssegnato,
         CAST(ISNULL(StatusCompilazione,0) AS INT) AS StatusCompilazione
     FROM {{CANDIDATES}}
 ),
@@ -761,6 +765,7 @@ SELECT
     D.TipoBando,
 
     D.CodTipoEsitoBS,
+    D.ImportoAssegnato,
     D.StatusCompilazione,
 
     ISNULL(vv.Status_sede,'') AS StatusSedeAttuale,

@@ -11,6 +11,7 @@ namespace ProcedureNet7
         public string TipoRedditoOrigine { get; set; } = "";
         public string TipoRedditoIntegrazione { get; set; } = "";
         public int? CodTipoEsitoBS { get; set; }
+        public double? ImportoAssegnato { get; set; }
 
         public int NumeroComponenti { get; set; }
         public int NumeroConviventiEstero { get; set; }

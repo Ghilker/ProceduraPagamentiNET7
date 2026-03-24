@@ -36,6 +36,7 @@ namespace ProcedureNet7
         public string TipoRedditoOrigine { get; init; } = string.Empty;
         public string TipoRedditoIntegrazione { get; init; } = string.Empty;
         public int? CodTipoEsitoBS { get; init; }
+        public double? ImportoAssegnato {  get; init; } = double.NegativeZero;
 
         public decimal? ISR { get; init; }
         public decimal? ISP { get; init; }

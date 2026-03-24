@@ -1,7 +1,5 @@
 using ProcedureNet7.Modules.Contracts;
-using ProcedureNet7.Storni;
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
@@ -9,7 +7,45 @@ using System.Linq;
 
 namespace ProcedureNet7.Verifica.Modules
 {
-    internal sealed class IscrizioneVerificaModule : IVerificaModule<VerificaPipelineContext>
+    internal sealed partial class VerificaDataImportModule : IVerificaDataCollector<VerificaPipelineContext>
+    {
+        private readonly VerificaControlliDatiEconomici _economiciService;
+        private readonly ControlloStatusSede _statusSedeService;
+        private readonly CalcoloImportoBorsa _importoBorsaService;
+
+        public VerificaDataImportModule(
+            VerificaControlliDatiEconomici economiciService,
+            ControlloStatusSede statusSedeService,
+            CalcoloImportoBorsa importoBorsaService)
+        {
+            _economiciService = economiciService ?? throw new ArgumentNullException(nameof(economiciService));
+            _statusSedeService = statusSedeService ?? throw new ArgumentNullException(nameof(statusSedeService));
+            _importoBorsaService = importoBorsaService ?? throw new ArgumentNullException(nameof(importoBorsaService));
+        }
+
+        public void Collect(VerificaPipelineContext context)
+        {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
+            _economiciService.Collect(context.AnnoAccademico, context.Students);
+            context.CalcParams = _economiciService.GetCalcParams();
+
+            _statusSedeService.CollectFromTempCandidates(
+                context.AnnoAccademico,
+                context.TempCandidatesTable,
+                context.Students);
+
+            ResetIscrizioneState(context);
+            LoadBaseIscrizione(context);
+            LoadCarrieraPregressa(context);
+            BuildCarrieraPregressaAggregate(context);
+
+            _importoBorsaService.Collect(context.CalcParams, context.Students);
+        }
+    }
+
+    internal sealed partial class VerificaDataImportModule
     {
         private const string BaseIscrizioneSql = @"
 SET NOCOUNT ON;
@@ -165,28 +201,7 @@ JOIN vCARRIERA_PREGRESSA cp
  AND UPPER(LTRIM(RTRIM(cp.Cod_fiscale))) = D.CodFiscale
 ORDER BY D.CodFiscale, D.NumDomanda, TRY_CONVERT(INT, cp.Anno_avvenimento), CONVERT(NVARCHAR(50), cp.Cod_avvenimento);";
 
-        public string Name => "Iscrizione";
-
-        public void Collect(VerificaPipelineContext context)
-        {
-            if (context == null)
-                throw new ArgumentNullException(nameof(context));
-
-            ResetStudents(context);
-            LoadBaseIscrizione(context);
-            LoadCarrieraPregressa(context);
-            BuildCarrieraPregressaAggregate(context);
-        }
-
-        public void Calculate(VerificaPipelineContext context)
-        {
-        }
-
-        public void Validate(VerificaPipelineContext context)
-        {
-        }
-
-        private static void ResetStudents(VerificaPipelineContext context)
+        private static void ResetIscrizioneState(VerificaPipelineContext context)
         {
             foreach (var info in context.Students.Values)
             {

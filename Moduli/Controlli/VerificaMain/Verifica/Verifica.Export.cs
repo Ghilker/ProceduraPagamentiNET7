@@ -88,6 +88,7 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("StatusSedeRiferimentoImportoBorsa", typeof(string));
             dt.Columns.Add("ImportoBaseBorsa", typeof(decimal));
             dt.Columns.Add("ImportoFinaleBorsa", typeof(decimal));
+            dt.Columns.Add("ImportoAssegnato", typeof(double));
             dt.Columns.Add("CalcoloImportoBorsaEseguito", typeof(bool));
 
             return dt;
@@ -113,6 +114,7 @@ namespace ProcedureNet7.Verifica
                 row["TipoRedditoOrigine"] = eco.TipoRedditoOrigine ?? "";
                 row["TipoRedditoIntegrazione"] = eco.TipoRedditoIntegrazione ?? "";
                 row["CodTipoEsitoBS"] = eco.CodTipoEsitoBS ?? 0;
+                row["ImportoAssegnato"] = eco.ImportoAssegnato ?? 0;
                 row["ISR"] = eco.ISRDSU;
                 row["ISP"] = eco.ISPDSU;
                 row["Detrazioni"] = eco.Detrazioni;
@@ -154,7 +156,7 @@ namespace ProcedureNet7.Verifica
                 row["UtentePresaCaricoUltimaIstanzaChiusaDomicilio"] = sede.UtentePresaCaricoUltimaIstanzaChiusaDomicilio ?? "";
 
                 row["TipoBando"] = iscr.TipoBando ?? "";
-                SetIfPositiveInt(row, "AnnoCorsoIscrizione", iscr.AnnoCorso);
+                SetIfHasValue(row, "AnnoCorsoIscrizione", iscr.AnnoCorso);
                 row["CodSedeStudiIscrizione"] = iscr.CodSedeStudi ?? "";
                 row["CodCorsoLaureaIscrizione"] = iscr.CodCorsoLaurea ?? "";
                 row["CodFacoltaIscrizione"] = iscr.CodFacolta ?? "";

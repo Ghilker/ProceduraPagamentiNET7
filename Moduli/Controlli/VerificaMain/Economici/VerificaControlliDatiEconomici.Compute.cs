@@ -135,6 +135,7 @@ namespace ProcedureNet7
                 outputRow["TipoRedditoOrigine"] = eco.TipoRedditoOrigine ?? "";
                 outputRow["TipoRedditoIntegrazione"] = eco.TipoRedditoIntegrazione ?? "";
                 outputRow["CodTipoEsitoBS"] = (object?)eco.CodTipoEsitoBS ?? DBNull.Value;
+                outputRow["ImportoAssegnato"] = eco.ImportoAssegnato;
                 outputRow["ISR"] = (double)RoundSql(eco.ISRDSU, 2);
                 outputRow["ISP"] = (double)RoundSql(eco.ISPDSU, 2);
                 outputRow["Detrazioni"] = (double)RoundSql(eco.Detrazioni, 2);
@@ -158,6 +159,7 @@ namespace ProcedureNet7
                     TipoRedditoOrigine = item.InformazioniEconomiche.TipoRedditoOrigine ?? string.Empty,
                     TipoRedditoIntegrazione = item.InformazioniEconomiche.TipoRedditoIntegrazione ?? string.Empty,
                     CodTipoEsitoBS = item.InformazioniEconomiche.CodTipoEsitoBS,
+                    ImportoAssegnato = item.InformazioniEconomiche.ImportoAssegnato,
                     ISR = RoundSql(item.InformazioniEconomiche.ISRDSU, 2),
                     ISP = RoundSql(item.InformazioniEconomiche.ISPDSU, 2),
                     Detrazioni = RoundSql(item.InformazioniEconomiche.Detrazioni, 2),

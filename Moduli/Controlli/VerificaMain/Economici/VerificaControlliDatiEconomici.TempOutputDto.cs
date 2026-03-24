@@ -80,6 +80,7 @@ END;";
             dt.Columns.Add("TipoRedditoOrigine", typeof(string));
             dt.Columns.Add("TipoRedditoIntegrazione", typeof(string));
             dt.Columns.Add("CodTipoEsitoBS", typeof(int));
+            dt.Columns.Add("ImportoAssegnato", typeof(double));
             dt.Columns.Add("ISR", typeof(double));
             dt.Columns.Add("ISP", typeof(double));
             dt.Columns.Add("Detrazioni", typeof(double));
@@ -137,6 +138,12 @@ END;";
             {
                 get => Eco.CodTipoEsitoBS;
                 set => Eco.CodTipoEsitoBS = value;
+            }
+
+            public double? ImportoAssegnato
+            {
+                get => Eco.ImportoAssegnato;
+                set => Eco.ImportoAssegnato = value;
             }
 
             public int NumeroComponenti

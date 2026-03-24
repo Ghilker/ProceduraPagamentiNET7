@@ -61,7 +61,8 @@ WITH EsitoBS AS
     SELECT
         ec.Anno_accademico,
         ec.Num_domanda,
-        MAX(ec.Cod_tipo_esito) AS Cod_tipo_esito
+        MAX(ec.Cod_tipo_esito) AS Cod_tipo_esito,
+        MAX(ec.imp_beneficio) AS imp_assegnato
     FROM vEsiti_concorsi ec
     WHERE ec.Anno_accademico = @AA
       AND ec.Cod_beneficio = 'BS'
@@ -69,7 +70,8 @@ WITH EsitoBS AS
 )
 SELECT
     t.Cod_fiscale,
-    e.Cod_tipo_esito
+    e.Cod_tipo_esito,
+    e.imp_assegnato
 FROM #TargetsEconomici t
 LEFT JOIN EsitoBS e
     ON e.Anno_accademico = @AA
@@ -92,6 +94,9 @@ LEFT JOIN EsitoBS e
                 int? codTipoEsito = rawEsito is DBNull or null ? (int?)null : Convert.ToInt32(rawEsito, CultureInfo.InvariantCulture);
 
                 economicRow.CodTipoEsitoBS = codTipoEsito;
+
+                double importoAssegnato = Utilities.SafeGetDouble(reader, "imp_assegnato");
+                economicRow.ImportoAssegnato = importoAssegnato;
             }
         }
 
