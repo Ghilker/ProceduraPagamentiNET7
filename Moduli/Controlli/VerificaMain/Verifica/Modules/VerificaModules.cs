@@ -38,6 +38,7 @@ namespace ProcedureNet7.Verifica.Modules
 
         public void Calculate(VerificaPipelineContext context)
         {
+            _service.SetReferenceDate(context.ReferenceDate);
             _service.Calculate();
         }
 

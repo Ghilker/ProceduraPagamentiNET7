@@ -37,18 +37,8 @@ namespace ProcedureNet7
 
             foreach (var info in _students.Values)
             {
-
-                if(info.InformazioniPersonali.CodFiscale == "BBANSA00A15Z352H")
-                {
-                    string test = "";
-                }
                 var imp = info.InformazioniImportoBorsa;
                 string status = GetStatusSedeRiferimento(info.InformazioniSede);
-
-                if(info.InformazioniIscrizione.TipoCorso == 6)
-                {
-                    status = "B";
-                }
 
                 decimal importoBase = GetImportoBaseByStatus(status);
                 decimal importoFinale = importoBase;
@@ -162,10 +152,10 @@ namespace ProcedureNet7
         {
             var eco = info.InformazioniEconomiche;
 
-            if (TryReadDecimal(eco?.ISEEDSU, out var ordinario) && ordinario >= 0m)
-                return ordinario;
+            if (TryReadDecimal(eco?.ISEEDSU, out var ricalcolato) && ricalcolato > 0m)
+                return ricalcolato;
 
-            if (TryReadDecimal(eco?.ISEEDSU_Attuale, out var attuale) && attuale >= 0m)
+            if (TryReadDecimal(eco?.ISEEDSU_Attuale, out var attuale) && attuale > 0m)
                 return attuale;
 
             return 0m;

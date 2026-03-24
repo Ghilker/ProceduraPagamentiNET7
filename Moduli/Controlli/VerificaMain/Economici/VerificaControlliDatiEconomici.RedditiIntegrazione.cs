@@ -9,13 +9,14 @@ namespace ProcedureNet7
 {
     internal sealed partial class VerificaControlliDatiEconomici
     {
-        private void AddDatiEconomiciItaliani_CI(string aa, List<string> codiciFiscali)
+        private void AddDatiEconomiciItaliani_CI(string aa, List<Target> targets)
         {
-            EnsureTempCfTableAndFill(codiciFiscali);
+            EnsureTempTargetsTableAndFill(targets);
 
             const string sql = @"
 SELECT
     t.Cod_fiscale,
+    t.Num_domanda,
     ISNULL(cte.ISR,0) AS ISR,
     ISNULL(cte.ISP,0) AS ISP,
     ISNULL(cte.Scala_equivalenza,0) AS SEQU,
@@ -29,7 +30,6 @@ SELECT
     ISNULL(cte.Metri_quadri,0) AS Metri_quadri,
     ISNULL(cte.Redd_fam_50_est,0) AS Redd_fam_50_est
 FROM #TargetsEconomici t
-INNER JOIN #CFEstrazione cfe ON t.Cod_fiscale = cfe.Cod_fiscale
 INNER JOIN vCertificaz_ISEE cte
     ON cte.Anno_accademico = @AA
    AND cte.Num_domanda     = t.Num_domanda
@@ -42,9 +42,8 @@ INNER JOIN vCertificaz_ISEE cte
             while (reader.Read())
             {
                 string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                if (!_rows.TryGetValue(codFiscale, out var economicRow)) continue;
-
-                if (codFiscale == debugCF) { string _ = ""; }
+                string numDomanda = reader.SafeGetString("Num_domanda");
+                if (!TryGetEconomicRow(codFiscale, numDomanda, out var economicRow)) continue;
 
                 decimal isr = reader.SafeGetDecimal("ISR");
                 decimal isp = reader.SafeGetDecimal("ISP");
@@ -74,13 +73,14 @@ INNER JOIN vCertificaz_ISEE cte
         //  ESTRAZIONE ECONOMICI - EE integrazione (DI)
         // =========================
 
-        private void AddDatiEconomiciStranieri_DI(string aa, List<string> codiciFiscali)
+        private void AddDatiEconomiciStranieri_DI(string aa, List<Target> targets)
         {
-            EnsureTempCfTableAndFill(codiciFiscali);
+            EnsureTempTargetsTableAndFill(targets);
 
             const string sql = @"
 SELECT
     t.Cod_fiscale,
+    t.Num_domanda,
     nf.Numero_componenti,
     ISNULL(nf.Redd_complessivo,0) AS Redd_complessivo,
     ISNULL(nf.Patr_mobiliare,0) AS Patr_mobiliare,
@@ -90,7 +90,6 @@ SELECT
     ISNULL(nf.Redd_lordo_fratell,0) AS Redd_lordo_fratell,
     ISNULL(nf.Patr_mob_fratell,0) AS Patr_mob_fratell
 FROM #TargetsEconomici t
-INNER JOIN #CFEstrazione cfe ON t.Cod_fiscale = cfe.Cod_fiscale
 INNER JOIN vNucleo_fam_stranieri_DI nf
     ON nf.Anno_accademico = @AA
    AND nf.Num_domanda     = t.Num_domanda;";
@@ -102,9 +101,8 @@ INNER JOIN vNucleo_fam_stranieri_DI nf
             while (reader.Read())
             {
                 string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                if (!_rows.TryGetValue(codFiscale, out var economicRow)) continue;
-
-                if (codFiscale == debugCF) { string _ = ""; }
+                string numDomanda = reader.SafeGetString("Num_domanda");
+                if (!TryGetEconomicRow(codFiscale, numDomanda, out var economicRow)) continue;
 
                 int nComp = reader.SafeGetInt("Numero_componenti");
                 decimal redd = reader.SafeGetDecimal("Redd_complessivo");

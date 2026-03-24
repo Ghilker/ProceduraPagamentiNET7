@@ -13,14 +13,15 @@ namespace ProcedureNet7
         {
             EnsureTempTargetsTableAndFill(targets);
 
-            _statusInpsOrigineByCf.Clear();
+            _statusInpsOrigineByKey.Clear();
             _statusInpsIntegrazioneByCf.Clear();
-            _coAttestazioneOkByCf.Clear();
+            _coAttestazioneOkByKey.Clear();
 
             // ORIGINE: come stored (NOT IN ('CI','DI') + filtro num_domanda)
             const string sqlOrig = @"
 SELECT
     t.Cod_fiscale,
+    t.Num_domanda,
     si.status_inps
 FROM #TargetsEconomici t
 LEFT JOIN vStatus_INPS si
@@ -38,10 +39,11 @@ LEFT JOIN vStatus_INPS si
                 while (reader.Read())
                 {
                     string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                    if (string.IsNullOrWhiteSpace(codFiscale)) continue;
+                    string numDomanda = reader.SafeGetString("Num_domanda");
+                    if (string.IsNullOrWhiteSpace(codFiscale) || string.IsNullOrWhiteSpace(numDomanda)) continue;
 
                     int statusInps = reader.SafeGetInt("status_inps");
-                    _statusInpsOrigineByCf[codFiscale] = statusInps;
+                    _statusInpsOrigineByKey[BuildStudentKey(codFiscale, numDomanda)] = statusInps;
                 }
             }
 
@@ -49,6 +51,7 @@ LEFT JOIN vStatus_INPS si
             const string sqlInt = @"
 SELECT
     t.Cod_fiscale,
+    t.Num_domanda,
     si.status_inps
 FROM #TargetsEconomici t
 LEFT JOIN vStatus_INPS si
@@ -76,6 +79,7 @@ LEFT JOIN vStatus_INPS si
             const string sqlAtt = @"
 SELECT
     t.Cod_fiscale,
+    t.Num_domanda,
     LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))) AS Cod_tipo_attestazione
 FROM #TargetsEconomici t
 LEFT JOIN vCertificaz_ISEE cte
@@ -91,10 +95,11 @@ LEFT JOIN vCertificaz_ISEE cte
                 while (reader.Read())
                 {
                     string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                    if (string.IsNullOrWhiteSpace(codFiscale)) continue;
+                    string numDomanda = reader.SafeGetString("Num_domanda");
+                    if (string.IsNullOrWhiteSpace(codFiscale) || string.IsNullOrWhiteSpace(numDomanda)) continue;
 
                     string tipoAttestazione = reader.SafeGetString("Cod_tipo_attestazione");
-                    _coAttestazioneOkByCf[codFiscale] = !string.IsNullOrWhiteSpace(tipoAttestazione);
+                    _coAttestazioneOkByKey[BuildStudentKey(codFiscale, numDomanda)] = !string.IsNullOrWhiteSpace(tipoAttestazione);
                 }
             }
         }
@@ -159,6 +164,7 @@ WHERE Anno_accademico = @AA;";
             const string sql = @"
 SELECT
     t.Cod_fiscale,
+    t.Num_domanda,
     ISNULL(nf.Num_componenti, 0) AS Num_componenti,
     ISNULL(nf.Cod_tipologia_nucleo, '') AS Cod_tipologia_nucleo,
     ISNULL(nf.Numero_conviventi_estero, 0) AS Numero_conviventi_estero
@@ -174,9 +180,8 @@ INNER JOIN vNucleo_familiare nf
             while (reader.Read())
             {
                 string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                if (!_rows.TryGetValue(codFiscale, out var economicRow)) continue;
-
-                if (codFiscale == debugCF) { string _ = ""; }
+                string numDomanda = reader.SafeGetString("Num_domanda");
+                if (!TryGetEconomicRow(codFiscale, numDomanda, out var economicRow)) continue;
 
                 economicRow.NumeroComponenti = reader.SafeGetInt("Num_componenti");
                 economicRow.TipoNucleo = reader.SafeGetString("Cod_tipologia_nucleo");

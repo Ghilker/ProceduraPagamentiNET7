@@ -19,8 +19,6 @@ namespace ProcedureNet7.Verifica
 
         public IReadOnlyList<StudenteInfo> OutputVerificaList { get; private set; } = Array.Empty<StudenteInfo>();
         public DataTable OutputVerifica { get; private set; } = BuildOutputTable();
-        public IReadOnlyList<StudenteInfo> StudentiInfoList { get; private set; } = Array.Empty<StudenteInfo>();
-        public DataTable OutputCarrieraPregressa { get; private set; } = BuildCarrieraPregressaOutputTable();
 
         public override void RunProcedure(ArgsVerifica args)
         {
@@ -31,14 +29,12 @@ namespace ProcedureNet7.Verifica
             _folderPath = args._folderPath;
 
             var context = BuildPipelineContext(args);
-            StudentiInfoList = context.OrderedStudents;
 
             if (context.Candidates.Count == 0)
             {
                 OutputVerificaList = Array.Empty<StudenteInfo>();
                 OutputVerifica = BuildOutputTable();
-                OutputCarrieraPregressa = BuildCarrieraPregressaOutputTable();
-                Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath);
+                Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath, true, $"Verifica_{_aa}_{DateTime.Now:yyyyMMdd_HHmmss}");
                 return;
             }
 
@@ -68,10 +64,8 @@ namespace ProcedureNet7.Verifica
                 }
 
                 OutputVerificaList = context.OrderedStudents;
-                StudentiInfoList = OutputVerificaList;
                 OutputVerifica = ToDataTable(OutputVerificaList);
-                OutputCarrieraPregressa = ToCarrieraPregressaDataTable(OutputVerificaList);
-                Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath);
+                Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath, true, $"Verifica_{_aa}");
             }
             finally
             {
@@ -85,9 +79,10 @@ namespace ProcedureNet7.Verifica
             {
                 AnnoAccademico = _aa,
                 FolderPath = _folderPath,
-                IncludeEsclusi = GetBoolArg(args, "_includeEsclusi", "IncludeEsclusi", fallback: true),
-                IncludeNonTrasmesse = GetBoolArg(args, "_includeNonTrasmesse", "IncludeNonTrasmesse", fallback: true),
-                TempCandidatesTable = "#SS_Candidates"
+                IncludeEsclusi = true,
+                IncludeNonTrasmesse = true,
+                TempCandidatesTable = "#SS_Candidates",
+                ReferenceDate = DateTime.Now
             };
 
             var candidates = LoadStatusSedeCandidates(
@@ -134,42 +129,6 @@ namespace ProcedureNet7.Verifica
 
     internal sealed partial class Verifica
     {
-        private static string GetStringArg(object args, string n1, string n2, string n3, string n4, string fallback)
-        {
-            foreach (var name in new[] { n1, n2, n3, n4 })
-            {
-                if (string.IsNullOrWhiteSpace(name)) continue;
-
-                var prop = args.GetType().GetProperty(name.Trim(), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                if (prop == null) continue;
-
-                var value = prop.GetValue(args);
-                if (value is string s && !string.IsNullOrWhiteSpace(s))
-                    return s;
-
-                if (value != null)
-                    return value.ToString() ?? fallback;
-            }
-            return fallback;
-        }
-
-        private static bool GetBoolArg(object args, string n1, string n2, bool fallback)
-        {
-            foreach (var name in new[] { n1, n2 })
-            {
-                if (string.IsNullOrWhiteSpace(name)) continue;
-
-                var prop = args.GetType().GetProperty(name.Trim(), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                if (prop == null) continue;
-
-                var value = prop.GetValue(args);
-                if (value is bool b) return b;
-                if (value is string s && bool.TryParse(s, out var parsed)) return parsed;
-                if (value is int i) return i != 0;
-            }
-            return fallback;
-        }
-
         private static IReadOnlyCollection<string>? GetStringListArg(object args, params string[] names)
         {
             foreach (var name in names)

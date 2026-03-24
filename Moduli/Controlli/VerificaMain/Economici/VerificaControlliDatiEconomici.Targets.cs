@@ -22,7 +22,7 @@ namespace ProcedureNet7
         d.Data_validita,
         ROW_NUMBER() OVER
         (
-            PARTITION BY UPPER(LTRIM(RTRIM(d.Cod_fiscale)))
+            PARTITION BY d.Num_domanda
             ORDER BY d.Data_validita DESC, d.Num_domanda DESC
         ) AS rn
     FROM Domanda d
@@ -36,7 +36,7 @@ namespace ProcedureNet7
 SELECT Cod_fiscale, Num_domanda
 FROM D
 WHERE rn = 1
-ORDER BY Cod_fiscale;";
+ORDER BY Cod_fiscale, Num_domanda;";
 
             using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
@@ -82,7 +82,7 @@ ORDER BY Cod_fiscale;";
         d.Data_validita,
         ROW_NUMBER() OVER
         (
-            PARTITION BY UPPER(LTRIM(RTRIM(d.Cod_fiscale)))
+            PARTITION BY d.Num_domanda
             ORDER BY d.Data_validita DESC, d.Num_domanda DESC
         ) AS rn
     FROM Domanda d
@@ -98,7 +98,7 @@ ORDER BY Cod_fiscale;";
 SELECT Cod_fiscale, Num_domanda
 FROM D
 WHERE rn = 1
-ORDER BY Cod_fiscale;";
+ORDER BY Cod_fiscale, Num_domanda;";
 
             using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
@@ -129,8 +129,7 @@ ORDER BY Cod_fiscale;";
                 .Select(target => new Target(
                     Utilities.RemoveAllSpaces(target.CodFiscale).ToUpperInvariant(),
                     Utilities.RemoveAllSpaces(target.NumDomanda)))
-                .GroupBy(target => target.CodFiscale, StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.First())
+                .Distinct()
                 .ToList();
 
             const string ensureSql = @"

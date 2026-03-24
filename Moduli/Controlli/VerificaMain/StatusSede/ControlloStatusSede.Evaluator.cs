@@ -20,7 +20,7 @@ namespace ProcedureNet7
                 _comuniEquiparati = comuniEquiparati ?? new HashSet<(string ComuneA, string ComuneB)>();
             }
 
-            public StatusSedeDecision Evaluate(StatusSedeStudent row, DateTime aaStart, DateTime aaEnd)
+            public StatusSedeDecision Evaluate(StatusSedeStudent row, DateTime aaStart, DateTime aaEnd, DateTime referenceDate)
             {
                 var info = row.Info;
 
@@ -78,7 +78,7 @@ namespace ProcedureNet7
                 if (pendolareDefaultSameProvNoLists)
                     return StatusSedeDecision.Fixed("C", "Stessa provincia ma assente da COMUNI_INSEDE/COMUNI_PENDOLARI/COMUNI_FUORISEDE => pendolare default");
 
-                var dom = DomicilioValidator.Validate(row, aaStart, aaEnd);
+                var dom = DomicilioValidator.Validate(row, aaStart, aaEnd, referenceDate);
                 if (!dom.Presente)
                     return StatusSedeDecision.WithDom("D", "Dati domicilio non presenti => pendolare calcolato (D)", dom);
 
@@ -143,13 +143,20 @@ namespace ProcedureNet7
         // =========================
         private static class DomicilioValidator
         {
-            public static DomResult Validate(StatusSedeStudent row, DateTime aaStart, DateTime aaEnd)
+            public static DomResult Validate(StatusSedeStudent row, DateTime aaStart, DateTime aaEnd, DateTime referenceDate)
             {
+                int minMesiDom = row.MinMesiDomicilioFuoriSede;
+                if(row.Info.InformazioniIscrizione.ConfermaSemestreFiltro == 1)
+                {
+                    minMesiDom = 3;
+                }
+
                 var corrente = ValidateSnapshot(
                     BuildCurrentSnapshot(row.Info),
-                    row.MinMesiDomicilioFuoriSede,
+                    minMesiDom,
                     aaStart,
                     aaEnd,
+                    referenceDate,
                     "DOMICILIO CORRENTE");
 
                 bool hasIstanza = row.HasIstanzaDomicilio && row.IstanzaDomicilio != null;
@@ -158,9 +165,10 @@ namespace ProcedureNet7
 
                 var istanza = ValidateSnapshot(
                     row.IstanzaDomicilio!,
-                    row.MinMesiDomicilioFuoriSede,
+                    minMesiDom,
                     aaStart,
                     aaEnd,
+                    referenceDate,
                     $"ISTANZA APERTA {row.NumIstanzaDomicilio}");
 
                 if (!corrente.Presente && istanza.Presente)
@@ -246,6 +254,7 @@ namespace ProcedureNet7
                 int minMesiDb,
                 DateTime aaStart,
                 DateTime aaEnd,
+                DateTime referenceDate,
                 string source)
             {
                 string comuneDom = (dom.ComuneDomicilio ?? "").Trim();
@@ -316,9 +325,7 @@ namespace ProcedureNet7
                 int mesi = CoveredMonths(effStart, effEnd);
                 if (mesi < min)
                 {
-                    var today = DateTime.Today;
-
-                    if (today <= dom.DataScadenza.Date.AddDays(30))
+                    if (referenceDate.Date <= dom.DataScadenza.Date.AddDays(30))
                     {
                         return new DomResult(
                             true,

@@ -180,6 +180,7 @@ namespace ProcedureNet7
             public string SerieProroga { get; init; } = "";
             public string DenomEnte { get; init; } = "";
             public double ImportoRataEnte { get; init; }
+            public int ConfermaSemestreFiltro { get; init; }
         }
     }
 }

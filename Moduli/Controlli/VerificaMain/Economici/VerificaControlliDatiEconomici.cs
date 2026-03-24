@@ -18,21 +18,16 @@ namespace ProcedureNet7
         private const string TempCfTable = "#CFEstrazione";
         private const string TempTargetsTable = "#TargetsEconomici";
 
-        private string debugCF = "";
         private string _aa = "";
 
         // Adapter tecnico: non contiene più lo stato economico vero.
         // Lo stato vero vive in StudenteInfo.InformazioniEconomiche.
-        private readonly Dictionary<string, EconomicRow> _rows =
-            new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<StudentKey, EconomicRow> _rows = new();
 
         private readonly Dictionary<StudentKey, StudenteInfo> _studentsByKey = new();
-        private readonly Dictionary<string, InformazioniEconomiche> _sharedEconomiciByCf =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, int> _statusInpsOrigineByCf = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<StudentKey, int> _statusInpsOrigineByKey = new();
+        private readonly Dictionary<StudentKey, bool> _coAttestazioneOkByKey = new();
         private readonly Dictionary<string, int> _statusInpsIntegrazioneByCf = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, bool> _coAttestazioneOkByCf = new(StringComparer.OrdinalIgnoreCase);
 
         public DataTable OutputEconomici { get; private set; } = BuildOutputTable();
         public IReadOnlyList<ValutazioneEconomici> OutputEconomiciList { get; private set; } = Array.Empty<ValutazioneEconomici>();
@@ -52,7 +47,9 @@ namespace ProcedureNet7
             _aa = aa;
             _rows.Clear();
             _studentsByKey.Clear();
-            _sharedEconomiciByCf.Clear();
+            _statusInpsOrigineByKey.Clear();
+            _statusInpsIntegrazioneByCf.Clear();
+            _coAttestazioneOkByKey.Clear();
             _targets.Clear();
             OutputEconomici = BuildOutputTable();
             OutputEconomiciList = Array.Empty<ValutazioneEconomici>();
@@ -64,26 +61,21 @@ namespace ProcedureNet7
         {
             foreach (var pair in students)
             {
-                var key = pair.Key;
+                var sourceKey = pair.Key;
                 var info = pair.Value ?? new StudenteInfo();
-                string cf = NormalizeCf(key.CodFiscale);
-                string numDomanda = NormalizeDomanda(key.NumDomanda);
+                string cf = NormalizeCf(sourceKey.CodFiscale);
+                string numDomanda = NormalizeDomanda(sourceKey.NumDomanda);
+                var key = new StudentKey(cf, numDomanda);
 
                 info.InformazioniPersonali.CodFiscale = cf;
                 info.InformazioniPersonali.NumDomanda = numDomanda;
+                info.InformazioniEconomiche ??= new InformazioniEconomiche();
 
-                if (!_sharedEconomiciByCf.TryGetValue(cf, out var sharedEco))
-                {
-                    sharedEco = info.InformazioniEconomiche ?? new InformazioniEconomiche();
-                    _sharedEconomiciByCf[cf] = sharedEco;
-                }
-
-                info.InformazioniEconomiche = sharedEco;
-                _studentsByKey[new StudentKey(cf, numDomanda)] = info;
+                _studentsByKey[key] = info;
                 _targets.Add(new Target(cf, numDomanda));
 
-                if (!_rows.ContainsKey(cf))
-                    _rows[cf] = new EconomicRow(info);
+                if (!_rows.ContainsKey(key))
+                    _rows[key] = new EconomicRow(info);
             }
         }
 
@@ -110,17 +102,11 @@ namespace ProcedureNet7
                 info.InformazioniPersonali.CodFiscale = cf;
                 info.InformazioniPersonali.NumDomanda = numDomanda;
 
-                if (!_sharedEconomiciByCf.TryGetValue(cf, out var sharedEco))
-                {
-                    sharedEco = info.InformazioniEconomiche ?? new InformazioniEconomiche();
-                    _sharedEconomiciByCf[cf] = sharedEco;
-                }
-
-                info.InformazioniEconomiche = sharedEco;
+                info.InformazioniEconomiche ??= new InformazioniEconomiche();
                 _studentsByKey[key] = info;
 
-                if (!_rows.ContainsKey(cf))
-                    _rows[cf] = new EconomicRow(info);
+                if (!_rows.ContainsKey(key))
+                    _rows[key] = new EconomicRow(info);
             }
         }
 
@@ -129,5 +115,11 @@ namespace ProcedureNet7
 
         private static string NormalizeDomanda(string? value)
             => Utilities.RemoveAllSpaces((value ?? "").Trim());
+
+        private static StudentKey BuildStudentKey(string? codFiscale, string? numDomanda)
+            => new StudentKey(NormalizeCf(codFiscale), NormalizeDomanda(numDomanda));
+
+        private bool TryGetEconomicRow(string? codFiscale, string? numDomanda, out EconomicRow economicRow)
+            => _rows.TryGetValue(BuildStudentKey(codFiscale, numDomanda), out economicRow!);
     }
 }

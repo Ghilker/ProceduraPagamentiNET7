@@ -14,6 +14,7 @@ namespace ProcedureNet7
         private bool _collectionCompleted;
         private bool _calculationCompleted;
         private string _selectedAA = "";
+        private DateTime _referenceDate = DateTime.Today.Date;
 
         public ControlloStatusSede(SqlConnection conn)
         {
@@ -24,6 +25,11 @@ namespace ProcedureNet7
         public IReadOnlyList<ValutazioneStatusSede> OutputStatusSedeList { get; private set; } = Array.Empty<ValutazioneStatusSede>();
 
         public DataTable Compute(string aa) => Compute(aa, includeEsclusi: false, includeNonTrasmesse: false);
+
+        public void SetReferenceDate(DateTime referenceDate)
+        {
+            _referenceDate = referenceDate.Date;
+        }
 
         public DataTable Compute(string aa, bool includeEsclusi, bool includeNonTrasmesse)
         {
@@ -97,7 +103,7 @@ namespace ProcedureNet7
 
             foreach (var inputRow in _collectedInputs)
             {
-                var decision = evaluator.Evaluate(inputRow, aaStart, aaEnd);
+                var decision = evaluator.Evaluate(inputRow, aaStart, aaEnd, _referenceDate);
 
                 inputRow.Info.InformazioniSede.StatusSedeSuggerito = decision.SuggestedStatus;
                 inputRow.Info.InformazioniSede.MotivoStatusSede = decision.Reason;

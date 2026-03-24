@@ -184,13 +184,15 @@ namespace ProcedureNet7
             string cf = NormalizeCf(info.InformazioniPersonali.CodFiscale);
             var eco = info.InformazioniEconomiche;
 
-            if (_statusInpsOrigineByCf.TryGetValue(cf, out var inpsOrigine))
+            var key = BuildStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+
+            if (_statusInpsOrigineByKey.TryGetValue(key, out var inpsOrigine))
                 eco.StatusInpsOrigine = inpsOrigine;
 
             if (_statusInpsIntegrazioneByCf.TryGetValue(cf, out var inpsIntegrazione))
                 eco.StatusInpsIntegrazione = inpsIntegrazione;
 
-            if (_coAttestazioneOkByCf.TryGetValue(cf, out var coOk))
+            if (_coAttestazioneOkByKey.TryGetValue(key, out var coOk))
                 eco.CoAttestazioneOk = coOk;
         }
     }

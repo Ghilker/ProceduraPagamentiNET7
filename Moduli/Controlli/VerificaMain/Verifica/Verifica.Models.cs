@@ -19,6 +19,7 @@ namespace ProcedureNet7.Verifica
         public bool IncludeEsclusi { get; set; }
         public bool IncludeNonTrasmesse { get; set; }
         public string TempCandidatesTable { get; set; } = "#SS_Candidates";
+        public DateTime ReferenceDate { get; set; } = DateTime.Today.Date;
 
         public List<VerificaCandidate> Candidates { get; } = new();
         public Dictionary<StudentKey, StudenteInfo> Students { get; } = new();

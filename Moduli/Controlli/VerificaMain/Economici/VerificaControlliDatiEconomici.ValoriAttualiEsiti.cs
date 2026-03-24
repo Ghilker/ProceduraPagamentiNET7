@@ -16,6 +16,7 @@ namespace ProcedureNet7
             const string sql = @"
 SELECT
     t.Cod_fiscale,
+    t.Num_domanda,
     vv.ISPEDSU,
     vv.ISEDSU,
     vv.SEQ,
@@ -33,11 +34,10 @@ LEFT JOIN vValori_calcolati vv
             while (reader.Read())
             {
                 string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                if (string.IsNullOrWhiteSpace(codFiscale)) continue;
+                string numDomanda = reader.SafeGetString("Num_domanda");
+                if (string.IsNullOrWhiteSpace(codFiscale) || string.IsNullOrWhiteSpace(numDomanda)) continue;
 
-                if (codFiscale == debugCF) { string _ = ""; }
-
-                if (!_rows.TryGetValue(codFiscale, out var economicRow)) continue;
+                if (!TryGetEconomicRow(codFiscale, numDomanda, out var economicRow)) continue;
 
                 economicRow.ISPEDSU_Attuale = reader.SafeGetDouble("ISPEDSU");
                 economicRow.ISEDSU_Attuale = reader.SafeGetDouble("ISEDSU");
@@ -61,21 +61,21 @@ WITH EsitoBS AS
     SELECT
         ec.Anno_accademico,
         ec.Num_domanda,
-        MAX(ec.Cod_tipo_esito) AS Cod_tipo_esito,
-        MAX(ec.imp_beneficio) AS imp_assegnato
+        ec.Cod_tipo_esito,
+        ec.imp_beneficio AS imp_assegnato
     FROM vEsiti_concorsi ec
     WHERE ec.Anno_accademico = @AA
       AND ec.Cod_beneficio = 'BS'
-    GROUP BY ec.Anno_accademico, ec.Num_domanda
 )
 SELECT
     t.Cod_fiscale,
+    t.Num_domanda,
     e.Cod_tipo_esito,
     e.imp_assegnato
 FROM #TargetsEconomici t
 LEFT JOIN EsitoBS e
     ON e.Anno_accademico = @AA
-   AND e.Num_domanda     = t.Num_domanda;";
+   AND e.Num_domanda     = t.Num_domanda";
 
             using var command = new SqlCommand(sql, _conn);
             command.Parameters.AddWithValue("@AA", aa);
@@ -84,11 +84,10 @@ LEFT JOIN EsitoBS e
             while (reader.Read())
             {
                 string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                if (string.IsNullOrWhiteSpace(codFiscale)) continue;
+                string numDomanda = reader.SafeGetString("Num_domanda");
+                if (string.IsNullOrWhiteSpace(codFiscale) || string.IsNullOrWhiteSpace(numDomanda)) continue;
 
-                if (codFiscale == debugCF) { string _ = ""; }
-
-                if (!_rows.TryGetValue(codFiscale, out var economicRow)) continue;
+                if (!TryGetEconomicRow(codFiscale, numDomanda, out var economicRow)) continue;
 
                 object rawEsito = reader["Cod_tipo_esito"];
                 int? codTipoEsito = rawEsito is DBNull or null ? (int?)null : Convert.ToInt32(rawEsito, CultureInfo.InvariantCulture);
