@@ -19,6 +19,7 @@ namespace ProcedureNet7.Verifica
         public IReadOnlyList<StudenteInfo> OutputVerificaList { get; private set; } = Array.Empty<StudenteInfo>();
         public DataTable OutputVerifica { get; private set; } = BuildOutputTable();
         public IReadOnlyList<StudenteInfo> StudentiInfoList { get; private set; } = Array.Empty<StudenteInfo>();
+        public DataTable OutputCarrieraPregressa { get; private set; } = BuildCarrieraPregressaOutputTable();
 
         public override void RunProcedure(ArgsVerifica args)
         {
@@ -35,6 +36,7 @@ namespace ProcedureNet7.Verifica
             {
                 OutputVerificaList = Array.Empty<StudenteInfo>();
                 OutputVerifica = BuildOutputTable();
+                OutputCarrieraPregressa = BuildCarrieraPregressaOutputTable();
                 Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath);
                 return;
             }
@@ -63,6 +65,7 @@ namespace ProcedureNet7.Verifica
                 OutputVerificaList = context.OrderedStudents;
                 StudentiInfoList = OutputVerificaList;
                 OutputVerifica = ToDataTable(OutputVerificaList);
+                OutputCarrieraPregressa = ToCarrieraPregressaDataTable(OutputVerificaList);
                 Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath);
             }
             finally
@@ -104,7 +107,9 @@ namespace ProcedureNet7.Verifica
             return new IVerificaModule<VerificaPipelineContext>[]
             {
                 new EconomiciVerificaModule(new VerificaControlliDatiEconomici(context.Connection)),
-                new StatusSedeVerificaModule(new ControlloStatusSede(context.Connection))
+                new StatusSedeVerificaModule(new ControlloStatusSede(context.Connection)),
+                new IscrizioneVerificaModule(),
+                new ImportoBorsaVerificaModule(new CalcoloImportoBorsa())
             };
         }
 

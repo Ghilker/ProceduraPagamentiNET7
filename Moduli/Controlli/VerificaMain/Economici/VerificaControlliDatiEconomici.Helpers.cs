@@ -134,7 +134,7 @@ LEFT JOIN vCertificaz_ISEE cte
         private void LoadCalcParams(string aa)
         {
             const string sql = @"
-SELECT Franchigia, tasso_rendimento_pat_mobiliare, franchigia_pat_mobiliare
+SELECT Franchigia, tasso_rendimento_pat_mobiliare, franchigia_pat_mobiliare, Importo_borsa_A, Importo_borsa_B, Importo_borsa_C, Soglia_Isee
 FROM DatiGenerali_con
 WHERE Anno_accademico = @AA;";
 
@@ -147,6 +147,10 @@ WHERE Anno_accademico = @AA;";
                 _calc.Franchigia = reader.SafeGetDecimal("Franchigia");
                 _calc.RendPatr = reader.SafeGetDecimal("tasso_rendimento_pat_mobiliare");
                 _calc.FranchigiaPatMob = reader.SafeGetDecimal("franchigia_pat_mobiliare");
+                _calc.ImportoBorsaA = reader.SafeGetDecimal("Importo_borsa_A");
+                _calc.ImportoBorsaB = reader.SafeGetDecimal("Importo_borsa_B");
+                _calc.ImportoBorsaC = reader.SafeGetDecimal("Importo_borsa_C");
+                _calc.SogliaIsee = reader.SafeGetDecimal("Soglia_Isee");
             }
         }
 

@@ -17,5 +17,6 @@ namespace ProcedureNet7
         public bool RichiestaPA { get; set; }
         public bool RinunciaPA { get; set; }
         public bool HaServizioSanitario { get; set; }
+        public bool ConcessaMonetizzazioneMensa {  get; set; }
     }
 }

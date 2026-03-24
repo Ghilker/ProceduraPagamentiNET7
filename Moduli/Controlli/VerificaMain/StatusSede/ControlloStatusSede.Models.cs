@@ -47,9 +47,14 @@ namespace ProcedureNet7
                 studenteInfo.InformazioniPersonali.CodFiscale = codFiscale;
                 studenteInfo.InformazioniSede.StatusSede = record.SafeGetString("StatusSedeAttuale").Trim().ToUpperInvariant();
                 studenteInfo.InformazioniSede.ForzaturaStatusSede = record.SafeGetString("ForcedStatus").Trim().ToUpperInvariant();
+                studenteInfo.InformazioniPersonali.Sesso = record.SafeGetString("StudenteSesso").Trim().ToUpperInvariant();
                 bool alwaysA = record.SafeGetBool("AlwaysA");
                 bool rifugiatoPolitico = record.SafeGetBool("RifugiatoPolitico");
                 studenteInfo.InformazioniPersonali.Rifugiato = rifugiatoPolitico;
+                bool concessaMonetizzazione = record.SafeGetBool("ConcessaMonetizzazione");
+                studenteInfo.InformazioniBeneficio.ConcessaMonetizzazioneMensa = concessaMonetizzazione;
+                bool invalido = record.SafeGetBool("Invalido");
+                studenteInfo.InformazioniPersonali.Disabile = invalido;
                 int numeroComponentiNucleo = record.SafeGetInt("NumComponenti");
                 int numeroComponentiNucleoEstero = record.SafeGetInt("NumConvEstero");
                 studenteInfo.SetNucleoFamiliare(numeroComponentiNucleo, numeroComponentiNucleoEstero);
@@ -64,6 +69,7 @@ namespace ProcedureNet7
                 studenteInfo.InformazioniIscrizione.CodFacolta = record.SafeGetString("CodFacolta").Trim();
                 studenteInfo.InformazioniIscrizione.ComuneSedeStudi = record.SafeGetString("ComuneSedeStudi").Trim();
                 studenteInfo.InformazioniIscrizione.ProvinciaSedeStudi = record.SafeGetString("ProvinciaSede").Trim().ToUpperInvariant();
+                studenteInfo.InformazioniIscrizione.CorsoStem = record.SafeGetBool("Stem");
 
                 bool inSedeList = record.SafeGetBool("InSedeList");
                 bool pendolareList = record.SafeGetBool("PendolareList");

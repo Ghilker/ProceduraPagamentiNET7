@@ -109,11 +109,28 @@ Forzature AS
       AND f.Status_sede IN ('A','B','C','D')
 ),
 
+StudenteEstrazione AS
+(
+    SELECT Sesso as StudenteSesso, UPPER(LTRIM(RTRIM(s.Cod_Fiscale))) AS CodFiscale
+    FROM Studente S
+    JOIN D ON D.CodFiscale = UPPER(LTRIM(RTRIM(S.Cod_Fiscale)))
+),
+
+MonetizzazioneMensa AS
+(
+    SELECT UPPER(LTRIM(RTRIM(mm.Cod_Fiscale))) AS CodFiscale, 
+        CAST(CASE WHEN ISNULL(mm.Concessa_monetizzazione,0) = 1 THEN 1 ELSE 0 END AS BIT) AS ConcessaMonetizzazione
+    FROM vMonetizzazione_Mensa mm 
+    JOIN D on D.CodFiscale = UPPER(LTRIM(RTRIM(mm.Cod_Fiscale))) 
+        AND D.NumDomanda = mm.Num_Domanda
+),
+
 DG AS
 (
     SELECT
         CAST(v.Num_domanda AS INT) AS NumDomanda,
-        CAST(CASE WHEN ISNULL(v.Rifug_politico,0) = 1 THEN 1 ELSE 0 END AS BIT) AS RifugiatoPolitico
+        CAST(CASE WHEN ISNULL(v.Rifug_politico,0) = 1 THEN 1 ELSE 0 END AS BIT) AS RifugiatoPolitico,
+        CAST(CASE WHEN ISNULL(v.Invalido,0) = 1 THEN 1 ELSE 0 END AS BIT) AS Invalido
     FROM vDATIGENERALI_dom v
     JOIN D ON D.NumDomanda = v.Num_domanda
     WHERE v.Anno_accademico = @AA
@@ -150,6 +167,7 @@ ISCR AS
         i.Cod_corso_laurea AS CodCorso,
         i.Cod_facolta AS CodFacolta,
         i.Cod_tipologia_studi AS CodTipoStudi,
+        CAST(ISNULL(cl.Corso_stem,0) AS INT) AS Stem,
         -- normalizzo distaccata: NULL/'' => '00000'
         CASE
             WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.Cod_sede_distaccata,''))), '') IS NULL THEN '00000'
@@ -332,10 +350,13 @@ SELECT
 
     ISNULL(vv.Status_sede,'') AS StatusSedeAttuale,
     ISNULL(f.ForcedStatus,'') AS ForcedStatus,
+    ISNULL(s.StudenteSesso,'') AS StudenteSesso,
 
     ISNULL(i.AlwaysA, CAST(0 AS BIT)) AS AlwaysA,
 
     ISNULL(dg.RifugiatoPolitico, CAST(0 AS BIT)) AS RifugiatoPolitico,
+    ISNULL(mm.ConcessaMonetizzazione, CAST(0 AS BIT)) AS ConcessaMonetizzazione,
+    ISNULL(dg.Invalido, CAST(0 AS BIT)) AS Invalido,
     ISNULL(nf.NumComponenti,0) AS NumComponenti,
     ISNULL(nf.NumConvEstero,0) AS NumConvEstero,
 
@@ -348,6 +369,7 @@ SELECT
     ISNULL(i.CodFacolta,'') AS CodFacolta,
     ISNULL(i.ComuneSedeStudi,'') AS ComuneSedeStudi,
     ISNULL(i.CodTipoStudi, '') AS CodTipoStudi,
+    ISNULL(i.Stem, CAST(0 AS BIT)) AS Stem,
     UPPER(ISNULL(ps.ProvinciaSede,'')) AS ProvinciaSede,
 
     -- IN SEDE: match per cod_sede_studi OR cod_sede_distaccata (NULL/'00000' gestito)
@@ -446,6 +468,10 @@ LEFT JOIN VV vv
        ON vv.NumDomanda = D.NumDomanda
 LEFT JOIN Forzature f
        ON f.CodFiscale = D.CodFiscale
+LEFT JOIN StudenteEstrazione s
+       ON s.CodFiscale = D.CodFiscale
+LEFT JOIN MonetizzazioneMensa mm
+       ON mm.CodFiscale = D.CodFiscale
 LEFT JOIN DG dg
        ON dg.NumDomanda = D.NumDomanda
 LEFT JOIN NF nf
@@ -503,11 +529,28 @@ Forzature AS
       AND f.Status_sede IN ('A','B','C','D')
 ),
 
+StudenteEstrazione AS
+(
+    SELECT Sesso as StudenteSesso, UPPER(LTRIM(RTRIM(s.Cod_Fiscale))) AS CodFiscale
+    FROM Studente S
+    JOIN D ON D.CodFiscale = UPPER(LTRIM(RTRIM(S.Cod_Fiscale)))
+),
+
+MonetizzazioneMensa AS
+(
+    SELECT UPPER(LTRIM(RTRIM(mm.Cod_Fiscale))) AS CodFiscale, 
+        CAST(CASE WHEN ISNULL(mm.Concessa_monetizzazione,0) = 1 THEN 1 ELSE 0 END AS BIT) AS ConcessaMonetizzazione
+    FROM vMonetizzazione_Mensa mm 
+    JOIN D on D.CodFiscale = UPPER(LTRIM(RTRIM(mm.Cod_Fiscale))) 
+        AND D.NumDomanda = mm.Num_Domanda
+),
+
 DG AS
 (
     SELECT
         CAST(v.Num_domanda AS INT) AS NumDomanda,
-        CAST(CASE WHEN ISNULL(v.Rifug_politico,0) = 1 THEN 1 ELSE 0 END AS BIT) AS RifugiatoPolitico
+        CAST(CASE WHEN ISNULL(v.Rifug_politico,0) = 1 THEN 1 ELSE 0 END AS BIT) AS RifugiatoPolitico,
+        CAST(CASE WHEN ISNULL(v.Invalido,0) = 1 THEN 1 ELSE 0 END AS BIT) AS Invalido
     FROM vDATIGENERALI_dom v
     JOIN D ON D.NumDomanda = v.Num_domanda
     WHERE v.Anno_accademico = @AA
@@ -544,6 +587,7 @@ ISCR AS
         i.Cod_corso_laurea AS CodCorso,
         i.Cod_facolta AS CodFacolta,
         i.Cod_tipologia_studi AS CodTipoStudi,
+        CAST(ISNULL(cl.Corso_stem,0) AS INT) AS Stem,
         CASE
             WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.Cod_sede_distaccata,''))), '') IS NULL THEN '00000'
             ELSE LTRIM(RTRIM(cl.Cod_sede_distaccata))
@@ -721,10 +765,13 @@ SELECT
 
     ISNULL(vv.Status_sede,'') AS StatusSedeAttuale,
     ISNULL(f.ForcedStatus,'') AS ForcedStatus,
+    ISNULL(s.StudenteSesso,'') AS StudenteSesso,
 
     ISNULL(i.AlwaysA, CAST(0 AS BIT)) AS AlwaysA,
 
     ISNULL(dg.RifugiatoPolitico, CAST(0 AS BIT)) AS RifugiatoPolitico,
+    ISNULL(mm.ConcessaMonetizzazione, CAST(0 AS BIT)) AS ConcessaMonetizzazione,
+    ISNULL(dg.Invalido, CAST(0 AS BIT)) AS Invalido,
     ISNULL(nf.NumComponenti,0) AS NumComponenti,
     ISNULL(nf.NumConvEstero,0) AS NumConvEstero,
 
@@ -737,6 +784,7 @@ SELECT
     ISNULL(i.CodFacolta,'') AS CodFacolta,
     ISNULL(i.ComuneSedeStudi,'') AS ComuneSedeStudi,
     ISNULL(i.CodTipoStudi, '') AS CodTipoStudi,
+    ISNULL(i.Stem, CAST(0 AS BIT)) AS Stem,
     UPPER(ISNULL(ps.ProvinciaSede,'')) AS ProvinciaSede,
 
     CAST(
@@ -832,6 +880,10 @@ LEFT JOIN VV vv
        ON vv.NumDomanda = D.NumDomanda
 LEFT JOIN Forzature f
        ON f.CodFiscale = D.CodFiscale
+LEFT JOIN StudenteEstrazione s
+       ON s.CodFiscale = D.CodFiscale
+LEFT JOIN MonetizzazioneMensa mm
+       ON mm.CodFiscale = D.CodFiscale
 LEFT JOIN DG dg
        ON dg.NumDomanda = D.NumDomanda
 LEFT JOIN NF nf

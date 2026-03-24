@@ -23,6 +23,7 @@ namespace ProcedureNet7.Verifica
         public List<VerificaCandidate> Candidates { get; } = new();
         public Dictionary<StudentKey, StudenteInfo> Students { get; } = new();
         public HashSet<StudentKey> CandidateKeys { get; } = new();
+        public CalcParams CalcParams { get; set; } = new();
 
         public IReadOnlyList<StudenteInfo> OrderedStudents =>
             Students

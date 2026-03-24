@@ -1,24 +1,22 @@
-using ProcedureNet7.Modules.Contracts;
+﻿using ProcedureNet7.Modules.Contracts;
 using System;
 
 namespace ProcedureNet7.Verifica.Modules
 {
-    internal sealed class EconomiciVerificaModule : IVerificaModule<VerificaPipelineContext>
+    internal sealed class ImportoBorsaVerificaModule : IVerificaModule<VerificaPipelineContext>
     {
-        private readonly VerificaControlliDatiEconomici _service;
+        private readonly CalcoloImportoBorsa _service;
 
-        public EconomiciVerificaModule(VerificaControlliDatiEconomici service)
+        public ImportoBorsaVerificaModule(CalcoloImportoBorsa service)
         {
             _service = service ?? throw new ArgumentNullException(nameof(service));
         }
 
-        public string Name => "Economici";
+        public string Name => "ImportoBorsa";
 
         public void Collect(VerificaPipelineContext context)
         {
-            _service.Collect(context.AnnoAccademico, context.Students);
-
-            context.CalcParams = _service.GetCalcParams();
+            _service.Collect(context.CalcParams, context.Students);
         }
 
         public void Calculate(VerificaPipelineContext context)

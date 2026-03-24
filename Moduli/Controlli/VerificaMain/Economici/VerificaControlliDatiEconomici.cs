@@ -37,14 +37,12 @@ namespace ProcedureNet7
         public DataTable OutputEconomici { get; private set; } = BuildOutputTable();
         public IReadOnlyList<ValutazioneEconomici> OutputEconomiciList { get; private set; } = Array.Empty<ValutazioneEconomici>();
 
-        private sealed class CalcParams
-        {
-            public decimal Franchigia { get; set; }
-            public decimal RendPatr { get; set; }
-            public decimal FranchigiaPatMob { get; set; }
-        }
-
         private readonly CalcParams _calc = new();
+
+        public CalcParams GetCalcParams()
+        {
+            return _calc.Clone();
+        }
         private readonly List<Target> _targets = new();
         private bool _collectionCompleted;
         private bool _calculationCompleted;

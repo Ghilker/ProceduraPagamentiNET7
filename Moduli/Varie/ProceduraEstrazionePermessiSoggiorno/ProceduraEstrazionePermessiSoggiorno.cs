@@ -52,7 +52,7 @@ WITH base AS (
     INNER JOIN Domanda AS d
         ON vs.Cod_fiscale = d.Cod_fiscale
        AND d.Anno_accademico IN (20252026, 20242025, 20232024)
-       AND d.Tipo_bando = 'lz'
+       AND d.Tipo_bando like 'l%'
     INNER JOIN vEsiti_concorsi AS ve
         ON d.Num_domanda = ve.Num_domanda
        AND ve.Cod_beneficio = 'bs'
@@ -85,7 +85,7 @@ WITH base AS (
     INNER JOIN Domanda AS d
         ON vs.Cod_fiscale = d.Cod_fiscale
        AND d.Anno_accademico IN (20252026, 20242025, 20232024)
-       AND d.Tipo_bando = 'lz'
+       AND d.Tipo_bando like 'l%'
     INNER JOIN vEsiti_concorsi AS ve
         ON d.Num_domanda = ve.Num_domanda
        AND ve.Cod_beneficio = 'pa'

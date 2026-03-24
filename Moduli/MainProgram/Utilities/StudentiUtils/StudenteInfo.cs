@@ -14,6 +14,7 @@ namespace ProcedureNet7
         public InformazioniConto InformazioniConto { get; set; } = new InformazioniConto();
         public InformazioniSede InformazioniSede { get; set; } = new InformazioniSede();
         public InformazioniEconomiche InformazioniEconomiche { get; set; } = new InformazioniEconomiche();
+        public InformazioniImportoBorsa InformazioniImportoBorsa { get; set; } = new InformazioniImportoBorsa();
         public Dictionary<string, string> MessaggiErrore { get; set; } = new Dictionary<string, string>();
         public void SetLuogoNascita(string codComune, string nomeComune, string provincia)
         {
