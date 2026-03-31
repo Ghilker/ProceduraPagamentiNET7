@@ -536,67 +536,106 @@ ORDER BY D.CodFiscale, D.NumDomanda, TRY_CONVERT(INT, cp.Anno_avvenimento), CONV
             }
         }
 
-        private static void LoadBaseIscrizione(VerificaPipelineContext context)
+        private void LoadBaseIscrizione(VerificaPipelineContext context)
         {
             string sql = BaseIscrizioneSql.Replace("{TEMP_TABLE}", context.TempPipelineTable);
 
             using var cmd = new SqlCommand(sql, context.Connection) { CommandTimeout = 999999 };
             cmd.Parameters.AddWithValue("@AA", context.AnnoAccademico);
 
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                string cf = reader.SafeGetString("CodFiscale").Trim().ToUpperInvariant();
-                string numDomanda = reader.SafeGetInt("NumDomanda").ToString(CultureInfo.InvariantCulture) ?? "";
-                var key = new StudentKey(cf, numDomanda);
-                if (!context.Students.TryGetValue(key, out var info))
-                    continue;
+            var dtoMap = ReadDtoMap(
+                cmd,
+                ReadIscrizioneKey,
+                static () => new BaseIscrizioneDto(),
+                ReadBaseIscrizioneDto,
+                out var readCount,
+                context.Students.ContainsKey,
+                context.Students.Count);
 
-                var iscr = info.InformazioniIscrizione;
-                iscr.TipoBando = reader.SafeGetString("TipoBando");
-                SetIfPresent(reader.SafeGetInt("Anno_corso"), value => iscr.AnnoCorso = value);
-                iscr.CodCorsoLaurea = reader.SafeGetString("Cod_corso_laurea");
-                iscr.CodFacolta = reader.SafeGetString("Cod_facolta");
-                iscr.CodSedeStudi = reader.SafeGetString("Cod_sede_studi");
-                SetIfPresent(reader.SafeGetString("Cod_tipologia_studi"), value =>
-                {
-                    if (TryParseInt(value, out var tipoCorso))
-                        iscr.TipoCorso = tipoCorso;
-                });
-                iscr.CreditiTirocinio = reader.SafeGetDecimal("Crediti_tirocinio");
-                iscr.CreditiRiconosciuti = reader.SafeGetDecimal("Crediti_riconosciuti");
-                iscr.ConfermaSemestreFiltro = reader.SafeGetInt("Conferma_semestre_filtro");
-                iscr.CodSedeDistaccata = reader.SafeGetString("Cod_sede_distaccata");
-                iscr.CodEnte = reader.SafeGetString("Cod_ente");
-                iscr.AnnoImmatricolazione = reader.SafeGetInt("Anno_immatricolaz");
-                iscr.NumeroEsami = reader.SafeGetInt("Numero_esami");
-                iscr.NumeroCrediti = reader.SafeGetDecimal("Numero_crediti");
-                iscr.SommaVoti = reader.SafeGetDecimal("Somma_voti");
-                iscr.UtilizzoBonus = reader.SafeGetInt("Utilizzo_bonus");
-                iscr.CreditiUtilizzati = reader.SafeGetDecimal("Crediti_utilizzati");
-                iscr.CreditiRimanenti = reader.SafeGetDecimal("Crediti_rimanenti");
-                iscr.CreditiRiconosciutiDaRinuncia = reader.SafeGetDecimal("Crediti_riconosciuti_da_rinuncia");
-                iscr.AACreditiRiconosciuti = reader.SafeGetString("AACreditiRiconosciuti");
-            }
+            MergeDtoMap(dtoMap, context.Students, ApplyBaseIscrizioneDto);
         }
 
-        private static void LoadCarrieraPregressa(VerificaPipelineContext context)
+        private void LoadCarrieraPregressa(VerificaPipelineContext context)
         {
             string sql = CarrieraPregressaSql.Replace("{TEMP_TABLE}", context.TempPipelineTable);
 
             using var cmd = new SqlCommand(sql, context.Connection) { CommandTimeout = 999999 };
             cmd.Parameters.AddWithValue("@AA", context.AnnoAccademico);
 
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                string cf = reader.SafeGetString("CodFiscale").Trim().ToUpperInvariant();
-                string numDomanda = reader.SafeGetInt("NumDomanda").ToString(CultureInfo.InvariantCulture) ?? "";
-                var key = new StudentKey(cf, numDomanda);
-                if (!context.Students.TryGetValue(key, out var info))
-                    continue;
+            var dtoRows = ReadDtoList(
+                cmd,
+                ReadIscrizioneKey,
+                ReadCarrieraPregressaDto,
+                out var readCount,
+                context.Students.ContainsKey);
 
-                info.InformazioniIscrizione.CarrierePregresse.Add(new InformazioniCarrieraPregressa
+            MergeDtoList(dtoRows, context.Students, static (info, dto) => info.InformazioniIscrizione.CarrierePregresse.Add(dto.Item));
+        }
+
+        private static StudentKey ReadIscrizioneKey(SqlDataReader reader)
+        {
+            string cf = NormalizeCf(reader.SafeGetString("CodFiscale"));
+            string numDomanda = reader.SafeGetInt("NumDomanda").ToString(CultureInfo.InvariantCulture);
+            return new StudentKey(cf, numDomanda);
+        }
+
+        private static void ReadBaseIscrizioneDto(SqlDataReader reader, BaseIscrizioneDto dto)
+        {
+            dto.TipoBando = reader.SafeGetString("TipoBando");
+            dto.AnnoCorso = reader.SafeGetInt("Anno_corso");
+            dto.CodCorsoLaurea = reader.SafeGetString("Cod_corso_laurea");
+            dto.CodFacolta = reader.SafeGetString("Cod_facolta");
+            dto.CodSedeStudi = reader.SafeGetString("Cod_sede_studi");
+            dto.CodTipologiaStudi = reader.SafeGetString("Cod_tipologia_studi");
+            dto.CreditiTirocinio = reader.SafeGetDecimal("Crediti_tirocinio");
+            dto.CreditiRiconosciuti = reader.SafeGetDecimal("Crediti_riconosciuti");
+            dto.ConfermaSemestreFiltro = reader.SafeGetInt("Conferma_semestre_filtro");
+            dto.CodSedeDistaccata = reader.SafeGetString("Cod_sede_distaccata");
+            dto.CodEnte = reader.SafeGetString("Cod_ente");
+            dto.AnnoImmatricolazione = reader.SafeGetInt("Anno_immatricolaz");
+            dto.NumeroEsami = reader.SafeGetInt("Numero_esami");
+            dto.NumeroCrediti = reader.SafeGetDecimal("Numero_crediti");
+            dto.SommaVoti = reader.SafeGetDecimal("Somma_voti");
+            dto.UtilizzoBonus = reader.SafeGetInt("Utilizzo_bonus");
+            dto.CreditiUtilizzati = reader.SafeGetDecimal("Crediti_utilizzati");
+            dto.CreditiRimanenti = reader.SafeGetDecimal("Crediti_rimanenti");
+            dto.CreditiRiconosciutiDaRinuncia = reader.SafeGetDecimal("Crediti_riconosciuti_da_rinuncia");
+            dto.AACreditiRiconosciuti = reader.SafeGetString("AACreditiRiconosciuti");
+        }
+
+        private static void ApplyBaseIscrizioneDto(StudenteInfo info, BaseIscrizioneDto dto)
+        {
+            var iscr = info.InformazioniIscrizione;
+            iscr.TipoBando = dto.TipoBando;
+            SetIfPresent(dto.AnnoCorso, value => iscr.AnnoCorso = value);
+            iscr.CodCorsoLaurea = dto.CodCorsoLaurea;
+            iscr.CodFacolta = dto.CodFacolta;
+            iscr.CodSedeStudi = dto.CodSedeStudi;
+            SetIfPresent(dto.CodTipologiaStudi, value =>
+            {
+                if (TryParseInt(value, out var tipoCorso))
+                    iscr.TipoCorso = tipoCorso;
+            });
+            iscr.CreditiTirocinio = dto.CreditiTirocinio;
+            iscr.CreditiRiconosciuti = dto.CreditiRiconosciuti;
+            iscr.ConfermaSemestreFiltro = dto.ConfermaSemestreFiltro;
+            iscr.CodSedeDistaccata = dto.CodSedeDistaccata;
+            iscr.CodEnte = dto.CodEnte;
+            iscr.AnnoImmatricolazione = dto.AnnoImmatricolazione;
+            iscr.NumeroEsami = dto.NumeroEsami;
+            iscr.NumeroCrediti = dto.NumeroCrediti;
+            iscr.SommaVoti = dto.SommaVoti;
+            iscr.UtilizzoBonus = dto.UtilizzoBonus;
+            iscr.CreditiUtilizzati = dto.CreditiUtilizzati;
+            iscr.CreditiRimanenti = dto.CreditiRimanenti;
+            iscr.CreditiRiconosciutiDaRinuncia = dto.CreditiRiconosciutiDaRinuncia;
+            iscr.AACreditiRiconosciuti = dto.AACreditiRiconosciuti;
+        }
+
+        private static CarrieraPregressaDto ReadCarrieraPregressaDto(SqlDataReader reader)
+            => new CarrieraPregressaDto
+            {
+                Item = new InformazioniCarrieraPregressa
                 {
                     CodAvvenimento = reader.SafeGetString("Cod_avvenimento"),
                     AnnoAvvenimento = reader.SafeGetInt("Anno_avvenimento"),
@@ -616,8 +655,36 @@ ORDER BY D.CodFiscale, D.NumDomanda, TRY_CONVERT(INT, cp.Anno_avvenimento), CONV
                     CodComuneAteneo = reader.SafeGetString("CodComune_Ateneo"),
                     CodAteneo = reader.SafeGetString("CodAteneo"),
                     ConfermaSemestreFiltroDi = reader.SafeGetInt("Iscritto_semestre_filtroDI")
-                });
-            }
+                }
+            };
+
+        private sealed class BaseIscrizioneDto
+        {
+            public string TipoBando { get; set; } = string.Empty;
+            public int? AnnoCorso { get; set; }
+            public string CodCorsoLaurea { get; set; } = string.Empty;
+            public string CodFacolta { get; set; } = string.Empty;
+            public string CodSedeStudi { get; set; } = string.Empty;
+            public string CodTipologiaStudi { get; set; } = string.Empty;
+            public decimal? CreditiTirocinio { get; set; }
+            public decimal? CreditiRiconosciuti { get; set; }
+            public int ConfermaSemestreFiltro { get; set; }
+            public string CodSedeDistaccata { get; set; } = string.Empty;
+            public string CodEnte { get; set; } = string.Empty;
+            public int? AnnoImmatricolazione { get; set; }
+            public int? NumeroEsami { get; set; }
+            public decimal? NumeroCrediti { get; set; }
+            public decimal? SommaVoti { get; set; }
+            public int UtilizzoBonus { get; set; }
+            public decimal? CreditiUtilizzati { get; set; }
+            public decimal? CreditiRimanenti { get; set; }
+            public decimal? CreditiRiconosciutiDaRinuncia { get; set; }
+            public string AACreditiRiconosciuti { get; set; } = string.Empty;
+        }
+
+        private sealed class CarrieraPregressaDto
+        {
+            public InformazioniCarrieraPregressa Item { get; set; } = new InformazioniCarrieraPregressa();
         }
 
         private static void BuildCarrieraPregressaAggregate(VerificaPipelineContext context)

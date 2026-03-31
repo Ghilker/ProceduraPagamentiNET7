@@ -79,17 +79,18 @@ LEFT JOIN vStatus_INPS si
 
             using (var command = new SqlCommand(sqlOrig, _conn))
             {
-                command.Parameters.AddWithValue("@AA", aa);
+                command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
 
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
-                {
-                    string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                    if (string.IsNullOrWhiteSpace(codFiscale)) continue;
+                var dtoMap = ReadDtoMap(
+                    command,
+                    static reader => ReadStudentKey(reader),
+                    static () => new EconomiciInpsAttestazioniDto(),
+                    static (reader, dto) => dto.StatusInpsOrigine = reader.SafeGetInt("status_inps"),
+                    out var readCount,
+                    _studentsByKey.ContainsKey,
+                    _studentsByKey.Count);
 
-                    int statusInps = reader.SafeGetInt("status_inps");
-                    GetEconomicInfo(CreateStudentKey(codFiscale, reader.SafeGetString("Num_domanda"))).StatusInpsOrigine = statusInps;
-                }
+                MergeDtoMap(dtoMap, _studentsByKey, static (info, dto) => info.InformazioniEconomiche.StatusInpsOrigine = dto.StatusInpsOrigine);
             }
 
             string sqlInt = $@"
@@ -107,17 +108,18 @@ LEFT JOIN vStatus_INPS si
 
             using (var command = new SqlCommand(sqlInt, _conn))
             {
-                command.Parameters.AddWithValue("@AA", aa);
+                command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
 
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
-                {
-                    string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                    if (string.IsNullOrWhiteSpace(codFiscale)) continue;
+                var dtoMap = ReadDtoMap(
+                    command,
+                    static reader => ReadStudentKey(reader),
+                    static () => new EconomiciInpsAttestazioniDto(),
+                    static (reader, dto) => dto.StatusInpsIntegrazione = reader.SafeGetInt("status_inps"),
+                    out var readCount,
+                    _studentsByKey.ContainsKey,
+                    _studentsByKey.Count);
 
-                    int statusInps = reader.SafeGetInt("status_inps");
-                    GetEconomicInfo(CreateStudentKey(codFiscale, reader.SafeGetString("Num_domanda"))).StatusInpsIntegrazione = statusInps;
-                }
+                MergeDtoMap(dtoMap, _studentsByKey, static (info, dto) => info.InformazioniEconomiche.StatusInpsIntegrazione = dto.StatusInpsIntegrazione);
             }
 
             string sqlAtt = $@"
@@ -133,17 +135,18 @@ LEFT JOIN vCertificaz_ISEE cte
 
             using (var command = new SqlCommand(sqlAtt, _conn))
             {
-                command.Parameters.AddWithValue("@AA", aa);
+                command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
 
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
-                {
-                    string codFiscale = Utilities.RemoveAllSpaces(reader.SafeGetString("Cod_fiscale").ToUpperInvariant());
-                    if (string.IsNullOrWhiteSpace(codFiscale)) continue;
+                var dtoMap = ReadDtoMap(
+                    command,
+                    static reader => ReadStudentKey(reader),
+                    static () => new EconomiciInpsAttestazioniDto(),
+                    static (reader, dto) => dto.CoAttestazioneOk = !string.IsNullOrWhiteSpace(reader.SafeGetString("Cod_tipo_attestazione")),
+                    out var readCount,
+                    _studentsByKey.ContainsKey,
+                    _studentsByKey.Count);
 
-                    string tipoAttestazione = reader.SafeGetString("Cod_tipo_attestazione");
-                    GetEconomicInfo(CreateStudentKey(codFiscale, reader.SafeGetString("Num_domanda"))).CoAttestazioneOk = !string.IsNullOrWhiteSpace(tipoAttestazione);
-                }
+                MergeDtoMap(dtoMap, _studentsByKey, static (info, dto) => info.InformazioniEconomiche.CoAttestazioneOk = dto.CoAttestazioneOk);
             }
         }
 
@@ -187,19 +190,43 @@ INNER JOIN vNucleo_familiare nf
    AND nf.Num_domanda     = t.NumDomanda;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
+            command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
 
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
+            var dtoMap = ReadDtoMap(
+                command,
+                static reader => ReadStudentKey(reader),
+                static () => new NucleoFamiliareDto(),
+                static (reader, dto) =>
+                {
+                    dto.NumeroComponenti = reader.SafeGetInt("Num_componenti");
+                    dto.TipoNucleo = reader.SafeGetString("Cod_tipologia_nucleo");
+                    dto.NumeroConviventiEstero = reader.SafeGetInt("Numero_conviventi_estero");
+                },
+                out var readCount,
+                _studentsByKey.ContainsKey,
+                _studentsByKey.Count);
+
+            MergeDtoMap(dtoMap, _studentsByKey, static (info, dto) =>
             {
-                if (!TryGetStudentInfo(reader, out var info)) continue;
-                var eco = info.InformazioniEconomiche;
-                var raw = eco.Raw;
+                var raw = info.InformazioniEconomiche.Raw;
+                raw.NumeroComponenti = dto.NumeroComponenti;
+                raw.TipoNucleo = dto.TipoNucleo;
+                raw.NumeroConviventiEstero = dto.NumeroConviventiEstero;
+            });
+        }
 
-                raw.NumeroComponenti = reader.SafeGetInt("Num_componenti");
-                raw.TipoNucleo = reader.SafeGetString("Cod_tipologia_nucleo");
-                raw.NumeroConviventiEstero = reader.SafeGetInt("Numero_conviventi_estero");
-            }
+        private sealed class EconomiciInpsAttestazioniDto
+        {
+            public int StatusInpsOrigine { get; set; }
+            public int StatusInpsIntegrazione { get; set; }
+            public bool CoAttestazioneOk { get; set; }
+        }
+
+        private sealed class NucleoFamiliareDto
+        {
+            public int NumeroComponenti { get; set; }
+            public string TipoNucleo { get; set; } = string.Empty;
+            public int NumeroConviventiEstero { get; set; }
         }
 
         private static string ResolveTempTableName(string tableName)
@@ -485,21 +512,6 @@ WHERE t.IsOrigIT_CO = 1;";
 
             MergeOrigineCoDtos(dtoMap);
         }
-        private static string ReadDomandaAsString(SqlDataReader reader, int ordinal)
-        {
-            if (reader.IsDBNull(ordinal))
-                return "";
-
-            object value = reader.GetValue(ordinal);
-            return value switch
-            {
-                int i => i.ToString(CultureInfo.InvariantCulture),
-                long l => l.ToString(CultureInfo.InvariantCulture),
-                decimal d => d.ToString(CultureInfo.InvariantCulture),
-                string s => NormalizeDomanda(s),
-                _ => NormalizeDomanda(Convert.ToString(value, CultureInfo.InvariantCulture))
-            };
-        }
         private sealed class EconomiciOrigineCoDto
         {
             public string OrigineFonte { get; set; } = "CO";
@@ -518,8 +530,6 @@ WHERE t.IsOrigIT_CO = 1;";
             public decimal OrigineReddFam50Est { get; set; }
             public decimal OriginePatrImm50FratSor { get; set; }
         }
-        private static StudentKey ReadStudentKey(SqlDataReader reader, string cfColumn = "Cod_fiscale", string domandaColumn = "Num_domanda")
-    => CreateStudentKey(reader.SafeGetString(cfColumn), reader.SafeGetString(domandaColumn));
         private void MergeOrigineCoDtos(Dictionary<StudentKey, EconomiciOrigineCoDto> dtoMap)
         {
             foreach (var pair in dtoMap)
@@ -549,8 +559,6 @@ WHERE t.IsOrigIT_CO = 1;";
                 raw.OriginePatrImm50FratSor = dto.OriginePatrImm50FratSor;
             }
         }
-        private static decimal GetDecimalOrZero(SqlDataReader reader, int ordinal)
-    => reader.IsDBNull(ordinal) ? 0m : reader.GetDecimal(ordinal);
         private void AddDatiEconomiciStranieri_DO(string aa, string sourceTableName)
         {
             sourceTableName = ResolveTempTableName(sourceTableName);

@@ -441,104 +441,83 @@ LEFT JOIN IST_CLOSED1 istc
 
             Logger.LogInfo(null, $"[VerificaRaccoltaDati] StatusSede query (temp candidates) | AA={aa} | Candidates={tempCandidatesTable}");
 
-            using var reader = cmd.ExecuteReader();
+            Func<StudentKey, bool>? keyFilter = infoByKey == null
+                ? null
+                : key => infoByKey.ContainsKey(key);
 
-            int readCount = 0;
-            while (reader.Read())
-            {
-                ApplyStatusSedeRecordToStudent(reader, infoByKey);
-                readCount++;
+            var dtoMap = ReadDtoMap(
+                cmd,
+                ReadStatusSedeKey,
+                static () => new StatusSedeDto(),
+                ReadStatusSedeDto,
+                out var readCount,
+                keyFilter,
+                infoByKey?.Count ?? 0);
 
-                if (readCount % 5000 == 0)
-                    Logger.LogInfo(null, $"[VerificaRaccoltaDati] Lettura righe status sede... {readCount}");
-            }
+            MergeDtoMap(dtoMap, infoByKey ?? _studentsByKey, ApplyStatusSedeDtoToStudent);
 
-            Logger.LogInfo(null, $"[VerificaRaccoltaDati] StatusSede completato. Righe={readCount}");
+            Logger.LogInfo(null, $"[VerificaRaccoltaDati] StatusSede completato. Righe={readCount}, studenti aggiornati={dtoMap.Count}");
         }
 
-        private static void ApplyStatusSedeRecordToStudent(
-            IDataRecord record,
-            IReadOnlyDictionary<StudentKey, StudenteInfo>? infoByKey)
+        private static StudentKey ReadStatusSedeKey(SqlDataReader reader)
         {
-            int numDomanda = record.SafeGetInt("NumDomanda");
-            string codFiscale = (record.SafeGetString("CodFiscale") ?? string.Empty).Trim().ToUpperInvariant();
+            int numDomanda = reader.SafeGetInt("NumDomanda");
+            string codFiscale = NormalizeCf(reader.SafeGetString("CodFiscale"));
             string numDomandaTxt = numDomanda <= 0 ? string.Empty : numDomanda.ToString(CultureInfo.InvariantCulture);
-            var key = new StudentKey(codFiscale, numDomandaTxt);
+            return new StudentKey(codFiscale, numDomandaTxt);
+        }
 
-            if (infoByKey == null || !infoByKey.TryGetValue(key, out var info) || info == null)
-                return;
+        private static void ReadStatusSedeDto(SqlDataReader record, StatusSedeDto dto)
+        {
+            dto.NumDomanda = record.SafeGetInt("NumDomanda");
+            dto.CodFiscale = NormalizeCf(record.SafeGetString("CodFiscale"));
+            dto.StatusSedeAttuale = record.SafeGetString("StatusSedeAttuale").Trim().ToUpperInvariant();
+            dto.ForcedStatus = record.SafeGetString("ForcedStatus").Trim().ToUpperInvariant();
+            dto.StudenteSesso = record.SafeGetString("StudenteSesso").Trim().ToUpperInvariant();
+            dto.RifugiatoPolitico = record.SafeGetBool("RifugiatoPolitico");
+            dto.ConcessaMonetizzazione = record.SafeGetBool("ConcessaMonetizzazione");
+            dto.Invalido = record.SafeGetBool("Invalido");
+            dto.NumComponenti = record.SafeGetInt("NumComponenti");
+            dto.NumConvEstero = record.SafeGetInt("NumConvEstero");
+            dto.ComuneResidenza = record.SafeGetString("ComuneResidenza").Trim();
+            dto.ProvinciaResidenza = record.SafeGetString("ProvinciaResidenza").Trim().ToUpperInvariant();
+            dto.CodSedeStudi = record.SafeGetString("CodSedeStudi").Trim().ToUpperInvariant();
+            dto.CodCorso = record.SafeGetString("CodCorso").Trim();
+            dto.CodTipoStudi = record.SafeGetInt("CodTipoStudi");
+            dto.CodFacolta = record.SafeGetString("CodFacolta").Trim();
+            dto.ComuneSedeStudi = record.SafeGetString("ComuneSedeStudi").Trim();
+            dto.ProvinciaSede = record.SafeGetString("ProvinciaSede").Trim().ToUpperInvariant();
+            dto.Stem = record.SafeGetBool("Stem");
+            dto.AlwaysA = record.SafeGetBool("AlwaysA");
+            dto.InSedeList = record.SafeGetBool("InSedeList");
+            dto.PendolareList = record.SafeGetBool("PendolareList");
+            dto.FuoriSedeList = record.SafeGetBool("FuoriSedeList");
+            dto.HasAlloggio12 = record.SafeGetBool("HasAlloggio12");
+            dto.MinMesiDomicilioFuoriSede = record.SafeGetInt("MinMesiDomicilioFuoriSede");
+            dto.ComuneDomicilio = record.SafeGetString("ComuneDomicilio").Trim();
+            dto.TitoloOneroso = record.SafeGetBool("TitoloOneroso");
+            dto.ContrattoEnte = record.SafeGetBool("ContrattoEnte");
+            dto.TipoEnte = record.SafeGetString("TipoEnte").Trim().ToUpperInvariant();
+            dto.SerieContratto = record.SafeGetString("SerieContratto").Trim();
+            dto.DataRegistrazione = record.SafeGetDateTime("DataRegistrazione");
+            dto.DataDecorrenza = record.SafeGetDateTime("DataDecorrenza");
+            dto.DataScadenza = record.SafeGetDateTime("DataScadenza");
+            dto.DurataContratto = record.SafeGetInt("DurataContratto");
+            dto.Prorogato = record.SafeGetBool("Prorogato");
+            dto.DurataProroga = record.SafeGetInt("DurataProroga");
+            dto.SerieProroga = record.SafeGetString("SerieProroga").Trim();
+            dto.DenomEnte = record.SafeGetString("DenomEnte").Trim();
+            dto.ImportoRataEnte = record.SafeGetDouble("ImportoRataEnte");
+            dto.HasIstanzaDomicilio = record.SafeGetBool("HasIstanzaDomicilio");
+            dto.CodTipoIstanzaAperta = record.SafeGetString("CodTipoIstanzaAperta").Trim();
+            dto.NumIstanzaAperta = record.SafeGetInt("NumIstanzaAperta");
+            dto.HasUltimaIstanzaChiusaDomicilio = record.SafeGetBool("HasUltimaIstanzaChiusaDomicilio");
+            dto.CodTipoUltimaIstanzaChiusaDomicilio = record.SafeGetString("CodTipoUltimaIstanzaChiusaDomicilio").Trim();
+            dto.NumUltimaIstanzaChiusaDomicilio = record.SafeGetInt("NumUltimaIstanzaChiusaDomicilio");
+            dto.EsitoUltimaIstanzaChiusaDomicilio = record.SafeGetString("EsitoUltimaIstanzaChiusaDomicilio").Trim();
+            dto.UtentePresaCaricoUltimaIstanzaChiusaDomicilio = record.SafeGetString("UtentePresaCaricoUltimaIstanzaChiusaDomicilio").Trim();
 
-            info.InformazioniPersonali.NumDomanda = numDomandaTxt;
-            info.InformazioniPersonali.CodFiscale = codFiscale;
-            info.InformazioniSede.StatusSede = record.SafeGetString("StatusSedeAttuale").Trim().ToUpperInvariant();
-            info.InformazioniSede.ForzaturaStatusSede = record.SafeGetString("ForcedStatus").Trim().ToUpperInvariant();
-            info.InformazioniPersonali.Sesso = record.SafeGetString("StudenteSesso").Trim().ToUpperInvariant();
-            info.InformazioniPersonali.Rifugiato = record.SafeGetBool("RifugiatoPolitico");
-            info.InformazioniBeneficio.ConcessaMonetizzazioneMensa = record.SafeGetBool("ConcessaMonetizzazione");
-            info.InformazioniPersonali.Disabile = record.SafeGetBool("Invalido");
-            info.SetNucleoFamiliare(record.SafeGetInt("NumComponenti"), record.SafeGetInt("NumConvEstero"));
-
-            string comuneResidenza = record.SafeGetString("ComuneResidenza").Trim();
-            string provinciaResidenza = record.SafeGetString("ProvinciaResidenza").Trim().ToUpperInvariant();
-            info.SetResidenza(string.Empty, comuneResidenza, provinciaResidenza, string.Empty, comuneResidenza);
-
-            info.InformazioniIscrizione.CodSedeStudi = record.SafeGetString("CodSedeStudi").Trim().ToUpperInvariant();
-            info.InformazioniIscrizione.CodCorsoLaurea = record.SafeGetString("CodCorso").Trim();
-            info.InformazioniIscrizione.TipoCorso = record.SafeGetInt("CodTipoStudi");
-            info.InformazioniIscrizione.CodFacolta = record.SafeGetString("CodFacolta").Trim();
-            info.InformazioniIscrizione.ComuneSedeStudi = record.SafeGetString("ComuneSedeStudi").Trim();
-            info.InformazioniIscrizione.ProvinciaSedeStudi = record.SafeGetString("ProvinciaSede").Trim().ToUpperInvariant();
-            info.InformazioniIscrizione.CorsoStem = record.SafeGetBool("Stem");
-
-            info.InformazioniSede.AlwaysA = record.SafeGetBool("AlwaysA");
-            info.InformazioniSede.InSedeList = record.SafeGetBool("InSedeList");
-            info.InformazioniSede.PendolareList = record.SafeGetBool("PendolareList");
-            info.InformazioniSede.FuoriSedeList = record.SafeGetBool("FuoriSedeList");
-            info.InformazioniSede.HasAlloggio12 = record.SafeGetBool("HasAlloggio12");
-            info.InformazioniSede.MinMesiDomicilioFuoriSede = record.SafeGetInt("MinMesiDomicilioFuoriSede");
-
-            string comuneDomicilio = record.SafeGetString("ComuneDomicilio").Trim();
-            bool titoloOneroso = record.SafeGetBool("TitoloOneroso");
-            bool contrattoEnte = record.SafeGetBool("ContrattoEnte");
-            string tipoEnte = record.SafeGetString("TipoEnte").Trim().ToUpperInvariant();
-            string serieContratto = record.SafeGetString("SerieContratto").Trim();
-            DateTime dataRegistrazione = record.SafeGetDateTime("DataRegistrazione");
-            DateTime dataDecorrenza = record.SafeGetDateTime("DataDecorrenza");
-            DateTime dataScadenza = record.SafeGetDateTime("DataScadenza");
-            int durataContratto = record.SafeGetInt("DurataContratto");
-            bool prorogato = record.SafeGetBool("Prorogato");
-            int durataProroga = record.SafeGetInt("DurataProroga");
-            string serieProroga = record.SafeGetString("SerieProroga").Trim();
-            string denomEnte = record.SafeGetString("DenomEnte").Trim();
-            double importoRataEnte = record.SafeGetDouble("ImportoRataEnte");
-
-            info.InformazioniSede.Domicilio.codComuneDomicilio = comuneDomicilio;
-            info.InformazioniSede.Domicilio.titoloOneroso = titoloOneroso;
-            info.InformazioniSede.Domicilio.contrEnte = contrattoEnte;
-            info.InformazioniSede.Domicilio.TipoEnte = tipoEnte;
-            info.InformazioniSede.Domicilio.codiceSerieLocazione = serieContratto;
-            info.InformazioniSede.Domicilio.dataRegistrazioneLocazione = dataRegistrazione;
-            info.InformazioniSede.Domicilio.dataDecorrenzaLocazione = dataDecorrenza;
-            info.InformazioniSede.Domicilio.dataScadenzaLocazione = dataScadenza;
-            info.InformazioniSede.Domicilio.durataMesiLocazione = durataContratto;
-            info.InformazioniSede.Domicilio.prorogatoLocazione = prorogato;
-            info.InformazioniSede.Domicilio.durataMesiProrogaLocazione = durataProroga;
-            info.InformazioniSede.Domicilio.codiceSerieProrogaLocazione = serieProroga;
-            info.InformazioniSede.ContrattoEnte = contrattoEnte;
-            info.InformazioniSede.Domicilio.denominazioneIstituto = denomEnte;
-            info.InformazioniSede.Domicilio.importoMensileRataIstituto = importoRataEnte;
-
-            bool hasIstanzaDomicilio = record.SafeGetBool("HasIstanzaDomicilio");
-            info.InformazioniSede.HasIstanzaDomicilio = hasIstanzaDomicilio;
-            info.InformazioniSede.CodTipoIstanzaDomicilio = record.SafeGetString("CodTipoIstanzaAperta").Trim();
-            info.InformazioniSede.NumIstanzaDomicilio = record.SafeGetInt("NumIstanzaAperta");
-            info.InformazioniSede.HasUltimaIstanzaChiusaDomicilio = record.SafeGetBool("HasUltimaIstanzaChiusaDomicilio");
-            info.InformazioniSede.CodTipoUltimaIstanzaChiusaDomicilio = record.SafeGetString("CodTipoUltimaIstanzaChiusaDomicilio").Trim();
-            info.InformazioniSede.NumUltimaIstanzaChiusaDomicilio = record.SafeGetInt("NumUltimaIstanzaChiusaDomicilio");
-            info.InformazioniSede.EsitoUltimaIstanzaChiusaDomicilio = record.SafeGetString("EsitoUltimaIstanzaChiusaDomicilio").Trim();
-            info.InformazioniSede.UtentePresaCaricoUltimaIstanzaChiusaDomicilio = record.SafeGetString("UtentePresaCaricoUltimaIstanzaChiusaDomicilio").Trim();
-
-            info.InformazioniSede.IstanzaDomicilio = hasIstanzaDomicilio
+            dto.IstanzaDomicilio = dto.HasIstanzaDomicilio
                 ? new DomicilioSnapshot
                 {
                     ComuneDomicilio = record.SafeGetString("IstanzaComuneDomicilio").Trim(),
@@ -557,6 +536,115 @@ LEFT JOIN IST_CLOSED1 istc
                     ImportoRataEnte = record.SafeGetDouble("IstanzaImportoRataEnte")
                 }
                 : null;
+        }
+
+        private static void ApplyStatusSedeDtoToStudent(StudenteInfo info, StatusSedeDto dto)
+        {
+            string numDomandaTxt = dto.NumDomanda <= 0 ? string.Empty : dto.NumDomanda.ToString(CultureInfo.InvariantCulture);
+
+            info.InformazioniPersonali.NumDomanda = numDomandaTxt;
+            info.InformazioniPersonali.CodFiscale = dto.CodFiscale;
+            info.InformazioniSede.StatusSede = dto.StatusSedeAttuale;
+            info.InformazioniSede.ForzaturaStatusSede = dto.ForcedStatus;
+            info.InformazioniPersonali.Sesso = dto.StudenteSesso;
+            info.InformazioniPersonali.Rifugiato = dto.RifugiatoPolitico;
+            info.InformazioniBeneficio.ConcessaMonetizzazioneMensa = dto.ConcessaMonetizzazione;
+            info.InformazioniPersonali.Disabile = dto.Invalido;
+            info.SetNucleoFamiliare(dto.NumComponenti, dto.NumConvEstero);
+            info.SetResidenza(string.Empty, dto.ComuneResidenza, dto.ProvinciaResidenza, string.Empty, dto.ComuneResidenza);
+
+            info.InformazioniIscrizione.CodSedeStudi = dto.CodSedeStudi;
+            info.InformazioniIscrizione.CodCorsoLaurea = dto.CodCorso;
+            info.InformazioniIscrizione.TipoCorso = dto.CodTipoStudi;
+            info.InformazioniIscrizione.CodFacolta = dto.CodFacolta;
+            info.InformazioniIscrizione.ComuneSedeStudi = dto.ComuneSedeStudi;
+            info.InformazioniIscrizione.ProvinciaSedeStudi = dto.ProvinciaSede;
+            info.InformazioniIscrizione.CorsoStem = dto.Stem;
+
+            info.InformazioniSede.AlwaysA = dto.AlwaysA;
+            info.InformazioniSede.InSedeList = dto.InSedeList;
+            info.InformazioniSede.PendolareList = dto.PendolareList;
+            info.InformazioniSede.FuoriSedeList = dto.FuoriSedeList;
+            info.InformazioniSede.HasAlloggio12 = dto.HasAlloggio12;
+            info.InformazioniSede.MinMesiDomicilioFuoriSede = dto.MinMesiDomicilioFuoriSede;
+
+            info.InformazioniSede.Domicilio.codComuneDomicilio = dto.ComuneDomicilio;
+            info.InformazioniSede.Domicilio.titoloOneroso = dto.TitoloOneroso;
+            info.InformazioniSede.Domicilio.contrEnte = dto.ContrattoEnte;
+            info.InformazioniSede.Domicilio.TipoEnte = dto.TipoEnte;
+            info.InformazioniSede.Domicilio.codiceSerieLocazione = dto.SerieContratto;
+            info.InformazioniSede.Domicilio.dataRegistrazioneLocazione = dto.DataRegistrazione;
+            info.InformazioniSede.Domicilio.dataDecorrenzaLocazione = dto.DataDecorrenza;
+            info.InformazioniSede.Domicilio.dataScadenzaLocazione = dto.DataScadenza;
+            info.InformazioniSede.Domicilio.durataMesiLocazione = dto.DurataContratto;
+            info.InformazioniSede.Domicilio.prorogatoLocazione = dto.Prorogato;
+            info.InformazioniSede.Domicilio.durataMesiProrogaLocazione = dto.DurataProroga;
+            info.InformazioniSede.Domicilio.codiceSerieProrogaLocazione = dto.SerieProroga;
+            info.InformazioniSede.ContrattoEnte = dto.ContrattoEnte;
+            info.InformazioniSede.Domicilio.denominazioneIstituto = dto.DenomEnte;
+            info.InformazioniSede.Domicilio.importoMensileRataIstituto = dto.ImportoRataEnte;
+
+            info.InformazioniSede.HasIstanzaDomicilio = dto.HasIstanzaDomicilio;
+            info.InformazioniSede.CodTipoIstanzaDomicilio = dto.CodTipoIstanzaAperta;
+            info.InformazioniSede.NumIstanzaDomicilio = dto.NumIstanzaAperta;
+            info.InformazioniSede.HasUltimaIstanzaChiusaDomicilio = dto.HasUltimaIstanzaChiusaDomicilio;
+            info.InformazioniSede.CodTipoUltimaIstanzaChiusaDomicilio = dto.CodTipoUltimaIstanzaChiusaDomicilio;
+            info.InformazioniSede.NumUltimaIstanzaChiusaDomicilio = dto.NumUltimaIstanzaChiusaDomicilio;
+            info.InformazioniSede.EsitoUltimaIstanzaChiusaDomicilio = dto.EsitoUltimaIstanzaChiusaDomicilio;
+            info.InformazioniSede.UtentePresaCaricoUltimaIstanzaChiusaDomicilio = dto.UtentePresaCaricoUltimaIstanzaChiusaDomicilio;
+            info.InformazioniSede.IstanzaDomicilio = dto.IstanzaDomicilio;
+        }
+
+        private sealed class StatusSedeDto
+        {
+            public int NumDomanda { get; set; }
+            public string CodFiscale { get; set; } = string.Empty;
+            public string StatusSedeAttuale { get; set; } = string.Empty;
+            public string ForcedStatus { get; set; } = string.Empty;
+            public string StudenteSesso { get; set; } = string.Empty;
+            public bool RifugiatoPolitico { get; set; }
+            public bool ConcessaMonetizzazione { get; set; }
+            public bool Invalido { get; set; }
+            public int NumComponenti { get; set; }
+            public int NumConvEstero { get; set; }
+            public string ComuneResidenza { get; set; } = string.Empty;
+            public string ProvinciaResidenza { get; set; } = string.Empty;
+            public string CodSedeStudi { get; set; } = string.Empty;
+            public string CodCorso { get; set; } = string.Empty;
+            public int CodTipoStudi { get; set; }
+            public string CodFacolta { get; set; } = string.Empty;
+            public string ComuneSedeStudi { get; set; } = string.Empty;
+            public string ProvinciaSede { get; set; } = string.Empty;
+            public bool Stem { get; set; }
+            public bool AlwaysA { get; set; }
+            public bool InSedeList { get; set; }
+            public bool PendolareList { get; set; }
+            public bool FuoriSedeList { get; set; }
+            public bool HasAlloggio12 { get; set; }
+            public int MinMesiDomicilioFuoriSede { get; set; }
+            public string ComuneDomicilio { get; set; } = string.Empty;
+            public bool TitoloOneroso { get; set; }
+            public bool ContrattoEnte { get; set; }
+            public string TipoEnte { get; set; } = string.Empty;
+            public string SerieContratto { get; set; } = string.Empty;
+            public DateTime DataRegistrazione { get; set; }
+            public DateTime DataDecorrenza { get; set; }
+            public DateTime DataScadenza { get; set; }
+            public int DurataContratto { get; set; }
+            public bool Prorogato { get; set; }
+            public int DurataProroga { get; set; }
+            public string SerieProroga { get; set; } = string.Empty;
+            public string DenomEnte { get; set; } = string.Empty;
+            public double ImportoRataEnte { get; set; }
+            public bool HasIstanzaDomicilio { get; set; }
+            public string CodTipoIstanzaAperta { get; set; } = string.Empty;
+            public int NumIstanzaAperta { get; set; }
+            public bool HasUltimaIstanzaChiusaDomicilio { get; set; }
+            public string CodTipoUltimaIstanzaChiusaDomicilio { get; set; } = string.Empty;
+            public int NumUltimaIstanzaChiusaDomicilio { get; set; }
+            public string EsitoUltimaIstanzaChiusaDomicilio { get; set; } = string.Empty;
+            public string UtentePresaCaricoUltimaIstanzaChiusaDomicilio { get; set; } = string.Empty;
+            public DomicilioSnapshot? IstanzaDomicilio { get; set; }
         }
 
         private HashSet<(string ComuneA, string ComuneB)> LoadComuniEquiparatiFromDb()
