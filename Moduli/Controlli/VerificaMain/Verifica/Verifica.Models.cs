@@ -17,7 +17,7 @@ namespace ProcedureNet7.Verifica
         public string FolderPath { get; set; } = "";
         public bool IncludeEsclusi { get; set; }
         public bool IncludeNonTrasmesse { get; set; }
-        public string TempCandidatesTable { get; set; } = "#SS_Candidates";
+        public string TempPipelineTable { get; set; } = "#VerificaPipelineTargets";
         public DateTime ReferenceDate { get; set; } = DateTime.Now;
 
         public Dictionary<StudentKey, StudenteInfo> Students { get; } = new();

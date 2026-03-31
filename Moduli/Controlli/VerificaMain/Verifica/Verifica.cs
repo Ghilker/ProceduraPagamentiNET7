@@ -65,7 +65,7 @@ namespace ProcedureNet7.Verifica
                 FolderPath = _folderPath,
                 IncludeEsclusi = true,
                 IncludeNonTrasmesse = true,
-                TempCandidatesTable = "#SS_Candidates"
+                TempPipelineTable = "#VerificaPipelineTargets"
             };
             var cfFilter = GetStringListArg(args, "_codiciFiscali", "CodiciFiscali", "CodiciFiscale", "CF");
             if (cfFilter != null && cfFilter.Count > 0)

@@ -11,9 +11,6 @@ namespace ProcedureNet7
     {
         private readonly SqlConnection _conn;
 
-        private const string TempTargetsTable = "#TargetsEconomici";
-
-
         private readonly System.Collections.Generic.Dictionary<StudentKey, StudenteInfo> _studentsByKey = new();
 
 
@@ -115,15 +112,15 @@ ORDER BY CodFiscale, NumDomanda;
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-            var candidatesTable = CaricaCandidatiEInizializzaStudenti(context);
+            var pipelineTable = CaricaCandidatiEInizializzaStudenti(context);
             if (context.Students.Count == 0)
             {
                 context.CalcParams = _calc.Clone();
                 return;
             }
 
-            CreateTempCandidatesTable(context.Connection, context.TempCandidatesTable);
-            BulkCopyCandidates(context.Connection, context.TempCandidatesTable, candidatesTable);
+            CreateTempPipelineTable(context.Connection, context.TempPipelineTable);
+            BulkCopyPipelineTargets(context.Connection, context.TempPipelineTable, pipelineTable);
 
             try
             {
@@ -139,7 +136,7 @@ ORDER BY CodFiscale, NumDomanda;
             }
             finally
             {
-                DropTempCandidatesTable(context.Connection, context.TempCandidatesTable);
+                DropTempPipelineTable(context.Connection, context.TempPipelineTable);
             }
         }
 
@@ -198,22 +195,13 @@ ORDER BY CodFiscale, NumDomanda;
             throw new InvalidOperationException($"Studente non trovato per chiave economica {key.CodFiscale}/{key.NumDomanda}.");
         }
 
-        private static List<Target> DistinctTargets(IEnumerable<Target> targets)
-        {
-            return targets
-                .Where(target => !string.IsNullOrWhiteSpace(target.CodFiscale) && !string.IsNullOrWhiteSpace(target.NumDomanda))
-                .Select(target => new Target(NormalizeCf(target.CodFiscale), NormalizeDomanda(target.NumDomanda)))
-                .Distinct()
-                .ToList();
-        }
-
         private void RaccogliStatusSede(VerificaPipelineContext context)
         {
             _comuniEquiparati.Clear();
 
             LoadStatusSedeFromTempCandidates(
                 context.AnnoAccademico,
-                context.TempCandidatesTable,
+                context.TempPipelineTable,
                 context.Students);
 
             foreach (var pair in LoadComuniEquiparatiFromDb())
@@ -230,7 +218,7 @@ ORDER BY CodFiscale, NumDomanda;
             context.Students.Clear();
             context.ComuniEquiparati.Clear();
 
-            var table = BuildCandidatesDataTable();
+            var table = BuildPipelineTargetsDataTable();
 
             using var cmd = new SqlCommand(VerificaCandidatesSql, _conn)
             {
@@ -285,7 +273,7 @@ ORDER BY CodFiscale, NumDomanda;
                 var key = new StudentKey(codFiscale, numDomandaText);
                 context.Students[key] = info;
 
-                table.Rows.Add(numDomanda, codFiscale, tipoBando, codTipoEsitoBs, importoAssegnato, statusCompilazione);
+                table.Rows.Add(numDomanda, codFiscale, tipoBando, codTipoEsitoBs, importoAssegnato, statusCompilazione, false, false, false, false, false);
 
                 read++;
                 if (read % 5000 == 0)
@@ -296,7 +284,7 @@ ORDER BY CodFiscale, NumDomanda;
             return table;
         }
 
-        private static DataTable BuildCandidatesDataTable()
+        private static DataTable BuildPipelineTargetsDataTable()
         {
             var dt = new DataTable();
             dt.Columns.Add("NumDomanda", typeof(int));
@@ -305,10 +293,15 @@ ORDER BY CodFiscale, NumDomanda;
             dt.Columns.Add("CodTipoEsitoBS", typeof(int));
             dt.Columns.Add("ImportoAssegnato", typeof(decimal));
             dt.Columns.Add("StatusCompilazione", typeof(int));
+            dt.Columns.Add("IsOrigIT_CO", typeof(bool));
+            dt.Columns.Add("IsOrigIT_DO", typeof(bool));
+            dt.Columns.Add("IsOrigEE", typeof(bool));
+            dt.Columns.Add("IsIntIT_CI", typeof(bool));
+            dt.Columns.Add("IsIntDI", typeof(bool));
             return dt;
         }
 
-        private static void CreateTempCandidatesTable(SqlConnection conn, string tempTableName)
+        private static void CreateTempPipelineTable(SqlConnection conn, string tempTableName)
         {
             string sql = $@"
 IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL
@@ -320,22 +313,30 @@ CREATE TABLE {tempTableName}
     CodFiscale NVARCHAR(32) NOT NULL,
     TipoBando NVARCHAR(16) NOT NULL,
     CodTipoEsitoBS INT NOT NULL,
-    ImportoAssegnato Decimal(10,0) NOT NULL,
-    StatusCompilazione INT NOT NULL
-);";
+    ImportoAssegnato DECIMAL(10,0) NOT NULL,
+    StatusCompilazione INT NOT NULL,
+    IsOrigIT_CO BIT NOT NULL,
+    IsOrigIT_DO BIT NOT NULL,
+    IsOrigEE BIT NOT NULL,
+    IsIntIT_CI BIT NOT NULL,
+    IsIntDI BIT NOT NULL
+);
+
+CREATE INDEX IX_{tempTableName.TrimStart('#')}_CF_ND ON {tempTableName}(CodFiscale, NumDomanda);
+CREATE INDEX IX_{tempTableName.TrimStart('#')}_ND ON {tempTableName}(NumDomanda);";
 
             using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 9999999 };
             cmd.ExecuteNonQuery();
         }
 
-        private static void DropTempCandidatesTable(SqlConnection conn, string tempTableName)
+        private static void DropTempPipelineTable(SqlConnection conn, string tempTableName)
         {
             string sql = $"IF OBJECT_ID('tempdb..{tempTableName}') IS NOT NULL DROP TABLE {tempTableName};";
             using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 9999999 };
             cmd.ExecuteNonQuery();
         }
 
-        private static void BulkCopyCandidates(SqlConnection conn, string tempTableName, DataTable candidatesTable)
+        private static void BulkCopyPipelineTargets(SqlConnection conn, string tempTableName, DataTable candidatesTable)
         {
             using var bulk = new SqlBulkCopy(conn, SqlBulkCopyOptions.TableLock, externalTransaction: null)
             {
@@ -350,6 +351,11 @@ CREATE TABLE {tempTableName}
             bulk.ColumnMappings.Add("CodTipoEsitoBS", "CodTipoEsitoBS");
             bulk.ColumnMappings.Add("ImportoAssegnato", "ImportoAssegnato");
             bulk.ColumnMappings.Add("StatusCompilazione", "StatusCompilazione");
+            bulk.ColumnMappings.Add("IsOrigIT_CO", "IsOrigIT_CO");
+            bulk.ColumnMappings.Add("IsOrigIT_DO", "IsOrigIT_DO");
+            bulk.ColumnMappings.Add("IsOrigEE", "IsOrigEE");
+            bulk.ColumnMappings.Add("IsIntIT_CI", "IsIntIT_CI");
+            bulk.ColumnMappings.Add("IsIntDI", "IsIntDI");
             bulk.WriteToServer(candidatesTable);
         }
 
@@ -532,7 +538,7 @@ ORDER BY D.CodFiscale, D.NumDomanda, TRY_CONVERT(INT, cp.Anno_avvenimento), CONV
 
         private static void LoadBaseIscrizione(VerificaPipelineContext context)
         {
-            string sql = BaseIscrizioneSql.Replace("{TEMP_TABLE}", context.TempCandidatesTable);
+            string sql = BaseIscrizioneSql.Replace("{TEMP_TABLE}", context.TempPipelineTable);
 
             using var cmd = new SqlCommand(sql, context.Connection) { CommandTimeout = 999999 };
             cmd.Parameters.AddWithValue("@AA", context.AnnoAccademico);
@@ -576,7 +582,7 @@ ORDER BY D.CodFiscale, D.NumDomanda, TRY_CONVERT(INT, cp.Anno_avvenimento), CONV
 
         private static void LoadCarrieraPregressa(VerificaPipelineContext context)
         {
-            string sql = CarrieraPregressaSql.Replace("{TEMP_TABLE}", context.TempCandidatesTable);
+            string sql = CarrieraPregressaSql.Replace("{TEMP_TABLE}", context.TempPipelineTable);
 
             using var cmd = new SqlCommand(sql, context.Connection) { CommandTimeout = 999999 };
             cmd.Parameters.AddWithValue("@AA", context.AnnoAccademico);
