@@ -19,12 +19,12 @@ namespace ProcedureNet7.Verifica
         public bool IncludeEsclusi { get; set; }
         public bool IncludeNonTrasmesse { get; set; }
         public string TempCandidatesTable { get; set; } = "#SS_Candidates";
-        public DateTime ReferenceDate { get; set; } = DateTime.Today.Date;
+        public DateTime ReferenceDate { get; set; } = DateTime.Now;
 
-        public List<VerificaCandidate> Candidates { get; } = new();
         public Dictionary<StudentKey, StudenteInfo> Students { get; } = new();
-        public HashSet<StudentKey> CandidateKeys { get; } = new();
+        public HashSet<(string ComuneA, string ComuneB)> ComuniEquiparati { get; } = new();
         public CalcParams CalcParams { get; set; } = new();
+        public List<string> CodiciFiscaliFiltro { get; } = new();
 
         public IReadOnlyList<StudenteInfo> OrderedStudents =>
             Students
@@ -35,19 +35,14 @@ namespace ProcedureNet7.Verifica
 
         public void InitializeStudents(IEnumerable<VerificaCandidate> candidates)
         {
-            Candidates.Clear();
-            Candidates.AddRange(candidates);
-
             Students.Clear();
-            CandidateKeys.Clear();
+            ComuniEquiparati.Clear();
 
-            foreach (var candidate in Candidates)
+            foreach (var candidate in candidates)
             {
                 string cf = NormalizeCf(candidate.CodFiscale);
                 string numDomanda = candidate.NumDomanda.ToString(CultureInfo.InvariantCulture);
                 var key = new StudentKey(cf, numDomanda);
-
-                CandidateKeys.Add(key);
 
                 var info = new StudenteInfo();
                 info.InformazioniPersonali.CodFiscale = cf;
@@ -58,15 +53,5 @@ namespace ProcedureNet7.Verifica
 
         private static string NormalizeCf(string? value)
             => (value ?? "").Trim().ToUpperInvariant();
-    }
-
-    // Kept only as a compatibility wrapper for callers that still expect a named result type.
-    internal sealed class ValutazioneVerifica
-    {
-        public StudenteInfo Info { get; set; } = new StudenteInfo();
-
-        public StudentKey Key => new StudentKey(
-            Info.InformazioniPersonali.CodFiscale ?? string.Empty,
-            Info.InformazioniPersonali.NumDomanda ?? string.Empty);
     }
 }

@@ -11,10 +11,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Excel = Microsoft.Office.Interop.Excel;
-
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 namespace ProcedureNet7
 {
@@ -357,8 +353,6 @@ namespace ProcedureNet7
                 throw;
             }
         }
-
-
 
         private static string GenerateFileName(string fileName)
         {
@@ -714,7 +708,6 @@ namespace ProcedureNet7
 
             return defaultValue ?? DateTime.MinValue;
         }
-
 
         public static double SafeGetDouble(this IDataRecord record, string fieldName, double defaultValue = 0.0)
         {

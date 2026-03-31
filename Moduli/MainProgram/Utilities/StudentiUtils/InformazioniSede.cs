@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 
 namespace ProcedureNet7
 {
     public class InformazioniSede
     {
         public Domicilio Domicilio { get; set; } = new Domicilio();
+        public DomicilioSnapshot? IstanzaDomicilio { get; set; }
         public bool ContrattoValido { get; set; }
         public bool ProrogaValido { get; set; }
         public bool ContrattoEnte { get; set; }
@@ -24,13 +21,20 @@ namespace ProcedureNet7
         public int GiorniDallaScad { get; set; }
         public string CodBlocchi { get; set; } = string.Empty;
 
-        public string CodComuneSedeStudi {  get; set; } = string.Empty;
-        public string CodProvinciaSedeStudi {  get; set; } = string.Empty;
+        public string CodComuneSedeStudi { get; set; } = string.Empty;
+        public string CodProvinciaSedeStudi { get; set; } = string.Empty;
 
         public string MotivoStatusSede { get; set; } = "";
         public bool DomicilioPresente { get; set; }
         public bool DomicilioValido { get; set; }
         public bool HasAlloggio12 { get; set; }
+
+        public bool AlwaysA { get; set; }
+        public bool InSedeList { get; set; }
+        public bool PendolareList { get; set; }
+        public bool FuoriSedeList { get; set; }
+        public int MinMesiDomicilioFuoriSede { get; set; } = 10;
+
         public bool HasIstanzaDomicilio { get; set; }
         public string CodTipoIstanzaDomicilio { get; set; } = "";
         public int NumIstanzaDomicilio { get; set; }

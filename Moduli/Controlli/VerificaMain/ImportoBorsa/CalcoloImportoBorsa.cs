@@ -1,53 +1,30 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Globalization;
+using ProcedureNet7.Verifica;
 
 namespace ProcedureNet7
 {
     internal sealed class CalcoloImportoBorsa
     {
-        private readonly Dictionary<StudentKey, StudenteInfo> _students = new();
-
-        private CalcParams _params = new();
-
-        private bool _collectionCompleted;
-        private bool _calculationCompleted;
-
-        public void Collect(CalcParams calcParams, IReadOnlyDictionary<StudentKey, StudenteInfo> students)
+        public void Calculate(VerificaPipelineContext context)
         {
-            if (calcParams == null)
-                throw new ArgumentNullException(nameof(calcParams));
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
 
-            _students.Clear();
-            foreach (var pair in students)
-                _students[pair.Key] = pair.Value;
+            var calc = context.CalcParams ?? new CalcParams();
 
-            _params = calcParams;
-
-            ResetStudentState();
-
-            _collectionCompleted = true;
-            _calculationCompleted = false;
-        }
-
-        public void Calculate()
-        {
-            if (!_collectionCompleted)
-                throw new InvalidOperationException("Collect deve essere eseguito prima di Calculate.");
-
-            foreach (var info in _students.Values)
+            foreach (var info in context.Students.Values)
             {
                 var imp = info.InformazioniImportoBorsa;
                 string status = GetStatusSedeRiferimento(info.InformazioniSede);
 
-                decimal importoBase = GetImportoBaseByStatus(status);
+                decimal importoBase = GetImportoBaseByStatus(status, calc);
                 decimal importoFinale = importoBase;
-
                 decimal isee = GetIseeRiferimento(info);
 
                 if (importoFinale > 0m)
                 {
-                    importoFinale = ApplyIseeRule(importoFinale, isee, _params.SogliaIsee);
+                    importoFinale = ApplyIseeRule(importoFinale, isee, calc.SogliaIsee);
 
                     if (IsDonnaStem(info))
                         importoFinale += RoundMoney(importoBase * 0.20m);
@@ -65,57 +42,17 @@ namespace ProcedureNet7
                 imp.ImportoFinale = RoundMoney(importoFinale);
                 imp.CalcoloEseguito = true;
             }
-
-            _calculationCompleted = true;
         }
 
-        public void Validate()
-        {
-            if (!_collectionCompleted)
-                throw new InvalidOperationException("Collect deve essere eseguito prima di Validate.");
-            if (!_calculationCompleted)
-                throw new InvalidOperationException("Calculate deve essere eseguito prima di Validate.");
-
-            foreach (var info in _students.Values)
-            {
-                var imp = info.InformazioniImportoBorsa;
-
-                if (imp.ImportoBase < 0m)
-                    imp.ImportoBase = 0m;
-
-                if (imp.ImportoFinale < 0m)
-                    imp.ImportoFinale = 0m;
-            }
-        }
-
-        private void ResetStudentState()
-        {
-            foreach (var info in _students.Values)
-            {
-                var imp = info.InformazioniImportoBorsa;
-                imp.StatusSedeRiferimento = string.Empty;
-                imp.ImportoBase = 0m;
-                imp.ImportoFinale = 0m;
-                imp.CalcoloEseguito = false;
-            }
-        }
-
-        private decimal GetImportoBaseByStatus(string status)
+        private static decimal GetImportoBaseByStatus(string status, CalcParams calc)
         {
             switch ((status ?? string.Empty).Trim().ToUpperInvariant())
             {
-                case "A":
-                    return _params.ImportoBorsaA;
-
-                case "B":
-                    return _params.ImportoBorsaB;
-
+                case "A": return calc.ImportoBorsaA;
+                case "B": return calc.ImportoBorsaB;
                 case "C":
-                case "D":
-                    return _params.ImportoBorsaC;
-
-                default:
-                    return 0m;
+                case "D": return calc.ImportoBorsaC;
+                default: return 0m;
             }
         }
 
@@ -141,7 +78,6 @@ namespace ProcedureNet7
 
                 decimal progresso = (isee - dueTerziSoglia) / ampiezza;
                 decimal coeff = 1m - (0.5m * progresso);
-
                 return RoundMoney(importoBase * coeff);
             }
 
@@ -152,10 +88,10 @@ namespace ProcedureNet7
         {
             var eco = info.InformazioniEconomiche;
 
-            if (TryReadDecimal(eco?.ISEEDSU, out var ricalcolato) && ricalcolato > 0m)
-                return ricalcolato;
+            if (TryReadDecimal(eco?.Calcolate?.ISEEDSU, out var ordinario) && ordinario > 0m)
+                return ordinario;
 
-            if (TryReadDecimal(eco?.ISEEDSU_Attuale, out var attuale) && attuale > 0m)
+            if (TryReadDecimal(eco?.Attuali?.ISEEDSU, out var attuale) && attuale > 0m)
                 return attuale;
 
             return 0m;
@@ -163,13 +99,8 @@ namespace ProcedureNet7
 
         private static bool IsDonnaStem(StudenteInfo info)
         {
-            bool donna = string.Equals(
-                (info.InformazioniPersonali?.Sesso ?? string.Empty).Trim(),
-                "F",
-                StringComparison.OrdinalIgnoreCase);
-
+            bool donna = string.Equals((info.InformazioniPersonali?.Sesso ?? string.Empty).Trim(), "F", StringComparison.OrdinalIgnoreCase);
             bool stem = info.InformazioniIscrizione?.CorsoStem == true;
-
             return donna && stem;
         }
 
@@ -177,45 +108,30 @@ namespace ProcedureNet7
         {
             int annoCorso = info.InformazioniIscrizione?.AnnoCorso ?? 0;
             bool invalido = info.InformazioniPersonali?.Disabile == true;
-
-            return (annoCorso == -1 && !invalido)
-                || (annoCorso == -2 && invalido);
+            return (annoCorso == -1 && !invalido) || (annoCorso == -2 && invalido);
         }
 
-        private static bool HaMonetizzazioneMensa(StudenteInfo info)
-        {
-            return info.InformazioniBeneficio?.ConcessaMonetizzazioneMensa == true;
-        }
+        private static bool HaMonetizzazioneMensa(StudenteInfo info) => info.InformazioniBeneficio?.ConcessaMonetizzazioneMensa == true;
 
         private static string GetStatusSedeRiferimento(InformazioniSede sede)
         {
             if (!string.IsNullOrWhiteSpace(sede.StatusSedeSuggerito))
                 return sede.StatusSedeSuggerito;
-
             return sede.StatusSede ?? string.Empty;
         }
 
         private static bool TryReadDecimal(object? value, out decimal result)
         {
             result = 0m;
-
-            if (value == null || value == DBNull.Value)
-                return false;
-
+            if (value == null || value == DBNull.Value) return false;
             try
             {
                 result = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
                 return true;
             }
-            catch
-            {
-                return false;
-            }
+            catch { return false; }
         }
 
-        private static decimal RoundMoney(decimal value)
-        {
-            return Math.Round(value, 2, MidpointRounding.AwayFromZero);
-        }
+        private static decimal RoundMoney(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
     }
 }

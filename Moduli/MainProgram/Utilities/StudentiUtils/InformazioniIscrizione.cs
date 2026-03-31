@@ -46,7 +46,7 @@ namespace ProcedureNet7
         public int? AnnoAvvenimento { get; set; }
         public string UnivDiConseguim { get; set; } = string.Empty;
         public string UnivProvenienza { get; set; } = string.Empty;
-        public DateTime? PrimaImmatricolaz { get; set; }
+        public int? PrimaImmatricolaz { get; set; }
         public string TipologiaCorso { get; set; } = string.Empty;
         public int? DurataLegTitoloConseguito { get; set; }
         public int PassaggioCorsoEstero { get; set; }
