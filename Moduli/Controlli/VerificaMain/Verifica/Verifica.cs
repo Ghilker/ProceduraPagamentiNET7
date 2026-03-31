@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
-using System.Globalization;
 
 namespace ProcedureNet7.Verifica
 {
@@ -28,12 +27,9 @@ namespace ProcedureNet7.Verifica
 
             var context = BuildPipelineContext(args);
             var raccoltaDati = new global::ProcedureNet7.VerificaRaccoltaDati(context.Connection);
-            var economici = new VerificaControlliDatiEconomici();
-            var statusSede = new ControlloStatusSede();
-            var importoBorsa = new CalcoloImportoBorsa();
+            var modules = BuildModules();
 
-            Logger.LogInfo(null, "[Verifica] Raccolta dati centralizzata -> StudenteInfo");
-            raccoltaDati.PopolaContesto(context);
+            VerificaExecutionSupport.ExecuteTimed("Verifica.RaccoltaDati", () => raccoltaDati.PopolaContesto(context), () => $"AA={context.AnnoAccademico}");
 
             if (context.Students.Count == 0)
             {
@@ -43,19 +39,26 @@ namespace ProcedureNet7.Verifica
                 return;
             }
 
-            Logger.LogInfo(null, "[Verifica] Calculate -> Economici");
-            economici.Calculate(context);
+            foreach (var module in modules)
+            {
+                VerificaExecutionSupport.ExecuteTimed($"Verifica.Module.{module.Name}", () => module.Calculate(context), () => $"students={context.Students.Count}");
+            }
 
-            Logger.LogInfo(null, "[Verifica] Calculate -> StatusSede");
-            statusSede.Calculate(context);
+            VerificaExecutionSupport.ExecuteTimed("Verifica.Output", () =>
+            {
+                (OutputVerificaList, OutputVerifica) = BuildOrderedOutputs(context.Students);
+            }, () => $"students={context.Students.Count}");
 
-            Logger.LogInfo(null, "[Verifica] Calculate -> ImportoBorsa");
-            importoBorsa.Calculate(context);
-
-            OutputVerificaList = context.OrderedStudents;
-            OutputVerifica = ToDataTable(OutputVerificaList);
-            Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath);
+            VerificaExecutionSupport.ExecuteTimed("Verifica.Export", () => Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath), () => $"rows={OutputVerifica.Rows.Count}");
         }
+
+        private static IReadOnlyList<IVerificaModule> BuildModules()
+            => new IVerificaModule[]
+            {
+                new VerificaControlliDatiEconomici(),
+                new ControlloStatusSede(),
+                new CalcoloImportoBorsa()
+            };
 
         private VerificaPipelineContext BuildPipelineContext(ArgsVerifica args)
         {
@@ -67,6 +70,7 @@ namespace ProcedureNet7.Verifica
                 IncludeNonTrasmesse = true,
                 TempPipelineTable = "#VerificaPipelineTargets"
             };
+
             var cfFilter = GetStringListArg(args, "_codiciFiscali", "CodiciFiscali", "CodiciFiscale", "CF");
             if (cfFilter != null && cfFilter.Count > 0)
             {
@@ -95,7 +99,6 @@ namespace ProcedureNet7.Verifica
                 if (value is IReadOnlyCollection<string> roc) return roc;
                 if (value is IEnumerable<string> e) return e.Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
 
-                // singola stringa "CF1;CF2;..."
                 if (value is string s)
                 {
                     var parts = s.Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)

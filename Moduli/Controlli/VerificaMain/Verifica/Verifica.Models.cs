@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Data.SqlClient;
 
 namespace ProcedureNet7.Verifica
@@ -24,12 +23,5 @@ namespace ProcedureNet7.Verifica
         public HashSet<(string ComuneA, string ComuneB)> ComuniEquiparati { get; } = new();
         public CalcParams CalcParams { get; set; } = new();
         public List<string> CodiciFiscaliFiltro { get; } = new();
-
-        public IReadOnlyList<StudenteInfo> OrderedStudents =>
-            Students
-                .OrderBy(pair => pair.Key.CodFiscale, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(pair => pair.Key.NumDomanda, StringComparer.OrdinalIgnoreCase)
-                .Select(pair => pair.Value)
-                .ToList();
     }
 }

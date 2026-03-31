@@ -4,8 +4,10 @@ using ProcedureNet7.Verifica;
 
 namespace ProcedureNet7
 {
-    internal sealed class CalcoloImportoBorsa
+    internal sealed class CalcoloImportoBorsa : IVerificaModule
     {
+        public string Name => "ImportoBorsa";
+
         public void Calculate(VerificaPipelineContext context)
         {
             if (context == null)

@@ -7,8 +7,10 @@ using ProcedureNet7.Verifica;
 
 namespace ProcedureNet7
 {
-    internal sealed partial class ControlloStatusSede
+    internal sealed partial class ControlloStatusSede : IVerificaModule
     {
+        public string Name => "StatusSede";
+
         public void Calculate(VerificaPipelineContext context)
         {
             if (context == null)
@@ -17,7 +19,7 @@ namespace ProcedureNet7
             var evaluator = new StatusSedeEvaluator(context.ComuniEquiparati, context.ReferenceDate.Date);
             var (aaStart, aaEnd) = GetAaDateRange(context.AnnoAccademico);
 
-            foreach (var info in context.OrderedStudents)
+            foreach (var info in context.Students.Values)
             {
                 var decision = evaluator.Evaluate(info, aaStart, aaEnd);
 

@@ -1,101 +1,138 @@
 using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace ProcedureNet7
 {
     internal sealed partial class VerificaRaccoltaDati
     {
-        private static Dictionary<StudentKey, TDto> ReadDtoMap<TDto>(
-            SqlCommand command,
-            Func<SqlDataReader, StudentKey> keyReader,
-            Func<TDto> factory,
-            Action<SqlDataReader, TDto> readRow,
-            out int readCount,
-            Func<StudentKey, bool>? keyFilter = null,
-            int capacity = 0)
-            where TDto : class
-        {
-            var map = capacity > 0
-                ? new Dictionary<StudentKey, TDto>(capacity)
-                : new Dictionary<StudentKey, TDto>();
+        private VerificaPipelineContext CurrentContext
+            => _currentContext ?? throw new InvalidOperationException("Contesto verifica non inizializzato.");
 
-            readCount = 0;
+        private IReadOnlyDictionary<StudentKey, StudenteInfo> CurrentStudents
+            => CurrentContext.Students;
+
+        private static IDisposable MeasureCollectionStep(string scope, string details)
+            => new LogMeasureScope(scope, details);
+
+        private static void AddAaParameter(SqlCommand command, string aa)
+        {
+            if (command == null)
+                throw new ArgumentNullException(nameof(command));
+
+            command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
+        }
+
+        private static string NormalizeCf(string? value)
+            => Utilities.RemoveAllSpaces((value ?? string.Empty).Trim().ToUpperInvariant());
+
+        private static string NormalizeDomanda(string? value)
+            => Utilities.RemoveAllSpaces((value ?? string.Empty).Trim());
+
+        private static StudentKey CreateStudentKey(string? codFiscale, string? numDomanda)
+            => new StudentKey(NormalizeCf(codFiscale), NormalizeDomanda(numDomanda));
+
+        private bool TryGetStudentInfo(StudentKey key, out StudenteInfo info)
+        {
+            if (CurrentStudents.TryGetValue(key, out info!) && info != null)
+            {
+                info.InformazioniEconomiche ??= new InformazioniEconomiche();
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryGetStudentInfo(
+            SqlDataReader reader,
+            out StudenteInfo info,
+            string cfColumn = "Cod_fiscale",
+            string domandaColumn = "Num_domanda")
+        {
+            var key = CreateStudentKey(
+                reader.SafeGetString(cfColumn),
+                reader.SafeGetString(domandaColumn));
+
+            return TryGetStudentInfo(key, out info!);
+        }
+
+        private InformazioniEconomiche GetEconomicInfo(StudentKey key)
+        {
+            if (TryGetStudentInfo(key, out var info))
+                return info.InformazioniEconomiche;
+
+            throw new InvalidOperationException(
+                $"Studente non trovato per chiave economica {key.CodFiscale}/{key.NumDomanda}.");
+        }
+
+        private void ReadAndMergeSingleDto<TDto>(
+            SqlCommand command,
+            Func<SqlDataReader, StudentKey> keyFactory,
+            Func<SqlDataReader, TDto> dtoFactory,
+            Action<StudenteInfo, TDto> merge)
+        {
+            if (command == null)
+                throw new ArgumentNullException(nameof(command));
+            if (keyFactory == null)
+                throw new ArgumentNullException(nameof(keyFactory));
+            if (dtoFactory == null)
+                throw new ArgumentNullException(nameof(dtoFactory));
+            if (merge == null)
+                throw new ArgumentNullException(nameof(merge));
+
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
-                readCount++;
-                var key = keyReader(reader);
-                if (keyFilter != null && !keyFilter(key))
+                var key = keyFactory(reader);
+                if (!TryGetStudentInfo(key, out var info))
                     continue;
 
-                if (!map.TryGetValue(key, out var dto))
-                {
-                    dto = factory();
-                    map[key] = dto;
-                }
-
-                readRow(reader, dto);
+                merge(info, dtoFactory(reader));
             }
-
-            return map;
         }
 
-        private static List<(StudentKey Key, TDto Dto)> ReadDtoList<TDto>(
+        private void ReadAndMergeBufferedDtos<TDto>(
             SqlCommand command,
-            Func<SqlDataReader, StudentKey> keyReader,
-            Func<SqlDataReader, TDto> projector,
-            out int readCount,
-            Func<StudentKey, bool>? keyFilter = null,
-            int capacity = 0)
+            Func<SqlDataReader, StudentKey> keyFactory,
+            Func<SqlDataReader, TDto> dtoFactory,
+            Action<Dictionary<StudentKey, TDto>, StudentKey, TDto> accumulate,
+            Action<StudenteInfo, TDto> merge)
         {
-            var list = capacity > 0
-                ? new List<(StudentKey Key, TDto Dto)>(capacity)
-                : new List<(StudentKey Key, TDto Dto)>();
+            if (command == null)
+                throw new ArgumentNullException(nameof(command));
+            if (keyFactory == null)
+                throw new ArgumentNullException(nameof(keyFactory));
+            if (dtoFactory == null)
+                throw new ArgumentNullException(nameof(dtoFactory));
+            if (accumulate == null)
+                throw new ArgumentNullException(nameof(accumulate));
+            if (merge == null)
+                throw new ArgumentNullException(nameof(merge));
 
-            readCount = 0;
+            var dtoMap = new Dictionary<StudentKey, TDto>(CurrentStudents.Count);
+
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
-                readCount++;
-                var key = keyReader(reader);
-                if (keyFilter != null && !keyFilter(key))
+                var key = keyFactory(reader);
+                if (!CurrentStudents.ContainsKey(key))
                     continue;
 
-                list.Add((key, projector(reader)));
+                accumulate(dtoMap, key, dtoFactory(reader));
             }
 
-            return list;
-        }
-
-        private static void MergeDtoMap<TDto>(
-            IReadOnlyDictionary<StudentKey, TDto> dtoMap,
-            IReadOnlyDictionary<StudentKey, StudenteInfo> students,
-            Action<StudenteInfo, TDto> apply)
-        {
             foreach (var pair in dtoMap)
             {
-                if (students.TryGetValue(pair.Key, out var info) && info != null)
-                    apply(info, pair.Value);
+                if (!TryGetStudentInfo(pair.Key, out var info))
+                    continue;
+
+                merge(info, pair.Value);
             }
         }
-
-        private static void MergeDtoList<TDto>(
-            IEnumerable<(StudentKey Key, TDto Dto)> rows,
-            IReadOnlyDictionary<StudentKey, StudenteInfo> students,
-            Action<StudenteInfo, TDto> apply)
-        {
-            foreach (var row in rows)
-            {
-                if (students.TryGetValue(row.Key, out var info) && info != null)
-                    apply(info, row.Dto);
-            }
-        }
-
-        private static StudentKey ReadStudentKey(SqlDataReader reader, string cfColumn = "Cod_fiscale", string domandaColumn = "Num_domanda")
-            => CreateStudentKey(reader.SafeGetString(cfColumn), reader.SafeGetString(domandaColumn));
 
         private static string ReadDomandaAsString(SqlDataReader reader, int ordinal)
         {
@@ -115,5 +152,34 @@ namespace ProcedureNet7
 
         private static decimal GetDecimalOrZero(SqlDataReader reader, int ordinal)
             => reader.IsDBNull(ordinal) ? 0m : reader.GetDecimal(ordinal);
+
+        private sealed class LogMeasureScope : IDisposable
+        {
+            private readonly string _scope;
+            private readonly string _details;
+            private readonly Stopwatch _sw;
+
+            public LogMeasureScope(string scope, string details)
+            {
+                _scope = scope;
+                _details = details ?? string.Empty;
+                _sw = Stopwatch.StartNew();
+
+                Logger.LogInfo(null, $"[{_scope}] START{FormatDetails(_details)}");
+            }
+
+            public void Dispose()
+            {
+                _sw.Stop();
+                Logger.LogInfo(
+                    null,
+                    $"[{_scope}] END | elapsed={_sw.ElapsedMilliseconds} ms{FormatDetails(_details)}");
+            }
+
+            private static string FormatDetails(string details)
+                => string.IsNullOrWhiteSpace(details)
+                    ? string.Empty
+                    : $" | {details}";
+        }
     }
 }

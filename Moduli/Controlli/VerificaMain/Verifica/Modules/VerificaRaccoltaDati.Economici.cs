@@ -23,9 +23,9 @@ namespace ProcedureNet7
             if (string.IsNullOrWhiteSpace(aa) || aa.Length != 8)
                 throw new ArgumentException("Anno accademico non valido (atteso char(8), es: 20232024).");
 
+            _currentContext = context;
             ResetState();
-            InitializeStudentsFromContext(context.Students);
-            Log(10, $"Studenti inizializzati dal contesto: {_studentsByKey.Count}");
+            Log(10, $"Studenti nel contesto: {CurrentStudents.Count}");
 
             ExecuteEconomiciCollectionPipeline(aa, context.TempPipelineTable, Log);
         }
@@ -37,9 +37,6 @@ namespace ProcedureNet7
 
             LoadCalcParams(aa);
             LoadNucleoFamiliare(aa, pipelineTableName);
-
-            log(19, "Caricamento esito concorso BS (ultimo record valido).");
-            LoadEsitoBorsaStudio(aa, pipelineTableName);
 
             log(22, "Caricamento INPS e attestazioni CO.");
             LoadInpsAndAttestazioni_StoredLike(aa, pipelineTableName);
@@ -57,108 +54,87 @@ namespace ProcedureNet7
             if (split.IntIT_CI.Count > 0) AddDatiEconomiciItaliani_CI(aa, pipelineTableName);
             if (split.IntDI.Count > 0) AddDatiEconomiciStranieri_DI(aa, pipelineTableName);
 
-            log(70, $"Raccolta dati economici completata. Righe in memoria: {_studentsByKey.Count}, studenti nel contesto: {_studentsByKey.Count}");
+            log(70, $"Raccolta dati economici completata. Studenti nel contesto: {CurrentStudents.Count}");
         }
 
         private void LoadInpsAndAttestazioni_StoredLike(string aa, string sourceTableName)
         {
             sourceTableName = ResolveTempTableName(sourceTableName);
 
-            string sqlOrig = $@"
+            string sql = $@"
 SELECT
     t.CodFiscale AS Cod_fiscale,
     t.NumDomanda AS Num_domanda,
-    si.status_inps
+    ISNULL(sio.StatusInpsOrigine, 0) AS StatusInpsOrigine,
+    ISNULL(sii.StatusInpsIntegrazione, 0) AS StatusInpsIntegrazione,
+    ISNULL(att.CoAttestazioneOk, 0) AS CoAttestazioneOk
 FROM {sourceTableName} t
-LEFT JOIN vStatus_INPS si
-    ON si.anno_accademico = @AA
-   AND si.cod_fiscale     = t.CodFiscale
-   AND si.num_domanda     = t.NumDomanda
-   AND si.data_fine_validita IS NULL
-   AND si.tipo_certificaz NOT IN ('CI','DI');";
+OUTER APPLY
+(
+    SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsOrigine
+    FROM vStatus_INPS si
+    WHERE si.anno_accademico = @AA
+      AND si.cod_fiscale = t.CodFiscale
+      AND si.num_domanda = t.NumDomanda
+      AND si.data_fine_validita IS NULL
+      AND si.tipo_certificaz NOT IN ('CI','DI')
+) sio
+OUTER APPLY
+(
+    SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsIntegrazione
+    FROM vStatus_INPS si
+    WHERE si.anno_accademico = @AA
+      AND si.cod_fiscale = t.CodFiscale
+      AND si.num_domanda = t.NumDomanda
+      AND si.data_fine_validita IS NULL
+      AND si.tipo_certificaz IN ('CI','DI')
+) sii
+OUTER APPLY
+(
+    SELECT MAX(CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))), '') IS NULL THEN 0 ELSE 1 END) AS CoAttestazioneOk
+    FROM vCertificaz_ISEE cte
+    WHERE cte.Anno_accademico = @AA
+      AND cte.Num_domanda = t.NumDomanda
+      AND cte.tipologia_certificazione = 'CO'
+) att;";
 
-            using (var command = new SqlCommand(sqlOrig, _conn))
-            {
-                command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
+            using var command = new SqlCommand(sql, _conn);
+            AddAaParameter(command, aa);
+            ReadAndMergeSingleDto(
+                command,
+                reader => ReadStudentKey(reader),
+                reader => new InpsAttestazioneDto
+                {
+                    StatusInpsOrigine = reader.SafeGetInt("StatusInpsOrigine"),
+                    StatusInpsIntegrazione = reader.SafeGetInt("StatusInpsIntegrazione"),
+                    CoAttestazioneOk = reader.SafeGetInt("CoAttestazioneOk") != 0
+                },
+                static (info, dto) =>
+                {
+                    var raw = info.InformazioniEconomiche.Raw;
+                    raw.StatusInpsOrigine = dto.StatusInpsOrigine;
+                    raw.StatusInpsIntegrazione = dto.StatusInpsIntegrazione;
+                    raw.CoAttestazioneOk = dto.CoAttestazioneOk;
+                });
+        }
 
-                var dtoMap = ReadDtoMap(
-                    command,
-                    static reader => ReadStudentKey(reader),
-                    static () => new EconomiciInpsAttestazioniDto(),
-                    static (reader, dto) => dto.StatusInpsOrigine = reader.SafeGetInt("status_inps"),
-                    out var readCount,
-                    _studentsByKey.ContainsKey,
-                    _studentsByKey.Count);
-
-                MergeDtoMap(dtoMap, _studentsByKey, static (info, dto) => info.InformazioniEconomiche.StatusInpsOrigine = dto.StatusInpsOrigine);
-            }
-
-            string sqlInt = $@"
-SELECT
-    t.CodFiscale AS Cod_fiscale,
-    t.NumDomanda AS Num_domanda,
-    si.status_inps
-FROM {sourceTableName} t
-LEFT JOIN vStatus_INPS si
-    ON si.anno_accademico = @AA
-   AND si.cod_fiscale     = t.CodFiscale
-   AND si.num_domanda     = t.NumDomanda
-   AND si.data_fine_validita IS NULL
-   AND si.tipo_certificaz IN ('CI','DI');";
-
-            using (var command = new SqlCommand(sqlInt, _conn))
-            {
-                command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
-
-                var dtoMap = ReadDtoMap(
-                    command,
-                    static reader => ReadStudentKey(reader),
-                    static () => new EconomiciInpsAttestazioniDto(),
-                    static (reader, dto) => dto.StatusInpsIntegrazione = reader.SafeGetInt("status_inps"),
-                    out var readCount,
-                    _studentsByKey.ContainsKey,
-                    _studentsByKey.Count);
-
-                MergeDtoMap(dtoMap, _studentsByKey, static (info, dto) => info.InformazioniEconomiche.StatusInpsIntegrazione = dto.StatusInpsIntegrazione);
-            }
-
-            string sqlAtt = $@"
-SELECT
-    t.CodFiscale AS Cod_fiscale,
-    t.NumDomanda AS Num_domanda,
-    LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))) AS Cod_tipo_attestazione
-FROM {sourceTableName} t
-LEFT JOIN vCertificaz_ISEE cte
-    ON cte.Anno_accademico = @AA
-   AND cte.Num_domanda     = t.NumDomanda
-   AND cte.tipologia_certificazione = 'CO';";
-
-            using (var command = new SqlCommand(sqlAtt, _conn))
-            {
-                command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
-
-                var dtoMap = ReadDtoMap(
-                    command,
-                    static reader => ReadStudentKey(reader),
-                    static () => new EconomiciInpsAttestazioniDto(),
-                    static (reader, dto) => dto.CoAttestazioneOk = !string.IsNullOrWhiteSpace(reader.SafeGetString("Cod_tipo_attestazione")),
-                    out var readCount,
-                    _studentsByKey.ContainsKey,
-                    _studentsByKey.Count);
-
-                MergeDtoMap(dtoMap, _studentsByKey, static (info, dto) => info.InformazioniEconomiche.CoAttestazioneOk = dto.CoAttestazioneOk);
-            }
+        private sealed class InpsAttestazioneDto
+        {
+            public int StatusInpsOrigine { get; set; }
+            public int StatusInpsIntegrazione { get; set; }
+            public bool CoAttestazioneOk { get; set; }
         }
 
         private void LoadCalcParams(string aa)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadCalcParams", $"AA={aa}");
             const string sql = @"
 SELECT Franchigia, tasso_rendimento_pat_mobiliare, franchigia_pat_mobiliare, Importo_borsa_A, Importo_borsa_B, Importo_borsa_C, Soglia_Isee
 FROM DatiGenerali_con
 WHERE Anno_accademico = @AA;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
+            AddAaParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             if (reader.Read())
@@ -175,6 +151,7 @@ WHERE Anno_accademico = @AA;";
 
         private void LoadNucleoFamiliare(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadNucleoFamiliare", $"AA={aa}");
             sourceTableName = ResolveTempTableName(sourceTableName);
 
             string sql = $@"
@@ -190,43 +167,19 @@ INNER JOIN vNucleo_familiare nf
    AND nf.Num_domanda     = t.NumDomanda;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
+            AddAaParameter(command, aa);
 
-            var dtoMap = ReadDtoMap(
-                command,
-                static reader => ReadStudentKey(reader),
-                static () => new NucleoFamiliareDto(),
-                static (reader, dto) =>
-                {
-                    dto.NumeroComponenti = reader.SafeGetInt("Num_componenti");
-                    dto.TipoNucleo = reader.SafeGetString("Cod_tipologia_nucleo");
-                    dto.NumeroConviventiEstero = reader.SafeGetInt("Numero_conviventi_estero");
-                },
-                out var readCount,
-                _studentsByKey.ContainsKey,
-                _studentsByKey.Count);
-
-            MergeDtoMap(dtoMap, _studentsByKey, static (info, dto) =>
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
             {
-                var raw = info.InformazioniEconomiche.Raw;
-                raw.NumeroComponenti = dto.NumeroComponenti;
-                raw.TipoNucleo = dto.TipoNucleo;
-                raw.NumeroConviventiEstero = dto.NumeroConviventiEstero;
-            });
-        }
+                if (!TryGetStudentInfo(reader, out var info)) continue;
+                var eco = info.InformazioniEconomiche;
+                var raw = eco.Raw;
 
-        private sealed class EconomiciInpsAttestazioniDto
-        {
-            public int StatusInpsOrigine { get; set; }
-            public int StatusInpsIntegrazione { get; set; }
-            public bool CoAttestazioneOk { get; set; }
-        }
-
-        private sealed class NucleoFamiliareDto
-        {
-            public int NumeroComponenti { get; set; }
-            public string TipoNucleo { get; set; } = string.Empty;
-            public int NumeroConviventiEstero { get; set; }
+                raw.NumeroComponenti = reader.SafeGetInt("Num_componenti");
+                raw.TipoNucleo = reader.SafeGetString("Cod_tipologia_nucleo");
+                raw.NumeroConviventiEstero = reader.SafeGetInt("Numero_conviventi_estero");
+            }
         }
 
         private static string ResolveTempTableName(string tableName)
@@ -247,63 +200,69 @@ INNER JOIN vNucleo_familiare nf
 
         private void ApplyEconomicSplitFlagsToPipelineTable(string pipelineTableName, SplitResult split)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.ApplyEconomicSplitFlags", $"students={CurrentStudents.Count}");
             pipelineTableName = ResolveTempTableName(pipelineTableName);
 
-            using (var resetCommand = new SqlCommand($@"
-UPDATE {pipelineTableName}
-SET
-    IsOrigIT_CO = 0,
-    IsOrigIT_DO = 0,
-    IsOrigEE = 0,
-    IsIntIT_CI = 0,
-    IsIntDI = 0;", _conn))
-            {
-                resetCommand.CommandTimeout = 9999999;
-                resetCommand.ExecuteNonQuery();
-            }
-
-            using (var ensureFlagsCommand = new SqlCommand(@"
-IF OBJECT_ID('tempdb..#PipelineEconomicFlags') IS NOT NULL
-    DROP TABLE #PipelineEconomicFlags;
-
-CREATE TABLE #PipelineEconomicFlags
+            string sql = $@"
+;WITH Tipologie AS
 (
-    NumDomanda INT NOT NULL,
-    CodFiscale NVARCHAR(32) NOT NULL,
-    IsOrigIT_CO BIT NOT NULL,
-    IsOrigIT_DO BIT NOT NULL,
-    IsOrigEE BIT NOT NULL,
-    IsIntIT_CI BIT NOT NULL,
-    IsIntDI BIT NOT NULL
-);", _conn))
-            {
-                ensureFlagsCommand.CommandTimeout = 9999999;
-                ensureFlagsCommand.ExecuteNonQuery();
-            }
-
-            using (var flagsTable = BuildPipelineEconomicFlagsDataTable(split))
-            {
-                if (flagsTable.Rows.Count > 0)
-                {
-                    using var bulk = new SqlBulkCopy(_conn, SqlBulkCopyOptions.TableLock, null)
-                    {
-                        DestinationTableName = "#PipelineEconomicFlags",
-                        BatchSize = 5000,
-                        BulkCopyTimeout = 9999999
-                    };
-
-                    bulk.ColumnMappings.Add("NumDomanda", "NumDomanda");
-                    bulk.ColumnMappings.Add("CodFiscale", "CodFiscale");
-                    bulk.ColumnMappings.Add("IsOrigIT_CO", "IsOrigIT_CO");
-                    bulk.ColumnMappings.Add("IsOrigIT_DO", "IsOrigIT_DO");
-                    bulk.ColumnMappings.Add("IsOrigEE", "IsOrigEE");
-                    bulk.ColumnMappings.Add("IsIntIT_CI", "IsIntIT_CI");
-                    bulk.ColumnMappings.Add("IsIntDI", "IsIntDI");
-                    bulk.WriteToServer(flagsTable);
-                }
-            }
-
-            using (var updateCommand = new SqlCommand($@"
+    SELECT
+        t.NumDomanda,
+        t.CodFiscale,
+        UPPER(LTRIM(RTRIM(ISNULL(tr.Tipo_redd_nucleo_fam_origine,'')))) AS TipoOrigine,
+        UPPER(LTRIM(RTRIM(ISNULL(tr.Tipo_redd_nucleo_fam_integr,'')))) AS TipoIntegrazione,
+        UPPER(LTRIM(RTRIM(ISNULL(nf.Cod_tipologia_nucleo,'')))) AS TipoNucleo,
+        ISNULL(sio.StatusInpsOrigine, 0) AS StatusInpsOrigine,
+        ISNULL(sii.StatusInpsIntegrazione, 0) AS StatusInpsIntegrazione,
+        ISNULL(att.CoAttestazioneOk, 0) AS CoAttestazioneOk
+    FROM {pipelineTableName} t
+    LEFT JOIN vTipologie_redditi tr
+        ON tr.Anno_accademico = @AA
+       AND tr.Num_domanda = t.NumDomanda
+    LEFT JOIN vNucleo_familiare nf
+        ON nf.Anno_accademico = @AA
+       AND nf.Num_domanda = t.NumDomanda
+    OUTER APPLY
+    (
+        SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsOrigine
+        FROM vStatus_INPS si
+        WHERE si.anno_accademico = @AA
+          AND si.cod_fiscale = t.CodFiscale
+          AND si.num_domanda = t.NumDomanda
+          AND si.data_fine_validita IS NULL
+          AND si.tipo_certificaz NOT IN ('CI','DI')
+    ) sio
+    OUTER APPLY
+    (
+        SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsIntegrazione
+        FROM vStatus_INPS si
+        WHERE si.anno_accademico = @AA
+          AND si.cod_fiscale = t.CodFiscale
+          AND si.num_domanda = t.NumDomanda
+          AND si.data_fine_validita IS NULL
+          AND si.tipo_certificaz IN ('CI','DI')
+    ) sii
+    OUTER APPLY
+    (
+        SELECT MAX(CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))), '') IS NULL THEN 0 ELSE 1 END) AS CoAttestazioneOk
+        FROM vCertificaz_ISEE cte
+        WHERE cte.Anno_accademico = @AA
+          AND cte.Num_domanda = t.NumDomanda
+          AND cte.tipologia_certificazione = 'CO'
+    ) att
+),
+Flags AS
+(
+    SELECT
+        NumDomanda,
+        CodFiscale,
+        CAST(CASE WHEN TipoOrigine = 'IT' AND StatusInpsOrigine = 2 AND CoAttestazioneOk = 1 THEN 1 ELSE 0 END AS BIT) AS IsOrigIT_CO,
+        CAST(CASE WHEN TipoOrigine = 'IT' AND NOT (StatusInpsOrigine = 2 AND CoAttestazioneOk = 1) THEN 1 ELSE 0 END AS BIT) AS IsOrigIT_DO,
+        CAST(CASE WHEN TipoOrigine = 'EE' THEN 1 ELSE 0 END AS BIT) AS IsOrigEE,
+        CAST(CASE WHEN TipoNucleo = 'I' AND TipoIntegrazione = 'IT' AND StatusInpsIntegrazione = 2 THEN 1 ELSE 0 END AS BIT) AS IsIntIT_CI,
+        CAST(CASE WHEN TipoNucleo = 'I' AND ((TipoIntegrazione = 'IT' AND StatusInpsIntegrazione <> 2) OR TipoIntegrazione = 'EE') THEN 1 ELSE 0 END AS BIT) AS IsIntDI
+    FROM Tipologie
+)
 UPDATE p
 SET
     p.IsOrigIT_CO = f.IsOrigIT_CO,
@@ -312,88 +271,23 @@ SET
     p.IsIntIT_CI = f.IsIntIT_CI,
     p.IsIntDI = f.IsIntDI
 FROM {pipelineTableName} p
-INNER JOIN #PipelineEconomicFlags f
+INNER JOIN Flags f
     ON f.NumDomanda = p.NumDomanda
-   AND f.CodFiscale = p.CodFiscale;
+   AND f.CodFiscale = p.CodFiscale;";
 
-DROP TABLE #PipelineEconomicFlags;", _conn))
+            using var command = new SqlCommand(sql, _conn)
             {
-                updateCommand.CommandTimeout = 9999999;
-                updateCommand.ExecuteNonQuery();
-            }
-        }
-
-        private static DataTable BuildPipelineEconomicFlagsDataTable(SplitResult split)
-        {
-            var map = new Dictionary<(string CodFiscale, string NumDomanda), PipelineEconomicFlagsRow>();
-
-            static PipelineEconomicFlagsRow GetOrCreate(Dictionary<(string CodFiscale, string NumDomanda), PipelineEconomicFlagsRow> source, Target target)
-            {
-                var key = (NormalizeCf(target.CodFiscale), NormalizeDomanda(target.NumDomanda));
-                if (!source.TryGetValue(key, out var row))
-                {
-                    row = new PipelineEconomicFlagsRow();
-                    source[key] = row;
-                }
-
-                return row;
-            }
-
-            foreach (var target in split.OrigIT_CO)
-                GetOrCreate(map, target).IsOrigIT_CO = true;
-
-            foreach (var target in split.OrigIT_DO)
-                GetOrCreate(map, target).IsOrigIT_DO = true;
-
-            foreach (var target in split.OrigEE)
-                GetOrCreate(map, target).IsOrigEE = true;
-
-            foreach (var target in split.IntIT_CI)
-                GetOrCreate(map, target).IsIntIT_CI = true;
-
-            foreach (var target in split.IntDI)
-                GetOrCreate(map, target).IsIntDI = true;
-
-            var dt = new DataTable();
-            dt.Columns.Add("NumDomanda", typeof(int));
-            dt.Columns.Add("CodFiscale", typeof(string));
-            dt.Columns.Add("IsOrigIT_CO", typeof(bool));
-            dt.Columns.Add("IsOrigIT_DO", typeof(bool));
-            dt.Columns.Add("IsOrigEE", typeof(bool));
-            dt.Columns.Add("IsIntIT_CI", typeof(bool));
-            dt.Columns.Add("IsIntDI", typeof(bool));
-
-            foreach (var pair in map)
-            {
-                if (!int.TryParse(pair.Key.NumDomanda, NumberStyles.Integer, CultureInfo.InvariantCulture, out int numDomanda))
-                    continue;
-
-                dt.Rows.Add(
-                    numDomanda,
-                    pair.Key.CodFiscale,
-                    pair.Value.IsOrigIT_CO,
-                    pair.Value.IsOrigIT_DO,
-                    pair.Value.IsOrigEE,
-                    pair.Value.IsIntIT_CI,
-                    pair.Value.IsIntDI);
-            }
-
-            return dt;
-        }
-
-        private sealed class PipelineEconomicFlagsRow
-        {
-            public bool IsOrigIT_CO { get; set; }
-            public bool IsOrigIT_DO { get; set; }
-            public bool IsOrigEE { get; set; }
-            public bool IsIntIT_CI { get; set; }
-            public bool IsIntDI { get; set; }
+                CommandTimeout = 9999999
+            };
+            AddAaParameter(command, CurrentContext.AnnoAccademico);
+            command.ExecuteNonQuery();
         }
 
         private readonly record struct Target(string CodFiscale, string NumDomanda);
 
         private void AddDatiEconomiciItaliani_CO(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.AddDatiEconomiciItaliani_CO", $"AA={aa}");
             sourceTableName = ResolveTempTableName(sourceTableName);
 
             int eseFin = EconomiciFormulaSupport.GetEseFinanziario(aa);
@@ -450,7 +344,7 @@ LEFT JOIN sumPagamenti sp ON t.CodFiscale = sp.Cod_fiscale
 LEFT JOIN impAltreBorse iab ON t.NumDomanda = iab.num_domanda AND @AA = iab.anno_accademico
 WHERE t.IsOrigIT_CO = 1;";
 
-            var dtoMap = new Dictionary<StudentKey, EconomiciOrigineCoDto>(_studentsByKey.Count);
+            var dtoMap = new Dictionary<StudentKey, EconomiciOrigineCoDto>(CurrentStudents.Count);
 
             using var command = new SqlCommand(sql, _conn)
             {
@@ -485,7 +379,7 @@ WHERE t.IsOrigIT_CO = 1;";
                     reader.IsDBNull(ordCf) ? "" : reader.GetString(ordCf),
                     ReadDomandaAsString(reader, ordNumDomanda));
 
-                if (!_studentsByKey.ContainsKey(key))
+                if (!CurrentStudents.ContainsKey(key))
                     continue;
 
                 if (!dtoMap.TryGetValue(key, out var dto))
@@ -530,11 +424,13 @@ WHERE t.IsOrigIT_CO = 1;";
             public decimal OrigineReddFam50Est { get; set; }
             public decimal OriginePatrImm50FratSor { get; set; }
         }
+        private static StudentKey ReadStudentKey(SqlDataReader reader, string cfColumn = "Cod_fiscale", string domandaColumn = "Num_domanda")
+            => CreateStudentKey(reader.SafeGetString(cfColumn), reader.SafeGetString(domandaColumn));
         private void MergeOrigineCoDtos(Dictionary<StudentKey, EconomiciOrigineCoDto> dtoMap)
         {
             foreach (var pair in dtoMap)
             {
-                if (!_studentsByKey.TryGetValue(pair.Key, out var info) || info == null)
+                if (!TryGetStudentInfo(pair.Key, out var info) || info == null)
                     continue;
 
                 info.InformazioniEconomiche ??= new InformazioniEconomiche();
@@ -561,6 +457,7 @@ WHERE t.IsOrigIT_CO = 1;";
         }
         private void AddDatiEconomiciStranieri_DO(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.AddDatiEconomiciStranieri_DO", $"AA={aa}");
             sourceTableName = ResolveTempTableName(sourceTableName);
 
             string sql = $@"
@@ -582,7 +479,7 @@ INNER JOIN vNucleo_fam_stranieri_DO nf
 WHERE t.IsOrigEE = 1;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
+            AddAaParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -605,6 +502,7 @@ WHERE t.IsOrigEE = 1;";
 
         private void AddDatiEconomiciItaliani_DOFromCert(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.AddDatiEconomiciItaliani_DOFromCert", $"AA={aa}");
             sourceTableName = ResolveTempTableName(sourceTableName);
 
             string sql = $@"
@@ -632,7 +530,7 @@ INNER JOIN vCertificaz_ISEE cte
 WHERE t.IsOrigIT_DO = 1;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
+            AddAaParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -659,6 +557,7 @@ WHERE t.IsOrigIT_DO = 1;";
 
         private void AddDatiEconomiciItaliani_CI(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.AddDatiEconomiciItaliani_CI", $"AA={aa}");
             sourceTableName = ResolveTempTableName(sourceTableName);
 
             string sql = $@"
@@ -685,7 +584,7 @@ INNER JOIN vCertificaz_ISEE cte
 WHERE t.IsIntIT_CI = 1;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
+            AddAaParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -711,6 +610,7 @@ WHERE t.IsIntIT_CI = 1;";
 
         private void AddDatiEconomiciStranieri_DI(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.AddDatiEconomiciStranieri_DI", $"AA={aa}");
             sourceTableName = ResolveTempTableName(sourceTableName);
 
             string sql = $@"
@@ -732,7 +632,7 @@ INNER JOIN vNucleo_fam_stranieri_DI nf
 WHERE t.IsIntDI = 1;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
+            AddAaParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -764,6 +664,7 @@ WHERE t.IsIntDI = 1;";
 
         private SplitResult LoadTipologieRedditiAndSplit(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadTipologieRedditiAndSplit", $"AA={aa}");
             Logger.LogInfo(30, "Esecuzione query tipologie reddito (vTipologie_redditi) + split per studente/domanda.");
 
             sourceTableName = ResolveTempTableName(sourceTableName);
@@ -780,10 +681,10 @@ FROM {sourceTableName} t
 INNER JOIN vTipologie_redditi tr
     ON tr.Anno_accademico = @AA
    AND tr.Num_domanda     = t.NumDomanda
-ORDER BY t.CodFiscale, t.NumDomanda;";
+;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
+            AddAaParameter(command, aa);
 
             int readCount = 0;
             using var reader = command.ExecuteReader();
@@ -841,6 +742,7 @@ ORDER BY t.CodFiscale, t.NumDomanda;";
 
         private void LoadValoriCalcolatiAttuali(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadValoriCalcolatiAttuali", $"AA={aa}");
             sourceTableName = ResolveTempTableName(sourceTableName);
 
             string sql = $@"
@@ -858,7 +760,7 @@ LEFT JOIN vValori_calcolati vv
    AND vv.Num_domanda     = t.NumDomanda;";
 
             using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
+            AddAaParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -875,53 +777,5 @@ LEFT JOIN vValori_calcolati vv
             }
         }
 
-        private void LoadEsitoBorsaStudio(string aa, string sourceTableName)
-        {
-            sourceTableName = ResolveTempTableName(sourceTableName);
-
-            string sql = $@"
-WITH EsitoBS AS
-(
-    SELECT
-        ec.Anno_accademico,
-        ec.Num_domanda,
-        CAST(ec.Cod_tipo_esito AS INT) AS Cod_tipo_esito,
-        ec.imp_beneficio AS imp_assegnato,
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY ec.Anno_accademico, ec.Num_domanda
-            ORDER BY ec.Data_validita DESC, ec.Cod_tipo_esito DESC
-        ) AS rn
-    FROM vEsiti_concorsi ec
-    WHERE ec.Anno_accademico = @AA
-      AND ec.Cod_beneficio = 'BS'
-)
-SELECT
-    t.CodFiscale AS Cod_fiscale,
-    t.NumDomanda AS Num_domanda,
-    e.Cod_tipo_esito,
-    e.imp_assegnato
-FROM {sourceTableName} t
-LEFT JOIN EsitoBS e
-    ON e.Anno_accademico = @AA
-   AND e.Num_domanda     = t.NumDomanda
-   AND e.rn = 1;";
-
-            using var command = new SqlCommand(sql, _conn);
-            command.Parameters.AddWithValue("@AA", aa);
-
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-            {
-                if (!TryGetStudentInfo(reader, out var info)) continue;
-                var eco = info.InformazioniEconomiche;
-                var raw = eco.Raw;
-
-                object rawEsito = reader["Cod_tipo_esito"];
-                int? codTipoEsito = rawEsito is DBNull or null ? (int?)null : Convert.ToInt32(rawEsito, CultureInfo.InvariantCulture);
-                raw.CodTipoEsitoBS = codTipoEsito;
-                raw.ImportoAssegnato = Utilities.SafeGetDouble(reader, "imp_assegnato");
-            }
-        }
     }
 }

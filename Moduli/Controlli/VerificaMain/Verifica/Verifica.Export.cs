@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
-using System.Linq;
 
 namespace ProcedureNet7.Verifica
 {
@@ -88,126 +87,151 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("StatusSedeRiferimentoImportoBorsa", typeof(string));
             dt.Columns.Add("ImportoBaseBorsa", typeof(decimal));
             dt.Columns.Add("ImportoFinaleBorsa", typeof(decimal));
-            dt.Columns.Add("ImportoAssegnato", typeof(double));
+            dt.Columns.Add("ImportoAssegnato", typeof(decimal));
             dt.Columns.Add("CalcoloImportoBorsaEseguito", typeof(bool));
 
             return dt;
         }
 
-        private static DataTable ToDataTable(
-            IReadOnlyList<StudenteInfo> items)
+        private static (IReadOnlyList<StudenteInfo> Items, DataTable Table) BuildOrderedOutputs(IReadOnlyDictionary<StudentKey, StudenteInfo> students)
         {
+            var orderedPairs = VerificaExecutionSupport.OrderStudents(students);
             var dt = BuildOutputTable();
+            var items = new List<StudenteInfo>(orderedPairs.Count);
 
-            foreach (var info in items)
+            dt.BeginLoadData();
+            try
             {
-                var eco = info.InformazioniEconomiche;
-                var sede = info.InformazioniSede;
-                var dom = info.InformazioniSede.Domicilio;
-                var iscr = info.InformazioniIscrizione;
-                var impBorsa = info.InformazioniImportoBorsa;
-
-                var row = dt.NewRow();
-                row["CodFiscale"] = info.InformazioniPersonali.CodFiscale ?? "";
-                row["NumDomanda"] = info.InformazioniPersonali.NumDomanda ?? "";
-
-                row["TipoRedditoOrigine"] = eco.Raw.TipoRedditoOrigine ?? "";
-                row["TipoRedditoIntegrazione"] = eco.Raw.TipoRedditoIntegrazione ?? "";
-                row["CodTipoEsitoBS"] = eco.Raw.CodTipoEsitoBS ?? 0;
-                row["ImportoAssegnato"] = eco.Raw.ImportoAssegnato ?? 0;
-                row["ISR"] = eco.Calcolate.ISRDSU;
-                row["ISP"] = eco.Calcolate.ISPDSU;
-                row["Detrazioni"] = eco.Calcolate.Detrazioni;
-                row["ISEDSU"] = eco.Calcolate.ISEDSU;
-                row["ISEEDSU"] = eco.Calcolate.ISEEDSU;
-                row["ISPEDSU"] = eco.Calcolate.ISPEDSU;
-                row["ISPDSU"] = eco.Calcolate.ISPDSU;
-                row["SEQ"] = eco.Calcolate.SEQ;
-                row["ISEDSU_Attuale"] = Convert.ToDecimal(eco.Attuali.ISEDSU);
-                row["ISEEDSU_Attuale"] = Convert.ToDecimal(eco.Attuali.ISEEDSU);
-                row["ISPEDSU_Attuale"] = Convert.ToDecimal(eco.Attuali.ISPEDSU);
-                row["ISPDSU_Attuale"] = Convert.ToDecimal(eco.Attuali.ISPDSU);
-                row["SEQ_Attuale"] = Convert.ToDecimal(eco.Attuali.SEQ);
-
-                row["StatusSedeAttuale"] = sede.StatusSede ?? "";
-                row["StatusSedeSuggerito"] = sede.StatusSedeSuggerito ?? "";
-                row["MotivoStatusSede"] = sede.MotivoStatusSede ?? "";
-                row["ComuneResidenza"] = sede.Residenza.codComune ?? "";
-                row["ProvinciaResidenza"] = sede.Residenza.provincia ?? "";
-                row["ComuneSedeStudi"] = info.InformazioniIscrizione.ComuneSedeStudi ?? "";
-                row["ProvinciaSede"] = info.InformazioniIscrizione.ProvinciaSedeStudi ?? "";
-                row["ComuneDomicilio"] = dom?.codComuneDomicilio ?? "";
-                row["SerieContrattoDomicilio"] = dom?.codiceSerieLocazione ?? "";
-                row["DataRegistrazioneDomicilio"] = FormatDateForExport(dom?.dataRegistrazioneLocazione);
-                row["DataDecorrenzaDomicilio"] = FormatDateForExport(dom?.dataDecorrenzaLocazione);
-                row["DataScadenzaDomicilio"] = FormatDateForExport(dom?.dataScadenzaLocazione);
-                row["ProrogatoDomicilio"] = dom?.prorogatoLocazione ?? false;
-                row["SerieProrogaDomicilio"] = dom?.codiceSerieProrogaLocazione ?? "";
-                row["DomicilioPresente"] = sede.DomicilioPresente;
-                row["DomicilioValido"] = sede.DomicilioValido;
-                row["HasAlloggio12"] = sede.HasAlloggio12;
-                row["HasIstanzaDomicilio"] = sede.HasIstanzaDomicilio;
-                row["CodTipoIstanzaDomicilio"] = sede.CodTipoIstanzaDomicilio ?? "";
-                row["NumIstanzaDomicilio"] = sede.NumIstanzaDomicilio > 0 ? sede.NumIstanzaDomicilio.ToString(CultureInfo.InvariantCulture) : "";
-                row["HasUltimaIstanzaChiusaDomicilio"] = sede.HasUltimaIstanzaChiusaDomicilio;
-                row["CodTipoUltimaIstanzaChiusaDomicilio"] = sede.CodTipoUltimaIstanzaChiusaDomicilio ?? "";
-                row["NumUltimaIstanzaChiusaDomicilio"] = sede.NumUltimaIstanzaChiusaDomicilio > 0 ? sede.NumUltimaIstanzaChiusaDomicilio.ToString(CultureInfo.InvariantCulture) : "";
-                row["EsitoUltimaIstanzaChiusaDomicilio"] = sede.EsitoUltimaIstanzaChiusaDomicilio ?? "";
-                row["UtentePresaCaricoUltimaIstanzaChiusaDomicilio"] = sede.UtentePresaCaricoUltimaIstanzaChiusaDomicilio ?? "";
-
-                row["TipoBando"] = iscr.TipoBando ?? "";
-                SetIfHasValue(row, "AnnoCorsoIscrizione", iscr.AnnoCorso);
-                row["CodSedeStudiIscrizione"] = iscr.CodSedeStudi ?? "";
-                row["CodCorsoLaureaIscrizione"] = iscr.CodCorsoLaurea ?? "";
-                row["CodFacoltaIscrizione"] = iscr.CodFacolta ?? "";
-                row["CodTipologiaStudiIscrizione"] = iscr.TipoCorso > 0 ? iscr.TipoCorso.ToString(CultureInfo.InvariantCulture) : "";
-                SetIfHasValue(row, "CreditiTirocinioIscrizione", iscr.CreditiTirocinio);
-                SetIfHasValue(row, "CreditiRiconosciutiIscrizione", iscr.CreditiRiconosciuti);
-                row["IscrittoSemestreFiltroIscrizione"] = iscr.ConfermaSemestreFiltro != 0;
-                row["CodSedeDistaccataAppartenenza"] = iscr.CodSedeDistaccata ?? "";
-                row["CodEnteAppartenenza"] = iscr.CodEnte ?? "";
-                SetIfHasValue(row, "AnnoImmatricolazioneMerito", iscr.AnnoImmatricolazione);
-                SetIfHasValue(row, "NumeroEsamiMerito", iscr.NumeroEsami);
-                SetIfHasValue(row, "NumeroCreditiMerito", iscr.NumeroCrediti);
-                SetIfHasValue(row, "SommaVotiMerito", iscr.SommaVoti);
-                row["UtilizzoBonusMerito"] = iscr.UtilizzoBonus != 0;
-                SetIfHasValue(row, "CreditiUtilizzatiMerito", iscr.CreditiUtilizzati);
-                SetIfHasValue(row, "CreditiRimanentiMerito", iscr.CreditiRimanenti);
-                SetIfHasValue(row, "CreditiRiconosciutiDaRinunciaMerito", iscr.CreditiRiconosciutiDaRinuncia);
-                row["AACreditiRiconosciutiMerito"] = iscr.AACreditiRiconosciuti ?? "";
-
-                SetIfPositiveInt(row, "NumeroEventiCarrieraPregressa", iscr.NumeroEventiCarrieraPregressa);
-                SetIfHasValue(row, "UltimoAnnoAvvenimentoCarrieraPregressa", iscr.UltimoAnnoAvvenimentoCarrieraPregressa);
-                row["TotaleCreditiCarrieraPregressa"] = iscr.TotaleCreditiCarrieraPregressa;
-                row["HaPassaggioCorsoEsteroCarrieraPregressa"] = iscr.HaPassaggioCorsoEsteroCarrieraPregressa != 0;
-                row["HaRipetenzaCarrieraPregressa"] = iscr.HaRipetenzaCarrieraPregressa != 0;
-                row["CodiciAvvenimentoCarrieraPregressa"] = iscr.CodiciAvvenimentoCarrieraPregressa ?? "";
-
-                row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
-                row["ImportoBaseBorsa"] = impBorsa.ImportoBase;
-                row["ImportoFinaleBorsa"] = impBorsa.ImportoFinale;
-                row["CalcoloImportoBorsaEseguito"] = impBorsa.CalcoloEseguito;
-
-                dt.Rows.Add(row);
+                foreach (var pair in orderedPairs)
+                {
+                    var info = pair.Value;
+                    items.Add(info);
+                    AddOutputRow(dt, info);
+                }
+            }
+            finally
+            {
+                dt.EndLoadData();
             }
 
-            return dt;
+            return (items, dt);
+        }
+
+        private static void AddOutputRow(DataTable dt, StudenteInfo info)
+        {
+            var eco = info.InformazioniEconomiche;
+            var sede = info.InformazioniSede;
+            var dom = info.InformazioniSede.Domicilio;
+            var iscr = info.InformazioniIscrizione;
+            var impBorsa = info.InformazioniImportoBorsa;
+
+            var row = dt.NewRow();
+            row["CodFiscale"] = info.InformazioniPersonali.CodFiscale ?? "";
+            row["NumDomanda"] = info.InformazioniPersonali.NumDomanda ?? "";
+
+            row["TipoRedditoOrigine"] = eco.Raw.TipoRedditoOrigine ?? "";
+            row["TipoRedditoIntegrazione"] = eco.Raw.TipoRedditoIntegrazione ?? "";
+            row["CodTipoEsitoBS"] = eco.Raw.CodTipoEsitoBS ?? 0;
+            row["ImportoAssegnato"] = ToDecimalOrZero(eco.Raw.ImportoAssegnato);
+            row["ISR"] = eco.Calcolate.ISRDSU;
+            row["ISP"] = eco.Calcolate.ISPDSU;
+            row["Detrazioni"] = eco.Calcolate.Detrazioni;
+            row["ISEDSU"] = eco.Calcolate.ISEDSU;
+            row["ISEEDSU"] = eco.Calcolate.ISEEDSU;
+            row["ISPEDSU"] = eco.Calcolate.ISPEDSU;
+            row["ISPDSU"] = eco.Calcolate.ISPDSU;
+            row["SEQ"] = eco.Calcolate.SEQ;
+            row["ISEDSU_Attuale"] = ToDecimalOrZero(eco.Attuali.ISEDSU);
+            row["ISEEDSU_Attuale"] = ToDecimalOrZero(eco.Attuali.ISEEDSU);
+            row["ISPEDSU_Attuale"] = ToDecimalOrZero(eco.Attuali.ISPEDSU);
+            row["ISPDSU_Attuale"] = ToDecimalOrZero(eco.Attuali.ISPDSU);
+            row["SEQ_Attuale"] = ToDecimalOrZero(eco.Attuali.SEQ);
+
+            row["StatusSedeAttuale"] = sede.StatusSede ?? "";
+            row["StatusSedeSuggerito"] = sede.StatusSedeSuggerito ?? "";
+            row["MotivoStatusSede"] = sede.MotivoStatusSede ?? "";
+            row["ComuneResidenza"] = sede.Residenza.codComune ?? "";
+            row["ProvinciaResidenza"] = sede.Residenza.provincia ?? "";
+            row["ComuneSedeStudi"] = info.InformazioniIscrizione.ComuneSedeStudi ?? "";
+            row["ProvinciaSede"] = info.InformazioniIscrizione.ProvinciaSedeStudi ?? "";
+            row["ComuneDomicilio"] = dom?.codComuneDomicilio ?? "";
+            row["SerieContrattoDomicilio"] = dom?.codiceSerieLocazione ?? "";
+            row["DataRegistrazioneDomicilio"] = FormatDateForExport(dom?.dataRegistrazioneLocazione);
+            row["DataDecorrenzaDomicilio"] = FormatDateForExport(dom?.dataDecorrenzaLocazione);
+            row["DataScadenzaDomicilio"] = FormatDateForExport(dom?.dataScadenzaLocazione);
+            row["ProrogatoDomicilio"] = dom?.prorogatoLocazione ?? false;
+            row["SerieProrogaDomicilio"] = dom?.codiceSerieProrogaLocazione ?? "";
+            row["DomicilioPresente"] = sede.DomicilioPresente;
+            row["DomicilioValido"] = sede.DomicilioValido;
+            row["HasAlloggio12"] = sede.HasAlloggio12;
+            row["HasIstanzaDomicilio"] = sede.HasIstanzaDomicilio;
+            row["CodTipoIstanzaDomicilio"] = sede.CodTipoIstanzaDomicilio ?? "";
+            row["NumIstanzaDomicilio"] = sede.NumIstanzaDomicilio > 0 ? sede.NumIstanzaDomicilio.ToString(CultureInfo.InvariantCulture) : "";
+            row["HasUltimaIstanzaChiusaDomicilio"] = sede.HasUltimaIstanzaChiusaDomicilio;
+            row["CodTipoUltimaIstanzaChiusaDomicilio"] = sede.CodTipoUltimaIstanzaChiusaDomicilio ?? "";
+            row["NumUltimaIstanzaChiusaDomicilio"] = sede.NumUltimaIstanzaChiusaDomicilio > 0 ? sede.NumUltimaIstanzaChiusaDomicilio.ToString(CultureInfo.InvariantCulture) : "";
+            row["EsitoUltimaIstanzaChiusaDomicilio"] = sede.EsitoUltimaIstanzaChiusaDomicilio ?? "";
+            row["UtentePresaCaricoUltimaIstanzaChiusaDomicilio"] = sede.UtentePresaCaricoUltimaIstanzaChiusaDomicilio ?? "";
+
+            row["TipoBando"] = iscr.TipoBando ?? "";
+            SetIfHasValue(row, "AnnoCorsoIscrizione", iscr.AnnoCorso);
+            row["CodSedeStudiIscrizione"] = iscr.CodSedeStudi ?? "";
+            row["CodCorsoLaureaIscrizione"] = iscr.CodCorsoLaurea ?? "";
+            row["CodFacoltaIscrizione"] = iscr.CodFacolta ?? "";
+            row["CodTipologiaStudiIscrizione"] = iscr.TipoCorso > 0 ? iscr.TipoCorso.ToString(CultureInfo.InvariantCulture) : "";
+            SetIfHasValue(row, "CreditiTirocinioIscrizione", iscr.CreditiTirocinio);
+            SetIfHasValue(row, "CreditiRiconosciutiIscrizione", iscr.CreditiRiconosciuti);
+            row["IscrittoSemestreFiltroIscrizione"] = iscr.ConfermaSemestreFiltro != 0;
+            row["CodSedeDistaccataAppartenenza"] = iscr.CodSedeDistaccata ?? "";
+            row["CodEnteAppartenenza"] = iscr.CodEnte ?? "";
+            SetIfHasValue(row, "AnnoImmatricolazioneMerito", iscr.AnnoImmatricolazione);
+            SetIfHasValue(row, "NumeroEsamiMerito", iscr.NumeroEsami);
+            SetIfHasValue(row, "NumeroCreditiMerito", iscr.NumeroCrediti);
+            SetIfHasValue(row, "SommaVotiMerito", iscr.SommaVoti);
+            row["UtilizzoBonusMerito"] = iscr.UtilizzoBonus != 0;
+            SetIfHasValue(row, "CreditiUtilizzatiMerito", iscr.CreditiUtilizzati);
+            SetIfHasValue(row, "CreditiRimanentiMerito", iscr.CreditiRimanenti);
+            SetIfHasValue(row, "CreditiRiconosciutiDaRinunciaMerito", iscr.CreditiRiconosciutiDaRinuncia);
+            row["AACreditiRiconosciutiMerito"] = iscr.AACreditiRiconosciuti ?? "";
+
+            SetIfPositiveInt(row, "NumeroEventiCarrieraPregressa", iscr.NumeroEventiCarrieraPregressa);
+            SetIfHasValue(row, "UltimoAnnoAvvenimentoCarrieraPregressa", iscr.UltimoAnnoAvvenimentoCarrieraPregressa);
+            row["TotaleCreditiCarrieraPregressa"] = iscr.TotaleCreditiCarrieraPregressa;
+            row["HaPassaggioCorsoEsteroCarrieraPregressa"] = iscr.HaPassaggioCorsoEsteroCarrieraPregressa != 0;
+            row["HaRipetenzaCarrieraPregressa"] = iscr.HaRipetenzaCarrieraPregressa != 0;
+            row["CodiciAvvenimentoCarrieraPregressa"] = iscr.CodiciAvvenimentoCarrieraPregressa ?? "";
+
+            row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
+            row["ImportoBaseBorsa"] = impBorsa.ImportoBase;
+            row["ImportoFinaleBorsa"] = impBorsa.ImportoFinale;
+            row["CalcoloImportoBorsaEseguito"] = impBorsa.CalcoloEseguito;
+
+            dt.Rows.Add(row);
+        }
+
+        private static decimal ToDecimalOrZero(object? value)
+        {
+            if (value == null || value == DBNull.Value)
+                return 0m;
+
+            try
+            {
+                return Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return 0m;
+            }
         }
 
         private static void SetIfHasValue(DataRow row, string columnName, object? value)
         {
-            if (value == null)
-                row[columnName] = DBNull.Value;
-            else
-                row[columnName] = value;
+            row[columnName] = value ?? DBNull.Value;
         }
 
         private static void SetIfPositiveInt(DataRow row, string columnName, int value)
         {
-            if (value > 0)
-                row[columnName] = value;
-            else
-                row[columnName] = DBNull.Value;
+            row[columnName] = value > 0 ? value : DBNull.Value;
         }
 
         private static string FormatDateForExport(DateTime? value)

@@ -3,8 +3,10 @@ using ProcedureNet7.Verifica;
 
 namespace ProcedureNet7
 {
-    internal sealed class VerificaControlliDatiEconomici
+    internal sealed class VerificaControlliDatiEconomici : IVerificaModule
     {
+        public string Name => "Economici";
+
         public void Calculate(VerificaPipelineContext context)
         {
             if (context == null)
@@ -22,8 +24,8 @@ namespace ProcedureNet7
                 eco.Calcolate.ISRDSU = Math.Max(eco.Calcolate.ISRDSU - eco.Calcolate.Detrazioni, 0m);
 
                 decimal isedsu = eco.Calcolate.ISRDSU + 0.2m * eco.Calcolate.ISPDSU;
-                decimal iseed = eco.Calcolate.SEQ > 0 ? isedsu / eco.Calcolate.SEQ : isedsu;
-                decimal ispe = (eco.Calcolate.ISPDSU > 0 && eco.Calcolate.SEQ > 0) ? eco.Calcolate.ISPDSU / eco.Calcolate.SEQ : 0m;
+                decimal iseed = eco.Calcolate.SEQ > 0m ? isedsu / eco.Calcolate.SEQ : isedsu;
+                decimal ispe = (eco.Calcolate.ISPDSU > 0m && eco.Calcolate.SEQ > 0m) ? eco.Calcolate.ISPDSU / eco.Calcolate.SEQ : 0m;
 
                 eco.Calcolate.ISEDSU = EconomiciFormulaSupport.RoundSql(isedsu, 2);
                 eco.Calcolate.ISEEDSU = EconomiciFormulaSupport.RoundSql(iseed, 2);
@@ -132,8 +134,8 @@ namespace ProcedureNet7
             int componentiIntegrazione = Math.Max(raw.NumeroComponentiIntegrazione, 0);
             if (componentiIntegrazione <= 0)
             {
-                var seqSoloStudente = EconomiciFormulaSupport.ScalaMin(componentiStudente) + maggiorazioneStudente;
-                return EconomiciFormulaSupport.RoundSql(seqSoloStudente <= 0 ? 1m : seqSoloStudente, 2);
+                decimal seqSoloStudente = EconomiciFormulaSupport.ScalaMin(componentiStudente) + maggiorazioneStudente;
+                return EconomiciFormulaSupport.RoundSql(seqSoloStudente <= 0m ? 1m : seqSoloStudente, 2);
             }
 
             decimal maggiorazioneIntegrazione = 0m;
@@ -144,7 +146,7 @@ namespace ProcedureNet7
             decimal seq = EconomiciFormulaSupport.ScalaMin(componentiTot) + maggiorazioneStudente +
                           (string.Equals(raw.TipoRedditoIntegrazione, "it", StringComparison.OrdinalIgnoreCase) ? maggiorazioneIntegrazione : 0m);
 
-            return EconomiciFormulaSupport.RoundSql(seq <= 0 ? 1m : seq, 2);
+            return EconomiciFormulaSupport.RoundSql(seq <= 0m ? 1m : seq, 2);
         }
     }
 
