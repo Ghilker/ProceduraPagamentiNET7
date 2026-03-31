@@ -1,50 +1,51 @@
+using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Data.SqlClient;
 using System.Data;
+using System.Data.SqlClient;
 using System.Globalization;
+using System.Linq;
 
 namespace ProcedureNet7
 {
     internal sealed partial class VerificaRaccoltaDati
     {
-        internal void RaccogliEconomiciDaContesto(string aa, IReadOnlyDictionary<StudentKey, StudenteInfo> students)
+        internal void RaccogliEconomiciDaContesto(VerificaPipelineContext context)
         {
             void Log(int pct, string msg) => Logger.LogInfo(Math.Max(0, Math.Min(100, pct)), msg);
 
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
             Log(0, "Avvio raccolta dati economici centralizzata");
 
-            aa = (aa ?? "").Trim();
+            string aa = (context.AnnoAccademico ?? "").Trim();
             if (string.IsNullOrWhiteSpace(aa) || aa.Length != 8)
                 throw new ArgumentException("Anno accademico non valido (atteso char(8), es: 20232024).");
 
-            ResetState(aa);
-            InitializeStudentsFromContext(students);
-            Log(10, $"Studenti inizializzati dal contesto: {_targets.Count}");
+            ResetState();
+            InitializeStudentsFromContext(context.Students);
+            Log(10, $"Studenti inizializzati dal contesto: {_studentsByKey.Count}");
 
-            ExecuteEconomiciCollectionPipeline(aa, Log);
+            ExecuteEconomiciCollectionPipeline(aa, context.TempCandidatesTable, Log);
         }
 
-        private void ExecuteEconomiciCollectionPipeline(string aa, Action<int, string> log)
+        private void ExecuteEconomiciCollectionPipeline(string aa, string fullTargetsTableName, Action<int, string> log)
         {
-            _targets.Clear();
-            _targets.AddRange(DistinctTargets(_studentsByKey.Keys.Select(key => new Target(key.CodFiscale, key.NumDomanda))));
-
             log(18, "Caricamento valori attuali da vValori_calcolati.");
-            LoadValoriCalcolatiAttuali(aa, _targets);
+            LoadValoriCalcolatiAttuali(aa, fullTargetsTableName);
 
             LoadCalcParams(aa);
-            LoadNucleoFamiliare(aa, _targets);
+            LoadNucleoFamiliare(aa, fullTargetsTableName);
 
             log(19, "Caricamento esito concorso BS (ultimo record valido).");
-            LoadEsitoBorsaStudio(aa, _targets);
+            LoadEsitoBorsaStudio(aa, fullTargetsTableName);
 
             log(22, "Caricamento INPS e attestazioni CO.");
-            LoadInpsAndAttestazioni_StoredLike(aa, _targets);
+            LoadInpsAndAttestazioni_StoredLike(aa, fullTargetsTableName);
 
             log(30, "Lettura tipologie reddito e split per studente/domanda.");
-            var split = LoadTipologieRedditiAndSplit(aa, _targets);
+            var split = LoadTipologieRedditiAndSplit(aa, fullTargetsTableName);
 
             log(40, "Estrazione dati economici origine.");
             if (split.OrigIT_CO.Count > 0) AddDatiEconomiciItaliani_CO(aa, split.OrigIT_CO);
@@ -58,17 +59,16 @@ namespace ProcedureNet7
             log(70, $"Raccolta dati economici completata. Righe in memoria: {_studentsByKey.Count}, studenti nel contesto: {_studentsByKey.Count}");
         }
 
-        private void LoadInpsAndAttestazioni_StoredLike(string aa, List<Target> targets)
+        private void LoadInpsAndAttestazioni_StoredLike(string aa, string sourceTableName)
         {
-            EnsureTempTargetsTableAndFill(targets);
+            sourceTableName = ResolveTempTableName(sourceTableName);
 
-
-            const string sqlOrig = @"
+            string sqlOrig = $@"
 SELECT
     t.Cod_fiscale,
     t.Num_domanda,
     si.status_inps
-FROM #TargetsEconomici t
+FROM {sourceTableName} t
 LEFT JOIN vStatus_INPS si
     ON si.anno_accademico = @AA
    AND si.cod_fiscale     = t.Cod_fiscale
@@ -91,12 +91,12 @@ LEFT JOIN vStatus_INPS si
                 }
             }
 
-            const string sqlInt = @"
+            string sqlInt = $@"
 SELECT
     t.Cod_fiscale,
     t.Num_domanda,
     si.status_inps
-FROM #TargetsEconomici t
+FROM {sourceTableName} t
 LEFT JOIN vStatus_INPS si
     ON si.anno_accademico = @AA
    AND si.cod_fiscale     = t.Cod_fiscale
@@ -119,12 +119,12 @@ LEFT JOIN vStatus_INPS si
                 }
             }
 
-            const string sqlAtt = @"
+            string sqlAtt = $@"
 SELECT
     t.Cod_fiscale,
     t.Num_domanda,
     LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))) AS Cod_tipo_attestazione
-FROM #TargetsEconomici t
+FROM {sourceTableName} t
 LEFT JOIN vCertificaz_ISEE cte
     ON cte.Anno_accademico = @AA
    AND cte.Num_domanda     = t.Num_domanda
@@ -169,18 +169,18 @@ WHERE Anno_accademico = @AA;";
             }
         }
 
-        private void LoadNucleoFamiliare(string aa, List<Target> targets)
+        private void LoadNucleoFamiliare(string aa, string sourceTableName)
         {
-            EnsureTempTargetsTableAndFill(targets);
+            sourceTableName = ResolveTempTableName(sourceTableName);
 
-            const string sql = @"
+            string sql = $@"
 SELECT
     t.Cod_fiscale,
     t.Num_domanda,
     ISNULL(nf.Num_componenti, 0) AS Num_componenti,
     ISNULL(nf.Cod_tipologia_nucleo, '') AS Cod_tipologia_nucleo,
     ISNULL(nf.Numero_conviventi_estero, 0) AS Numero_conviventi_estero
-FROM #TargetsEconomici t
+FROM {sourceTableName} t
 INNER JOIN vNucleo_familiare nf
     ON nf.Anno_accademico = @AA
    AND nf.Num_domanda     = t.Num_domanda;";
@@ -194,12 +194,27 @@ INNER JOIN vNucleo_familiare nf
                 if (!TryGetStudentInfo(reader, out var info)) continue;
                 var eco = info.InformazioniEconomiche;
                 var raw = eco.Raw;
-                var attuali = eco.Attuali;
 
                 raw.NumeroComponenti = reader.SafeGetInt("Num_componenti");
                 raw.TipoNucleo = reader.SafeGetString("Cod_tipologia_nucleo");
                 raw.NumeroConviventiEstero = reader.SafeGetInt("Numero_conviventi_estero");
             }
+        }
+
+        private static string ResolveTempTableName(string tableName)
+        {
+            string value = (tableName ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException("Nome temp table non valido.", nameof(tableName));
+
+            foreach (char ch in value)
+            {
+                bool ok = char.IsLetterOrDigit(ch) || ch == '#' || ch == '_';
+                if (!ok)
+                    throw new ArgumentException($"Nome temp table non valido: {tableName}", nameof(tableName));
+            }
+
+            return value;
         }
 
         private void EnsureTempTargetsTableAndFill(List<Target> targets)
@@ -565,21 +580,21 @@ INNER JOIN vNucleo_fam_stranieri_DI nf
             public List<Target> IntDI { get; } = new();
         }
 
-        private SplitResult LoadTipologieRedditiAndSplit(string aa, List<Target> targets)
+        private SplitResult LoadTipologieRedditiAndSplit(string aa, string sourceTableName)
         {
             Logger.LogInfo(30, "Esecuzione query tipologie reddito (vTipologie_redditi) + split per studente/domanda.");
 
-            EnsureTempTargetsTableAndFill(targets);
+            sourceTableName = ResolveTempTableName(sourceTableName);
             var result = new SplitResult();
 
-            const string sql = @"
+            string sql = $@"
 SELECT
     t.Cod_fiscale,
     t.Num_domanda,
     tr.Tipo_redd_nucleo_fam_origine,
     tr.Tipo_redd_nucleo_fam_integr,
     ISNULL(tr.altri_mezzi,0) AS altri_mezzi
-FROM #TargetsEconomici t
+FROM {sourceTableName} t
 INNER JOIN vTipologie_redditi tr
     ON tr.Anno_accademico = @AA
    AND tr.Num_domanda     = t.Num_domanda
@@ -597,19 +612,16 @@ ORDER BY t.Cod_fiscale, t.Num_domanda;";
                     continue;
                 var eco = info.InformazioniEconomiche;
                 var raw = eco.Raw;
-                var attuali = eco.Attuali;
 
                 string codFiscale = NormalizeCf(reader.SafeGetString("Cod_fiscale"));
                 string numDomanda = NormalizeDomanda(reader.SafeGetString("Num_domanda"));
                 var target = new Target(codFiscale, numDomanda);
-                var key = CreateStudentKey(codFiscale, numDomanda);
                 string tipoOrigine = Utilities.RemoveAllSpaces(reader.SafeGetString("Tipo_redd_nucleo_fam_origine"));
                 string tipoIntegrazione = Utilities.RemoveAllSpaces(reader.SafeGetString("Tipo_redd_nucleo_fam_integr"));
 
                 raw.TipoRedditoOrigine = tipoOrigine;
                 raw.TipoRedditoIntegrazione = tipoIntegrazione;
                 raw.AltriMezzi = reader.SafeGetDecimal("altri_mezzi");
-
 
                 if (tipoOrigine.Equals("it", StringComparison.OrdinalIgnoreCase))
                 {
@@ -644,11 +656,11 @@ ORDER BY t.Cod_fiscale, t.Num_domanda;";
             return result;
         }
 
-        private void LoadValoriCalcolatiAttuali(string aa, List<Target> targets)
+        private void LoadValoriCalcolatiAttuali(string aa, string sourceTableName)
         {
-            EnsureTempTargetsTableAndFill(targets);
+            sourceTableName = ResolveTempTableName(sourceTableName);
 
-            const string sql = @"
+            string sql = $@"
 SELECT
     t.Cod_fiscale,
     t.Num_domanda,
@@ -657,7 +669,7 @@ SELECT
     vv.SEQ,
     vv.ISPDSU,
     vv.ISEEDSU
-FROM #TargetsEconomici t
+FROM {sourceTableName} t
 LEFT JOIN vValori_calcolati vv
     ON vv.Anno_accademico = @AA
    AND vv.Num_domanda     = t.Num_domanda;";
@@ -670,7 +682,6 @@ LEFT JOIN vValori_calcolati vv
             {
                 if (!TryGetStudentInfo(reader, out var info)) continue;
                 var eco = info.InformazioniEconomiche;
-                var raw = eco.Raw;
                 var attuali = eco.Attuali;
 
                 attuali.ISPEDSU = reader.SafeGetDouble("ISPEDSU");
@@ -681,11 +692,11 @@ LEFT JOIN vValori_calcolati vv
             }
         }
 
-        private void LoadEsitoBorsaStudio(string aa, List<Target> targets)
+        private void LoadEsitoBorsaStudio(string aa, string sourceTableName)
         {
-            EnsureTempTargetsTableAndFill(targets);
+            sourceTableName = ResolveTempTableName(sourceTableName);
 
-            const string sql = @"
+            string sql = $@"
 WITH EsitoBS AS
 (
     SELECT
@@ -707,7 +718,7 @@ SELECT
     t.Num_domanda,
     e.Cod_tipo_esito,
     e.imp_assegnato
-FROM #TargetsEconomici t
+FROM {sourceTableName} t
 LEFT JOIN EsitoBS e
     ON e.Anno_accademico = @AA
    AND e.Num_domanda     = t.Num_domanda
@@ -722,7 +733,6 @@ LEFT JOIN EsitoBS e
                 if (!TryGetStudentInfo(reader, out var info)) continue;
                 var eco = info.InformazioniEconomiche;
                 var raw = eco.Raw;
-                var attuali = eco.Attuali;
 
                 object rawEsito = reader["Cod_tipo_esito"];
                 int? codTipoEsito = rawEsito is DBNull or null ? (int?)null : Convert.ToInt32(rawEsito, CultureInfo.InvariantCulture);

@@ -18,7 +18,6 @@ namespace ProcedureNet7
 
 
         private readonly CalcParams _calc = new();
-        private readonly System.Collections.Generic.List<Target> _targets = new();
         private readonly System.Collections.Generic.HashSet<(string ComuneA, string ComuneB)> _comuniEquiparati = new();
 
         private const string VerificaCandidatesSql = @"
@@ -128,7 +127,7 @@ ORDER BY CodFiscale, NumDomanda;
 
             try
             {
-                RaccogliEconomiciDaContesto(context.AnnoAccademico, context.Students);
+                RaccogliEconomiciDaContesto(context);
                 context.CalcParams = _calc.Clone();
 
                 RaccogliStatusSede(context);
@@ -144,10 +143,9 @@ ORDER BY CodFiscale, NumDomanda;
             }
         }
 
-        private void ResetState(string aa)
+        private void ResetState()
         {
             _studentsByKey.Clear();
-            _targets.Clear();
             _comuniEquiparati.Clear();
         }
 
@@ -165,7 +163,6 @@ ORDER BY CodFiscale, NumDomanda;
                 info.InformazioniEconomiche ??= new InformazioniEconomiche();
                 var studentKey = new StudentKey(cf, numDomanda);
                 _studentsByKey[studentKey] = info;
-                _targets.Add(new Target(cf, numDomanda));
             }
         }
 
@@ -230,10 +227,10 @@ ORDER BY CodFiscale, NumDomanda;
 
         private DataTable CaricaCandidatiEInizializzaStudenti(VerificaPipelineContext context)
         {
-            var table = BuildCandidatesDataTable();
-
             context.Students.Clear();
             context.ComuniEquiparati.Clear();
+
+            var table = BuildCandidatesDataTable();
 
             using var cmd = new SqlCommand(VerificaCandidatesSql, _conn)
             {
@@ -247,58 +244,55 @@ ORDER BY CodFiscale, NumDomanda;
 
             var filtroCf = context.CodiciFiscaliFiltro.Count == 0
                 ? null
-                : new System.Collections.Generic.HashSet<string>(context.CodiciFiscaliFiltro.Select(NormalizeCf), StringComparer.OrdinalIgnoreCase);
+                : new HashSet<string>(context.CodiciFiscaliFiltro.Select(NormalizeCf), StringComparer.OrdinalIgnoreCase);
 
             Logger.LogInfo(null, $"[VerificaRaccoltaDati] Estrazione candidati | AA={context.AnnoAccademico} | IncludeEsclusi={context.IncludeEsclusi} | IncludeNonTrasmesse={context.IncludeNonTrasmesse}");
 
             using var reader = cmd.ExecuteReader();
             int read = 0;
-            int used = 0;
             while (reader.Read())
             {
-                read++;
-
+                int numDomanda = reader.SafeGetInt("NumDomanda");
                 string codFiscale = NormalizeCf(reader.SafeGetString("CodFiscale"));
-                if (filtroCf != null && !filtroCf.Contains(codFiscale))
+                if (string.IsNullOrWhiteSpace(codFiscale))
                 {
-                    if (read % 5000 == 0)
-                        Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati letti... {read}");
+                    read++;
                     continue;
                 }
 
-                int numDomandaInt = reader.SafeGetInt("NumDomanda");
-                string numDomanda = numDomandaInt.ToString(CultureInfo.InvariantCulture);
-                string tipoBando = (reader.SafeGetString("TipoBando") ?? string.Empty).Trim();
-                int statusCompilazione = reader.SafeGetInt("StatusCompilazione");
-                int codTipoEsitoBS = reader.SafeGetInt("CodTipoEsitoBS");
-                decimal importoAssegnato = Convert.ToDecimal(reader["ImportoAssegnato"], CultureInfo.InvariantCulture);
+                if (filtroCf != null && !filtroCf.Contains(codFiscale))
+                {
+                    read++;
+                    continue;
+                }
 
-                var key = new StudentKey(codFiscale, numDomanda);
+                string tipoBando = (reader.SafeGetString("TipoBando") ?? "").Trim();
+                int codTipoEsitoBs = reader.SafeGetInt("CodTipoEsitoBS");
+                decimal importoAssegnato = reader["ImportoAssegnato"] is DBNull
+                    ? 0m
+                    : Convert.ToDecimal(reader["ImportoAssegnato"], CultureInfo.InvariantCulture);
+                int statusCompilazione = reader.SafeGetInt("StatusCompilazione");
+                string numDomandaText = numDomanda.ToString(CultureInfo.InvariantCulture);
+
                 var info = new StudenteInfo
                 {
                     TipoBando = tipoBando,
                     StatusCompilazione = statusCompilazione
                 };
                 info.InformazioniPersonali.CodFiscale = codFiscale;
-                info.InformazioniPersonali.NumDomanda = numDomanda;
-                info.InformazioniIscrizione.TipoBando = tipoBando;
+                info.InformazioniPersonali.NumDomanda = numDomandaText;
+
+                var key = new StudentKey(codFiscale, numDomandaText);
                 context.Students[key] = info;
 
-                var row = table.NewRow();
-                row["NumDomanda"] = numDomandaInt;
-                row["CodFiscale"] = codFiscale;
-                row["TipoBando"] = tipoBando;
-                row["CodTipoEsitoBS"] = codTipoEsitoBS;
-                row["ImportoAssegnato"] = importoAssegnato;
-                row["StatusCompilazione"] = statusCompilazione;
-                table.Rows.Add(row);
+                table.Rows.Add(numDomanda, codFiscale, tipoBando, codTipoEsitoBs, importoAssegnato, statusCompilazione);
 
-                used++;
+                read++;
                 if (read % 5000 == 0)
                     Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati letti... {read}");
             }
 
-            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati utilizzati: {used}");
+            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati utilizzati: {context.Students.Count}");
             return table;
         }
 
@@ -489,17 +483,17 @@ SELECT
     TRY_CONVERT(INT, cp.Prima_immatricolaz) AS Prima_immatricolaz,
     CONVERT(NVARCHAR(150), cp.Tipologia_corso) AS Tipologia_corso,
     TRY_CONVERT(INT, cp.Durata_leg_titolo_conseguito) AS Durata_leg_titolo_conseguito,
-    CAST(CASE WHEN UPPER(CONVERT(NVARCHAR(10), ISNULL(cp.Passaggio_corso_estero,0))) IN ('1','S','Y','T','TRUE') THEN 1 ELSE 0 END AS BIT) AS Passaggio_corso_estero,
+    TRY_CONVERT(INT, cp.Passaggio_corso_estero,0) AS Passaggio_corso_estero,
     CONVERT(NVARCHAR(250), cp.Sede_istituzione_universitaria) AS Sede_istituzione_universitaria,
     CONVERT(NVARCHAR(250), cp.benefici_usufruiti) AS benefici_usufruiti,
     CONVERT(NVARCHAR(250), cp.importi_restituiti) AS importi_restituiti,
     TRY_CONVERT(DECIMAL(18,2), cp.numero_crediti) AS numero_crediti,
     TRY_CONVERT(INT, cp.anno_corso) AS anno_corso,
-    CAST(CASE WHEN UPPER(CONVERT(NVARCHAR(10), ISNULL(cp.ripetente,0))) IN ('1','S','Y','T','TRUE') THEN 1 ELSE 0 END AS BIT) AS ripetente,
+    TRY_CONVERT(INT, cp.ripetente,0) AS ripetente,
     CONVERT(NVARCHAR(250), cp.Ateneo) AS Ateneo,
     CONVERT(NVARCHAR(50), cp.CodComune_Ateneo) AS CodComune_Ateneo,
     CONVERT(NVARCHAR(50), cp.CodAteneo) AS CodAteneo,
-    CAST(CASE WHEN UPPER(CONVERT(NVARCHAR(10), ISNULL(cp.Iscritto_semestre_filtroDI,0))) IN ('1','S','Y','T','TRUE') THEN 1 ELSE 0 END AS BIT) AS Iscritto_semestre_filtroDI
+    TRY_CONVERT(INT, cp.Iscritto_semestre_filtroDI,0) AS Iscritto_semestre_filtroDI
 FROM D
 JOIN vCARRIERA_PREGRESSA cp
   ON cp.Anno_accademico = @AA
