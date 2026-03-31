@@ -8,6 +8,8 @@ namespace ProcedureNet7
 {
     public class StudenteInfo
     {
+        public string TipoBando { get; set; } = string.Empty;
+        public int StatusCompilazione { get; set; }
         public InformazioniPersonali InformazioniPersonali { get; set; } = new InformazioniPersonali();
         public InformazioniIscrizione InformazioniIscrizione { get; set; } = new InformazioniIscrizione();
         public InformazioniBeneficio InformazioniBeneficio { get; set; } = new InformazioniBeneficio();

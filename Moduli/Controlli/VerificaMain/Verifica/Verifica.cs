@@ -109,16 +109,6 @@ namespace ProcedureNet7.Verifica
         }
     }
 
-    internal sealed class VerificaCandidate
-    {
-        public int NumDomanda { get; init; }
-        public string CodFiscale { get; init; } = "";
-        public string TipoBando { get; init; } = "";
-        public int CodTipoEsitoBS { get; init; }
-        public double ImportoAssegnato { get; init; }
-        public int StatusCompilazione { get; init; }
-    }
-
     internal sealed partial class Verifica
     {
         private static string NormalizeCf(string? cf)

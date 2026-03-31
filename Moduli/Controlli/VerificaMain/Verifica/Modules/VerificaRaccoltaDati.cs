@@ -116,8 +116,7 @@ ORDER BY CodFiscale, NumDomanda;
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-            var candidates = CaricaCandidatiEInizializzaStudenti(context);
-
+            var candidatesTable = CaricaCandidatiEInizializzaStudenti(context);
             if (context.Students.Count == 0)
             {
                 context.CalcParams = _calc.Clone();
@@ -125,7 +124,7 @@ ORDER BY CodFiscale, NumDomanda;
             }
 
             CreateTempCandidatesTable(context.Connection, context.TempCandidatesTable);
-            BulkCopyCandidates(context.Connection, context.TempCandidatesTable, candidates);
+            BulkCopyCandidates(context.Connection, context.TempCandidatesTable, candidatesTable);
 
             try
             {
@@ -228,24 +227,13 @@ ORDER BY CodFiscale, NumDomanda;
                 context.ComuniEquiparati.Add(pair);
         }
 
-        private List<VerificaCandidate> CaricaCandidatiEInizializzaStudenti(VerificaPipelineContext context)
-        {
-            var candidates = LoadVerificaCandidates(
-                context.AnnoAccademico,
-                context.IncludeEsclusi,
-                context.IncludeNonTrasmesse,
-                context.CodiciFiscaliFiltro);
 
-            context.InitializeStudents(candidates);
-            return candidates;
-        }
-        private List<VerificaCandidate> LoadVerificaCandidates(
-            string aa,
-            bool includeEsclusi,
-            bool includeNonTrasmesse,
-            IReadOnlyCollection<string>? codiciFiscaliFiltro)
+        private DataTable CaricaCandidatiEInizializzaStudenti(VerificaPipelineContext context)
         {
-            var list = new List<VerificaCandidate>(capacity: 80000);
+            var table = BuildCandidatesDataTable();
+
+            context.Students.Clear();
+            context.ComuniEquiparati.Clear();
 
             using var cmd = new SqlCommand(VerificaCandidatesSql, _conn)
             {
@@ -253,40 +241,77 @@ ORDER BY CodFiscale, NumDomanda;
                 CommandTimeout = 9999999
             };
 
-            cmd.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
-            cmd.Parameters.Add("@IncludeEsclusi", SqlDbType.Bit).Value = includeEsclusi;
-            cmd.Parameters.Add("@IncludeNonTrasmesse", SqlDbType.Bit).Value = includeNonTrasmesse;
+            cmd.Parameters.Add("@AA", SqlDbType.Char, 8).Value = context.AnnoAccademico;
+            cmd.Parameters.Add("@IncludeEsclusi", SqlDbType.Bit).Value = context.IncludeEsclusi;
+            cmd.Parameters.Add("@IncludeNonTrasmesse", SqlDbType.Bit).Value = context.IncludeNonTrasmesse;
 
-            var filtroCf = codiciFiscaliFiltro == null || codiciFiscaliFiltro.Count == 0
+            var filtroCf = context.CodiciFiscaliFiltro.Count == 0
                 ? null
-                : new HashSet<string>(codiciFiscaliFiltro.Select(NormalizeCf), StringComparer.OrdinalIgnoreCase);
+                : new System.Collections.Generic.HashSet<string>(context.CodiciFiscaliFiltro.Select(NormalizeCf), StringComparer.OrdinalIgnoreCase);
 
-            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Estrazione candidati | AA={aa} | IncludeEsclusi={includeEsclusi} | IncludeNonTrasmesse={includeNonTrasmesse}");
+            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Estrazione candidati | AA={context.AnnoAccademico} | IncludeEsclusi={context.IncludeEsclusi} | IncludeNonTrasmesse={context.IncludeNonTrasmesse}");
 
             using var reader = cmd.ExecuteReader();
             int read = 0;
+            int used = 0;
             while (reader.Read())
             {
-                var candidate = new VerificaCandidate
-                {
-                    NumDomanda = reader.SafeGetInt("NumDomanda"),
-                    CodFiscale = NormalizeCf(reader.SafeGetString("CodFiscale")),
-                    TipoBando = (reader.SafeGetString("TipoBando") ?? "").Trim(),
-                    CodTipoEsitoBS = reader.SafeGetInt("CodTipoEsitoBS"),
-                    ImportoAssegnato = reader.SafeGetInt("ImportoAssegnato"),
-                    StatusCompilazione = reader.SafeGetInt("StatusCompilazione")
-                };
-
-                if (filtroCf == null || filtroCf.Contains(candidate.CodFiscale))
-                    list.Add(candidate);
-
                 read++;
+
+                string codFiscale = NormalizeCf(reader.SafeGetString("CodFiscale"));
+                if (filtroCf != null && !filtroCf.Contains(codFiscale))
+                {
+                    if (read % 5000 == 0)
+                        Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati letti... {read}");
+                    continue;
+                }
+
+                int numDomandaInt = reader.SafeGetInt("NumDomanda");
+                string numDomanda = numDomandaInt.ToString(CultureInfo.InvariantCulture);
+                string tipoBando = (reader.SafeGetString("TipoBando") ?? string.Empty).Trim();
+                int statusCompilazione = reader.SafeGetInt("StatusCompilazione");
+                int codTipoEsitoBS = reader.SafeGetInt("CodTipoEsitoBS");
+                decimal importoAssegnato = Convert.ToDecimal(reader["ImportoAssegnato"], CultureInfo.InvariantCulture);
+
+                var key = new StudentKey(codFiscale, numDomanda);
+                var info = new StudenteInfo
+                {
+                    TipoBando = tipoBando,
+                    StatusCompilazione = statusCompilazione
+                };
+                info.InformazioniPersonali.CodFiscale = codFiscale;
+                info.InformazioniPersonali.NumDomanda = numDomanda;
+                info.InformazioniIscrizione.TipoBando = tipoBando;
+                context.Students[key] = info;
+
+                var row = table.NewRow();
+                row["NumDomanda"] = numDomandaInt;
+                row["CodFiscale"] = codFiscale;
+                row["TipoBando"] = tipoBando;
+                row["CodTipoEsitoBS"] = codTipoEsitoBS;
+                row["ImportoAssegnato"] = importoAssegnato;
+                row["StatusCompilazione"] = statusCompilazione;
+                table.Rows.Add(row);
+
+                used++;
                 if (read % 5000 == 0)
                     Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati letti... {read}");
             }
 
-            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati utilizzati: {list.Count}");
-            return list;
+            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati utilizzati: {used}");
+            return table;
+        }
+
+        private static DataTable BuildCandidatesDataTable()
+        {
+            var dt = new DataTable();
+            dt.Columns.Add("NumDomanda", typeof(int));
+            dt.Columns.Add("CodFiscale", typeof(string));
+            dt.Columns.Add("TipoBando", typeof(string));
+            dt.Columns.Add("CodTipoEsitoBS", typeof(int));
+            dt.Columns.Add("ImportoAssegnato", typeof(decimal));
+            dt.Columns.Add("StatusCompilazione", typeof(int));
+            return dt;
         }
 
         private static void CreateTempCandidatesTable(SqlConnection conn, string tempTableName)
@@ -316,19 +341,8 @@ CREATE TABLE {tempTableName}
             cmd.ExecuteNonQuery();
         }
 
-        private static void BulkCopyCandidates(SqlConnection conn, string tempTableName, IReadOnlyCollection<VerificaCandidate> candidates)
+        private static void BulkCopyCandidates(SqlConnection conn, string tempTableName, DataTable candidatesTable)
         {
-            var dt = new DataTable();
-            dt.Columns.Add("NumDomanda", typeof(int));
-            dt.Columns.Add("CodFiscale", typeof(string));
-            dt.Columns.Add("TipoBando", typeof(string));
-            dt.Columns.Add("CodTipoEsitoBS", typeof(int));
-            dt.Columns.Add("ImportoAssegnato", typeof(double));
-            dt.Columns.Add("StatusCompilazione", typeof(int));
-
-            foreach (var candidate in candidates)
-                dt.Rows.Add(candidate.NumDomanda, candidate.CodFiscale, candidate.TipoBando ?? "", candidate.CodTipoEsitoBS, candidate.ImportoAssegnato, candidate.StatusCompilazione);
-
             using var bulk = new SqlBulkCopy(conn, SqlBulkCopyOptions.TableLock, externalTransaction: null)
             {
                 DestinationTableName = tempTableName,
@@ -342,7 +356,7 @@ CREATE TABLE {tempTableName}
             bulk.ColumnMappings.Add("CodTipoEsitoBS", "CodTipoEsitoBS");
             bulk.ColumnMappings.Add("ImportoAssegnato", "ImportoAssegnato");
             bulk.ColumnMappings.Add("StatusCompilazione", "StatusCompilazione");
-            bulk.WriteToServer(dt);
+            bulk.WriteToServer(candidatesTable);
         }
 
         private static (string ComuneA, string ComuneB) NormalizeComunePair(string? comuneA, string? comuneB)
@@ -381,7 +395,7 @@ ISCR AS
         CONVERT(NVARCHAR(50), i.Cod_tipologia_studi) AS Cod_tipologia_studi,
         TRY_CONVERT(DECIMAL(18,2), i.Crediti_tirocinio) AS Crediti_tirocinio,
         TRY_CONVERT(DECIMAL(18,2), i.Crediti_riconosciuti) AS Crediti_riconosciuti,
-        CAST(CASE WHEN UPPER(CONVERT(NVARCHAR(10), ISNULL(i.Iscritto_semestre_filtro,0))) IN ('1','S','Y','T','TRUE') THEN 1 ELSE 0 END AS BIT) AS Iscritto_semestre_filtro,
+        TRY_CONVERT(INT, i.Conferma_semestre_filtro,0) AS Conferma_semestre_filtro,
         ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY D.NumDomanda) AS rn
     FROM D
     LEFT JOIN vIscrizioni i
@@ -412,7 +426,7 @@ MER AS
         TRY_CONVERT(INT, m.Numero_esami) AS Numero_esami,
         TRY_CONVERT(DECIMAL(18,2), m.Numero_crediti) AS Numero_crediti,
         TRY_CONVERT(DECIMAL(18,2), m.Somma_voti) AS Somma_voti,
-        CAST(CASE WHEN UPPER(CONVERT(NVARCHAR(10), ISNULL(m.Utilizzo_bonus,0))) IN ('1','S','Y','T','TRUE') THEN 1 ELSE 0 END AS BIT) AS Utilizzo_bonus,
+        TRY_CONVERT(INT, m.Utilizzo_bonus,0) AS Utilizzo_bonus,
         TRY_CONVERT(DECIMAL(18,2), m.Crediti_utilizzati) AS Crediti_utilizzati,
         TRY_CONVERT(DECIMAL(18,2), m.Crediti_rimanenti) AS Crediti_rimanenti,
         TRY_CONVERT(DECIMAL(18,2), m.Crediti_riconosciuti_da_rinuncia) AS Crediti_riconosciuti_da_rinuncia,
@@ -434,7 +448,7 @@ SELECT
     I.Cod_tipologia_studi,
     I.Crediti_tirocinio,
     I.Crediti_riconosciuti,
-    I.Iscritto_semestre_filtro,
+    I.Conferma_semestre_filtro,
     A.Cod_sede_distaccata,
     A.Cod_ente,
     M.Anno_immatricolaz,
@@ -551,7 +565,7 @@ ORDER BY D.CodFiscale, D.NumDomanda, TRY_CONVERT(INT, cp.Anno_avvenimento), CONV
                 });
                 iscr.CreditiTirocinio = reader.SafeGetDecimal("Crediti_tirocinio");
                 iscr.CreditiRiconosciuti = reader.SafeGetDecimal("Crediti_riconosciuti");
-                iscr.ConfermaSemestreFiltro = reader.SafeGetInt("Iscritto_semestre_filtro");
+                iscr.ConfermaSemestreFiltro = reader.SafeGetInt("Conferma_semestre_filtro");
                 iscr.CodSedeDistaccata = reader.SafeGetString("Cod_sede_distaccata");
                 iscr.CodEnte = reader.SafeGetString("Cod_ente");
                 iscr.AnnoImmatricolazione = reader.SafeGetInt("Anno_immatricolaz");

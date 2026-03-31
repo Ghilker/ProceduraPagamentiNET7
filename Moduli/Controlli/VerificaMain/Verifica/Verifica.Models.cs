@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using System.Data.SqlClient;
+using System.Linq;
 
 namespace ProcedureNet7.Verifica
 {
@@ -32,26 +31,5 @@ namespace ProcedureNet7.Verifica
                 .ThenBy(pair => pair.Key.NumDomanda, StringComparer.OrdinalIgnoreCase)
                 .Select(pair => pair.Value)
                 .ToList();
-
-        public void InitializeStudents(IEnumerable<VerificaCandidate> candidates)
-        {
-            Students.Clear();
-            ComuniEquiparati.Clear();
-
-            foreach (var candidate in candidates)
-            {
-                string cf = NormalizeCf(candidate.CodFiscale);
-                string numDomanda = candidate.NumDomanda.ToString(CultureInfo.InvariantCulture);
-                var key = new StudentKey(cf, numDomanda);
-
-                var info = new StudenteInfo();
-                info.InformazioniPersonali.CodFiscale = cf;
-                info.InformazioniPersonali.NumDomanda = numDomanda;
-                Students[key] = info;
-            }
-        }
-
-        private static string NormalizeCf(string? value)
-            => (value ?? "").Trim().ToUpperInvariant();
     }
 }
