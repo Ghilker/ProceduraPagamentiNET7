@@ -24,7 +24,7 @@ namespace ProcedureNet7
                 throw new ArgumentException("Anno accademico non valido (atteso char(8), es: 20232024).");
 
             _currentContext = context;
-            ResetState();
+            ResetComuniEquiparatiState();
             Log(10, $"Studenti nel contesto: {CurrentStudents.Count}");
 
             ExecuteEconomiciCollectionPipeline(aa, context.TempPipelineTable, Log);

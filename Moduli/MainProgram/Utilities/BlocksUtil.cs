@@ -345,14 +345,25 @@ WHERE d.Anno_accademico = @aa
 
 CREATE UNIQUE CLUSTERED INDEX IX_Base ON #Base(Anno_accademico, Num_domanda);
 
-DECLARE @Removed TABLE (Num_domanda DECIMAL(18,0) NOT NULL PRIMARY KEY);
+DECLARE @RemovedRaw TABLE
+(
+    Anno_accademico CHAR(8) NOT NULL,
+    Num_domanda DECIMAL(18,0) NOT NULL
+);
+
+DECLARE @Removed TABLE
+(
+    Anno_accademico CHAR(8) NOT NULL,
+    Num_domanda DECIMAL(18,0) NOT NULL,
+    PRIMARY KEY (Anno_accademico, Num_domanda)
+);
 
 UPDATE mbp
 SET Blocco_pagamento_attivo = 0,
     Data_fine_validita = CURRENT_TIMESTAMP,
     Utente_sblocco = @utente
-OUTPUT inserted.Num_domanda
-INTO @Removed(Num_domanda)
+OUTPUT inserted.Anno_accademico, inserted.Num_domanda
+INTO @RemovedRaw(Anno_accademico, Num_domanda)
 FROM dbo.Motivazioni_blocco_pagamenti mbp
 INNER JOIN #Base b
     ON mbp.Anno_accademico = b.Anno_accademico
@@ -361,6 +372,10 @@ WHERE mbp.Cod_tipologia_blocco = @block
   AND mbp.Blocco_pagamento_attivo = 1
   AND mbp.Data_fine_validita IS NULL;
 
+INSERT INTO @Removed (Anno_accademico, Num_domanda)
+SELECT DISTINCT Anno_accademico, Num_domanda
+FROM @RemovedRaw;
+
 INSERT INTO dbo.DatiGenerali_dom ({insertColumnsList})
 SELECT DISTINCT {selectColumnsList}
 FROM dbo.Domanda d
@@ -368,7 +383,8 @@ INNER JOIN dbo.vDATIGENERALI_dom v
     ON d.Anno_accademico = v.Anno_accademico
    AND d.Num_domanda     = v.Num_domanda
 INNER JOIN @Removed r
-    ON r.Num_domanda     = d.Num_domanda
+    ON r.Anno_accademico = d.Anno_accademico
+   AND r.Num_domanda     = d.Num_domanda
 WHERE d.Anno_accademico = @aa
   AND d.tipo_bando IN {TipoBandoFilter}
   AND NOT EXISTS (
@@ -380,15 +396,19 @@ WHERE d.Anno_accademico = @aa
           AND mbp2.Blocco_pagamento_attivo = 1
   );
 
--- RS1: actually removed (Num_domanda come string)
-SELECT DISTINCT CONVERT(VARCHAR(50), Num_domanda) AS Num_domanda
-FROM @Removed;
+-- RS1: actually removed
+SELECT DISTINCT CONVERT(VARCHAR(50), r.Num_domanda) AS Num_domanda
+FROM @Removed r
+ORDER BY CONVERT(VARCHAR(50), r.Num_domanda);
 
 -- RS2: nothing to remove
 SELECT CONVERT(VARCHAR(50), nd.NumDomanda) AS Num_domanda
 FROM {NumTempTable} nd
-LEFT JOIN @Removed r ON r.Num_domanda = nd.NumDomanda
-WHERE r.Num_domanda IS NULL;
+LEFT JOIN @Removed r
+    ON r.Anno_accademico = @aa
+   AND r.Num_domanda     = nd.NumDomanda
+WHERE r.Num_domanda IS NULL
+ORDER BY nd.NumDomanda;
 
 DROP TABLE #Base;
 ";
@@ -408,9 +428,11 @@ DROP TABLE #Base;
                 while (rdr.Read())
                     result.ActuallyRemoved.Add(rdr.GetString(0));
 
-                rdr.NextResult();
-                while (rdr.Read())
-                    result.NothingToRemove.Add(rdr.GetString(0));
+                if (rdr.NextResult())
+                {
+                    while (rdr.Read())
+                        result.NothingToRemove.Add(rdr.GetString(0));
+                }
             }
             finally
             {
