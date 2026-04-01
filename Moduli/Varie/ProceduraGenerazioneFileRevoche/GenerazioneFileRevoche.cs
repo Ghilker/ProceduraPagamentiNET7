@@ -468,6 +468,7 @@ namespace ProcedureNet7
 
             return fullPath;
         }
+
         private void ExportSplitTablesToFolders(Dictionary<string, DataTable> tables, string root, string aa)
         {
             string exportRoot = Path.Combine(root, Sanitize(BuildRootFolderName(aa)));
@@ -482,8 +483,154 @@ namespace ProcedureNet7
 
                 string fileName = BuildFileName(aa, kvp.Key);
 
+                // ✔ file principale
                 ExportDataTableToExcel_Euro(kvp.Value, folder, true, fileName);
+
+                // ✔ file allegato
+                string allegatoFileName =
+                    Path.GetFileNameWithoutExtension(fileName) + " - allegato.xlsx";
+
+                ExportAllegato(kvp.Value, folder, allegatoFileName, kvp.Key, aa);
             }
+        }
+
+        private static string S(DataRow r, string col) => r[col] == DBNull.Value ? "" : r[col].ToString();
+
+        private static decimal D(DataRow r, string col) => r[col] == DBNull.Value ? 0 : Convert.ToDecimal(r[col]);
+        private static string ExportAllegato(
+            DataTable dataTable,
+            string folderPath,
+            string fileName,
+            string key,
+            string aa)
+        {
+            string fullPath = Path.Combine(folderPath, fileName);
+
+            using (var wb = new XLWorkbook())
+            {
+                var ws = wb.Worksheets.Add("Allegato");
+
+                int row = 1;
+
+                // 🔵 COSTRUZIONE TITOLO DINAMICO
+                string anno = $"{aa.Substring(0, 4)}/{aa.Substring(4, 4)}";
+
+                bool conRecupero = key.StartsWith("Con rec somme", StringComparison.OrdinalIgnoreCase);
+
+                string titolo = conRecupero
+                    ? $"Revoche con recupero somme - BS - {anno}"
+                    : $"Revoche senza recupero somme - BS - {anno}";
+
+                // 🔵 TITOLO
+                ws.Cell(row, 1).Value = titolo;
+
+                ws.Range(row, 1, row, 26).Merge().Style
+                    .Font.SetBold()
+                    .Font.SetFontSize(14)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+                row += 2;
+
+                // 🔵 HEADER
+                var headers = new[]
+                {
+            "N°","Università","Codice Fiscale","Num domanda","Codice studente",
+            "Nome","Cognome","Data di nascita","Tipo Pagamento","Mandato",
+            "Esercizio finanziario","Tipo fondo","Determina",
+            "Impegno I rata","Anno impegno I rata",
+            "Impegno saldo","Anno impegno saldo",
+            "Importo beneficio","Importo pagato","Economia",
+            "Recupero borsa","Pensionato","Permanenza",
+            "Costo alloggio","Trattenuta","Recupero servizio"
+        };
+
+                for (int col = 0; col < headers.Length; col++)
+                {
+                    ws.Cell(row, col + 1).Value = headers[col];
+                }
+
+                ws.Range(row, 1, row, headers.Length).Style
+                    .Fill.SetBackgroundColor(XLColor.LightBlue)
+                    .Font.SetBold();
+
+                row++;
+
+                int progressivo = 1;
+
+                decimal totBeneficio = 0;
+                decimal totPagato = 0;
+                decimal totRecupero = 0;
+
+                // 🔵 DATI
+                foreach (DataRow r in dataTable.Rows)
+                {
+
+                    int col = 1;
+
+                    ws.Cell(row, col++).Value = progressivo++;
+
+                    ws.Cell(row, col++).Value = S(r, "Descrizione");
+                    ws.Cell(row, col++).Value = S(r, "Cod_fiscale");
+                    ws.Cell(row, col++).Value = S(r, "Num_domanda");
+                    ws.Cell(row, col++).Value = S(r, "Codice_Studente");
+                    ws.Cell(row, col++).Value = S(r, "Nome");
+                    ws.Cell(row, col++).Value = S(r, "Cognome");
+                    ws.Cell(row, col++).Value = S(r, "data_nascita");
+                    ws.Cell(row, col++).Value = S(r, "TipiPagamento");
+                    ws.Cell(row, col++).Value = S(r, "Mandati_pagamento");
+                    ws.Cell(row, col++).Value = S(r, "Esercizio_finanziario_mandato");
+                    ws.Cell(row, col++).Value = S(r, "Tipo_fondo");
+                    ws.Cell(row, col++).Value = S(r, "Determina_conferimento");
+
+                    ws.Cell(row, col++).Value = S(r, "num_impegno_primaRata");
+                    ws.Cell(row, col++).Value = S(r, "Esercizio_prima_rata");
+                    ws.Cell(row, col++).Value = S(r, "num_impegno_saldo");
+                    ws.Cell(row, col++).Value = S(r, "esercizio_saldo");
+
+                    // numeri veri
+                    decimal impBeneficio = D(r, "Imp_BS");
+                    decimal impPagato = D(r, "Liquidato");
+                    decimal recupero = D(r, "Recupero_borsa_di_studio");
+
+                    ws.Cell(row, col++).Value = impBeneficio;
+                    ws.Cell(row, col++).Value = impPagato;
+                    ws.Cell(row, col++).Value = D(r, "Economia");
+                    ws.Cell(row, col++).Value = recupero;
+
+                    ws.Cell(row, col++).Value = S(r, "Pensionato");
+                    ws.Cell(row, col++).Value = D(r, "Permanenza");
+                    ws.Cell(row, col++).Value = D(r, "Costo_posto_alloggio");
+                    ws.Cell(row, col++).Value = D(r, "Trattenuta_applicata_I_rata");
+                    ws.Cell(row, col++).Value = D(r, "Recupero_servizio_abitativo");
+
+                    totBeneficio += impBeneficio;
+                    totPagato += impPagato;
+                    totRecupero += recupero;
+
+                    row++;
+                }
+
+                // 🔵 TOTALE
+                ws.Cell(row, 1).Value = "Totale:";
+                ws.Cell(row, 18).Value = totBeneficio;
+                ws.Cell(row, 19).Value = totPagato;
+                ws.Cell(row, 21).Value = totRecupero;
+
+                ws.Range(row, 1, row, headers.Length).Style.Font.SetBold();
+
+                // 🔵 FORMATO EURO
+                for (int c = 18; c <= 26; c++)
+                {
+                    ws.Column(c).Style.NumberFormat.Format =
+                        "_-[$€-it-IT]* #,##0.00_-;-[$€-it-IT]* #,##0.00_-;_-[$€-it-IT]* \"-\"??_-;_-@_-";
+                }
+
+                ws.Columns().AdjustToContents();
+
+                wb.SaveAs(fullPath);
+            }
+
+            return fullPath;
         }
 
         // =========================
