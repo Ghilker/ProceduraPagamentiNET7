@@ -30,6 +30,7 @@ namespace ProcedureNet7
         private ContextMenuStrip? filtroTipoCorsoStrip;
         private ContextMenuStrip? filtroSedeStudiStrip;
         private ContextMenuStrip? filtroLoretoStrip;
+        private ContextMenuStrip? filtroSemestreFiltroStrip;
 
         private Dictionary<TipoFiltro, string> _TipoFiltro = new Dictionary<TipoFiltro, string>()
         {
@@ -65,6 +66,12 @@ namespace ProcedureNet7
             { "D", "Pendolare calcolato" }
         };
 
+        private Dictionary<string, string> filtroSemestreFiltroCombo = new Dictionary<string, string>()
+        {
+            { "0" , "No" },
+            { "1", "Si" },
+        };
+
         public Dictionary<string, string> DictWhereItems
         {
             get
@@ -80,7 +87,8 @@ namespace ProcedureNet7
                     { "Disabile", Utilities.GetCheckBoxSelectedCodes(filtroDisabileStrip ?.Items) },
                     { "TipoCorso", Utilities.GetCheckBoxSelectedCodes(filtroTipoCorsoStrip ?.Items) },
                     { "SedeStudi", Utilities.GetCheckBoxSelectedCodes(filtroSedeStudiStrip ?.Items) },
-                    { "TogliereLoreto", Utilities.GetCheckBoxSelectedCodes(filtroLoretoStrip ?.Items) }
+                    { "TogliereLoreto", Utilities.GetCheckBoxSelectedCodes(filtroLoretoStrip ?.Items) },
+                    { "SemestreFiltro", Utilities.GetCheckBoxSelectedCodes(filtroSemestreFiltroStrip ?.Items) }
                 };
 
                 return returnDict;
@@ -117,6 +125,7 @@ namespace ProcedureNet7
             CreateCittadinanzaStrip();
             Utilities.CreateDropDownMenu(ref filtroStatusSedeBTN, ref filtroStatusSedeStrip, filtroStatusSedeCombo);
             Utilities.CreateDropDownMenu(ref filtroSessoBtn, ref filtroSessoStrip, filtroSessoCombo);
+            Utilities.CreateDropDownMenu(ref filtroSemestreFiltroBtn, ref filtroSemestreFiltroStrip, filtroSemestreFiltroCombo);
             Utilities.CreateDropDownMenu(ref filtroDisabileBtn, ref filtroDisabileStrip, filtroDisabileCombo);
             CreateCodEnteStrip();
             CreateAnnoCorsoStrip();

@@ -51,277 +51,303 @@ namespace ProcedureNet7
         private static string GetQuery(string enteFilterSql)
         {
             return $@"
-                    ;WITH Domande AS (
-                        SELECT 
-                            d.Anno_accademico,
-                            d.Tipo_bando,
-                            d.Num_domanda,
-                            d.Cod_fiscale
-                        FROM Domanda d
-                        WHERE d.Anno_accademico = @AA
-                          AND d.Tipo_bando = 'LZ'
-                    ),
+;WITH CodiciPagamentoBS AS (
+    SELECT DISTINCT x.Cod_tipo_pagam
+    FROM (
+        SELECT dpn.Cod_tipo_pagam_new AS Cod_tipo_pagam
+        FROM Decod_pagam_new dpn
+        INNER JOIN Tipologie_pagam tp
+            ON tp.Cod_tipo_pagam = dpn.Cod_tipo_pagam_new
+        WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS'
+          AND tp.Visibile = 1
+          AND dpn.Cod_tipo_pagam_new IS NOT NULL
 
-                    PagamentiAgg AS (
-                        SELECT 
-                            p.Anno_accademico,
-                            p.Num_domanda,
-                            SUM(p.Imp_pagato) AS ImportoPagato,
-                            STRING_AGG(p.Cod_tipo_pagam, ', ') AS TipiPagamento,
-                            STRING_AGG(p.Cod_mandato, '/') AS Mandati,
-                            STRING_AGG(p.Ese_finanziario, '/') AS Ese_finanziari
-                        FROM Pagamenti p
-                        WHERE p.Ritirato_azienda = 0
-                          AND (
-                                p.cod_tipo_pagam IN (
-                                    SELECT dpn.Cod_tipo_pagam_new
-                                    FROM Decod_pagam_new dpn
-                                    INNER JOIN Tipologie_pagam tp 
-                                        ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
-                                    WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS'
-                                      AND tp.visibile = 1)
-                             OR p.cod_tipo_pagam IN (
-                                    SELECT dpn.Cod_tipo_pagam_old
-                                    FROM Decod_pagam_new dpn
-                                    INNER JOIN Tipologie_pagam tp 
-                                        ON dpn.Cod_tipo_pagam_new = tp.Cod_tipo_pagam
-                                    WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS'
-                                      AND tp.visibile = 1))
-                        GROUP BY 
-                            p.Anno_accademico,
-                            p.Num_domanda
-                    ),
+        UNION
 
-                    AssegnazioniRanked AS (
-                        SELECT 
-                            ap.Anno_Accademico,
-                            ap.Cod_Fiscale,
-                            ap.Cod_Pensionato,
-                            ap.Cod_Stanza,
-                            ap.Data_Decorrenza,
-                            ap.Data_Fine_Assegnazione,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY ap.Anno_Accademico, ap.Cod_Fiscale
-                                ORDER BY 
-                                    ap.Data_Fine_Assegnazione DESC,
-                                    ap.Data_Decorrenza DESC,
-                                    ap.Cod_Pensionato DESC,
-                                    ap.Cod_Stanza DESC) AS rn_last
-                        FROM Assegnazione_PA ap
-                        WHERE ap.Anno_Accademico = @AA
-                          AND ap.Cod_movimento = '01'
-                          AND ap.Ind_Assegnazione = 1
-                          AND ap.Status_Assegnazione = 0
-                          AND ap.Data_Accettazione IS NOT NULL
-                          AND ap.Data_Decorrenza IS NOT NULL
-                          AND ap.Data_Fine_Assegnazione IS NOT NULL
-                    ),
+        SELECT dpn.Cod_tipo_pagam_old AS Cod_tipo_pagam
+        FROM Decod_pagam_new dpn
+        INNER JOIN Tipologie_pagam tp
+            ON tp.Cod_tipo_pagam = dpn.Cod_tipo_pagam_new
+        WHERE LEFT(tp.Cod_tipo_pagam, 2) = 'BS'
+          AND tp.Visibile = 1
+          AND dpn.Cod_tipo_pagam_old IS NOT NULL
+    ) x
+),
+Domande AS (
+    SELECT
+        d.Anno_accademico,
+        d.Tipo_bando,
+        d.Num_domanda,
+        d.Cod_fiscale
+    FROM Domanda d
+    WHERE d.Anno_accademico = @AA
+      AND d.Tipo_bando = 'LZ'
+      AND EXISTS (
+          SELECT 1
+          FROM vMotivazioni_blocco_pagamenti mbp
+          WHERE mbp.Anno_accademico = d.Anno_accademico
+            AND mbp.Num_domanda = d.Num_domanda
+            AND mbp.Cod_tipologia_blocco = 'BCC'
+      )
+),
+DomandeCF AS (
+    SELECT DISTINCT
+        d.Anno_accademico,
+        d.Cod_fiscale
+    FROM Domande d
+),
+PagamentiAgg AS (
+    SELECT
+        p.Anno_accademico,
+        p.Num_domanda,
+        SUM(p.Imp_pagato) AS ImportoPagato,
+        STRING_AGG(p.Cod_tipo_pagam, ', ') AS TipiPagamento,
+        STRING_AGG(p.Cod_mandato, '/') AS Mandati,
+        STRING_AGG(CONVERT(varchar(20), p.Ese_finanziario), '/') AS Ese_finanziari
+    FROM Pagamenti p
+    INNER JOIN Domande d
+        ON d.Anno_accademico = p.Anno_accademico
+       AND d.Num_domanda = p.Num_domanda
+    INNER JOIN CodiciPagamentoBS cp
+        ON cp.Cod_tipo_pagam = p.Cod_tipo_pagam
+    WHERE p.Anno_accademico = @AA
+      AND p.Ritirato_azienda = 0
+    GROUP BY
+        p.Anno_accademico,
+        p.Num_domanda
+),
+AssegnazioniBase AS (
+    SELECT
+        ap.Id_assegnazione_PA,
+        ap.Anno_Accademico,
+        ap.Cod_Fiscale,
+        ap.Cod_Pensionato,
+        ap.Cod_Stanza,
+        ap.Data_Decorrenza,
+        ap.Data_Fine_Assegnazione
+    FROM Assegnazione_PA ap
+    INNER JOIN DomandeCF dcf
+        ON dcf.Anno_accademico = ap.Anno_Accademico
+       AND dcf.Cod_fiscale = ap.Cod_Fiscale
+    WHERE ap.Anno_Accademico = @AA
+      AND ap.Cod_movimento = '01'
+      AND ap.Ind_Assegnazione = 1
+      AND ap.Status_Assegnazione = 0
+      AND ap.Data_Accettazione IS NOT NULL
+      AND ap.Data_Decorrenza IS NOT NULL
+      AND ap.Data_Fine_Assegnazione IS NOT NULL
+),
+AssegnazioniRanked AS (
+    SELECT
+        ab.Id_assegnazione_PA,
+        ab.Anno_Accademico,
+        ab.Cod_Fiscale,
+        ab.Cod_Pensionato,
+        ab.Cod_Stanza,
+        ab.Data_Decorrenza,
+        ab.Data_Fine_Assegnazione,
+        ROW_NUMBER() OVER (
+            PARTITION BY ab.Anno_Accademico, ab.Cod_Fiscale
+            ORDER BY ab.Id_assegnazione_PA DESC
+        ) AS rn_last
+    FROM AssegnazioniBase ab
+),
+AssegnazioniDettaglio AS (
+    SELECT
+        ap.Anno_Accademico,
+        ap.Cod_Fiscale,
+        ap.Cod_Pensionato,
+        ap.Cod_Stanza,
+        calc.Permanenza,
+        CONVERT(decimal(18, 2),
+            (ISNULL(cs.Importo, 0) / 30.4375) * calc.Permanenza
+        ) AS Costo_posto_alloggio
+    FROM AssegnazioniRanked ap
+    CROSS APPLY (
+        SELECT GiorniBase = DATEDIFF(DAY, ap.Data_Decorrenza, ap.Data_Fine_Assegnazione)
+    ) gb
+    CROSS APPLY (
+        SELECT Permanenza =
+            gb.GiorniBase +
+            CASE
+                WHEN ap.rn_last = 1
+                 AND gb.GiorniBase <> 0
+                THEN 1
+                ELSE 0
+            END
+    ) calc
+    LEFT JOIN vStanza vzCosto
+        ON vzCosto.Cod_Pensionato = ap.Cod_Pensionato
+       AND vzCosto.Cod_Stanza = ap.Cod_Stanza
+    LEFT JOIN Costo_Servizio cs
+        ON cs.Anno_accademico = ap.Anno_Accademico
+       AND cs.Cod_pensionato = ap.Cod_Pensionato
+       AND cs.Cod_periodo = 'M'
+       AND cs.Tipo_stanza = vzCosto.Tipo_Costo_Stanza
+),
+AssegnPAAgg AS (
+    SELECT
+        a.Anno_Accademico,
+        a.Cod_Fiscale,
+        MAX(a.Cod_Pensionato) AS Cod_Pensionato,
+        MAX(a.Cod_Stanza) AS Cod_Stanza,
+        SUM(a.Permanenza) AS Permanenza,
+        CONVERT(money, SUM(a.Costo_posto_alloggio)) AS Costo_posto_alloggio
+    FROM AssegnazioniDettaglio a
+    GROUP BY
+        a.Anno_Accademico,
+        a.Cod_Fiscale
+),
+ReversaliAgg AS (
+    SELECT
+        r.Anno_accademico,
+        r.Num_domanda,
+        SUM(r.Importo) AS Importo,
+        STRING_AGG(CONVERT(varchar(50), r.Num_reversale), '/') AS Num_reversale
+    FROM Reversali r
+    INNER JOIN Domande d
+        ON d.Anno_accademico = r.Anno_accademico
+       AND d.Num_domanda = r.Num_domanda
+    WHERE r.Anno_accademico = @AA
+      AND r.Cod_reversale IN ('01', '03')
+    GROUP BY
+        r.Anno_accademico,
+        r.Num_domanda
+)
 
-                    AssegnazioniDettaglio AS (
-                        SELECT 
-                            ap.Anno_Accademico,
-                            ap.Cod_Fiscale,
-                            ap.Cod_Pensionato,
-                            ap.Cod_Stanza,
-                            DATEDIFF(DAY, ap.Data_Decorrenza, ap.Data_Fine_Assegnazione)
-                                + CASE WHEN ap.rn_last = 1 THEN 1 ELSE 0 END AS Permanenza,
-                            CONVERT(decimal(18, 2),
-                                (ISNULL(cs.Importo, 0) / 30.4375) *
-                                (DATEDIFF(DAY, ap.Data_Decorrenza, ap.Data_Fine_Assegnazione)+ CASE WHEN ap.rn_last = 1 THEN 1 ELSE 0 END)) AS Costo_posto_alloggio
-                        FROM AssegnazioniRanked ap
-                        LEFT JOIN vStanza vzCosto 
-                            ON vzCosto.Cod_Pensionato = ap.Cod_Pensionato
-                           AND vzCosto.Cod_Stanza = ap.Cod_Stanza
-                        LEFT JOIN Costo_Servizio cs 
-                            ON cs.Anno_accademico = ap.Anno_Accademico
-                           AND cs.Cod_pensionato = ap.Cod_Pensionato
-                           AND cs.Cod_periodo = 'M'
-                           AND cs.Tipo_stanza = vzCosto.Tipo_Costo_Stanza
-                    ),
+SELECT
+    d.Anno_accademico,
+    ss.Descrizione,
+    d.Cod_fiscale,
+    d.Num_domanda,
+    app.Cod_ente AS Cod_ente_gestione,
+    app.Cod_sede_studi AS Cod_sede_studi_gestione,
+    st.Codice_Studente,
+    st.Nome,
+    st.Cognome,
+    CONVERT(char(12), st.Data_nascita, 103) AS data_nascita,
+    ts.Descrizione AS Tipologia_studi,
 
-                    AssegnPAAgg AS (
-                        SELECT 
-                            a.Anno_Accademico,
-                            a.Cod_Fiscale,
-                            MAX(a.Cod_Pensionato) AS Cod_Pensionato,
-                            MAX(a.Cod_Stanza) AS Cod_Stanza,
-                            SUM(a.Permanenza) AS Permanenza,
-                            CONVERT(money, SUM(a.Costo_posto_alloggio)) AS Costo_posto_alloggio
-                        FROM AssegnazioniDettaglio a
-                        GROUP BY 
-                            a.Anno_Accademico,
-                            a.Cod_Fiscale
-                    ),
+    CONVERT(money, si.importo_assegnato, 0) AS Imp_BS,
+    p.TipiPagamento,
+    CONVERT(money, p.ImportoPagato, 0) AS Liquidato,
+    CONVERT(money, p.ImportoPagato, 0) AS Recupero_borsa_di_studio,
+    CONVERT(money, si.importo_assegnato - ISNULL(p.ImportoPagato, 0), 0) AS Economia,
 
-                    ReversaliAgg AS (
-                        SELECT
-                            r.Anno_accademico,
-                            r.Num_domanda,
-                            SUM(r.Importo) AS Importo,
-                            STRING_AGG(r.num_reversale, '/') AS Num_reversale
-                        FROM Reversali r
-                        WHERE r.Cod_reversale in ('01','03')
-                        GROUP BY
-                            r.Anno_accademico,
-                            r.Num_domanda
-                    )
+    pa.esito_PA,
+    ci.Cod_tipo_esito AS esito_CI,
 
-                    SELECT 
-                        d.Anno_accademico,
-                        ss.Descrizione,
-                        d.Cod_fiscale,
-                        d.Num_domanda,
-                        app.Cod_ente AS Cod_ente_gestione,
-                        app.Cod_sede_studi AS Cod_sede_studi_gestione,
-                        st.Codice_Studente,
-                        st.Nome,
-                        st.Cognome,
-                        CONVERT(char(12), st.Data_nascita, 103) AS data_nascita,
-                        ts.Descrizione AS Tipologia_studi,
+    pen.Descrizione AS Pensionato,
+    vz.Tipo_Stanza,
+    apa.Permanenza,
+    apa.Costo_posto_alloggio,
 
-                        CONVERT(money, bs.Imp_beneficio, 0) AS Imp_BS,
-                        p.TipiPagamento,
-                        CONVERT(money, p.ImportoPagato, 0) AS Liquidato,
-                        CONVERT(money, p.ImportoPagato, 0) AS Recupero_borsa_di_studio,
-                        CONVERT(money, bs.Imp_beneficio - p.ImportoPagato, 0) AS Economia,
+    r.Importo AS Trattenuta_applicata_I_rata,
 
-                        pa.esito_PA,
-                        ci.Cod_tipo_esito AS esito_CI,
+    CASE
+        WHEN apa.Costo_posto_alloggio IS NULL THEN NULL
+        ELSE CONVERT(money, apa.Costo_posto_alloggio - ISNULL(r.Importo, 0))
+    END AS Recupero_servizio_abitativo,
 
-                        pen.Descrizione AS Pensionato,
-                        vz.Tipo_Stanza,
-                        apa.Permanenza,
-                        apa.Costo_posto_alloggio,
+    si.importo_assegnato,
+    si.num_impegno_primaRata,
+    si.Esercizio_prima_rata,
+    si.num_impegno_saldo,
+    si.esercizio_saldo,
+    si.Tipo_fondo,
+    si.Capitolo,
 
-                        r.Importo AS Trattenuta_applicata_I_rata,
+    res.INDIRIZZO AS Indirizzo_residenza,
+    res.civico AS Civico_residenza,
+    res.CAP AS CAP_residenza,
+    res.comune_residenza,
+    res.provincia_residenza,
 
-                        CASE 
-                            WHEN apa.Costo_posto_alloggio IS NULL THEN NULL
-                            ELSE CONVERT(money, apa.Costo_posto_alloggio - ISNULL(r.Importo, 0))
-                        END AS Recupero_servizio_abitativo,
+    dom.Indirizzo_domicilio,
+    dom.Cap_domicilio,
+    dom.Descrizione AS Comune_domicilio,
+    dom.prov AS Provincia_domicilio,
 
-                        si.num_impegno_primaRata,
-                        si.Esercizio_prima_rata,
-                        si.num_impegno_saldo,
-                        si.esercizio_saldo,
-                        si.Tipo_fondo,
-                        si.Capitolo,
+    st.Indirizzo_e_mail,
+    pr.Indirizzo_PEC,
+    st.Telefono_cellulare,
 
-                        res.INDIRIZZO AS Indirizzo_residenza,
-                        res.civico AS Civico_residenza,
-                        res.CAP AS CAP_residenza,
-                        res.comune_residenza,
-                        res.provincia_residenza,
+    p.Mandati AS Mandati_pagamento,
+    p.Ese_finanziari AS Esercizio_finanziario_mandato,
 
-                        dom.Indirizzo_domicilio,
-                        dom.Cap_domicilio,
-                        dom.Descrizione AS Comune_domicilio,
-                        dom.prov AS Provincia_domicilio,
+    r.Num_reversale,
+    si.Esercizio_prima_rata AS Ese_finanziario_reversale,
+    si.Determina_conferimento
 
-                        st.Indirizzo_e_mail,
-                        pr.Indirizzo_PEC,
-                        st.Telefono_cellulare,
-
-                        p.Mandati AS Mandati_pagamento,
-                        p.Ese_finanziari AS Esercizio_finanziario_mandato,
-
-                        r.Num_reversale,
-                        si.Esercizio_prima_rata AS Ese_finanziario_reversale,
-                        si.Determina_conferimento
-
-                    FROM Domande d
-
-                    JOIN Studente st 
-                        ON st.Cod_fiscale = d.Cod_fiscale
-
-                    JOIN vAppartenenza app 
-                        ON app.Anno_accademico = d.Anno_accademico
-                       AND app.Cod_fiscale = d.Cod_fiscale
-                       AND app.Tipo_bando = d.Tipo_bando
-
-                    JOIN Sede_studi ss 
-                        ON ss.Cod_sede_studi = app.Cod_sede_studi
-                       AND ss.Cod_ente = app.Cod_ente
-
-                    JOIN vIscrizioni isc 
-                        ON isc.Anno_accademico = d.Anno_accademico
-                       AND isc.Cod_fiscale = d.Cod_fiscale
-                       AND isc.Cod_sede_studi = ss.Cod_sede_studi
-                       AND isc.Tipo_bando = d.Tipo_bando
-                       AND isc.Cod_tipologia_studi NOT IN ('06', '07')
-                       AND isc.Anno_corso = 1
-
-                    JOIN Tipologie_studi ts 
-                        ON ts.Cod_tipologia_studi = isc.Cod_tipologia_studi
-
-                    JOIN vValori_calcolati vc 
-                        ON vc.Anno_accademico = d.Anno_accademico
-                       AND vc.Num_domanda = d.Num_domanda
-
-                    JOIN vDATIGENERALI_dom dg 
-                        ON dg.Anno_accademico = d.Anno_accademico
-                       AND dg.Num_domanda = d.Num_domanda
-                       AND dg.Superamento_esami = 0
-                       AND dg.Superamento_esami_tassa_reg = 0
-
-                    JOIN vResidenza res 
-                        ON res.ANNO_ACCADEMICO = d.Anno_accademico
-                       AND res.COD_FISCALE = d.Cod_fiscale
-
-                    JOIN vSpecifiche_impegni si 
-                        ON si.Anno_accademico = d.Anno_accademico
-                       AND si.Num_domanda = d.Num_domanda
-                       AND si.Cod_beneficio = 'BS'
-
-                    JOIN vEsiti_concorsiBS bs 
-                        ON bs.Anno_accademico = d.Anno_accademico
-                       AND bs.Num_domanda = d.Num_domanda
-                       AND bs.Cod_tipo_esito <> 0
-
-                    LEFT JOIN vEsiti_concorsiPA pa 
-                        ON pa.Anno_accademico = d.Anno_accademico
-                       AND pa.Num_domanda = d.Num_domanda
-
-                    LEFT JOIN vEsiti_concorsiCI ci 
-                        ON ci.Anno_accademico = d.Anno_accademico
-                       AND ci.Num_domanda = d.Num_domanda
-
-                    LEFT JOIN PagamentiAgg p 
-                        ON p.Anno_accademico = d.Anno_accademico
-                       AND p.Num_domanda = d.Num_domanda
-
-                    LEFT JOIN ReversaliAgg r 
-                        ON r.Anno_accademico = d.Anno_accademico
-                       AND r.Num_domanda = d.Num_domanda
-
-                    LEFT JOIN vDomicilio dom 
-                        ON dom.ANNO_ACCADEMICO = d.Anno_accademico
-                       AND dom.COD_FISCALE = d.Cod_fiscale
-
-                    LEFT JOIN vProfilo pr 
-                        ON pr.Cod_Fiscale = st.Cod_fiscale
-
-                    LEFT JOIN AssegnPAAgg apa 
-                        ON apa.Anno_Accademico = d.Anno_accademico
-                       AND apa.Cod_Fiscale = d.Cod_fiscale
-
-                    LEFT JOIN Pensionati pen 
-                        ON pen.Cod_pensionato = apa.Cod_Pensionato
-
-                    LEFT JOIN vStanza vz 
-                        ON vz.Cod_Pensionato = apa.Cod_Pensionato
-                       AND vz.Cod_Stanza = apa.Cod_Stanza
-
-                    WHERE 1 = 1
-                    {enteFilterSql}
-
-                    ORDER BY 
-                        app.Cod_ente,
-                        ss.Descrizione,
-                        d.Cod_fiscale;
-                    ";
-
-
+FROM Domande d
+JOIN Studente st
+    ON st.Cod_fiscale = d.Cod_fiscale
+JOIN vAppartenenza app
+    ON app.Anno_accademico = d.Anno_accademico
+   AND app.Cod_fiscale = d.Cod_fiscale
+   AND app.Tipo_bando = d.Tipo_bando
+JOIN Sede_studi ss
+    ON ss.Cod_sede_studi = app.Cod_sede_studi
+   AND ss.Cod_ente = app.Cod_ente
+JOIN vIscrizioni isc
+    ON isc.Anno_accademico = d.Anno_accademico
+   AND isc.Cod_fiscale = d.Cod_fiscale
+   AND isc.Cod_sede_studi = ss.Cod_sede_studi
+   AND isc.Tipo_bando = d.Tipo_bando
+   AND isc.Anno_corso = 1
+JOIN Tipologie_studi ts
+    ON ts.Cod_tipologia_studi = isc.Cod_tipologia_studi
+JOIN vValori_calcolati vc
+    ON vc.Anno_accademico = d.Anno_accademico
+   AND vc.Num_domanda = d.Num_domanda
+JOIN vDATIGENERALI_dom dg
+    ON dg.Anno_accademico = d.Anno_accademico
+   AND dg.Num_domanda = d.Num_domanda
+   AND dg.Superamento_esami = 0
+   AND dg.Superamento_esami_tassa_reg = 0
+JOIN vResidenza res
+    ON res.ANNO_ACCADEMICO = d.Anno_accademico
+   AND res.COD_FISCALE = d.Cod_fiscale
+JOIN vSpecifiche_impegni si
+    ON si.Anno_accademico = d.Anno_accademico
+   AND si.Num_domanda = d.Num_domanda
+   AND si.Cod_beneficio = 'BS'
+JOIN vEsiti_concorsiBS bs
+    ON bs.Anno_accademico = d.Anno_accademico
+   AND bs.Num_domanda = d.Num_domanda
+   AND bs.Cod_tipo_esito <> 0
+LEFT JOIN vEsiti_concorsiPA pa
+    ON pa.Anno_accademico = d.Anno_accademico
+   AND pa.Num_domanda = d.Num_domanda
+LEFT JOIN vEsiti_concorsiCI ci
+    ON ci.Anno_accademico = d.Anno_accademico
+   AND ci.Num_domanda = d.Num_domanda
+LEFT JOIN PagamentiAgg p
+    ON p.Anno_accademico = d.Anno_accademico
+   AND p.Num_domanda = d.Num_domanda
+LEFT JOIN ReversaliAgg r
+    ON r.Anno_accademico = d.Anno_accademico
+   AND r.Num_domanda = d.Num_domanda
+LEFT JOIN vDomicilio dom
+    ON dom.ANNO_ACCADEMICO = d.Anno_accademico
+   AND dom.COD_FISCALE = d.Cod_fiscale
+LEFT JOIN vProfilo pr
+    ON pr.Cod_Fiscale = st.Cod_fiscale
+LEFT JOIN AssegnPAAgg apa
+    ON apa.Anno_Accademico = d.Anno_accademico
+   AND apa.Cod_Fiscale = d.Cod_fiscale
+LEFT JOIN Pensionati pen
+    ON pen.Cod_pensionato = apa.Cod_Pensionato
+LEFT JOIN vStanza vz
+    ON vz.Cod_Pensionato = apa.Cod_Pensionato
+   AND vz.Cod_Stanza = apa.Cod_Stanza
+WHERE 1 = 1
+{enteFilterSql}
+ORDER BY
+    app.Cod_ente,
+    ss.Descrizione,
+    d.Cod_fiscale;
+";
         }
 
         // =========================
@@ -766,6 +792,7 @@ namespace ProcedureNet7
         {
             var dt = new DataTable();
             using var cmd = new SqlCommand(sql, CONNECTION);
+            cmd.CommandTimeout = 999999;
             cmd.Parameters.AddRange(p);
             using var r = cmd.ExecuteReader();
             dt.Load(r);

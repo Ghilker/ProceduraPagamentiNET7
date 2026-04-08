@@ -195,6 +195,7 @@ namespace ProcedureNet7
                                         ,i.anno_accademico
                                         ,i.cod_facolta AS facolta
                                         ,i.cod_sede_studi AS sede_studi
+                                        ,i.conferma_semestre_filtro
                                     FROM
                                         iscrizioni i
                                         INNER JOIN MaxIscrizioni mdv ON i.anno_accademico = mdv.anno_accademico AND i.cod_fiscale = mdv.cod_fiscale AND i.data_validita = mdv.MaxDataValidita
@@ -307,6 +308,7 @@ namespace ProcedureNet7
 		                            ,Superamento_esami_tassa_reg
                                     ,COALESCE(RichiestaMensa, 0) as RichiestaMensa
                                     ,Rifug_politico
+                                    ,conferma_semestre_filtro
 
                                     FROM
                                         Domanda INNER JOIN

@@ -163,9 +163,11 @@ namespace ProcedureNet7
             public static DomResult Validate(StudenteInfo info, DateTime aaStart, DateTime aaEnd, DateTime referenceDate)
             {
                 int minMesiDom = info.InformazioniSede.MinMesiDomicilioFuoriSede;
+                string infoSemFiltro = "";
                 if (info.InformazioniIscrizione.ConfermaSemestreFiltro == 1)
                 {
                     minMesiDom = 3;
+                    infoSemFiltro = " SEMESTRE FILTRO";
                 }
                 var corrente = ValidateSnapshot(
                     BuildCurrentSnapshot(info),
@@ -173,7 +175,7 @@ namespace ProcedureNet7
                     aaStart,
                     aaEnd,
                     referenceDate,
-                    "DOMICILIO CORRENTE");
+                    "DOMICILIO CORRENTE" + infoSemFiltro);
 
                 bool hasIstanza = info.InformazioniSede.HasIstanzaDomicilio && info.InformazioniSede.IstanzaDomicilio != null;
                 if (!hasIstanza)

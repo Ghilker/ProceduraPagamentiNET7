@@ -341,7 +341,7 @@ namespace ProcedureNet7
                             codEnteFlusso: "00",
                             impegnoFlusso: impegno);
                     }
-                    else if (tipoStudente == "1")
+                    else if (tipoStudente == "0")
                     {
                         ProcessStudentsByAnnoCorso(
                             target,
@@ -352,7 +352,7 @@ namespace ProcedureNet7
                             codEnteFlusso: "00",
                             impegnoFlusso: impegno);
                     }
-                    else if (tipoStudente == "3")
+                    else if (tipoStudente == "1")
                     {
                         ProcessStudentsByAnnoCorso(
                             target,

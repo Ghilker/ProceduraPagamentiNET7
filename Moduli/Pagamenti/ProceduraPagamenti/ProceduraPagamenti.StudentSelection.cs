@@ -245,6 +245,7 @@ namespace ProcedureNet7
                                         superamento_esami_tassa_reg CHAR(1) COLLATE Latin1_General_CI_AS,
                                         richiesta_mensa CHAR(1) COLLATE Latin1_General_CI_AS,
                                         Rifug_politico CHAR(1) COLLATE Latin1_General_CI_AS,
+                                        Conferma_semestre_filtro CHAR(1) COLLATE Latin1_General_CI_AS,
                                         liquidabile CHAR(1) COLLATE Latin1_General_CI_AS,
                                         note VARCHAR(MAX) COLLATE Latin1_General_CI_AS,
                                         togliere_loreto VARCHAR(4) COLLATE Latin1_General_CI_AS,
@@ -569,6 +570,11 @@ namespace ProcedureNet7
                     {
                         countConditions++;
                         _ = conditionalBuilder.Append($" togliere_loreto IN ({dictQueryWhere["TogliereLoreto"]}) AND ");
+                    }
+                    if (dictQueryWhere["SemestreFiltro"] != "''")
+                    {
+                        countConditions++;
+                        _ = conditionalBuilder.Append($" Conferma_semestre_filtro in ({dictQueryWhere["SemestreFiltro"]}) AND ");
                     }
 
                     if (conditionalBuilder.Length > 0)
