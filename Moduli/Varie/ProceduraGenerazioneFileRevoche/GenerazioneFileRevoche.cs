@@ -48,7 +48,7 @@ namespace ProcedureNet7
         // =========================
         // QUERY COMPLETA
         // =========================
-        private static string GetQuery(string enteFilterSql)
+        private string GetQuery(string enteFilterSql)
         {
             return $@"
 ;WITH CodiciPagamentoBS AS (
@@ -249,7 +249,6 @@ SELECT
         ELSE CONVERT(money, apa.Costo_posto_alloggio - ISNULL(r.Importo, 0))
     END AS Recupero_servizio_abitativo,
 
-    si.importo_assegnato,
     si.num_impegno_primaRata,
     si.Esercizio_prima_rata,
     si.num_impegno_saldo,
@@ -402,7 +401,7 @@ ORDER BY
         // =========================
         // EXPORT
         // =========================
-        private static string ExportDataTableToExcel_Euro(
+        private string ExportDataTableToExcel_Euro(
     DataTable dataTable,
     string folderPath,
     bool includeHeaders = true,
@@ -520,10 +519,10 @@ ORDER BY
             }
         }
 
-        private static string S(DataRow r, string col) => r[col] == DBNull.Value ? "" : r[col].ToString();
+        private string S(DataRow r, string col) => r[col] == DBNull.Value ? "" : r[col].ToString();
 
-        private static decimal D(DataRow r, string col) => r[col] == DBNull.Value ? 0 : Convert.ToDecimal(r[col]);
-        private static string ExportAllegato(
+        private decimal D(DataRow r, string col) => r[col] == DBNull.Value ? 0 : Convert.ToDecimal(r[col]);
+        private string ExportAllegato(
             DataTable dataTable,
             string folderPath,
             string fileName,
@@ -567,7 +566,7 @@ ORDER BY
             "Impegno saldo","Anno impegno saldo",
             "Importo beneficio","Importo pagato","Economia",
             "Recupero borsa","Pensionato","Permanenza",
-            "Costo alloggio","Trattenuta","Recupero servizio"
+            "Costo alloggio","Trattenuta","Num reversale","Recupero servizio"
         };
 
                 for (int col = 0; col < headers.Length; col++)
@@ -576,7 +575,7 @@ ORDER BY
                 }
 
                 ws.Range(row, 1, row, headers.Length).Style
-                    .Fill.SetBackgroundColor(XLColor.LightBlue)
+                    .Fill.SetBackgroundColor(XLColor.CornflowerBlue)
                     .Font.SetBold();
 
                 row++;
@@ -586,6 +585,13 @@ ORDER BY
                 decimal totBeneficio = 0;
                 decimal totPagato = 0;
                 decimal totRecupero = 0;
+                decimal totEconomia = 0;
+                decimal totCostoAlloggio = 0;
+                decimal totTrattenute = 0;
+                decimal totRecuperoServizio = 0;
+
+
+
 
                 // 🔵 DATI
                 foreach (DataRow r in dataTable.Rows)
@@ -602,7 +608,7 @@ ORDER BY
                     ws.Cell(row, col++).Value = S(r, "Nome");
                     ws.Cell(row, col++).Value = S(r, "Cognome");
                     ws.Cell(row, col++).Value = S(r, "data_nascita");
-                    ws.Cell(row, col++).Value = S(r, "TipiPagamento");
+                    ws.Cell(row, col++).Value = TrasformaTipiPagamento(S(r, "TipiPagamento"));
                     ws.Cell(row, col++).Value = S(r, "Mandati_pagamento");
                     ws.Cell(row, col++).Value = S(r, "Esercizio_finanziario_mandato");
                     ws.Cell(row, col++).Value = S(r, "Tipo_fondo");
@@ -617,21 +623,30 @@ ORDER BY
                     decimal impBeneficio = D(r, "Imp_BS");
                     decimal impPagato = D(r, "Liquidato");
                     decimal recupero = D(r, "Recupero_borsa_di_studio");
+                    decimal economia = D(r, "Economia");
+                    decimal costoAlloggio = D(r, "Costo_posto_alloggio");
+                    decimal trattenuta = D(r, "Trattenuta_applicata_I_rata");
+                    decimal recuperoServizio = D(r, "Recupero_servizio_abitativo");
 
                     ws.Cell(row, col++).Value = impBeneficio;
                     ws.Cell(row, col++).Value = impPagato;
-                    ws.Cell(row, col++).Value = D(r, "Economia");
+                    ws.Cell(row, col++).Value = economia;
                     ws.Cell(row, col++).Value = recupero;
 
                     ws.Cell(row, col++).Value = S(r, "Pensionato");
-                    ws.Cell(row, col++).Value = D(r, "Permanenza");
-                    ws.Cell(row, col++).Value = D(r, "Costo_posto_alloggio");
-                    ws.Cell(row, col++).Value = D(r, "Trattenuta_applicata_I_rata");
-                    ws.Cell(row, col++).Value = D(r, "Recupero_servizio_abitativo");
+                    ws.Cell(row, col++).Value = S(r, "Permanenza");
+                    ws.Cell(row, col++).Value = costoAlloggio;
+                    ws.Cell(row, col++).Value = trattenuta;
+                    ws.Cell(row, col++).Value = S(r, "Num_reversale");
+                    ws.Cell(row, col++).Value = recuperoServizio;
 
                     totBeneficio += impBeneficio;
                     totPagato += impPagato;
                     totRecupero += recupero;
+                    totEconomia += economia;
+                    totCostoAlloggio += costoAlloggio;
+                    totTrattenute += trattenuta;
+                    totRecuperoServizio += recuperoServizio;
 
                     row++;
                 }
@@ -640,12 +655,16 @@ ORDER BY
                 ws.Cell(row, 1).Value = "Totale:";
                 ws.Cell(row, 18).Value = totBeneficio;
                 ws.Cell(row, 19).Value = totPagato;
+                ws.Cell(row, 20).Value = totEconomia;
                 ws.Cell(row, 21).Value = totRecupero;
+                ws.Cell(row, 24).Value = totCostoAlloggio;
+                ws.Cell(row, 25).Value = totTrattenute;
+                ws.Cell(row, 27).Value = totRecuperoServizio;
 
                 ws.Range(row, 1, row, headers.Length).Style.Font.SetBold();
 
                 // 🔵 FORMATO EURO
-                for (int c = 18; c <= 26; c++)
+                for (int c = 18; c <= 27; c++)
                 {
                     ws.Column(c).Style.NumberFormat.Format =
                         "_-[$€-it-IT]* #,##0.00_-;-[$€-it-IT]* #,##0.00_-;_-[$€-it-IT]* \"-\"??_-;_-@_-";
@@ -657,6 +676,28 @@ ORDER BY
             }
 
             return fullPath;
+        }
+
+        private string TrasformaTipiPagamento(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            var mapping = new Dictionary<string, string>
+            {
+                { "BSP0", "Prima Rata" },
+                { "BSI0", "Integrazione Prima Rata" },
+                { "01", "Prima Rata" },
+                { "BSP1", "Prima Rata" }
+                // aggiungi qui altri codici
+            };
+
+            foreach (var kv in mapping)
+            {
+                input = input.Replace(kv.Key, kv.Value);
+            }
+
+            return input;
         }
 
         // =========================
@@ -679,7 +720,7 @@ ORDER BY
             return $"Revoche {a} {ente}";
         }
 
-        private static string BuildFileName(string aa, string key)
+        private string BuildFileName(string aa, string key)
         {
             string a = $"{aa.Substring(2, 2)}-{aa.Substring(6, 2)}";
             var p = key.Split('\\');
@@ -689,7 +730,7 @@ ORDER BY
             ) + ".xlsx";
         }
 
-        private static string FmtEnte(string e) => e switch
+        private string FmtEnte(string e) => e switch
         {
             "Roma_1" => "Roma 1",
             "Roma_2" => "Roma 2",
@@ -698,20 +739,20 @@ ORDER BY
             _ => e
         };
 
-        private static string FmtFondo(string f) => f switch
+        private string FmtFondo(string f) => f switch
         {
             "PNRR" => "Fondo PNRR",
             "DISCO" => "Fondo DiSCo",
             _ => f
         };
 
-        private static string FmtRec(string r) => r switch
+        private string FmtRec(string r) => r switch
         {
             "Con rec somme" => "con recupero somme",
             "Senza rec somme" => "senza recupero somme",
             _ => ""
         };
-        private static string FmtPA(string p) => p switch
+        private string FmtPA(string p) => p switch
         {
             "Con posto alloggio" => "e PA",
             "Senza posto alloggio" => "e senza PA",
@@ -721,35 +762,35 @@ ORDER BY
         // =========================
         // HELPERS
         // =========================
-        private static DataTable ToDataTable(DataTable schema, IEnumerable<DataRow> rows)
+        private DataTable ToDataTable(DataTable schema, IEnumerable<DataRow> rows)
         {
             var dt = schema.Clone();
             foreach (var r in rows) dt.ImportRow(r);
             return dt;
         }
 
-        private static string BuildNested(string root, string key)
+        private string BuildNested(string root, string key)
         {
             foreach (var p in key.Split('\\'))
                 root = Path.Combine(root, Sanitize(p));
             return root;
         }
 
-        private static string Sanitize(string s)
+        private string Sanitize(string s)
         {
             foreach (var c in Path.GetInvalidFileNameChars())
                 s = s.Replace(c, '_');
             return s.Trim();
         }
 
-        private static bool HasRecuperoSomme(DataRow r) =>
+        private bool HasRecuperoSomme(DataRow r) =>
             !string.IsNullOrWhiteSpace(r["TipiPagamento"]?.ToString());
 
-        private static bool HasPA(DataRow r) =>
+        private bool HasPA(DataRow r) =>
             r["Recupero_servizio_abitativo"] != DBNull.Value &&
             Convert.ToDecimal(r["Recupero_servizio_abitativo"]) > 0;
 
-        private static string GetTipoFondoGroup(DataRow r)
+        private string GetTipoFondoGroup(DataRow r)
         {
             if (r["Tipo_fondo"] == DBNull.Value)
                 return "SCARTA";
@@ -765,7 +806,7 @@ ORDER BY
             return "ALTRO";
         }
 
-        private static string GetEnteGestioneGroup(DataRow r, string fondo)
+        private string GetEnteGestioneGroup(DataRow r, string fondo)
         {
             string ente = r["Cod_ente_gestione"]?.ToString() ?? "";
             string sede = r["Cod_sede_studi_gestione"]?.ToString()?.ToUpper() ?? "";
@@ -778,7 +819,7 @@ ORDER BY
             return "Cassino";
         }
 
-        private static string BuildEnteFilterSql(string e) => e switch
+        private string BuildEnteFilterSql(string e) => e switch
         {
             "-1" => "",
             "0" => "AND app.Cod_sede_studi = 'B'",
