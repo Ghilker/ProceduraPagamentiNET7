@@ -57,7 +57,8 @@ namespace ProcedureNet7.Verifica
             {
                 new VerificaControlliDatiEconomici(),
                 new ControlloStatusSede(),
-                new CalcoloImportoBorsa()
+                new CalcoloImportoBorsa(),
+                new CalcoloEsitoBorsa()
             };
 
         private VerificaPipelineContext BuildPipelineContext(ArgsVerifica args)

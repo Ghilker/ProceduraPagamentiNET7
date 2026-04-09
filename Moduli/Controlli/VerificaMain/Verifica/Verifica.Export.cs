@@ -88,7 +88,6 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("ImportoBaseBorsa", typeof(decimal));
             dt.Columns.Add("ImportoFinaleBorsa", typeof(decimal));
             dt.Columns.Add("ImportoAssegnato", typeof(decimal));
-            dt.Columns.Add("CalcoloImportoBorsaEseguito", typeof(bool));
 
             return dt;
         }
@@ -204,7 +203,6 @@ namespace ProcedureNet7.Verifica
             row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
             row["ImportoBaseBorsa"] = impBorsa.ImportoBase;
             row["ImportoFinaleBorsa"] = impBorsa.ImportoFinale;
-            row["CalcoloImportoBorsaEseguito"] = impBorsa.CalcoloEseguito;
 
             dt.Rows.Add(row);
         }
