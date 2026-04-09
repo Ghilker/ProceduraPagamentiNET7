@@ -5,6 +5,17 @@ using System.Data.SqlClient;
 using System.Globalization;
 using System.Text;
 using ClosedXML.Excel;
+using iText.IO.Font;
+using iText.IO.Font.Constants;
+using iText.Kernel.Colors;
+using iText.Kernel.Font;
+using iText.Kernel.Geom;
+using iText.Kernel.Pdf;
+using iText.Layout;
+using iText.Layout.Element;
+using iText.Layout.Properties;
+using Path = System.IO.Path;
+
 
 namespace ProcedureNet7
 {
@@ -16,6 +27,7 @@ namespace ProcedureNet7
         private string selectedAA = "";
         private string selectedEnte = "-1";
         private string selectedSaveFolder = "";
+        
 
         public Dictionary<string, DataTable> TabelleSeparate { get; private set; }
             = new(StringComparer.OrdinalIgnoreCase);
@@ -516,10 +528,23 @@ ORDER BY
                     Path.GetFileNameWithoutExtension(fileName) + " - allegato.xlsx";
 
                 ExportAllegato(kvp.Value, folder, allegatoFileName, kvp.Key, aa);
+                // ✔ PDF trasparenza
+                string pdfFileName =
+                    Path.GetFileNameWithoutExtension(fileName) + " - trasparenza.pdf";
+
+                ExportTrasparenzaPdf(kvp.Value, folder, pdfFileName, kvp.Key, aa);
             }
         }
 
         private string S(DataRow r, string col) => r[col] == DBNull.Value ? "" : r[col].ToString();
+
+        private string NormalizeLongPath(string path)
+        {
+            if (path.StartsWith(@"\\?\"))
+                return path;
+
+            return @"\\?\" + Path.GetFullPath(path);
+        }
 
         private decimal D(DataRow r, string col) => r[col] == DBNull.Value ? 0 : Convert.ToDecimal(r[col]);
         private string ExportAllegato(
@@ -529,7 +554,7 @@ ORDER BY
             string key,
             string aa)
         {
-            string fullPath = Path.Combine(folderPath, fileName);
+            string fullPath = NormalizeLongPath(Path.Combine(folderPath, fileName));
 
             using (var wb = new XLWorkbook())
             {
@@ -700,7 +725,181 @@ ORDER BY
             return input;
         }
 
-        // =========================
+        private readonly HashSet<string> ColonneSensibili = new(StringComparer.OrdinalIgnoreCase)
+            {
+                "Cod_fiscale",
+                "Nome",
+                "Cognome",
+                "data_nascita",
+                "Codice_Studente"
+            };
+        private List<(string Header, string Column)> GetAllegatoColumns()
+        {
+            return new List<(string, string)>
+            {
+                ("N°", null),
+                ("Università", "Descrizione"),
+                ("Codice Fiscale", "Cod_fiscale"),
+                ("Num domanda", "Num_domanda"),
+                ("Codice studente", "Codice_Studente"),
+                ("Nome", "Nome"),
+                ("Cognome", "Cognome"),
+                ("Data di nascita", "data_nascita"),
+                ("Tipo Pagamento", "TipiPagamento"),
+                ("Mandato", "Mandati_pagamento"),
+                ("Esercizio finanziario", "Esercizio_finanziario_mandato"),
+                ("Tipo fondo", "Tipo_fondo"),
+                ("Determina", "Determina_conferimento"),
+                ("Impegno I rata", "num_impegno_primaRata"),
+                ("Anno impegno I rata", "Esercizio_prima_rata"),
+                ("Impegno saldo", "num_impegno_saldo"),
+                ("Anno impegno saldo", "esercizio_saldo"),
+                ("Importo beneficio", "Imp_BS"),
+                ("Importo pagato", "Liquidato"),
+                ("Economia", "Economia"),
+                ("Recupero borsa", "Recupero_borsa_di_studio"),
+                ("Pensionato", "Pensionato"),
+                ("Permanenza", "Permanenza"),
+                ("Costo alloggio", "Costo_posto_alloggio"),
+                ("Trattenuta", "Trattenuta_applicata_I_rata"),
+                ("Num reversale", "Num_reversale"),
+                ("Recupero servizio", "Recupero_servizio_abitativo")
+            };
+        }
+
+        private void ExportTrasparenzaPdf(DataTable dataTable, string folderPath, string fileName, string key, string aa)
+        {
+            string fullPath = Path.Combine(folderPath, fileName);
+
+            string anno = $"{aa.Substring(0, 4)}/{aa.Substring(4, 4)}";
+            bool conRecupero = key.StartsWith("Con rec somme", StringComparison.OrdinalIgnoreCase);
+
+            string titolo = conRecupero
+                ? $"Revoche con recupero somme - BS - {anno}"
+                : $"Revoche senza recupero somme - BS - {anno}";
+
+            var colonne = GetAllegatoColumns()
+                .Where(c => c.Column == null || !ColonneSensibili.Contains(c.Column))
+                .ToList();
+
+            using (var writer = new PdfWriter(fullPath))
+            using (var pdf = new PdfDocument(writer))
+            using (var document = new Document(pdf, PageSize.A4.Rotate()))
+            {
+                document.SetMargins(10, 10, 10, 10);
+
+                // 🔵 TITOLO
+                document.Add(new Paragraph(titolo)
+                    .SetFontSize(14)
+                    .SetTextAlignment(TextAlignment.CENTER));
+
+                document.Add(new Paragraph("\n"));
+
+                // 🔵 TABELLA
+                var table = new Table(colonne.Count).UseAllAvailableWidth();
+
+                if (colonne == null || colonne.Count == 0)
+                    throw new Exception("Nessuna colonna disponibile");
+
+                // HEADER
+                foreach (var col in colonne)
+                {
+                    table.AddHeaderCell(
+                        new Cell()
+                            .Add(new Paragraph(col.Header))
+                            .SetBackgroundColor(ColorConstants.BLUE)
+                            .SetFontColor(ColorConstants.WHITE)
+                            .SetFontSize(8)
+                    );
+                }
+
+                int progressivo = 1;
+
+                decimal totBeneficio = 0;
+                decimal totPagato = 0;
+                decimal totEconomia = 0;
+                decimal totRecupero = 0;
+                decimal totCosto = 0;
+                decimal totTrattenute = 0;
+                decimal totRecServizio = 0;
+
+                foreach (DataRow r in dataTable.Rows)
+                {
+                    foreach (var col in colonne)
+                    {
+                        string text = "";
+
+                        if (col.Column != null && dataTable.Columns.Contains(col.Column))
+                        {
+                            var val = r[col.Column];
+
+                            if (val != DBNull.Value && val != null)
+                                text = val is decimal d ? d.ToString("N2") : val.ToString();
+                        }
+
+                        table.AddCell(
+                            new Cell().Add(
+                                new Paragraph(text)
+                                    .SetFontSize(7)
+                            )
+                        );
+                    }
+
+                    totBeneficio += D(r, "Imp_BS");
+                    totPagato += D(r, "Liquidato");
+                    totEconomia += D(r, "Economia");
+                    totRecupero += D(r, "Recupero_borsa_di_studio");
+                    totCosto += D(r, "Costo_posto_alloggio");
+                    totTrattenute += D(r, "Trattenuta_applicata_I_rata");
+                    totRecServizio += D(r, "Recupero_servizio_abitativo");
+
+                    progressivo++;
+                }
+
+                // 🔵 RIGA TOTALE
+                foreach (var col in colonne)
+                {
+                    string text = "";
+
+                    switch (col.Column)
+                    {
+                        case null:
+                            text = "Totale:";
+                            break;
+                        case "Imp_BS":
+                            text = totBeneficio.ToString("N2");
+                            break;
+                        case "Liquidato":
+                            text = totPagato.ToString("N2");
+                            break;
+                        case "Economia":
+                            text = totEconomia.ToString("N2");
+                            break;
+                        case "Recupero_borsa_di_studio":
+                            text = totRecupero.ToString("N2");
+                            break;
+                        case "Costo_posto_alloggio":
+                            text = totCosto.ToString("N2");
+                            break;
+                        case "Trattenuta_applicata_I_rata":
+                            text = totTrattenute.ToString("N2");
+                            break;
+                        case "Recupero_servizio_abitativo":
+                            text = totRecServizio.ToString("N2");
+                            break;
+                    }
+
+                    table.AddCell(new Cell().Add(new Paragraph(text)));
+                }
+
+                document.Add(table);
+
+                // 🔵 FOOTER
+                document.Add(new Paragraph($"\nGenerato il {DateTime.Now:dd/MM/yyyy HH:mm}")
+                    .SetTextAlignment(TextAlignment.CENTER)
+                    .SetFontSize(8));
+            }
+        }        // =========================
         // NAMING
         // =========================
         private string BuildRootFolderName(string aa)
