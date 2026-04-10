@@ -149,6 +149,11 @@ FROM D;";
                     () => $"students={context.Students.Count}");
 
                 VerificaExecutionSupport.ExecuteTimed(
+                    "VerificaRaccoltaDati.EsitoBorsaFacts",
+                    () => LoadEsitoBorsaSupportFacts(context),
+                    () => $"students={context.Students.Count}");
+
+                VerificaExecutionSupport.ExecuteTimed(
                     "VerificaRaccoltaDati.StatusSedeInput",
                     () => RaccogliStatusSede(context),
                     () => $"students={context.Students.Count}");

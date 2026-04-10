@@ -20,8 +20,16 @@ namespace ProcedureNet7.Verifica
         public DateTime ReferenceDate { get; set; } = DateTime.Now;
 
         public Dictionary<StudentKey, StudenteInfo> Students { get; } = new();
+        public Dictionary<StudentKey, EsitoBorsaFacts> EsitoBorsaFactsByStudent { get; } = new();
         public HashSet<(string ComuneA, string ComuneB)> ComuniEquiparati { get; } = new();
         public CalcParams CalcParams { get; set; } = new();
         public List<string> CodiciFiscaliFiltro { get; } = new();
+    }
+
+    internal sealed class EsitoBorsaFacts
+    {
+        public HashSet<string> ForzatureGenerali { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool ForzaturaRinunciaNoEsclusione { get; set; }
+        public string CodTipoOrdinamento { get; set; } = string.Empty;
     }
 }

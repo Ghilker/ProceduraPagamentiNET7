@@ -555,54 +555,74 @@ ORDER BY
             string aa)
         {
             string fullPath = NormalizeLongPath(Path.Combine(folderPath, fileName));
+            Directory.CreateDirectory(folderPath);
+
+            var colonne = GetAllegatoColumns();
+            var headers = colonne.Select(c => c.Header).ToArray();
 
             using (var wb = new XLWorkbook())
             {
                 var ws = wb.Worksheets.Add("Allegato");
 
                 int row = 1;
+                int totalColumns = headers.Length;
 
-                // 🔵 COSTRUZIONE TITOLO DINAMICO
                 string anno = $"{aa.Substring(0, 4)}/{aa.Substring(4, 4)}";
-
                 bool conRecupero = key.StartsWith("Con rec somme", StringComparison.OrdinalIgnoreCase);
 
                 string titolo = conRecupero
                     ? $"Revoche con recupero somme - BS - {anno}"
                     : $"Revoche senza recupero somme - BS - {anno}";
 
-                // 🔵 TITOLO
+                // =========================
+                // PAGE SETUP
+                // =========================
+                ws.PageSetup.PageOrientation = XLPageOrientation.Landscape;
+                ws.PageSetup.PaperSize = XLPaperSize.A4Paper;
+                ws.PageSetup.PagesWide = 1;   // tutta la larghezza in una sola pagina
+                ws.PageSetup.PagesTall = 0;   // altezza libera su più pagine se necessario
+                ws.PageSetup.CenterHorizontally = true;
+                ws.PageSetup.Margins.Left = 0.25;
+                ws.PageSetup.Margins.Right = 0.25;
+                ws.PageSetup.Margins.Top = 0.5;
+                ws.PageSetup.Margins.Bottom = 0.5;
+
+                // =========================
+                // TITOLO
+                // =========================
                 ws.Cell(row, 1).Value = titolo;
+                ws.Range(row, 1, row, totalColumns).Merge();
 
-                ws.Range(row, 1, row, 26).Merge().Style
+                ws.Range(row, 1, row, totalColumns).Style
                     .Font.SetBold()
-                    .Font.SetFontSize(14)
-                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                    .Font.SetFontSize(11)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .Alignment.SetVertical(XLAlignmentVerticalValues.Center);
 
+                ws.Row(row).Height = 20;
                 row += 2;
 
-                // 🔵 HEADER
-                var headers = new[]
-                {
-            "N°","Università","Codice Fiscale","Num domanda","Codice studente",
-            "Nome","Cognome","Data di nascita","Tipo Pagamento","Mandato",
-            "Esercizio finanziario","Tipo fondo","Determina",
-            "Impegno I rata","Anno impegno I rata",
-            "Impegno saldo","Anno impegno saldo",
-            "Importo beneficio","Importo pagato","Economia",
-            "Recupero borsa","Pensionato","Permanenza",
-            "Costo alloggio","Trattenuta","Num reversale","Recupero servizio"
-        };
-
+                // =========================
+                // HEADER
+                // =========================
                 for (int col = 0; col < headers.Length; col++)
                 {
                     ws.Cell(row, col + 1).Value = headers[col];
                 }
 
-                ws.Range(row, 1, row, headers.Length).Style
+                var headerRange = ws.Range(row, 1, row, totalColumns);
+                headerRange.Style
                     .Fill.SetBackgroundColor(XLColor.CornflowerBlue)
-                    .Font.SetBold();
+                    .Font.SetBold()
+                    .Font.SetFontColor(XLColor.White)
+                    .Font.SetFontSize(8)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                    .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                    .Alignment.SetWrapText(true);
 
+                ws.Row(row).Height = 28;
+
+                int headerRow = row;
                 row++;
 
                 int progressivo = 1;
@@ -615,17 +635,14 @@ ORDER BY
                 decimal totTrattenute = 0;
                 decimal totRecuperoServizio = 0;
 
-
-
-
-                // 🔵 DATI
+                // =========================
+                // DATI
+                // =========================
                 foreach (DataRow r in dataTable.Rows)
                 {
-
                     int col = 1;
 
                     ws.Cell(row, col++).Value = progressivo++;
-
                     ws.Cell(row, col++).Value = S(r, "Descrizione");
                     ws.Cell(row, col++).Value = S(r, "Cod_fiscale");
                     ws.Cell(row, col++).Value = S(r, "Num_domanda");
@@ -638,13 +655,11 @@ ORDER BY
                     ws.Cell(row, col++).Value = S(r, "Esercizio_finanziario_mandato");
                     ws.Cell(row, col++).Value = S(r, "Tipo_fondo");
                     ws.Cell(row, col++).Value = S(r, "Determina_conferimento");
-
                     ws.Cell(row, col++).Value = S(r, "num_impegno_primaRata");
                     ws.Cell(row, col++).Value = S(r, "Esercizio_prima_rata");
                     ws.Cell(row, col++).Value = S(r, "num_impegno_saldo");
                     ws.Cell(row, col++).Value = S(r, "esercizio_saldo");
 
-                    // numeri veri
                     decimal impBeneficio = D(r, "Imp_BS");
                     decimal impPagato = D(r, "Liquidato");
                     decimal recupero = D(r, "Recupero_borsa_di_studio");
@@ -657,7 +672,6 @@ ORDER BY
                     ws.Cell(row, col++).Value = impPagato;
                     ws.Cell(row, col++).Value = economia;
                     ws.Cell(row, col++).Value = recupero;
-
                     ws.Cell(row, col++).Value = S(r, "Pensionato");
                     ws.Cell(row, col++).Value = S(r, "Permanenza");
                     ws.Cell(row, col++).Value = costoAlloggio;
@@ -676,7 +690,9 @@ ORDER BY
                     row++;
                 }
 
-                // 🔵 TOTALE
+                // =========================
+                // TOTALE
+                // =========================
                 ws.Cell(row, 1).Value = "Totale:";
                 ws.Cell(row, 18).Value = totBeneficio;
                 ws.Cell(row, 19).Value = totPagato;
@@ -686,16 +702,65 @@ ORDER BY
                 ws.Cell(row, 25).Value = totTrattenute;
                 ws.Cell(row, 27).Value = totRecuperoServizio;
 
-                ws.Range(row, 1, row, headers.Length).Style.Font.SetBold();
+                ws.Range(row, 1, row, totalColumns).Style.Font.SetBold();
+                ws.Range(row, 1, row, totalColumns).Style.Fill.SetBackgroundColor(XLColor.LightGray);
 
-                // 🔵 FORMATO EURO
-                for (int c = 18; c <= 27; c++)
+                // =========================
+                // FORMATTAZIONE
+                // =========================
+                string euroFormat =
+                    "_-[$€-it-IT]* #,##0.00_-;-[$€-it-IT]* #,##0.00_-;_-[$€-it-IT]* \"-\"??_-;_-@_-";
+
+                foreach (int c in new[] { 18, 19, 20, 21, 24, 25, 27 })
                 {
-                    ws.Column(c).Style.NumberFormat.Format =
-                        "_-[$€-it-IT]* #,##0.00_-;-[$€-it-IT]* #,##0.00_-;_-[$€-it-IT]* \"-\"??_-;_-@_-";
+                    ws.Column(c).Style.NumberFormat.Format = euroFormat;
                 }
 
-                ws.Columns().AdjustToContents();
+                var usedRange = ws.Range(1, 1, row, totalColumns);
+                usedRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                usedRange.Style.Font.FontSize = 8;
+
+                // bordi tabella
+                ws.Range(headerRow, 1, row, totalColumns).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                ws.Range(headerRow, 1, row, totalColumns).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+                // Freeze
+                ws.SheetView.FreezeRows(headerRow);
+
+                // =========================
+                // LARGHEZZE COMPATTE
+                // =========================
+                ws.Column(1).Width = 4;    // N°
+                ws.Column(2).Width = 14;   // Università
+                ws.Column(3).Width = 16;   // CF
+                ws.Column(4).Width = 11;   // Num domanda
+                ws.Column(5).Width = 11;   // Codice studente
+                ws.Column(6).Width = 12;   // Nome
+                ws.Column(7).Width = 14;   // Cognome
+                ws.Column(8).Width = 10;   // Data nascita
+                ws.Column(9).Width = 14;   // Tipo pagamento
+                ws.Column(10).Width = 11;  // Mandato
+                ws.Column(11).Width = 10;  // Esercizio fin
+                ws.Column(12).Width = 9;   // Tipo fondo
+                ws.Column(13).Width = 12;  // Determina
+                ws.Column(14).Width = 10;  // Impegno I rata
+                ws.Column(15).Width = 8;   // Anno imp I rata
+                ws.Column(16).Width = 10;  // Impegno saldo
+                ws.Column(17).Width = 8;   // Anno imp saldo
+                ws.Column(18).Width = 11;  // Importo beneficio
+                ws.Column(19).Width = 11;  // Importo pagato
+                ws.Column(20).Width = 10;  // Economia
+                ws.Column(21).Width = 11;  // Recupero borsa
+                ws.Column(22).Width = 12;  // Pensionato
+                ws.Column(23).Width = 8;   // Permanenza
+                ws.Column(24).Width = 11;  // Costo alloggio
+                ws.Column(25).Width = 10;  // Trattenuta
+                ws.Column(26).Width = 11;  // Num reversale
+                ws.Column(27).Width = 11;  // Recupero servizio
+
+                // area di stampa
+                ws.PageSetup.PrintAreas.Clear();
+                ws.PageSetup.PrintAreas.Add(1, 1, row, totalColumns);
 
                 wb.SaveAs(fullPath);
             }
@@ -770,6 +835,7 @@ ORDER BY
         private void ExportTrasparenzaPdf(DataTable dataTable, string folderPath, string fileName, string key, string aa)
         {
             string fullPath = Path.Combine(folderPath, fileName);
+            Directory.CreateDirectory(folderPath);
 
             string anno = $"{aa.Substring(0, 4)}/{aa.Substring(4, 4)}";
             bool conRecupero = key.StartsWith("Con rec somme", StringComparison.OrdinalIgnoreCase);
@@ -782,34 +848,74 @@ ORDER BY
                 .Where(c => c.Column == null || !ColonneSensibili.Contains(c.Column))
                 .ToList();
 
+            if (colonne.Count == 0)
+                throw new Exception("Nessuna colonna disponibile");
+
+            // larghezze relative compatte per riempire bene la pagina orizzontale
+            float[] widths = new float[]
+            {
+                1.0f, // N°
+                2.6f, // Università
+                1.8f, // Num domanda
+                2.3f, // Tipo Pagamento
+                1.7f, // Mandato
+                1.4f, // Esercizio finanziario
+                1.4f, // Tipo fondo
+                2.0f, // Determina
+                1.6f, // Impegno I rata
+                1.3f, // Anno impegno I rata
+                1.6f, // Impegno saldo
+                1.3f, // Anno impegno saldo
+
+                2.5f, // Importo beneficio
+                2.5f, // Importo pagato
+                2.2f, // Economia
+                2.5f, // Recupero borsa
+
+                2.0f, // Pensionato
+                1.3f, // Permanenza
+
+                2.5f, // Costo alloggio
+                2.2f, // Trattenuta
+                1.8f, // Num reversale
+                2.7f  // Recupero servizio
+            };
+
             using (var writer = new PdfWriter(fullPath))
             using (var pdf = new PdfDocument(writer))
             using (var document = new Document(pdf, PageSize.A4.Rotate()))
             {
-                document.SetMargins(10, 10, 10, 10);
+                document.SetMargins(8, 8, 8, 8);
 
-                // 🔵 TITOLO
+                PdfFont font = PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
+                PdfFont fontBold = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
+                PdfFont fontMono = PdfFontFactory.CreateFont(StandardFonts.COURIER);
+
+                document.SetFont(font);
+
                 document.Add(new Paragraph(titolo)
-                    .SetFontSize(14)
-                    .SetTextAlignment(TextAlignment.CENTER));
+                    .SetFont(fontBold)
+                    .SetFontSize(11)
+                    .SetTextAlignment(TextAlignment.CENTER)
+                    .SetMarginTop(0)
+                    .SetMarginBottom(6));
 
-                document.Add(new Paragraph("\n"));
-
-                // 🔵 TABELLA
-                var table = new Table(colonne.Count).UseAllAvailableWidth();
-
-                if (colonne == null || colonne.Count == 0)
-                    throw new Exception("Nessuna colonna disponibile");
-
+                var table = new Table(UnitValue.CreatePercentArray(widths))
+                    .UseAllAvailableWidth()
+                    .SetFixedLayout();
+                var headerBlue = new DeviceRgb(100, 149, 237); // CornflowerBlue
                 // HEADER
                 foreach (var col in colonne)
                 {
                     table.AddHeaderCell(
                         new Cell()
-                            .Add(new Paragraph(col.Header))
-                            .SetBackgroundColor(ColorConstants.BLUE)
+                            .Add(new Paragraph(col.Header)
+                                .SetFont(fontBold)
+                                .SetFontSize(6.5f)
+                                .SetTextAlignment(TextAlignment.CENTER))
+                            .SetBackgroundColor(headerBlue)
                             .SetFontColor(ColorConstants.WHITE)
-                            .SetFontSize(8)
+                            .SetPadding(2)
                     );
                 }
 
@@ -827,21 +933,48 @@ ORDER BY
                 {
                     foreach (var col in colonne)
                     {
-                        string text = "";
+                        string text;
+                        bool isContabilita = col.Column != null && ColonneContabilita.Contains(col.Column);
 
-                        if (col.Column != null && dataTable.Columns.Contains(col.Column))
+                        if (col.Column == null)
+                        {
+                            text = progressivo.ToString();
+                        }
+                        else if (!dataTable.Columns.Contains(col.Column) || r[col.Column] == DBNull.Value || r[col.Column] == null)
+                        {
+                            text = isContabilita ? "€ -" : "";
+                        }
+                        else
                         {
                             var val = r[col.Column];
 
-                            if (val != DBNull.Value && val != null)
-                                text = val is decimal d ? d.ToString("N2") : val.ToString();
+                            if (col.Column.Equals("TipiPagamento", StringComparison.OrdinalIgnoreCase))
+                            {
+                                text = TrasformaTipiPagamento(val.ToString() ?? "");
+                            }
+                            else if (isContabilita)
+                            {
+                                text = FormatContabilitaPdf(Convert.ToDecimal(val));
+                            }
+                            else if (val is decimal dec)
+                            {
+                                text = dec.ToString("N2", ItCulture);
+                            }
+                            else
+                            {
+                                text = val.ToString() ?? "";
+                            }
                         }
 
                         table.AddCell(
-                            new Cell().Add(
-                                new Paragraph(text)
-                                    .SetFontSize(7)
-                            )
+                            new Cell()
+                                .Add(new Paragraph(text)
+                                    .SetFont(isContabilita ? fontMono : font)
+                                    .SetFontSize(isContabilita ? 5.8f : 6f)
+                                    .SetMargin(0))
+                                .SetPadding(isContabilita ? 1f : 1.5f)
+                                .SetTextAlignment(isContabilita ? TextAlignment.RIGHT : TextAlignment.CENTER)
+                                .SetVerticalAlignment(VerticalAlignment.MIDDLE)
                         );
                     }
 
@@ -856,50 +989,54 @@ ORDER BY
                     progressivo++;
                 }
 
-                // 🔵 RIGA TOTALE
+                // RIGA TOTALE
                 foreach (var col in colonne)
                 {
                     string text = "";
+                    bool isContabilita = col.Column != null && ColonneContabilita.Contains(col.Column);
 
-                    switch (col.Column)
-                    {
-                        case null:
-                            text = "Totale:";
-                            break;
-                        case "Imp_BS":
-                            text = totBeneficio.ToString("N2");
-                            break;
-                        case "Liquidato":
-                            text = totPagato.ToString("N2");
-                            break;
-                        case "Economia":
-                            text = totEconomia.ToString("N2");
-                            break;
-                        case "Recupero_borsa_di_studio":
-                            text = totRecupero.ToString("N2");
-                            break;
-                        case "Costo_posto_alloggio":
-                            text = totCosto.ToString("N2");
-                            break;
-                        case "Trattenuta_applicata_I_rata":
-                            text = totTrattenute.ToString("N2");
-                            break;
-                        case "Recupero_servizio_abitativo":
-                            text = totRecServizio.ToString("N2");
-                            break;
-                    }
+                    if (col.Column == null)
+                        text = "Totale:";
+                    else if (col.Column == "Imp_BS")
+                        text = FormatContabilitaPdf(totBeneficio);
+                    else if (col.Column == "Liquidato")
+                        text = FormatContabilitaPdf(totPagato);
+                    else if (col.Column == "Economia")
+                        text = FormatContabilitaPdf(totEconomia);
+                    else if (col.Column == "Recupero_borsa_di_studio")
+                        text = FormatContabilitaPdf(totRecupero);
+                    else if (col.Column == "Costo_posto_alloggio")
+                        text = FormatContabilitaPdf(totCosto);
+                    else if (col.Column == "Trattenuta_applicata_I_rata")
+                        text = FormatContabilitaPdf(totTrattenute);
+                    else if (col.Column == "Recupero_servizio_abitativo")
+                        text = FormatContabilitaPdf(totRecServizio);
 
-                    table.AddCell(new Cell().Add(new Paragraph(text)));
+                    table.AddCell(
+                        new Cell()
+                            .Add(new Paragraph(text)
+                                .SetFont(isContabilita ? fontMono : fontBold)
+                                .SetFontSize(isContabilita ? 5.8f : 6.5f)
+                                .SetMargin(0))
+                            .SetBackgroundColor(ColorConstants.LIGHT_GRAY)
+                            .SetPadding(isContabilita ? 1f : 2f)
+                            .SetTextAlignment(isContabilita ? TextAlignment.RIGHT : TextAlignment.CENTER)
+                            .SetVerticalAlignment(VerticalAlignment.MIDDLE)
+                    );
                 }
 
                 document.Add(table);
 
-                // 🔵 FOOTER
-                document.Add(new Paragraph($"\nGenerato il {DateTime.Now:dd/MM/yyyy HH:mm}")
+                document.Add(new Paragraph($"Generato il {DateTime.Now:dd/MM/yyyy HH:mm}")
+                    .SetFont(font)
+                    .SetFontSize(7)
                     .SetTextAlignment(TextAlignment.CENTER)
-                    .SetFontSize(8));
+                    .SetMarginTop(5)
+                    .SetMarginBottom(0));
             }
-        }        // =========================
+        }
+        
+        // =========================
         // NAMING
         // =========================
         private string BuildRootFolderName(string aa)
@@ -961,6 +1098,30 @@ ORDER BY
         // =========================
         // HELPERS
         // =========================
+
+        private static readonly HashSet<string> ColonneContabilita = new(StringComparer.OrdinalIgnoreCase)
+{
+    "Imp_BS",
+    "Liquidato",
+    "Economia",
+    "Recupero_borsa_di_studio",
+    "Costo_posto_alloggio",
+    "Trattenuta_applicata_I_rata",
+    "Recupero_servizio_abitativo"
+};
+
+        private static readonly CultureInfo ItCulture = CultureInfo.GetCultureInfo("it-IT");
+
+        private string FormatContabilitaPdf(decimal value)
+        {
+            if (value == 0m)
+                return "€ -";
+
+            if (value < 0m)
+                return "-€ " + Math.Abs(value).ToString("#,##0.00", ItCulture);
+
+            return "€ " + value.ToString("#,##0.00", ItCulture);
+        }
         private DataTable ToDataTable(DataTable schema, IEnumerable<DataRow> rows)
         {
             var dt = schema.Clone();
