@@ -28,6 +28,7 @@ ISCR AS
         D.CodFiscale,
         D.TipoBando,
         i.Cod_corso_laurea,
+        cl.Durata_legale,
         TRY_CONVERT(INT, i.Anno_corso) AS Anno_corso,
         i.Cod_facolta,
         i.Cod_sede_studi,
@@ -56,6 +57,7 @@ SELECT
     I.CodFiscale,
     I.TipoBando,
     I.Cod_corso_laurea,
+    I.Durata_legale,
     I.Anno_corso,
     I.Cod_facolta,
     I.Cod_sede_studi,
@@ -239,6 +241,7 @@ JOIN vCARRIERA_PREGRESSA cp
                 iscr.TipoBando = reader.SafeGetString("TipoBando");
                 iscr.AnnoCorso = reader.SafeGetInt("Anno_corso");
                 iscr.CodCorsoLaurea = reader.SafeGetString("Cod_corso_laurea");
+                iscr.CorsoMedicina = reader.SafeGetInt("Durata_legale") == 6;
                 iscr.CodFacolta = reader.SafeGetString("Cod_facolta");
                 iscr.CodSedeStudi = reader.SafeGetString("Cod_sede_studi");
                 iscr.ComuneSedeStudi = reader.SafeGetString("ComuneSedeStudi").Trim();

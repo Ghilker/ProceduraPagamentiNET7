@@ -10,6 +10,10 @@ namespace ProcedureNet7
     {
         public string TipoBando { get; set; } = string.Empty;
         public int StatusCompilazione { get; set; }
+        public int EsitoBorsaCalcolato { get; set; } // 0=Escluso, 1=Idoneo, 2=Vincitore
+        public string CodiciMotivoEsitoBorsaCalcolato { get; set; } = string.Empty;
+        public string MotiviEsitoBorsaCalcolato { get; set; } = string.Empty;
+        public bool CalcoloEsitoBorsaEseguito { get; set; }
         public InformazioniPersonali InformazioniPersonali { get; set; } = new InformazioniPersonali();
         public InformazioniIscrizione InformazioniIscrizione { get; set; } = new InformazioniIscrizione();
         public InformazioniBeneficio InformazioniBeneficio { get; set; } = new InformazioniBeneficio();

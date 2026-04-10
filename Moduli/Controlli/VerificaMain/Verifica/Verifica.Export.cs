@@ -1,4 +1,4 @@
-using ProcedureNet7.Storni;
+﻿using ProcedureNet7.Storni;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -14,6 +14,10 @@ namespace ProcedureNet7.Verifica
 
             dt.Columns.Add("CodFiscale", typeof(string));
             dt.Columns.Add("NumDomanda", typeof(string));
+            dt.Columns.Add("StatusCompilazione", typeof(int));
+            dt.Columns.Add("EsitoBorsaCalcolato", typeof(int));
+            dt.Columns.Add("CodiceMotivoEsitoBorsaCalcolato", typeof(string));
+            dt.Columns.Add("MotivoEsitoBorsaCalcolato", typeof(string));
             dt.Columns.Add("TipoRedditoOrigine", typeof(string));
             dt.Columns.Add("TipoRedditoIntegrazione", typeof(string));
             dt.Columns.Add("CodTipoEsitoBS", typeof(int));
@@ -127,6 +131,10 @@ namespace ProcedureNet7.Verifica
             var row = dt.NewRow();
             row["CodFiscale"] = info.InformazioniPersonali.CodFiscale ?? "";
             row["NumDomanda"] = info.InformazioniPersonali.NumDomanda ?? "";
+            row["StatusCompilazione"] = info.StatusCompilazione;
+            row["EsitoBorsaCalcolato"] = info.EsitoBorsaCalcolato;
+            row["CodiceMotivoEsitoBorsaCalcolato"] = info.CodiciMotivoEsitoBorsaCalcolato ?? "";
+            row["MotivoEsitoBorsaCalcolato"] = info.MotiviEsitoBorsaCalcolato ?? "";
 
             row["TipoRedditoOrigine"] = eco.Raw.TipoRedditoOrigine ?? "";
             row["TipoRedditoIntegrazione"] = eco.Raw.TipoRedditoIntegrazione ?? "";

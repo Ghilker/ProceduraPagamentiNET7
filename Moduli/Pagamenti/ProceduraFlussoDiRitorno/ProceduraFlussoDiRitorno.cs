@@ -648,7 +648,7 @@ namespace ProcedureNet7
                 $@"Gentile studente/ssa, il pagamento riguardante ''{pagamentoDescrizione}''{suffixAnno} è avvenuto con successo. <br>Puoi trovare il dettaglio nella sezione pagamenti della tua area riservata";
 
             string messaggioPendolare =
-                $@"Gentile studente/ssa, il pagamento relativo a ''{pagamentoDescrizione}''{suffixAnno} è stato eseguito correttamente, ma è stato effettuato come pendolare poiché, al momento dell'estrazione, non risultavano soddisfatti i requisiti di fuori sede (anche se era presente un'istanza non ancora lavorata).<br>Puoi consultare il dettaglio del pagamento nella sezione Pagamenti della tua area riservata.";
+                $@"Gentile studente/ssa, il pagamento relativo a ''{pagamentoDescrizione}''{suffixAnno} è stato eseguito correttamente, ma è stato effettuato come pendolare poiché, al momento dell'estrazione, non risultavano soddisfatti i requisiti di fuori sede.<br>Puoi consultare il dettaglio del pagamento nella sezione Pagamenti della tua area riservata.";
 
             var noteByMovimento = GetNoteValidazionePerMovimento(CONNECTION, sqlTransaction, studentiPagati);
             Logger.LogInfo(88, $"InsertMessaggio: note_validazione_lette={noteByMovimento.Count}");
