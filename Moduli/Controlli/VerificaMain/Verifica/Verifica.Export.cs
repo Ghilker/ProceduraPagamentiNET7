@@ -81,6 +81,26 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("CreditiRiconosciutiDaRinunciaMerito", typeof(decimal));
             dt.Columns.Add("AACreditiRiconosciutiMerito", typeof(string));
 
+            dt.Columns.Add("AnnoCorsoCalcolatoMerito", typeof(int));
+            dt.Columns.Add("AnnoCorsoRiferimentoBeneficio", typeof(int));
+            dt.Columns.Add("CodTipoOrdinamentoMerito", typeof(string));
+            dt.Columns.Add("PassaggioTrasferimentoMerito", typeof(bool));
+            dt.Columns.Add("RipetenteDaPassaggioMerito", typeof(bool));
+            dt.Columns.Add("PassaggioVecchioNuovoMerito", typeof(bool));
+            dt.Columns.Add("EsameComplementareMerito", typeof(bool));
+            dt.Columns.Add("RegolaMeritoApplicata", typeof(string));
+            dt.Columns.Add("EsamiMinimiRichiestiMerito", typeof(decimal));
+            dt.Columns.Add("CreditiMinimiRichiestiMerito", typeof(decimal));
+            dt.Columns.Add("CodCorsoLaureaPassaggioMerito", typeof(string));
+            dt.Columns.Add("CodTipoOrdinamentoPassaggioMerito", typeof(string));
+            dt.Columns.Add("AnnoAccadInizioPassaggioMerito", typeof(string));
+            dt.Columns.Add("DurataLegalePassaggioMerito", typeof(int));
+            dt.Columns.Add("ConversioneCreditiEsamiPassaggioMerito", typeof(decimal));
+            dt.Columns.Add("NumeroEsamiPassaggioMerito", typeof(int));
+            dt.Columns.Add("SommaVotiEsamiPassaggioMerito", typeof(decimal));
+            dt.Columns.Add("EsamiMinimiRichiestiPassaggioMerito", typeof(decimal));
+            dt.Columns.Add("CreditiMinimiRichiestiPassaggioMerito", typeof(decimal));
+
             dt.Columns.Add("NumeroEventiCarrieraPregressa", typeof(int));
             dt.Columns.Add("UltimoAnnoAvvenimentoCarrieraPregressa", typeof(int));
             dt.Columns.Add("TotaleCreditiCarrieraPregressa", typeof(decimal));
@@ -96,8 +116,9 @@ namespace ProcedureNet7.Verifica
             return dt;
         }
 
-        private static (IReadOnlyList<StudenteInfo> Items, DataTable Table) BuildOrderedOutputs(IReadOnlyDictionary<StudentKey, StudenteInfo> students)
+        private static (IReadOnlyList<StudenteInfo> Items, DataTable Table) BuildOrderedOutputs(VerificaPipelineContext context)
         {
+            var students = context.Students;
             var orderedPairs = VerificaExecutionSupport.OrderStudents(students);
             var dt = BuildOutputTable();
             var items = new List<StudenteInfo>(orderedPairs.Count);
@@ -109,7 +130,7 @@ namespace ProcedureNet7.Verifica
                 {
                     var info = pair.Value;
                     items.Add(info);
-                    AddOutputRow(dt, info);
+                    AddOutputRow(dt, context, pair.Key, info);
                 }
             }
             finally
@@ -120,7 +141,7 @@ namespace ProcedureNet7.Verifica
             return (items, dt);
         }
 
-        private static void AddOutputRow(DataTable dt, StudenteInfo info)
+        private static void AddOutputRow(DataTable dt, VerificaPipelineContext context, StudentKey key, StudenteInfo info)
         {
             var eco = info.InformazioniEconomiche;
             var sede = info.InformazioniSede;
@@ -200,6 +221,36 @@ namespace ProcedureNet7.Verifica
             SetIfHasValue(row, "CreditiRimanentiMerito", iscr.CreditiRimanenti);
             SetIfHasValue(row, "CreditiRiconosciutiDaRinunciaMerito", iscr.CreditiRiconosciutiDaRinuncia);
             row["AACreditiRiconosciutiMerito"] = iscr.AACreditiRiconosciuti ?? "";
+
+            int aaInizio = EsitoBorsaSupport.ParseAnnoAccademicoInizio(context.AnnoAccademico);
+            int aaNumero = EsitoBorsaSupport.ParseAnnoAccademicoAsNumber(context.AnnoAccademico);
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, aaInizio);
+            context.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts);
+            bool ripetenteDaPassaggio = aaNumero >= 20252026
+                                        && ((facts?.RipetenteDaPassaggio).HasValue == true
+                                            ? facts!.RipetenteDaPassaggio!.Value
+                                            : iscr.HaRipetenzaCarrieraPregressa != 0);
+            int annoCorsoRiferimentoBeneficio = ripetenteDaPassaggio ? iscr.AnnoCorso : annoCorsoCalcolato;
+
+            row["AnnoCorsoCalcolatoMerito"] = annoCorsoCalcolato != 0 ? annoCorsoCalcolato : DBNull.Value;
+            row["AnnoCorsoRiferimentoBeneficio"] = annoCorsoRiferimentoBeneficio != 0 ? annoCorsoRiferimentoBeneficio : DBNull.Value;
+            row["CodTipoOrdinamentoMerito"] = facts?.CodTipoOrdinamento ?? "";
+            row["PassaggioTrasferimentoMerito"] = facts?.PassaggioTrasferimento == true;
+            row["RipetenteDaPassaggioMerito"] = ripetenteDaPassaggio;
+            row["PassaggioVecchioNuovoMerito"] = facts?.PassaggioVecchioNuovo == true;
+            row["EsameComplementareMerito"] = facts?.EsameComplementare == true;
+            row["RegolaMeritoApplicata"] = iscr.RegolaMeritoApplicata ?? "";
+            SetIfHasValue(row, "EsamiMinimiRichiestiMerito", iscr.EsamiMinimiRichiestiMerito);
+            SetIfHasValue(row, "CreditiMinimiRichiestiMerito", iscr.CreditiMinimiRichiestiMerito);
+            row["CodCorsoLaureaPassaggioMerito"] = iscr.CodCorsoLaureaPassaggio ?? "";
+            row["CodTipoOrdinamentoPassaggioMerito"] = iscr.CodTipoOrdinamentoPassaggio ?? "";
+            row["AnnoAccadInizioPassaggioMerito"] = iscr.AnnoAccadInizioPassaggio ?? "";
+            SetIfHasValue(row, "DurataLegalePassaggioMerito", iscr.DurataLegalePassaggio);
+            SetIfHasValue(row, "ConversioneCreditiEsamiPassaggioMerito", iscr.ConversioneCreditiEsamiPassaggio);
+            SetIfHasValue(row, "NumeroEsamiPassaggioMerito", iscr.NumeroEsamiPassaggio);
+            SetIfHasValue(row, "SommaVotiEsamiPassaggioMerito", iscr.SommaVotiEsamiPassaggio);
+            SetIfHasValue(row, "EsamiMinimiRichiestiPassaggioMerito", iscr.EsamiMinimiRichiestiPassaggio);
+            SetIfHasValue(row, "CreditiMinimiRichiestiPassaggioMerito", iscr.CreditiMinimiRichiestiPassaggio);
 
             SetIfPositiveInt(row, "NumeroEventiCarrieraPregressa", iscr.NumeroEventiCarrieraPregressa);
             SetIfHasValue(row, "UltimoAnnoAvvenimentoCarrieraPregressa", iscr.UltimoAnnoAvvenimentoCarrieraPregressa);

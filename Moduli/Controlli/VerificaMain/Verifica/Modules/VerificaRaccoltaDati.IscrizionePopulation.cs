@@ -1,4 +1,4 @@
-using ProcedureNet7.Verifica;
+﻿using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -31,6 +31,7 @@ ISCR AS
         cl.Durata_legale,
         TRY_CONVERT(INT, i.Anno_corso) AS Anno_corso,
         i.Cod_facolta,
+        CONVERT(NVARCHAR(20), i.Anno_accad_inizio) AS Anno_accad_inizio,
         i.Cod_sede_studi,
         CONVERT(NVARCHAR(50), i.Cod_tipologia_studi) AS Cod_tipologia_studi,
         TRY_CONVERT(DECIMAL(18,2), i.Crediti_tirocinio) AS Crediti_tirocinio,
@@ -60,6 +61,7 @@ SELECT
     I.Durata_legale,
     I.Anno_corso,
     I.Cod_facolta,
+    I.Anno_accad_inizio,
     I.Cod_sede_studi,
     I.Cod_tipologia_studi,
     I.Crediti_tirocinio,
@@ -186,6 +188,16 @@ JOIN vCARRIERA_PREGRESSA cp
   ON cp.Anno_accademico = @AA
  AND cp.Cod_fiscale = D.CodFiscale;";
 
+        private static readonly string[] MeritoDurataLegaleCorsoCandidates = { "Durata_legale", "DurataLegale", "durata_legale" };
+        private static readonly string[] MeritoCodTipoOrdinamentoCorsoCandidates = { "Cod_tipo_ordinamento", "CodTipoOrdinamento", "cod_tipo_ordinamento" };
+        private static readonly string[] MeritoCodCorsoLaureaPassaggioCandidates = { "Cod_corso_laurea_passaggio", "CodCorsoLaureaPassaggio", "cod_corso_laurea_passaggio" };
+        private static readonly string[] MeritoCodTipoOrdinamentoPassaggioCandidates = { "Cod_tipo_ordinam_passaggio", "Cod_TipoOrdinam_Passaggio", "CodTipoOrdinamentoPassaggio", "cod_tipo_ordinam_passaggio" };
+        private static readonly string[] MeritoAnnoAccadInizioPassaggioCandidates = { "Anno_accad_inizio_passaggio", "AnnoAccadInizioPassaggio", "anno_accad_inizio_passaggio" };
+        private static readonly string[] MeritoDurataLegalePassaggioCandidates = { "Durata_legale_passaggio", "DurataLegalePassaggio", "durata_legale_passaggio" };
+        private static readonly string[] MeritoConversioneCreditiEsamiPassaggioCandidates = { "Conversione_crediti_esami_passaggio", "ConversioneCreditiEsamiPassaggio", "conversione_crediti_esami_passaggio" };
+        private static readonly string[] MeritoNumeroEsamiPassaggioCandidates = { "Numero_esami_passaggio", "NumeroEsamiPassaggio", "numero_esami_passaggio" };
+        private static readonly string[] MeritoSommaVotiEsamiPassaggioCandidates = { "Somma_voti_esami", "SommaVotiEsami", "somma_voti_esami" };
+
         private static void ResetIscrizioneState(VerificaPipelineContext context)
         {
             foreach (var info in context.Students.Values)
@@ -197,6 +209,7 @@ JOIN vCARRIERA_PREGRESSA cp
                 iscr.CodCorsoLaurea = string.Empty;
                 iscr.CodSedeStudi = string.Empty;
                 iscr.CodFacolta = string.Empty;
+                iscr.AnnoAccadInizioCorso = string.Empty;
                 iscr.CodEnte = string.Empty;
                 iscr.CodSedeDistaccata = string.Empty;
                 iscr.ComuneSedeStudi = string.Empty;
@@ -214,6 +227,20 @@ JOIN vCARRIERA_PREGRESSA cp
                 iscr.CreditiRimanenti = null;
                 iscr.CreditiRiconosciutiDaRinuncia = null;
                 iscr.AACreditiRiconosciuti = string.Empty;
+                iscr.DurataLegaleCorso = null;
+                iscr.CodTipoOrdinamentoCorso = string.Empty;
+                iscr.CodCorsoLaureaPassaggio = string.Empty;
+                iscr.CodTipoOrdinamentoPassaggio = string.Empty;
+                iscr.AnnoAccadInizioPassaggio = string.Empty;
+                iscr.DurataLegalePassaggio = null;
+                iscr.ConversioneCreditiEsamiPassaggio = null;
+                iscr.NumeroEsamiPassaggio = null;
+                iscr.SommaVotiEsamiPassaggio = null;
+                iscr.EsamiMinimiRichiestiMerito = null;
+                iscr.CreditiMinimiRichiestiMerito = null;
+                iscr.EsamiMinimiRichiestiPassaggio = null;
+                iscr.CreditiMinimiRichiestiPassaggio = null;
+                iscr.RegolaMeritoApplicata = string.Empty;
                 iscr.NumeroEventiCarrieraPregressa = 0;
                 iscr.UltimoAnnoAvvenimentoCarrieraPregressa = null;
                 iscr.TotaleCreditiCarrieraPregressa = 0m;
@@ -230,6 +257,7 @@ JOIN vCARRIERA_PREGRESSA cp
             LoadIscrizioneCore(context);
             LoadAppartenenza(context);
             LoadMerito(context);
+            LoadMeritoPassaggioExtensions(context);
         }
 
         private void LoadIscrizioneCore(VerificaPipelineContext context)
@@ -241,8 +269,10 @@ JOIN vCARRIERA_PREGRESSA cp
                 iscr.TipoBando = reader.SafeGetString("TipoBando");
                 iscr.AnnoCorso = reader.SafeGetInt("Anno_corso");
                 iscr.CodCorsoLaurea = reader.SafeGetString("Cod_corso_laurea");
+                iscr.DurataLegaleCorso = reader.SafeGetInt("Durata_legale");
                 iscr.CorsoMedicina = reader.SafeGetInt("Durata_legale") == 6;
                 iscr.CodFacolta = reader.SafeGetString("Cod_facolta");
+                iscr.AnnoAccadInizioCorso = reader.SafeGetString("Anno_accad_inizio");
                 iscr.CodSedeStudi = reader.SafeGetString("Cod_sede_studi");
                 iscr.ComuneSedeStudi = reader.SafeGetString("ComuneSedeStudi").Trim();
                 iscr.ProvinciaSedeStudi = reader.SafeGetString("ProvinciaSede").Trim().ToUpperInvariant();
@@ -282,6 +312,49 @@ JOIN vCARRIERA_PREGRESSA cp
                 iscr.CreditiRimanenti = reader.SafeGetDecimal("Crediti_rimanenti");
                 iscr.CreditiRiconosciutiDaRinuncia = reader.SafeGetDecimal("Crediti_riconosciuti_da_rinuncia");
                 iscr.AACreditiRiconosciuti = reader.SafeGetString("AACreditiRiconosciuti");
+            });
+        }
+
+        private void LoadMeritoPassaggioExtensions(VerificaPipelineContext context)
+        {
+            var columns = GetObjectColumns(context.Connection, "vMerito");
+            if (columns.Count == 0)
+                return;
+
+            string sql = $@"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    {BuildNullableIntExpression("m", columns, MeritoDurataLegaleCorsoCandidates)} AS DurataLegaleCorso,
+    {BuildNullableStringExpression("m", columns, MeritoCodTipoOrdinamentoCorsoCandidates)} AS CodTipoOrdinamentoCorso,
+    {BuildNullableStringExpression("m", columns, MeritoCodCorsoLaureaPassaggioCandidates)} AS CodCorsoLaureaPassaggio,
+    {BuildNullableStringExpression("m", columns, MeritoCodTipoOrdinamentoPassaggioCandidates)} AS CodTipoOrdinamentoPassaggio,
+    {BuildNullableStringExpression("m", columns, MeritoAnnoAccadInizioPassaggioCandidates)} AS AnnoAccadInizioPassaggio,
+    {BuildNullableIntExpression("m", columns, MeritoDurataLegalePassaggioCandidates)} AS DurataLegalePassaggio,
+    {BuildNullableDecimalExpression("m", columns, MeritoConversioneCreditiEsamiPassaggioCandidates)} AS ConversioneCreditiEsamiPassaggio,
+    {BuildNullableIntExpression("m", columns, MeritoNumeroEsamiPassaggioCandidates)} AS NumeroEsamiPassaggio,
+    {BuildNullableDecimalExpression("m", columns, MeritoSommaVotiEsamiPassaggioCandidates)} AS SommaVotiEsamiPassaggio
+FROM {{TEMP_TABLE}} t
+LEFT JOIN vMerito m
+  ON m.Anno_accademico = @AA
+ AND m.Num_domanda = t.NumDomanda;";
+
+            using var cmd = CreatePopulationCommand(sql, context);
+            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            {
+                var iscr = info.InformazioniIscrizione;
+                iscr.DurataLegaleCorso ??= reader.SafeGetInt("DurataLegaleCorso");
+                iscr.CodTipoOrdinamentoCorso = reader.SafeGetString("CodTipoOrdinamentoCorso");
+                iscr.CodCorsoLaureaPassaggio = reader.SafeGetString("CodCorsoLaureaPassaggio");
+                iscr.CodTipoOrdinamentoPassaggio = reader.SafeGetString("CodTipoOrdinamentoPassaggio");
+                iscr.AnnoAccadInizioPassaggio = reader.SafeGetString("AnnoAccadInizioPassaggio");
+                iscr.DurataLegalePassaggio = reader.SafeGetInt("DurataLegalePassaggio");
+                iscr.ConversioneCreditiEsamiPassaggio = reader.SafeGetDecimal("ConversioneCreditiEsamiPassaggio");
+                iscr.NumeroEsamiPassaggio = reader.SafeGetInt("NumeroEsamiPassaggio");
+                iscr.SommaVotiEsamiPassaggio = reader.SafeGetDecimal("SommaVotiEsamiPassaggio");
             });
         }
 
@@ -354,6 +427,50 @@ JOIN vCARRIERA_PREGRESSA cp
                 iscr.HaPassaggioCorsoEsteroCarrieraPregressa = hasPassaggioEstero;
                 iscr.HaRipetenzaCarrieraPregressa = hasRipetenza;
                 iscr.CodiciAvvenimentoCarrieraPregressa = string.Join("|", codici);
+            }
+        }
+
+        private const string EsamiCatalogSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CONVERT(NVARCHAR(50), e.COD_CORSO_LAUREA) AS Cod_corso_laurea,
+    CONVERT(NVARCHAR(20), e.COD_TIPO_ORDINAMENTO) AS Cod_tipo_ordinamento,
+    CONVERT(NVARCHAR(20), e.Anno_Accad_Inizio) AS Anno_accad_inizio,
+    TRY_CONVERT(INT, e.ANNO_CORSO) AS Anno_corso,
+    SUM(TRY_CONVERT(DECIMAL(18,2), e.NUM_ESAMI)) AS Numero_esami
+FROM ESAMI e
+WHERE e.ANNO_ACCADEMICO = @AA
+GROUP BY
+    CONVERT(NVARCHAR(50), e.COD_CORSO_LAUREA),
+    CONVERT(NVARCHAR(20), e.COD_TIPO_ORDINAMENTO),
+    CONVERT(NVARCHAR(20), e.Anno_Accad_Inizio),
+    TRY_CONVERT(INT, e.ANNO_CORSO);";
+
+        private void LoadEsamiCatalog(VerificaPipelineContext context)
+        {
+            context.EsamiCatalog.Clear();
+
+            if (!ObjectExists(context.Connection, "ESAMI"))
+                return;
+
+            using var cmd = new SqlCommand(EsamiCatalogSql, context.Connection)
+            {
+                CommandType = CommandType.Text,
+                CommandTimeout = 9999999
+            };
+            cmd.Parameters.Add("@AA", SqlDbType.Char, 8).Value = context.AnnoAccademico;
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                context.EsamiCatalog.Add(
+                    reader.SafeGetString("Cod_corso_laurea"),
+                    reader.SafeGetString("Cod_tipo_ordinamento"),
+                    reader.SafeGetString("Anno_accad_inizio"),
+                    reader.SafeGetInt("Anno_corso"),
+                    reader.SafeGetDecimal("Numero_esami"));
             }
         }
 

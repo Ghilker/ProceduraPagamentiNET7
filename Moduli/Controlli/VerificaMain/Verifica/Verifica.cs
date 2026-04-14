@@ -1,4 +1,4 @@
-using ProcedureNet7.Storni;
+﻿using ProcedureNet7.Storni;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -46,7 +46,7 @@ namespace ProcedureNet7.Verifica
 
             VerificaExecutionSupport.ExecuteTimed("Verifica.Output", () =>
             {
-                (OutputVerificaList, OutputVerifica) = BuildOrderedOutputs(context.Students);
+                (OutputVerificaList, OutputVerifica) = BuildOrderedOutputs(context);
             }, () => $"students={context.Students.Count}");
 
             VerificaExecutionSupport.ExecuteTimed("Verifica.Export", () => Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath), () => $"rows={OutputVerifica.Rows.Count}");

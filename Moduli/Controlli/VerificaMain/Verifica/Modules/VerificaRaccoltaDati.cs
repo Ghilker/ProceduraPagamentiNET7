@@ -1,4 +1,4 @@
-using ProcedureNet7.Verifica;
+﻿using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -145,6 +145,7 @@ FROM D;";
                         LoadBaseIscrizione(context);
                         LoadCarrieraPregressa(context);
                         BuildCarrieraPregressaAggregate(context);
+                        LoadEsamiCatalog(context);
                     },
                     () => $"students={context.Students.Count}");
 

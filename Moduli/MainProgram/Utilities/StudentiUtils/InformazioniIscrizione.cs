@@ -11,6 +11,7 @@ namespace ProcedureNet7
         public bool CorsoStem {  get; set; }
         public string CodSedeStudi { get; set; } = string.Empty;
         public string CodFacolta { get; set; } = string.Empty;
+        public string AnnoAccadInizioCorso { get; set; } = string.Empty;
         public string CodEnte { get; set; } = string.Empty;
         public string ComuneSedeStudi { get; set; } = string.Empty;
         public string ProvinciaSedeStudi { get; set; } = string.Empty;
@@ -29,6 +30,22 @@ namespace ProcedureNet7
         public decimal? CreditiRimanenti { get; set; }
         public decimal? CreditiRiconosciutiDaRinuncia { get; set; }
         public string AACreditiRiconosciuti { get; set; } = string.Empty;
+        public int? DurataLegaleCorso { get; set; }
+        public string CodTipoOrdinamentoCorso { get; set; } = string.Empty;
+
+        public string CodCorsoLaureaPassaggio { get; set; } = string.Empty;
+        public string CodTipoOrdinamentoPassaggio { get; set; } = string.Empty;
+        public string AnnoAccadInizioPassaggio { get; set; } = string.Empty;
+        public int? DurataLegalePassaggio { get; set; }
+        public decimal? ConversioneCreditiEsamiPassaggio { get; set; }
+        public int? NumeroEsamiPassaggio { get; set; }
+        public decimal? SommaVotiEsamiPassaggio { get; set; }
+
+        public decimal? EsamiMinimiRichiestiMerito { get; set; }
+        public decimal? CreditiMinimiRichiestiMerito { get; set; }
+        public decimal? EsamiMinimiRichiestiPassaggio { get; set; }
+        public decimal? CreditiMinimiRichiestiPassaggio { get; set; }
+        public string RegolaMeritoApplicata { get; set; } = string.Empty;
 
         public int NumeroEventiCarrieraPregressa { get; set; }
         public int? UltimoAnnoAvvenimentoCarrieraPregressa { get; set; }
