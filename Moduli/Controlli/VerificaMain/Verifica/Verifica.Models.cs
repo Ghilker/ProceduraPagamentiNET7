@@ -70,7 +70,40 @@ namespace ProcedureNet7.Verifica
         public bool? RipetenteDaPassaggio { get; set; }
         public bool? PassaggioVecchioNuovo { get; set; }
         public bool? EsameComplementare { get; set; }
-        public string CodTipoOrdinamentoPassaggio { get; set; } = string.Empty;
+
+        public bool RinunciaBS { get; set; }
+        public bool RinunciaPA { get; set; }
+        public bool RinunciaCM { get; set; }
+        public bool RinunciaCT { get; set; }
+        public bool RinunciaCI { get; set; }
+
+        public bool Revocato { get; set; }
+        public bool RevocatoBandoBS { get; set; }
+        public bool RevocatoBandoPA { get; set; }
+        public bool RevocatoBandoCM { get; set; }
+        public bool RevocatoBandoCT { get; set; }
+        public bool RevocatoBandoCI { get; set; }
+        public bool RevocatoSedeDistaccata { get; set; }
+        public bool RevocatoMancataIscrizione { get; set; }
+        public bool RevocatoIscrittoRipetente { get; set; }
+        public bool RevocatoISEE { get; set; }
+        public bool RevocatoLaureato { get; set; }
+        public bool RevocatoPatrimonio { get; set; }
+        public bool RevocatoReddito { get; set; }
+        public bool RevocatoEsami { get; set; }
+        public bool RevocatoFuoriTermine { get; set; }
+        public bool RevocatoIseeFuoriTermine { get; set; }
+        public bool RevocatoIseeNonProdotta { get; set; }
+        public bool RevocatoTrasmissioneIseeFuoriTermine { get; set; }
+        public bool RevocatoNoContrattoLocazione { get; set; }
+
+        public bool DecadutoBS { get; set; }
+        public bool DecadutoPA { get; set; }
+        public bool DecadutoCM { get; set; }
+        public bool DecadutoCT { get; set; }
+        public bool DecadutoCI { get; set; }
+
+        public string SlashMotiviEsclusioneBS { get; set; } = string.Empty;
 
         public int? TipologiaStudiTitoloConseguito { get; set; }
         public int? DurataLegTitoloConseguito { get; set; }

@@ -33,13 +33,6 @@ namespace ProcedureNet7
         public int? DurataLegaleCorso { get; set; }
         public string CodTipoOrdinamentoCorso { get; set; } = string.Empty;
 
-        public string CodCorsoLaureaPassaggio { get; set; } = string.Empty;
-        public string CodTipoOrdinamentoPassaggio { get; set; } = string.Empty;
-        public string AnnoAccadInizioPassaggio { get; set; } = string.Empty;
-        public int? DurataLegalePassaggio { get; set; }
-        public decimal? ConversioneCreditiEsamiPassaggio { get; set; }
-        public int? NumeroEsamiPassaggio { get; set; }
-        public decimal? SommaVotiEsamiPassaggio { get; set; }
 
         public decimal? EsamiMinimiRichiestiMerito { get; set; }
         public decimal? CreditiMinimiRichiestiMerito { get; set; }
@@ -73,9 +66,6 @@ namespace ProcedureNet7
         public decimal? NumeroCrediti { get; set; }
         public int? AnnoCorso { get; set; }
         public int Ripetente { get; set; }
-        public string Ateneo { get; set; } = string.Empty;
-        public string CodComuneAteneo { get; set; } = string.Empty;
-        public string CodAteneo { get; set; } = string.Empty;
         public int ConfermaSemestreFiltroDi { get; set; }
     }
 }

@@ -40,13 +40,12 @@ namespace ProcedureNet7
             if (facts.RinunciaBenefici == true)
                 evaluation.Add("GEN007");
 
+            ApplyVariazioniEscludenti(facts, evaluation);
+
             if (facts.TitoloAccademicoConseguito == true && !PassaRequisitiIscrizione(context))
                 evaluation.Add("GEN006");
 
             bool faseProvvisoria = context.Pipeline.FaseElaborativa == VerificaFaseElaborativa.GraduatorieProvvisorie;
-
-            if (!faseProvvisoria && RichiedeDocumentazioneConsolare(context) && facts.DocConsolare == false)
-                evaluation.Add("GEN004");
 
             if (!faseProvvisoria && RichiedePermessoSoggiorno(facts) && facts.PermessoSoggiorno == false)
                 evaluation.Add("GEN005");
@@ -82,41 +81,40 @@ namespace ProcedureNet7
             }
         }
 
+        private static void ApplyVariazioniEscludenti(EsitoBorsaFacts facts, EsitoBorsaEvaluation evaluation)
+        {
+            if (facts.Revocato)
+                evaluation.Add("VAR003");
+            if (facts.RevocatoMancataIscrizione)
+                evaluation.Add("VAR019");
+            if (facts.RevocatoIscrittoRipetente)
+                evaluation.Add("VAR020");
+            if (facts.RevocatoISEE)
+                evaluation.Add("VAR021");
+            if (facts.RevocatoLaureato)
+                evaluation.Add("VAR022");
+            if (facts.RevocatoPatrimonio)
+                evaluation.Add("VAR023");
+            if (facts.RevocatoReddito)
+                evaluation.Add("VAR024");
+            if (facts.RevocatoEsami)
+                evaluation.Add("VAR025");
+            if (facts.RevocatoFuoriTermine)
+                evaluation.Add("VAR027");
+            if (facts.RevocatoIseeFuoriTermine)
+                evaluation.Add("VAR028");
+            if (facts.RevocatoIseeNonProdotta)
+                evaluation.Add("VAR029");
+            if (facts.RevocatoTrasmissioneIseeFuoriTermine)
+                evaluation.Add("VAR030");
+            if (facts.RevocatoNoContrattoLocazione)
+                evaluation.Add("VAR031");
+        }
+
         private static void ApplyForzatureGenerali(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
             foreach (var code in context.Facts.ForzatureGenerali)
                 evaluation.Add($"GENF{code}");
-        }
-
-        private static bool RichiedeDocumentazioneConsolare(EsitoBorsaStudentContext context)
-        {
-            var info = context.Info;
-            var facts = context.Facts;
-
-            if (info == null)
-                return false;
-
-            if (info.InformazioniPersonali?.Rifugiato == true)
-                return false;
-
-            if (facts.IsConferma == true || facts.RedditoUe == true)
-                return false;
-
-            if (!facts.Straniero.HasValue || !facts.CittadinanzaUe.HasValue || !facts.FamigliaResidenteItalia.HasValue)
-                return false;
-
-            string comuneResidenza = EsitoBorsaSupport.GetComuneResidenza(info);
-            bool comuneEstero = comuneResidenza.StartsWith("Z", StringComparison.OrdinalIgnoreCase);
-            bool straniero = facts.Straniero.Value;
-            bool cittadinanzaUe = facts.CittadinanzaUe.Value;
-            bool famigliaResidenteItalia = facts.FamigliaResidenteItalia.Value;
-            bool residenzaUe = facts.ResidenzaUe ?? false;
-
-            bool casoExtraUe = straniero && !cittadinanzaUe && !famigliaResidenteItalia && comuneEstero;
-            bool casoUeNonResidente = cittadinanzaUe && !residenzaUe && !famigliaResidenteItalia;
-            bool casoItalianoEstero = comuneEstero && !straniero;
-
-            return casoExtraUe || casoUeNonResidente || casoItalianoEstero;
         }
 
         private static bool RichiedePermessoSoggiorno(EsitoBorsaFacts facts)

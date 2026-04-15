@@ -16,7 +16,7 @@ namespace ProcedureNet7
         private readonly CalcParams _calc = new();
         private readonly HashSet<(string ComuneA, string ComuneB)> _comuniEquiparati = new();
 
-        private const string VerificaCandidatesSql = @"
+        private const string VerificaStudentiBaseSql = @"
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
@@ -106,7 +106,7 @@ FROM D;";
             _currentContext = context;
 
             var pipelineTable = VerificaExecutionSupport.ExecuteTimed(
-                "VerificaRaccoltaDati.Candidati",
+                "VerificaRaccoltaDati.StudentiBase",
                 () => CaricaCandidatiEInizializzaStudenti(context),
                 () => $"AA={context.AnnoAccademico}");
 
@@ -203,7 +203,7 @@ FROM D;";
 
             var table = BuildPipelineTargetsDataTable();
 
-            using var cmd = new SqlCommand(VerificaCandidatesSql, _conn)
+            using var cmd = new SqlCommand(VerificaStudentiBaseSql, _conn)
             {
                 CommandType = CommandType.Text,
                 CommandTimeout = 9999999
@@ -217,7 +217,7 @@ FROM D;";
                 ? null
                 : new HashSet<string>(context.CodiciFiscaliFiltro.Select(NormalizeCf), StringComparer.OrdinalIgnoreCase);
 
-            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Estrazione candidati | AA={context.AnnoAccademico} | IncludeEsclusi={context.IncludeEsclusi} | IncludeNonTrasmesse={context.IncludeNonTrasmesse}");
+            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Estrazione studenti base | AA={context.AnnoAccademico} | IncludeEsclusi={context.IncludeEsclusi} | IncludeNonTrasmesse={context.IncludeNonTrasmesse}");
 
             using var reader = cmd.ExecuteReader();
             int read = 0;
@@ -254,10 +254,10 @@ FROM D;";
 
                 read++;
                 if (read % 5000 == 0)
-                    Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati letti... {read}");
+                    Logger.LogInfo(null, $"[VerificaRaccoltaDati] Studenti base letti... {read}");
             }
 
-            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Candidati utilizzati: {context.Students.Count}");
+            Logger.LogInfo(null, $"[VerificaRaccoltaDati] Studenti base utilizzati: {context.Students.Count}");
             return table;
         }
 

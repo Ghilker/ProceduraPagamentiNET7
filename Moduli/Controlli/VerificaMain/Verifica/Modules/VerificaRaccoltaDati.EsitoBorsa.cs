@@ -43,57 +43,68 @@ WHERE f.ANNO_ACCADEMICO = @AA
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-;WITH D AS
-(
-    SELECT
-        CAST(t.NumDomanda AS INT) AS NumDomanda,
-        t.CodFiscale,
-        COALESCE(t.TipoBando,'') AS TipoBando
-    FROM {TEMP_TABLE} t
-),
-ISCR AS
-(
-    SELECT
-        D.NumDomanda,
-        D.CodFiscale,
-        CONVERT(NVARCHAR(50), i.Cod_tipo_ordinamento) AS Cod_tipo_ordinamento,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY COALESCE(CONVERT(NVARCHAR(50), i.Cod_tipo_ordinamento),'')) AS rn
-    FROM D
-    LEFT JOIN vIscrizioni i
-      ON i.Anno_accademico = @AA
-     AND i.Cod_fiscale = D.CodFiscale
-     AND COALESCE(i.tipo_bando,'') = D.TipoBando
-)
-SELECT NumDomanda, CodFiscale, ISNULL(Cod_tipo_ordinamento,'') AS Cod_tipo_ordinamento
-FROM ISCR
-WHERE rn = 1;";
+SELECT
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    CAST('' AS NVARCHAR(50)) AS Cod_tipo_ordinamento
+FROM {TEMP_TABLE} t
+WHERE 1 = 0;";
 
-        private static readonly string[] FactFirmataCandidates = { "Firmata", "firmata" };
-        private static readonly string[] FactFotocopiaCandidates = { "Fotocopia", "Fotocopia_documento", "fotocopia" };
-        private static readonly string[] FactCartaceoCandidates = { "CartaceoInviato", "Cartaceo_inviato", "cartaceo_inviato" };
-        private static readonly string[] FactFuoriTermineCandidates = { "Fuori_termine", "FuoriTermine", "isFuoriTermine" };
-        private static readonly string[] FactIscrFuoriTermineCandidates = { "Iscrizione_fuori_termine", "IscrizioneFuoriTermine", "isIscrizioneFuoriTermine" };
-        private static readonly string[] FactDocConsolareCandidates = { "Doc_Consolare", "DocConsolare", "doc_consolare" };
-        private static readonly string[] FactPermessoCandidates = { "Permesso_Sogg", "PermessoSogg", "Permesso_di_soggiorno", "permesso_sogg" };
-        private static readonly string[] FactRinunciaBeneficiCandidates = { "RinunciaBenefici", "Rinuncia_benefici", "rinuncia_benefici" };
-        private static readonly string[] FactDomandaTrasmessaCandidates = { "DomandaTrasmessa", "Domanda_trasmessa", "domanda_trasmessa", "Trasmessa" };
-        private static readonly string[] FactDomandaPinCandidates = { "DomandaTrasmessa_PIN", "Domanda_trasmessa_pin", "Trasmessa_pin" };
-        private static readonly string[] FactConfermaRedditoCandidates = { "Conferma_Reddito", "ConfermaReddito", "conferma_reddito" };
-        private static readonly string[] FactStatusIseeCandidates = { "StatusIsee", "Status_Isee", "status_isee" };
-        private static readonly string[] FactTipoCertificazioneCandidates = { "tipo_certificazione", "Tipo_certificazione", "TipoCertificazione" };
-        private static readonly string[] FactTitoloConseguitoCandidates = { "TitoloAccademicoConseguito", "Titolo_accademico_conseguito", "titolo_accademico_conseguito" };
-        private static readonly string[] FactAttesaTitoloCandidates = { "Attesa_TitoloAccademicoConseguito", "Attesa_titolo_accademico_conseguito", "attesa_titolo_accademico_conseguito" };
-        private static readonly string[] FactConfermaCandidates = { "isConferma", "Conferma", "is_conferma", "conferma" };
-        private static readonly string[] FactStranieroCandidates = { "Straniero", "straniero" };
-        private static readonly string[] FactCittadinanzaUeCandidates = { "CittadinanzaUE", "Cittadinanza_Ue", "Cittadinanza_UE", "cittadinanza_ue" };
-        private static readonly string[] FactResidenzaUeCandidates = { "ResidenzaUE", "Residenza_Ue", "Residenza_UE", "residenza_ue" };
-        private static readonly string[] FactFamigliaItaliaCandidates = { "isFamigliaResidenteItalia", "Famiglia_residente_italia", "famiglia_residente_italia" };
-        private static readonly string[] FactTipologiaTitoloCandidates = { "TipologiaStudi_TitConseguito", "Tipologia_studi_tit_conseguito", "tipologia_studi_tit_conseguito" };
-        private static readonly string[] FactDurataTitoloCandidates = { "Durata_leg_titolo_conseguito", "Durata_Leg_Titolo_Conseguito", "durata_leg_titolo_conseguito" };
-        private static readonly string[] MeritoPassaggioTrasferimentoCandidates = { "Passaggio_trasferimento", "PassaggioTrasferimento", "passaggio_trasferimento" };
-        private static readonly string[] MeritoRipetenteDaPassaggioCandidates = { "Ripetente_da_passaggio", "RipetenteDaPassaggio", "ripetente_da_passaggio" };
-        private static readonly string[] MeritoPassaggioVecchioNuovoCandidates = { "Passaggio_vecchio_nuovo", "PassaggioVecchioNuovo", "passaggio_vecchio_nuovo" };
-        private static readonly string[] MeritoEsameComplementareCandidates = { "Esame_complementare", "EsameComplementare", "esame_complementare" };
+        private const string EsitoBorsaVariazioniSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    TRY_CONVERT(INT, v.COD_TIPO_VARIAZ) AS CodTipoVariaz,
+    UPPER(LTRIM(RTRIM(ISNULL(v.COD_BENEFICIO,'')))) AS CodBeneficio
+FROM {TEMP_TABLE} t
+JOIN VARIAZIONI v
+  ON v.ANNO_ACCADEMICO = @AA
+ AND v.NUM_DOMANDA = CAST(t.NumDomanda AS INT)
+WHERE v.DATA_VALIDITA =
+(
+    SELECT MAX(v2.DATA_VALIDITA)
+    FROM VARIAZIONI v2
+    WHERE v2.ANNO_ACCADEMICO = v.ANNO_ACCADEMICO
+      AND v2.NUM_DOMANDA = v.NUM_DOMANDA
+      AND v2.COD_TIPO_VARIAZ = v.COD_TIPO_VARIAZ
+      AND ISNULL(v2.COD_BENEFICIO,'') = ISNULL(v.COD_BENEFICIO,'')
+);";
+
+        private const string EsitoBorsaRinunceUfficioSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CAST(v.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    TRY_CONVERT(INT, v.Riga_valida) AS RigaValida,
+    UPPER(LTRIM(RTRIM(ISNULL(v.COD_BENEFICIO,'')))) AS CodBeneficio
+FROM {TEMP_TABLE} t
+JOIN RINUNCE v
+  ON v.ANNO_ACCADEMICO = @AA
+ AND v.NUM_DOMANDA = CAST(t.NumDomanda AS INT)
+WHERE v.DATA_VALIDITA =
+(
+    SELECT MAX(v2.DATA_VALIDITA)
+    FROM RINUNCE v2
+    WHERE v2.ANNO_ACCADEMICO = v.ANNO_ACCADEMICO
+      AND v2.NUM_DOMANDA = v.NUM_DOMANDA
+      AND v2.Riga_valida = v.Riga_valida
+      AND ISNULL(v2.COD_BENEFICIO,'') = ISNULL(v.COD_BENEFICIO,'')
+);";
+
+        private const string EsitoBorsaSlashMotiviEsclusioneSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    CONVERT(NVARCHAR(MAX), dbo.SlashMotiviEsclusioneTest(CAST(t.NumDomanda AS INT), @AA, 'BS')) AS SlashMotiviEsclusioneBS
+FROM {TEMP_TABLE} t;";
 
         private static readonly string[] CarrieraTitoloAvvenimentoMarkers =
         {
@@ -112,8 +123,10 @@ WHERE rn = 1;";
             LoadEsitoBorsaForzature(context);
             LoadEsitoBorsaForzatureRinuncia(context);
             LoadEsitoBorsaCodTipoOrdinamento(context);
-            LoadEsitoBorsaMeritoFlags(context);
             LoadEsitoBorsaGeneralFacts(context);
+            LoadEsitoBorsaVariazioni(context);
+            LoadEsitoBorsaRinunceUfficio(context);
+            LoadEsitoBorsaSlashMotiviEsclusione(context);
             LoadEsitoBorsaRedditoUeFacts(context);
             LoadEsitoBorsaLaureaSpecFacts(context);
             BuildEsitoBorsaPregressaFacts(context);
@@ -146,90 +159,418 @@ WHERE rn = 1;";
 
         private void LoadEsitoBorsaCodTipoOrdinamento(VerificaPipelineContext context)
         {
-            using var cmd = CreatePopulationCommand(EsitoBorsaCodTipoOrdinamentoSql, context);
+            foreach (var pair in context.Students)
+            {
+                var facts = GetOrCreateEsitoBorsaFacts(context, pair.Key);
+                facts.CodTipoOrdinamento = (pair.Value.InformazioniIscrizione.CodTipoOrdinamentoCorso ?? string.Empty).Trim();
+            }
+        }
+
+        private void LoadEsitoBorsaVariazioni(VerificaPipelineContext context)
+        {
+            using var cmd = CreatePopulationCommand(EsitoBorsaVariazioniSql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
                 var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
                 var facts = GetOrCreateEsitoBorsaFacts(context, key);
-                facts.CodTipoOrdinamento = reader.SafeGetString("Cod_tipo_ordinamento").Trim();
+                ApplyVariazione(facts, reader.SafeGetInt("CodTipoVariaz"), reader.SafeGetString("CodBeneficio"));
             });
         }
 
-        private void LoadEsitoBorsaMeritoFlags(VerificaPipelineContext context)
+        private void LoadEsitoBorsaRinunceUfficio(VerificaPipelineContext context)
         {
-            var columns = GetObjectColumns(context.Connection, "vMerito");
-            if (columns.Count == 0)
-                return;
-
-            string sql = $@"
-SET NOCOUNT ON;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
-
-SELECT
-    CAST(t.NumDomanda AS INT) AS NumDomanda,
-    t.CodFiscale,
-    {BuildNullableBitExpression("m", columns, MeritoPassaggioTrasferimentoCandidates)} AS PassaggioTrasferimento,
-    {BuildNullableBitExpression("m", columns, MeritoRipetenteDaPassaggioCandidates)} AS RipetenteDaPassaggio,
-    {BuildNullableBitExpression("m", columns, MeritoPassaggioVecchioNuovoCandidates)} AS PassaggioVecchioNuovo,
-    {BuildNullableBitExpression("m", columns, MeritoEsameComplementareCandidates)} AS EsameComplementare
-FROM {{TEMP_TABLE}} t
-LEFT JOIN vMerito m
-  ON m.Anno_accademico = @AA
- AND m.Num_domanda = t.NumDomanda;";
-
-            using var cmd = CreatePopulationCommand(sql, context);
+            using var cmd = CreatePopulationCommand(EsitoBorsaRinunceUfficioSql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
                 var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
                 var facts = GetOrCreateEsitoBorsaFacts(context, key);
-                facts.PassaggioTrasferimento = GetNullableBool(reader, "PassaggioTrasferimento");
-                facts.RipetenteDaPassaggio = GetNullableBool(reader, "RipetenteDaPassaggio");
-                facts.PassaggioVecchioNuovo = GetNullableBool(reader, "PassaggioVecchioNuovo");
-                facts.EsameComplementare = GetNullableBool(reader, "EsameComplementare");
-                if (info?.InformazioniIscrizione != null)
-                    facts.CodTipoOrdinamentoPassaggio = info.InformazioniIscrizione.CodTipoOrdinamentoPassaggio ?? string.Empty;
+                ApplyRinunciaUfficio(facts, reader.SafeGetInt("RigaValida"), reader.SafeGetString("CodBeneficio"));
             });
+        }
+
+        private void LoadEsitoBorsaSlashMotiviEsclusione(VerificaPipelineContext context)
+        {
+            using var cmd = CreatePopulationCommand(EsitoBorsaSlashMotiviEsclusioneSql, context);
+            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            {
+                var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                var facts = GetOrCreateEsitoBorsaFacts(context, key);
+                facts.SlashMotiviEsclusioneBS = reader.SafeGetString("SlashMotiviEsclusioneBS").Trim();
+            });
+        }
+
+        private static void ApplyRinunciaUfficio(EsitoBorsaFacts facts, int rigaValida, string? codBeneficio)
+        {
+            if (facts == null)
+                return;
+
+            string beneficio = NormalizeUpper(codBeneficio);
+            if(rigaValida == 0)
+            {
+                ApplyVariazione(facts, 2, beneficio);
+            }
+        }
+
+        private static void ApplyVariazione(EsitoBorsaFacts facts, int codTipoVariaz, string? codBeneficio)
+        {
+            if (facts == null)
+                return;
+
+            string beneficio = NormalizeUpper(codBeneficio);
+            switch (codTipoVariaz)
+            {
+                case 2:
+                case 9:
+                case 10:
+                    ApplyRinuncia(facts, beneficio);
+                    break;
+                case 3:
+                    if (beneficio == "00")
+                        facts.Revocato = true;
+                    else if (beneficio == "CI")
+                        facts.RevocatoBandoCI = true;
+                    break;
+                case 4:
+                    ApplyDecadenza(facts, beneficio);
+                    break;
+                case 11:
+                    ApplyRevocaBando(facts, beneficio);
+                    break;
+                case 18:
+                    if (beneficio == "PA") facts.RevocatoSedeDistaccata = true;
+                    break;
+                case 19:
+                    if (beneficio == "00") facts.RevocatoMancataIscrizione = true;
+                    break;
+                case 20:
+                    if (beneficio == "00") facts.RevocatoIscrittoRipetente = true;
+                    break;
+                case 21:
+                    if (beneficio == "00") facts.RevocatoISEE = true;
+                    break;
+                case 22:
+                    if (beneficio == "00") facts.RevocatoLaureato = true;
+                    break;
+                case 23:
+                    if (beneficio == "00") facts.RevocatoPatrimonio = true;
+                    break;
+                case 24:
+                    if (beneficio == "00") facts.RevocatoReddito = true;
+                    break;
+                case 25:
+                    if (beneficio == "00") facts.RevocatoEsami = true;
+                    break;
+                case 26:
+                    if (beneficio == "00") facts.RinunciaBenefici = true;
+                    break;
+                case 27:
+                    if (beneficio == "00") facts.RevocatoFuoriTermine = true;
+                    break;
+                case 28:
+                    if (beneficio == "00") facts.RevocatoIseeFuoriTermine = true;
+                    break;
+                case 29:
+                    if (beneficio == "00") facts.RevocatoIseeNonProdotta = true;
+                    break;
+                case 30:
+                    if (beneficio == "00") facts.RevocatoTrasmissioneIseeFuoriTermine = true;
+                    break;
+                case 31:
+                    if (beneficio == "00") facts.RevocatoNoContrattoLocazione = true;
+                    break;
+            }
+        }
+
+        private static void ApplyRinuncia(EsitoBorsaFacts facts, string beneficio)
+        {
+            switch (beneficio)
+            {
+                case "BS": facts.RinunciaBS = true; break;
+                case "PA": facts.RinunciaPA = true; break;
+                case "CM": facts.RinunciaCM = true; break;
+                case "CT": facts.RinunciaCT = true; break;
+                case "CI": facts.RinunciaCI = true; break;
+                case "00": facts.RinunciaBenefici = true; break;
+            }
+        }
+
+        private static void ApplyDecadenza(EsitoBorsaFacts facts, string beneficio)
+        {
+            switch (beneficio)
+            {
+                case "BS": facts.DecadutoBS = true; break;
+                case "PA": facts.DecadutoPA = true; break;
+                case "CM": facts.DecadutoCM = true; break;
+                case "CT": facts.DecadutoCT = true; break;
+                case "CI": facts.DecadutoCI = true; break;
+            }
+        }
+
+        private static void ApplyRevocaBando(EsitoBorsaFacts facts, string beneficio)
+        {
+            switch (beneficio)
+            {
+                case "BS": facts.RevocatoBandoBS = true; break;
+                case "PA": facts.RevocatoBandoPA = true; break;
+                case "CM": facts.RevocatoBandoCM = true; break;
+                case "CT": facts.RevocatoBandoCT = true; break;
+                case "CI": facts.RevocatoBandoCI = true; break;
+                case "00": facts.Revocato = true; break;
+            }
         }
 
         private void LoadEsitoBorsaGeneralFacts(VerificaPipelineContext context)
         {
-            var columns = GetObjectColumns(context.Connection, "vDATIGENERALI_dom");
-            if (columns.Count == 0)
-                return;
-
-            string sql = $@"
+            string sql = @"
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
+;WITH D AS
+(
+    SELECT DISTINCT
+        CAST(t.NumDomanda AS INT) AS NumDomanda,
+        LTRIM(RTRIM(t.CodFiscale)) AS CodFiscale
+    FROM {TEMP_TABLE} t
+),
+DG_MAX AS
+(
+    SELECT
+        dg.NUM_DOMANDA,
+        MAX(dg.DATA_VALIDITA) AS DATA_VALIDITA
+    FROM DATIGENERALI_DOM dg
+    INNER JOIN D
+        ON D.NumDomanda = dg.NUM_DOMANDA
+    WHERE dg.ANNO_ACCADEMICO = @AA
+    GROUP BY dg.NUM_DOMANDA
+),
+DG AS
+(
+    SELECT
+        dg.NUM_DOMANDA AS NumDomanda,
+        TRY_CONVERT(INT, dg.TIPO_STUDENTE) AS TipoStudente,
+        TRY_CONVERT(BIT, dg.FIRMATA) AS Firmata,
+        TRY_CONVERT(BIT, dg.FOTOCOPIA) AS FotocopiaDocumento,
+        TRY_CONVERT(BIT, dg.CONFERMA_REDDITO) AS ConfermaReddito,
+        TRY_CONVERT(BIT, dg.STRANIERO_FAM_RES_ITA) AS FamigliaResidenteItalia,
+        TRY_CONVERT(BIT, dg.DOC_CONSOLARE) AS DocConsolare,
+        TRY_CONVERT(BIT, dg.PERMESSO_SOGG) AS PermessoSoggiorno,
+        TRY_CONVERT(BIT, dg.FUORI_TERMINE) AS FuoriTermine,
+        TRY_CONVERT(BIT, dg.ISCRIZIONE_FUORITERMINE) AS IscrizioneFuoriTermine,
+        TRY_CONVERT(BIT, dg.RINUNCIA_IN_CORSO) AS RinunciaBenefici
+    FROM DATIGENERALI_DOM dg
+    INNER JOIN DG_MAX mx
+        ON mx.NUM_DOMANDA = dg.NUM_DOMANDA
+       AND mx.DATA_VALIDITA = dg.DATA_VALIDITA
+    WHERE dg.ANNO_ACCADEMICO = @AA
+),
+SC AS
+(
+    SELECT
+        sc.NUM_DOMANDA AS NumDomanda,
+        CAST(ISNULL(sc.STATUS_COMPILAZIONE, 0) AS INT) AS StatusCompilazione
+    FROM vSTATUS_COMPILAZIONE sc
+    INNER JOIN D
+        ON D.NumDomanda = sc.NUM_DOMANDA
+    WHERE sc.ANNO_ACCADEMICO = @AA
+),
+CIT_MAX AS
+(
+    SELECT
+        c.COD_FISCALE,
+        MAX(c.DATA_VALIDITA) AS DATA_VALIDITA
+    FROM CITTADINANZA c
+    INNER JOIN D
+        ON D.CodFiscale = LTRIM(RTRIM(c.COD_FISCALE))
+    GROUP BY c.COD_FISCALE
+),
+CIT AS
+(
+    SELECT
+        D.NumDomanda,
+        CAST(CASE WHEN ISNULL(c.COD_CITTADINANZA, 'Z000') <> 'Z000' THEN 1 ELSE 0 END AS BIT) AS Straniero,
+        CAST(CASE
+                WHEN ISNULL(c.COD_CITTADINANZA, 'Z000') <> 'Z000'
+                 AND EXISTS
+                     (
+                         SELECT 1
+                         FROM CITTADINANZE_UE cue
+                         WHERE cue.CODICE = c.COD_CITTADINANZA
+                     )
+                THEN 1
+                ELSE 0
+             END AS BIT) AS CittadinanzaUe
+    FROM D
+    LEFT JOIN CITTADINANZA c
+        ON c.COD_FISCALE = D.CodFiscale
+    LEFT JOIN CIT_MAX mx
+        ON mx.COD_FISCALE = c.COD_FISCALE
+       AND mx.DATA_VALIDITA = c.DATA_VALIDITA
+),
+RES AS
+(
+    SELECT
+        D.NumDomanda,
+        CAST
+        (
+            CASE
+                WHEN LEFT(ISNULL(r.COD_COMUNE, ''), 1) = 'Z' THEN
+                    CASE
+                        WHEN EXISTS
+                             (
+                                 SELECT 1
+                                 FROM CITTADINANZE_UE cue
+                                 WHERE cue.CODICE = r.COD_COMUNE
+                             )
+                        THEN 1
+                        ELSE 0
+                    END
+                ELSE 1
+            END
+            AS BIT
+        ) AS ResidenzaUe
+    FROM D
+    LEFT JOIN vRESIDENZA r
+        ON r.COD_FISCALE = D.CodFiscale
+       AND r.ANNO_ACCADEMICO = @AA
+       AND r.TIPO_BANDO = 'LZ'
+),
+VC_MAX AS
+(
+    SELECT
+        vc.NUM_DOMANDA,
+        MAX(vc.DATA_VALIDITA) AS DATA_VALIDITA
+    FROM VALORI_CALCOLATI vc
+    INNER JOIN D
+        ON D.NumDomanda = vc.NUM_DOMANDA
+    WHERE vc.ANNO_ACCADEMICO = @AA
+    GROUP BY vc.NUM_DOMANDA
+),
+VC AS
+(
+    SELECT
+        vc.NUM_DOMANDA AS NumDomanda,
+        TRY_CONVERT(INT, vc.STATUS_ISEE) AS StatusIsee
+    FROM VALORI_CALCOLATI vc
+    INNER JOIN VC_MAX mx
+        ON mx.NUM_DOMANDA = vc.NUM_DOMANDA
+       AND mx.DATA_VALIDITA = vc.DATA_VALIDITA
+    WHERE vc.ANNO_ACCADEMICO = @AA
+),
+CERT AS
+(
+    SELECT
+        D.NumDomanda,
+        CASE
+            WHEN MAX(CASE WHEN UPPER(ISNULL(ci.Cod_tipo_attestazione, '')) = 'UNIVERSITARIO' THEN 1 ELSE 0 END) = 1 THEN 'UNIV'
+            WHEN MAX(CASE WHEN UPPER(ISNULL(ci.Cod_tipo_attestazione, '')) = 'RIDOTTO' THEN 1 ELSE 0 END) = 1 THEN 'RID'
+            WHEN MAX(CASE WHEN ISNULL(ci.Cod_tipo_attestazione, '') <> '' THEN 1 ELSE 0 END) = 1 THEN 'ORD'
+            ELSE ''
+        END AS TipoCertificazione
+    FROM D
+    LEFT JOIN vCertificaz_ISEE ci
+        ON ci.anno_accademico = @AA
+       AND ci.num_domanda = D.NumDomanda
+       AND ci.Tipologia_certificazione = 'CO'
+    GROUP BY D.NumDomanda
+),
+CP_CD_MAX AS
+(
+    SELECT
+        cp.COD_FISCALE,
+        MAX(cp.DATA_VALIDITA) AS DATA_VALIDITA
+    FROM CARRIERA_PREGRESSA cp
+    INNER JOIN D
+        ON D.CodFiscale = LTRIM(RTRIM(cp.COD_FISCALE))
+    WHERE cp.ANNO_ACCADEMICO = @AA
+      AND cp.COD_AVVENIMENTO = 'CD'
+    GROUP BY cp.COD_FISCALE
+),
+CP_CD AS
+(
+    SELECT
+        D.NumDomanda,
+        TRY_CONVERT(INT, cp.RIGA_VALIDA) AS RigaValida,
+        TRY_CONVERT(INT, cp.TIPOLOGIA_CORSO) AS TipologiaCorso,
+        TRY_CONVERT(INT, cp.DURATA_LEG_TITOLO_CONSEGUITO) AS DurataLegTitoloConseguito
+    FROM D
+    LEFT JOIN CARRIERA_PREGRESSA cp
+        ON cp.COD_FISCALE = D.CodFiscale
+       AND cp.ANNO_ACCADEMICO = @AA
+       AND cp.COD_AVVENIMENTO = 'CD'
+    LEFT JOIN CP_CD_MAX mx
+        ON mx.COD_FISCALE = cp.COD_FISCALE
+       AND mx.DATA_VALIDITA = cp.DATA_VALIDITA
+),
+CP_AT_MAX AS
+(
+    SELECT
+        cp.COD_FISCALE,
+        MAX(cp.DATA_VALIDITA) AS DATA_VALIDITA
+    FROM CARRIERA_PREGRESSA cp
+    INNER JOIN D
+        ON D.CodFiscale = LTRIM(RTRIM(cp.COD_FISCALE))
+    WHERE cp.ANNO_ACCADEMICO = @AA
+      AND cp.COD_AVVENIMENTO = 'AT'
+    GROUP BY cp.COD_FISCALE
+),
+CP_AT AS
+(
+    SELECT
+        D.NumDomanda,
+        TRY_CONVERT(INT, cp.RIGA_VALIDA) AS RigaValida,
+        TRY_CONVERT(INT, cp.TIPOLOGIA_CORSO) AS TipologiaCorso
+    FROM D
+    LEFT JOIN CARRIERA_PREGRESSA cp
+        ON cp.COD_FISCALE = D.CodFiscale
+       AND cp.ANNO_ACCADEMICO = @AA
+       AND cp.COD_AVVENIMENTO = 'AT'
+    LEFT JOIN CP_AT_MAX mx
+        ON mx.COD_FISCALE = cp.COD_FISCALE
+       AND mx.DATA_VALIDITA = cp.DATA_VALIDITA
+)
 SELECT
-    CAST(t.NumDomanda AS INT) AS NumDomanda,
-    t.CodFiscale,
-    {BuildNullableBitExpression("v", columns, FactCartaceoCandidates)} AS CartaceoInviato,
-    {BuildNullableBitExpression("v", columns, FactFirmataCandidates)} AS Firmata,
-    {BuildNullableBitExpression("v", columns, FactFotocopiaCandidates)} AS FotocopiaDocumento,
-    {BuildNullableBitExpression("v", columns, FactFuoriTermineCandidates)} AS FuoriTermine,
-    {BuildNullableBitExpression("v", columns, FactIscrFuoriTermineCandidates)} AS IscrizioneFuoriTermine,
-    {BuildNullableBitExpression("v", columns, FactDocConsolareCandidates)} AS DocConsolare,
-    {BuildNullableBitExpression("v", columns, FactPermessoCandidates)} AS PermessoSoggiorno,
-    {BuildNullableBitExpression("v", columns, FactRinunciaBeneficiCandidates)} AS RinunciaBenefici,
-    {BuildNullableBitExpression("v", columns, FactDomandaTrasmessaCandidates)} AS DomandaTrasmessa,
-    {BuildNullableBitExpression("v", columns, FactDomandaPinCandidates)} AS DomandaTrasmessaPin,
-    {BuildNullableBitExpression("v", columns, FactConfermaRedditoCandidates)} AS ConfermaReddito,
-    {BuildNullableIntExpression("v", columns, FactStatusIseeCandidates)} AS StatusIsee,
-    {BuildNullableStringExpression("v", columns, FactTipoCertificazioneCandidates)} AS TipoCertificazione,
-    {BuildNullableBitExpression("v", columns, FactTitoloConseguitoCandidates)} AS TitoloAccademicoConseguito,
-    {BuildNullableBitExpression("v", columns, FactAttesaTitoloCandidates)} AS AttesaTitoloAccademicoConseguito,
-    {BuildNullableBitExpression("v", columns, FactConfermaCandidates)} AS IsConferma,
-    {BuildNullableBitExpression("v", columns, FactStranieroCandidates)} AS Straniero,
-    {BuildNullableBitExpression("v", columns, FactCittadinanzaUeCandidates)} AS CittadinanzaUe,
-    {BuildNullableBitExpression("v", columns, FactResidenzaUeCandidates)} AS ResidenzaUe,
-    {BuildNullableBitExpression("v", columns, FactFamigliaItaliaCandidates)} AS FamigliaResidenteItalia,
-    {BuildNullableIntExpression("v", columns, FactTipologiaTitoloCandidates)} AS TipologiaStudiTitoloConseguito,
-    {BuildNullableIntExpression("v", columns, FactDurataTitoloCandidates)} AS DurataLegTitoloConseguito
-FROM {{TEMP_TABLE}} t
-LEFT JOIN vDATIGENERALI_dom v
-  ON v.Num_domanda = t.NumDomanda
- AND v.Anno_accademico = @AA;";
+    D.NumDomanda,
+    D.CodFiscale,
+    CAST(CASE WHEN ISNULL(SC.StatusCompilazione, 0) >= 80 THEN 1 ELSE 0 END AS BIT) AS CartaceoInviato,
+    DG.Firmata,
+    DG.FotocopiaDocumento,
+    DG.FuoriTermine,
+    DG.IscrizioneFuoriTermine,
+    DG.DocConsolare,
+    DG.PermessoSoggiorno,
+    DG.RinunciaBenefici,
+    CAST(CASE WHEN ISNULL(SC.StatusCompilazione, 0) >= 80 THEN 1 ELSE 0 END AS BIT) AS DomandaTrasmessa,
+    CAST(CASE WHEN ISNULL(SC.StatusCompilazione, 0) >= 80 THEN 1 ELSE 0 END AS BIT) AS DomandaTrasmessaPin,
+    DG.ConfermaReddito,
+    ISNULL(VC.StatusIsee, 0) AS StatusIsee,
+    ISNULL(CERT.TipoCertificazione, '') AS TipoCertificazione,
+    CAST(CASE WHEN ISNULL(CP_CD.RigaValida, 1) = 0 THEN 1 ELSE 0 END AS BIT) AS TitoloAccademicoConseguito,
+    CAST(CASE WHEN ISNULL(CP_AT.RigaValida, 1) = 0 THEN 1 ELSE 0 END AS BIT) AS AttesaTitoloAccademicoConseguito,
+    CAST(CASE WHEN ISNULL(DG.TipoStudente, 0) IN (2, 3, 6) THEN 1 ELSE 0 END AS BIT) AS IsConferma,
+    ISNULL(CIT.Straniero, CAST(0 AS BIT)) AS Straniero,
+    ISNULL(CIT.CittadinanzaUe, CAST(0 AS BIT)) AS CittadinanzaUe,
+    ISNULL(RES.ResidenzaUe, CAST(0 AS BIT)) AS ResidenzaUe,
+    ISNULL(DG.FamigliaResidenteItalia, CAST(0 AS BIT)) AS FamigliaResidenteItalia,
+    COALESCE(CP_AT.TipologiaCorso, CP_CD.TipologiaCorso, 0) AS TipologiaStudiTitoloConseguito,
+    ISNULL(CP_CD.DurataLegTitoloConseguito, 0) AS DurataLegTitoloConseguito
+FROM D
+LEFT JOIN DG
+    ON DG.NumDomanda = D.NumDomanda
+LEFT JOIN SC
+    ON SC.NumDomanda = D.NumDomanda
+LEFT JOIN CIT
+    ON CIT.NumDomanda = D.NumDomanda
+LEFT JOIN RES
+    ON RES.NumDomanda = D.NumDomanda
+LEFT JOIN VC
+    ON VC.NumDomanda = D.NumDomanda
+LEFT JOIN CERT
+    ON CERT.NumDomanda = D.NumDomanda
+LEFT JOIN CP_CD
+    ON CP_CD.NumDomanda = D.NumDomanda
+LEFT JOIN CP_AT
+    ON CP_AT.NumDomanda = D.NumDomanda
+OPTION (RECOMPILE);";
 
             using var cmd = CreatePopulationCommand(sql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) =>

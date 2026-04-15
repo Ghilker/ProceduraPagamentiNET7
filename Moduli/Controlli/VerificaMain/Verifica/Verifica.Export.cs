@@ -91,15 +91,14 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("RegolaMeritoApplicata", typeof(string));
             dt.Columns.Add("EsamiMinimiRichiestiMerito", typeof(decimal));
             dt.Columns.Add("CreditiMinimiRichiestiMerito", typeof(decimal));
-            dt.Columns.Add("CodCorsoLaureaPassaggioMerito", typeof(string));
-            dt.Columns.Add("CodTipoOrdinamentoPassaggioMerito", typeof(string));
-            dt.Columns.Add("AnnoAccadInizioPassaggioMerito", typeof(string));
-            dt.Columns.Add("DurataLegalePassaggioMerito", typeof(int));
-            dt.Columns.Add("ConversioneCreditiEsamiPassaggioMerito", typeof(decimal));
-            dt.Columns.Add("NumeroEsamiPassaggioMerito", typeof(int));
-            dt.Columns.Add("SommaVotiEsamiPassaggioMerito", typeof(decimal));
             dt.Columns.Add("EsamiMinimiRichiestiPassaggioMerito", typeof(decimal));
             dt.Columns.Add("CreditiMinimiRichiestiPassaggioMerito", typeof(decimal));
+            dt.Columns.Add("SlashMotiviEsclusioneBS", typeof(string));
+            dt.Columns.Add("VariazioniEscludentiBS", typeof(string));
+            dt.Columns.Add("RinunciaBSDaVariazioni", typeof(bool));
+            dt.Columns.Add("DecadutoBSDaVariazioni", typeof(bool));
+            dt.Columns.Add("RevocatoDaVariazioni", typeof(bool));
+            dt.Columns.Add("RevocatoBandoBSDaVariazioni", typeof(bool));
 
             dt.Columns.Add("NumeroEventiCarrieraPregressa", typeof(int));
             dt.Columns.Add("UltimoAnnoAvvenimentoCarrieraPregressa", typeof(int));
@@ -242,15 +241,14 @@ namespace ProcedureNet7.Verifica
             row["RegolaMeritoApplicata"] = iscr.RegolaMeritoApplicata ?? "";
             SetIfHasValue(row, "EsamiMinimiRichiestiMerito", iscr.EsamiMinimiRichiestiMerito);
             SetIfHasValue(row, "CreditiMinimiRichiestiMerito", iscr.CreditiMinimiRichiestiMerito);
-            row["CodCorsoLaureaPassaggioMerito"] = iscr.CodCorsoLaureaPassaggio ?? "";
-            row["CodTipoOrdinamentoPassaggioMerito"] = iscr.CodTipoOrdinamentoPassaggio ?? "";
-            row["AnnoAccadInizioPassaggioMerito"] = iscr.AnnoAccadInizioPassaggio ?? "";
-            SetIfHasValue(row, "DurataLegalePassaggioMerito", iscr.DurataLegalePassaggio);
-            SetIfHasValue(row, "ConversioneCreditiEsamiPassaggioMerito", iscr.ConversioneCreditiEsamiPassaggio);
-            SetIfHasValue(row, "NumeroEsamiPassaggioMerito", iscr.NumeroEsamiPassaggio);
-            SetIfHasValue(row, "SommaVotiEsamiPassaggioMerito", iscr.SommaVotiEsamiPassaggio);
             SetIfHasValue(row, "EsamiMinimiRichiestiPassaggioMerito", iscr.EsamiMinimiRichiestiPassaggio);
             SetIfHasValue(row, "CreditiMinimiRichiestiPassaggioMerito", iscr.CreditiMinimiRichiestiPassaggio);
+            row["SlashMotiviEsclusioneBS"] = facts?.SlashMotiviEsclusioneBS ?? "";
+            row["VariazioniEscludentiBS"] = EsitoBorsaSupport.GetVariazioniEscludentiBsSummary(facts);
+            row["RinunciaBSDaVariazioni"] = facts?.RinunciaBS == true;
+            row["DecadutoBSDaVariazioni"] = facts?.DecadutoBS == true;
+            row["RevocatoDaVariazioni"] = facts != null && (facts.Revocato || facts.RevocatoMancataIscrizione || facts.RevocatoIscrittoRipetente || facts.RevocatoISEE || facts.RevocatoLaureato || facts.RevocatoPatrimonio || facts.RevocatoReddito || facts.RevocatoEsami || facts.RevocatoFuoriTermine || facts.RevocatoIseeFuoriTermine || facts.RevocatoIseeNonProdotta || facts.RevocatoTrasmissioneIseeFuoriTermine || facts.RevocatoNoContrattoLocazione);
+            row["RevocatoBandoBSDaVariazioni"] = facts?.RevocatoBandoBS == true;
 
             SetIfPositiveInt(row, "NumeroEventiCarrieraPregressa", iscr.NumeroEventiCarrieraPregressa);
             SetIfHasValue(row, "UltimoAnnoAvvenimentoCarrieraPregressa", iscr.UltimoAnnoAvvenimentoCarrieraPregressa);

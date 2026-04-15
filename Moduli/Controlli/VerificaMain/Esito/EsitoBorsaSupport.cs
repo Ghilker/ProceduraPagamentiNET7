@@ -42,7 +42,22 @@ namespace ProcedureNet7
             { "MER171", "Passaggio vecchio→nuovo non calcolabile con i dati esposti" },
             { "BS001", "Anno di corso oltre il limite ammesso per la borsa" },
             { "BS002", "Beneficio borsa già fruito e non restituito" },
-            { "BS003", "Rinuncia pregressa alla borsa di studio" }
+            { "BS003", "Rinuncia pregressa alla borsa di studio" },
+            { "VAR003", "Revoca di tutti i benefici da variazione" },
+            { "VAR004", "Decadenza della borsa di studio da variazione" },
+            { "VAR011", "Revoca della borsa per incompatibilità con il bando" },
+            { "VAR019", "Revoca per mancata iscrizione" },
+            { "VAR020", "Revoca per iscrizione come ripetente" },
+            { "VAR021", "Revoca per ISEE o anni di fuori corso inammissibili" },
+            { "VAR022", "Revoca per studente già laureato" },
+            { "VAR023", "Revoca per patrimonio oltre il limite" },
+            { "VAR024", "Revoca per reddito oltre il limite" },
+            { "VAR025", "Revoca per mancanza esami o crediti" },
+            { "VAR027", "Revoca per iscrizione fuori termine" },
+            { "VAR028", "Revoca per ISEE fuori termine" },
+            { "VAR029", "Revoca per ISEE non prodotta" },
+            { "VAR030", "Revoca per trasmissione ISEE CAF fuori termine" },
+            { "VAR031", "Revoca per mancanza contratto di locazione" }
         };
 
         public static string NormalizeUpper(string? value)
@@ -136,137 +151,15 @@ namespace ProcedureNet7
 
             var iscr = context.Iscrizione;
             string ordCorrente = NormalizeUpper(context.Facts.CodTipoOrdinamento);
-            string ordPassaggio = NormalizeUpper(!string.IsNullOrWhiteSpace(iscr.CodTipoOrdinamentoPassaggio)
-                ? iscr.CodTipoOrdinamentoPassaggio
-                : context.Facts.CodTipoOrdinamentoPassaggio);
-
             int aaImmatricolazioneInizio = GetAnnoInizioDaAnnoAccademico(iscr.AnnoImmatricolazione ?? 0);
 
-            if (ordPassaggio == "3" || string.IsNullOrWhiteSpace(ordPassaggio))
-                return false;
-
-            if (ordCorrente == "1" || ordCorrente == "2")
+            if (ordCorrente != "3")
                 return false;
 
             if (aaImmatricolazioneInizio > 2001 && IsEnte(iscr, "01"))
                 return false;
 
             return true;
-        }
-
-        public static int GetAnnoCorsoCalcolatoPassaggio(EsitoBorsaStudentContext context)
-        {
-            if (context?.Iscrizione == null)
-                return 0;
-
-            int anno = GetAnnoCorsoCalcolato(context.Iscrizione, context.AaInizio);
-            int durataPassaggio = context.Iscrizione.DurataLegalePassaggio ?? 0;
-            int durataCorrente = GetDurataNormaleCorso(context.Iscrizione);
-
-            if (anno == 0 || durataPassaggio <= 0)
-                return 0;
-
-            if (anno < 0 && durataCorrente > 0)
-                anno = Math.Abs(anno) + durataCorrente;
-
-            if (anno > durataPassaggio)
-                anno = durataPassaggio - anno;
-
-            return anno;
-        }
-
-        public static decimal? GetEsamiMinimiRichiestiPassaggio(EsitoBorsaStudentContext context)
-        {
-            if (context?.Pipeline == null || context.Iscrizione == null || !IsPassaggioVecchioNuovo(context))
-                return null;
-
-            var iscr = context.Iscrizione;
-            int annoCorsoPassaggio = GetAnnoCorsoCalcolatoPassaggio(context);
-            if (annoCorsoPassaggio == 0 || annoCorsoPassaggio == 1)
-                return 0m;
-
-            string codCorso = iscr.CodCorsoLaureaPassaggio;
-            string codOrd = !string.IsNullOrWhiteSpace(iscr.CodTipoOrdinamentoPassaggio)
-                ? iscr.CodTipoOrdinamentoPassaggio
-                : context.Facts.CodTipoOrdinamentoPassaggio;
-            string annoAccadInizio = !string.IsNullOrWhiteSpace(iscr.AnnoAccadInizioPassaggio)
-                ? iscr.AnnoAccadInizioPassaggio
-                : (iscr.AnnoImmatricolazione?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
-
-            if (string.IsNullOrWhiteSpace(codCorso) || string.IsNullOrWhiteSpace(codOrd))
-                return null;
-
-            decimal totaleEsami = annoCorsoPassaggio < 0
-                ? context.Pipeline.EsamiCatalog.GetTotal(codCorso, codOrd, annoAccadInizio)
-                : context.Pipeline.EsamiCatalog.GetSumBeforeYear(codCorso, codOrd, annoAccadInizio, annoCorsoPassaggio);
-
-            if (totaleEsami <= 0m)
-                return null;
-
-            bool corsoNormale = !NormalizeUpper(codCorso).StartsWith("Q00", StringComparison.Ordinal)
-                               && !NormalizeUpper(codCorso).StartsWith("U00", StringComparison.Ordinal)
-                               && NormalizeUpper(iscr.CodSedeStudi) != "P"
-                               && NormalizeUpper(iscr.CodSedeStudi) != "O";
-
-            decimal richiesti;
-            switch (annoCorsoPassaggio)
-            {
-                case 2:
-                    richiesti = corsoNormale ? (totaleEsami > 4m ? 2m : 1m) : totaleEsami;
-                    break;
-                case 3:
-                case 4:
-                case 5:
-                case 6:
-                    if (corsoNormale)
-                    {
-                        bool isUltimoAnno = iscr.DurataLegalePassaggio.HasValue && annoCorsoPassaggio == iscr.DurataLegalePassaggio.Value;
-                        richiesti = isUltimoAnno ? Math.Floor(totaleEsami * 0.6m) : Math.Floor(totaleEsami / 2m) + 1m;
-                    }
-                    else
-                    {
-                        richiesti = totaleEsami;
-                    }
-                    break;
-                case -1:
-                    richiesti = !NormalizeUpper(codCorso).StartsWith("U00", StringComparison.Ordinal)
-                                && NormalizeUpper(iscr.CodSedeStudi) != "P"
-                                && NormalizeUpper(iscr.CodSedeStudi) != "O"
-                        ? Math.Floor(totaleEsami * 0.66m)
-                        : totaleEsami;
-                    break;
-                case -2:
-                    richiesti = Math.Floor(totaleEsami * 0.9m);
-                    break;
-                case -3:
-                    richiesti = Math.Floor(totaleEsami * 1.063636363m);
-                    break;
-                case -4:
-                    richiesti = Math.Floor(totaleEsami * 1.227272727m);
-                    break;
-                default:
-                    richiesti = 0m;
-                    break;
-            }
-
-            if (context.Invalido)
-                richiesti = Math.Floor(richiesti * 0.55m);
-
-            return richiesti;
-        }
-
-        public static decimal? GetCreditiMinimiRichiestiPassaggio(EsitoBorsaStudentContext context)
-        {
-            if (context?.Iscrizione == null || !IsPassaggioVecchioNuovo(context))
-                return null;
-
-            decimal? esami = GetEsamiMinimiRichiestiPassaggio(context);
-            decimal conversione = context.Iscrizione.ConversioneCreditiEsamiPassaggio ?? 0m;
-
-            if (!esami.HasValue || conversione <= 0m)
-                return null;
-
-            return esami.Value * conversione;
         }
 
         public static int GetAnnoCorsoRiferimentoBeneficio(EsitoBorsaStudentContext context)
@@ -278,6 +171,31 @@ namespace ProcedureNet7
                 return context.Iscrizione.AnnoCorso;
 
             return GetAnnoCorsoCalcolato(context.Iscrizione, context.AaInizio);
+        }
+
+        public static string GetVariazioniEscludentiBsSummary(EsitoBorsaFacts? facts)
+        {
+            if (facts == null)
+                return string.Empty;
+
+            var items = new List<string>();
+            if (facts.RinunciaBS) items.Add("RINUNCIA_BS");
+            if (facts.DecadutoBS) items.Add("DECADENZA_BS");
+            if (facts.Revocato) items.Add("REVOCA_TOTALE");
+            if (facts.RevocatoBandoBS) items.Add("REVOCA_BANDO_BS");
+            if (facts.RevocatoMancataIscrizione) items.Add("REVOCA_MANCATA_ISCRIZIONE");
+            if (facts.RevocatoIscrittoRipetente) items.Add("REVOCA_RIPETENTE");
+            if (facts.RevocatoISEE) items.Add("REVOCA_ISEE");
+            if (facts.RevocatoLaureato) items.Add("REVOCA_LAUREATO");
+            if (facts.RevocatoPatrimonio) items.Add("REVOCA_PATRIMONIO");
+            if (facts.RevocatoReddito) items.Add("REVOCA_REDDITO");
+            if (facts.RevocatoEsami) items.Add("REVOCA_ESAMI");
+            if (facts.RevocatoFuoriTermine) items.Add("REVOCA_FUORI_TERMINE");
+            if (facts.RevocatoIseeFuoriTermine) items.Add("REVOCA_ISEE_FUORI_TERMINE");
+            if (facts.RevocatoIseeNonProdotta) items.Add("REVOCA_ISEE_NON_PRODOTTA");
+            if (facts.RevocatoTrasmissioneIseeFuoriTermine) items.Add("REVOCA_TRASMISSIONE_ISEE_FUORI_TERMINE");
+            if (facts.RevocatoNoContrattoLocazione) items.Add("REVOCA_NO_CONTRATTO");
+            return string.Join(";", items);
         }
 
         public static int GetAnnoInizioDaAnnoAccademico(int annoAccademico)
@@ -399,10 +317,10 @@ namespace ProcedureNet7
 
         public static decimal GetIspRiferimento(StudenteInfo info)
         {
-            if (TryReadDecimal(info?.InformazioniEconomiche?.Calcolate?.ISPDSU, out var ordinario) && ordinario > 0m)
+            if (TryReadDecimal(info?.InformazioniEconomiche?.Calcolate?.ISPEDSU, out var ordinario) && ordinario > 0m)
                 return ordinario;
 
-            if (TryReadDecimal(info?.InformazioniEconomiche?.Attuali?.ISPDSU, out var attuale) && attuale > 0m)
+            if (TryReadDecimal(info?.InformazioniEconomiche?.Attuali?.ISPEDSU, out var attuale) && attuale > 0m)
                 return attuale;
 
             return 0m;

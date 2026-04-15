@@ -213,48 +213,30 @@ namespace ProcedureNet7
         {
             iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO";
 
-            decimal conversione = iscr.ConversioneCreditiEsamiPassaggio ?? 0m;
-            string codCorsoPassaggio = (iscr.CodCorsoLaureaPassaggio ?? string.Empty).Trim();
-            bool medicinaValutataAdEsami = codCorsoPassaggio.StartsWith("C", StringComparison.OrdinalIgnoreCase);
-
-            if (conversione <= 0m && !medicinaValutataAdEsami)
-            {
-                iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO_DATI_INSUFFICIENTI";
-                return false;
-            }
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, context.AaInizio);
+            decimal creditiMinimiCorrenti = GetCreditiMinimiRichiesti(iscr, context.Invalido, context.AaNumero, annoCorsoCalcolato);
+            iscr.CreditiMinimiRichiestiMerito = creditiMinimiCorrenti > 0m ? creditiMinimiCorrenti : null;
+            iscr.CreditiMinimiRichiestiPassaggio = creditiMinimiCorrenti > 0m ? creditiMinimiCorrenti : null;
 
             decimal creditiStudente = iscr.NumeroCrediti ?? 0m;
-            decimal creditiMinimiCorrenti = GetCreditiMinimiRichiesti(iscr, context.Invalido, context.AaNumero, EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, context.AaInizio));
-            iscr.CreditiMinimiRichiestiMerito = creditiMinimiCorrenti;
-
-            if (conversione > 0m && creditiMinimiCorrenti > 0m && creditiStudente >= creditiMinimiCorrenti)
+            if (creditiMinimiCorrenti > 0m && creditiStudente >= creditiMinimiCorrenti)
             {
                 iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO_CREDITI_CORRENTE";
                 return true;
             }
 
-            if (conversione > 0m)
+            decimal? esamiMinimiCorrenti = EsitoBorsaSupport.GetEsamiMinimiRichiesti(context, iscr);
+            iscr.EsamiMinimiRichiestiPassaggio = esamiMinimiCorrenti;
+
+            if (esamiMinimiCorrenti.HasValue)
             {
-                decimal? creditiPassaggio = EsitoBorsaSupport.GetCreditiMinimiRichiestiPassaggio(context);
-                iscr.EsamiMinimiRichiestiPassaggio = EsitoBorsaSupport.GetEsamiMinimiRichiestiPassaggio(context);
-                iscr.CreditiMinimiRichiestiPassaggio = creditiPassaggio;
-                iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO_CONVERSIONE";
-
-                if (!creditiPassaggio.HasValue)
-                    return false;
-
-                return creditiStudente >= creditiPassaggio.Value;
+                iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO_ESAMI_CORRENTE";
+                int esamiStudente = iscr.NumeroEsami ?? 0;
+                return esamiStudente >= esamiMinimiCorrenti.Value;
             }
 
-            decimal? esamiPassaggio = EsitoBorsaSupport.GetEsamiMinimiRichiestiPassaggio(context);
-            iscr.EsamiMinimiRichiestiPassaggio = esamiPassaggio;
-            iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO_ESAMI";
-
-            if (!esamiPassaggio.HasValue)
-                return false;
-
-            int esamiStudente = iscr.NumeroEsamiPassaggio ?? iscr.NumeroEsami ?? 0;
-            return esamiStudente >= esamiPassaggio.Value;
+            iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO_DATI_CORRENTE";
+            return creditiMinimiCorrenti <= 0m;
         }
 
         private static bool HaCreditiMinimiPerBorsa(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, bool invalido, int aaNumero)

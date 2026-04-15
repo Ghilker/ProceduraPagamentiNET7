@@ -23,8 +23,14 @@ namespace ProcedureNet7
             if (HasBeneficioPregressoNonRestituito(context.Facts))
                 evaluation.Add("BS002");
 
-            if (context.Facts.RinunciaBorsa == true)
+            if (context.Facts.RinunciaBorsa == true || context.Facts.RinunciaBS)
                 evaluation.Add("BS003");
+
+            if (context.Facts.DecadutoBS)
+                evaluation.Add("VAR004");
+
+            if (context.Facts.RevocatoBandoBS)
+                evaluation.Add("VAR011");
         }
 
         private static bool IsAnnoCorsoAmmissibile(EsitoBorsaStudentContext context)

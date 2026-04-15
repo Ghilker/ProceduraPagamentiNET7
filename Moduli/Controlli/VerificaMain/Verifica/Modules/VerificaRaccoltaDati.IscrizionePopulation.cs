@@ -21,43 +21,86 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
         COALESCE(t.TipoBando,'') AS TipoBando
     FROM {TEMP_TABLE} t
 ),
+MER AS
+(
+    SELECT
+        D.NumDomanda,
+        TRY_CONVERT(INT, m.ANNO_IMMATRICOLAZ) AS Anno_immatricolaz
+    FROM D
+    LEFT JOIN MERITO m
+      ON m.ANNO_ACCADEMICO = @AA
+     AND m.NUM_DOMANDA = D.NumDomanda
+     AND m.DATA_VALIDITA =
+     (
+        SELECT MAX(m2.DATA_VALIDITA)
+        FROM MERITO m2
+        WHERE m2.ANNO_ACCADEMICO = m.ANNO_ACCADEMICO
+          AND m2.NUM_DOMANDA = m.NUM_DOMANDA
+     )
+),
 ISCR AS
 (
     SELECT
         D.NumDomanda,
         D.CodFiscale,
         D.TipoBando,
-        i.Cod_corso_laurea,
-        cl.Durata_legale,
-        TRY_CONVERT(INT, i.Anno_corso) AS Anno_corso,
-        i.Cod_facolta,
-        CONVERT(NVARCHAR(20), i.Anno_accad_inizio) AS Anno_accad_inizio,
-        i.Cod_sede_studi,
-        CONVERT(NVARCHAR(50), i.Cod_tipologia_studi) AS Cod_tipologia_studi,
-        TRY_CONVERT(DECIMAL(18,2), i.Crediti_tirocinio) AS Crediti_tirocinio,
-        TRY_CONVERT(DECIMAL(18,2), i.Crediti_riconosciuti) AS Crediti_riconosciuti,
-        TRY_CONVERT(INT, i.Conferma_semestre_filtro) AS Conferma_semestre_filtro,
-        CAST(ISNULL(cl.Corso_stem,0) AS BIT) AS Stem,
-        COALESCE(NULLIF(cl.comune_sede_studi_status,''), cl.Comune_Sede_studi) AS ComuneSedeStudi,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY TRY_CONVERT(INT, i.Anno_corso) DESC, COALESCE(i.Cod_corso_laurea,''), COALESCE(i.Cod_facolta,'')) AS rn
+        CONVERT(NVARCHAR(50), i.COD_CORSO_LAUREA) AS Cod_corso_laurea,
+        CONVERT(NVARCHAR(20), i.COD_TIPO_ORDINAMENTO) AS Cod_tipo_ordinamento,
+        TRY_CONVERT(INT, cl.DURATA_LEGALE) AS Durata_legale,
+        TRY_CONVERT(INT, i.ANNO_CORSO) AS Anno_corso,
+        CONVERT(NVARCHAR(50), cl.COD_FACOLTA) AS Cod_facolta,
+        CONVERT(NVARCHAR(20), cl.ANNO_ACCAD_INIZIO) AS Anno_accad_inizio,
+        CONVERT(NVARCHAR(50), i.COD_SEDE_STUDI) AS Cod_sede_studi,
+        CONVERT(NVARCHAR(50), i.COD_TIPOLOGIA_STUDI) AS Cod_tipologia_studi,
+        TRY_CONVERT(DECIMAL(18,2), i.CREDITI_TIROCINIO) AS Crediti_tirocinio,
+        TRY_CONVERT(DECIMAL(18,2), i.CREDITI_RICONOSCIUTI) AS Crediti_riconosciuti,
+        TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS Conferma_semestre_filtro,
+        CAST(ISNULL(cl.CORSO_STEM,0) AS BIT) AS Stem,
+        CONVERT(NVARCHAR(50), ss.COD_ENTE) AS Cod_ente,
+        CASE
+            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL THEN '00000'
+            ELSE LTRIM(RTRIM(cl.COD_SEDE_DISTACCATA))
+        END AS Cod_sede_distaccata,
+        CASE
+            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL
+                 OR LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))) = '00000'
+                THEN CASE
+                        WHEN ISNULL(cl.COMUNE_SEDE_STUDI,'') IN ('00000','0000') THEN 'H501'
+                        ELSE ISNULL(cl.COMUNE_SEDE_STUDI,'')
+                     END
+            ELSE ISNULL(sd.COD_COMUNE,'')
+        END AS ComuneSedeStudi,
+        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY i.DATA_VALIDITA DESC) AS rn
     FROM D
-    LEFT JOIN vIscrizioni i
-      ON i.Anno_accademico = @AA
-     AND i.Cod_fiscale = D.CodFiscale
-     AND COALESCE(i.tipo_bando,'') = D.TipoBando
-    LEFT JOIN Corsi_laurea cl
-      ON i.Cod_corso_laurea     = cl.Cod_corso_laurea
-     AND i.Anno_accad_inizio    = cl.Anno_accad_inizio
-     AND i.Cod_tipo_ordinamento = cl.Cod_tipo_ordinamento
-     AND i.Cod_facolta          = cl.Cod_facolta
-     AND i.Cod_sede_studi       = cl.Cod_sede_studi
-     AND i.Cod_tipologia_studi  = cl.Cod_tipologia_studi
+    LEFT JOIN MER m
+      ON m.NumDomanda = D.NumDomanda
+    LEFT JOIN ISCRIZIONI i
+      ON i.COD_FISCALE = D.CodFiscale
+     AND i.ANNO_ACCADEMICO = @AA
+     AND i.DATA_VALIDITA =
+     (
+        SELECT MAX(i2.DATA_VALIDITA)
+        FROM ISCRIZIONI i2
+        WHERE i2.COD_FISCALE = i.COD_FISCALE
+          AND i2.ANNO_ACCADEMICO = i.ANNO_ACCADEMICO
+          AND (i2.TIPO_BANDO IS NULL OR i2.TIPO_BANDO LIKE 'L%')
+     )
+    LEFT JOIN CORSI_LAUREA cl
+      ON cl.COD_CORSO_LAUREA = i.COD_CORSO_LAUREA
+     AND cl.COD_TIPO_ORDINAMENTO = i.COD_TIPO_ORDINAMENTO
+     AND cl.COD_FACOLTA = i.COD_FACOLTA
+     AND (cl.ANNO_ACCAD_FINE >= CONVERT(NVARCHAR(20), ISNULL(m.Anno_immatricolaz,0)) OR cl.ANNO_ACCAD_FINE IS NULL)
+    LEFT JOIN SEDE_STUDI ss
+      ON ss.COD_SEDE_STUDI = i.COD_SEDE_STUDI
+    LEFT JOIN SEDI_DISTACCATE sd
+      ON sd.COD_SEDE_DISTACCATA = cl.COD_SEDE_DISTACCATA
 )
 SELECT
     I.NumDomanda,
     I.CodFiscale,
     I.TipoBando,
     I.Cod_corso_laurea,
+    I.Cod_tipo_ordinamento,
     I.Durata_legale,
     I.Anno_corso,
     I.Cod_facolta,
@@ -68,6 +111,8 @@ SELECT
     I.Crediti_riconosciuti,
     ISNULL(I.Conferma_semestre_filtro, 0) AS Conferma_semestre_filtro,
     I.Stem,
+    ISNULL(I.Cod_ente,'') AS Cod_ente,
+    ISNULL(I.Cod_sede_distaccata,'00000') AS Cod_sede_distaccata,
     ISNULL(I.ComuneSedeStudi,'') AS ComuneSedeStudi,
     ISNULL(c.COD_PROVINCIA,'') AS ProvinciaSede
 FROM ISCR I
@@ -79,31 +124,13 @@ WHERE I.rn = 1;";
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-;WITH D AS
-(
-    SELECT
-        CAST(t.NumDomanda AS INT) AS NumDomanda,
-        t.CodFiscale,
-        COALESCE(t.TipoBando,'') AS TipoBando
-    FROM {TEMP_TABLE} t
-),
-APP AS
-(
-    SELECT
-        D.NumDomanda,
-        D.CodFiscale,
-        CONVERT(NVARCHAR(50), a.Cod_sede_distaccata) AS Cod_sede_distaccata,
-        CONVERT(NVARCHAR(50), a.Cod_ente) AS Cod_ente,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY COALESCE(a.Cod_sede_distaccata,''), COALESCE(a.Cod_ente,'')) AS rn
-    FROM D
-    LEFT JOIN vAppartenenza a
-      ON a.Anno_accademico = @AA
-     AND a.Cod_fiscale = D.CodFiscale
-     AND COALESCE(a.tipo_bando,'') = D.TipoBando
-)
-SELECT NumDomanda, CodFiscale, ISNULL(Cod_sede_distaccata,'') AS Cod_sede_distaccata, ISNULL(Cod_ente,'') AS Cod_ente
-FROM APP
-WHERE rn = 1;";
+SELECT
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    CAST('00000' AS NVARCHAR(50)) AS Cod_sede_distaccata,
+    CAST('' AS NVARCHAR(50)) AS Cod_ente
+FROM {TEMP_TABLE} t
+WHERE 1 = 0;";
 
         private const string MeritoPopulationSql = @"
 SET NOCOUNT ON;
@@ -113,41 +140,31 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 (
     SELECT CAST(t.NumDomanda AS INT) AS NumDomanda, t.CodFiscale
     FROM {TEMP_TABLE} t
-),
-MER AS
-(
-    SELECT
-        D.NumDomanda,
-        D.CodFiscale,
-        TRY_CONVERT(INT, m.Anno_immatricolaz) AS Anno_immatricolaz,
-        TRY_CONVERT(INT, m.Numero_esami) AS Numero_esami,
-        TRY_CONVERT(DECIMAL(18,2), m.Numero_crediti) AS Numero_crediti,
-        TRY_CONVERT(DECIMAL(18,2), m.Somma_voti) AS Somma_voti,
-        TRY_CONVERT(INT, m.Utilizzo_bonus) AS Utilizzo_bonus,
-        TRY_CONVERT(DECIMAL(18,2), m.Crediti_utilizzati) AS Crediti_utilizzati,
-        TRY_CONVERT(DECIMAL(18,2), m.Crediti_rimanenti) AS Crediti_rimanenti,
-        TRY_CONVERT(DECIMAL(18,2), m.Crediti_riconosciuti_da_rinuncia) AS Crediti_riconosciuti_da_rinuncia,
-        CONVERT(NVARCHAR(20), m.AACreditiRiconosciuti) AS AACreditiRiconosciuti,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY D.NumDomanda) AS rn
-    FROM D
-    LEFT JOIN vMerito m
-      ON m.Anno_accademico = @AA
-     AND m.Num_domanda = D.NumDomanda
 )
 SELECT
-    NumDomanda,
-    CodFiscale,
-    Anno_immatricolaz,
-    Numero_esami,
-    Numero_crediti,
-    Somma_voti,
-    ISNULL(Utilizzo_bonus,0) AS Utilizzo_bonus,
-    Crediti_utilizzati,
-    Crediti_rimanenti,
-    Crediti_riconosciuti_da_rinuncia,
-    ISNULL(AACreditiRiconosciuti,'') AS AACreditiRiconosciuti
-FROM MER
-WHERE rn = 1;";
+    D.NumDomanda,
+    D.CodFiscale,
+    TRY_CONVERT(INT, m.ANNO_IMMATRICOLAZ) AS Anno_immatricolaz,
+    TRY_CONVERT(INT, m.NUMERO_ESAMI) AS Numero_esami,
+    TRY_CONVERT(DECIMAL(18,2), m.NUMERO_CREDITI) AS Numero_crediti,
+    TRY_CONVERT(DECIMAL(18,2), m.SOMMA_VOTI) AS Somma_voti,
+    ISNULL(TRY_CONVERT(INT, m.UTILIZZO_BONUS),0) AS Utilizzo_bonus,
+    TRY_CONVERT(DECIMAL(18,2), m.CREDITI_UTILIZZATI) AS Crediti_utilizzati,
+    TRY_CONVERT(DECIMAL(18,2), m.CREDITI_RIMANENTI) AS Crediti_rimanenti,
+    TRY_CONVERT(DECIMAL(18,2), m.CREDITI_RICONOSCIUTI_DA_RINUNCIA) AS Crediti_riconosciuti_da_rinuncia,
+    ISNULL(CONVERT(NVARCHAR(20), m.AACREDITIRICONOSCIUTI), '') AS AACreditiRiconosciuti
+FROM D
+LEFT JOIN MERITO m
+  ON m.ANNO_ACCADEMICO = @AA
+ AND m.NUM_DOMANDA = D.NumDomanda
+ AND m.DATA_VALIDITA =
+ (
+    SELECT MAX(m2.DATA_VALIDITA)
+    FROM MERITO m2
+    WHERE m2.ANNO_ACCADEMICO = m.ANNO_ACCADEMICO
+      AND m2.NUM_DOMANDA = m.NUM_DOMANDA
+ );
+";
 
         private const string CarrieraPregressaSql = @"
 SET NOCOUNT ON;
@@ -165,38 +182,37 @@ SELECT
     D.NumDomanda,
     D.CodFiscale,
     D.TipoBando,
-    CONVERT(NVARCHAR(50), cp.Cod_avvenimento) AS Cod_avvenimento,
-    TRY_CONVERT(INT, cp.Anno_avvenimento) AS Anno_avvenimento,
-    CONVERT(NVARCHAR(250), cp.Univ_di_conseguim) AS Univ_di_conseguim,
-    CONVERT(NVARCHAR(250), cp.Univ_provenienza) AS Univ_provenienza,
-    TRY_CONVERT(INT, cp.Prima_immatricolaz) AS Prima_immatricolaz,
-    CONVERT(NVARCHAR(150), cp.Tipologia_corso) AS Tipologia_corso,
-    TRY_CONVERT(INT, cp.Durata_leg_titolo_conseguito) AS Durata_leg_titolo_conseguito,
-    TRY_CONVERT(INT, cp.Passaggio_corso_estero) AS Passaggio_corso_estero,
-    CONVERT(NVARCHAR(250), cp.Sede_istituzione_universitaria) AS Sede_istituzione_universitaria,
-    CONVERT(NVARCHAR(250), cp.benefici_usufruiti) AS benefici_usufruiti,
-    CONVERT(NVARCHAR(250), cp.importi_restituiti) AS importi_restituiti,
-    TRY_CONVERT(DECIMAL(18,2), cp.numero_crediti) AS numero_crediti,
-    TRY_CONVERT(INT, cp.anno_corso) AS anno_corso,
-    TRY_CONVERT(INT, cp.ripetente) AS ripetente,
-    CONVERT(NVARCHAR(250), cp.Ateneo) AS Ateneo,
-    CONVERT(NVARCHAR(50), cp.CodComune_Ateneo) AS CodComune_Ateneo,
-    CONVERT(NVARCHAR(50), cp.CodAteneo) AS CodAteneo,
-    TRY_CONVERT(INT, cp.Iscritto_semestre_filtroDI) AS Iscritto_semestre_filtroDI
+    CONVERT(NVARCHAR(50), cp.COD_AVVENIMENTO) AS Cod_avvenimento,
+    TRY_CONVERT(INT, cp.ANNO_AVVENIMENTO) AS Anno_avvenimento,
+    CONVERT(NVARCHAR(250), cp.UNIV_DI_CONSEGUIM) AS Univ_di_conseguim,
+    CONVERT(NVARCHAR(250), cp.UNIV_PROVENIENZA) AS Univ_provenienza,
+    TRY_CONVERT(INT, cp.PRIMA_IMMATRICOLAZ) AS Prima_immatricolaz,
+    CONVERT(NVARCHAR(150), cp.TIPOLOGIA_CORSO) AS Tipologia_corso,
+    TRY_CONVERT(INT, cp.DURATA_LEG_TITOLO_CONSEGUITO) AS Durata_leg_titolo_conseguito,
+    TRY_CONVERT(INT, cp.PASSAGGIO_CORSO_ESTERO) AS Passaggio_corso_estero,
+    CONVERT(NVARCHAR(250), cp.SEDE_ISTITUZIONE_UNIVERSITARIA) AS Sede_istituzione_universitaria,
+    CONVERT(NVARCHAR(250), cp.BENEFICI_USUFRUITI) AS benefici_usufruiti,
+    CONVERT(NVARCHAR(250), cp.IMPORTI_RESTITUITI) AS importi_restituiti,
+    TRY_CONVERT(DECIMAL(18,2), cp.NUMERO_CREDITI) AS numero_crediti,
+    TRY_CONVERT(INT, cp.ANNO_CORSO) AS anno_corso,
+    TRY_CONVERT(INT, cp.RIPETENTE) AS ripetente,
+    TRY_CONVERT(INT, cp.ISCRITTO_SEMESTRE_FILTRODI) AS Iscritto_semestre_filtroDI
 FROM D
-JOIN vCARRIERA_PREGRESSA cp
-  ON cp.Anno_accademico = @AA
- AND cp.Cod_fiscale = D.CodFiscale;";
+JOIN CARRIERA_PREGRESSA cp
+  ON cp.ANNO_ACCADEMICO = @AA
+ AND cp.COD_FISCALE = D.CodFiscale
+ AND cp.DATA_VALIDITA =
+ (
+    SELECT MAX(cp2.DATA_VALIDITA)
+    FROM CARRIERA_PREGRESSA cp2
+    WHERE cp2.COD_FISCALE = cp.COD_FISCALE
+      AND cp2.ANNO_ACCADEMICO = cp.ANNO_ACCADEMICO
+      AND cp2.COD_AVVENIMENTO = cp.COD_AVVENIMENTO
+ );
+";
 
-        private static readonly string[] MeritoDurataLegaleCorsoCandidates = { "Durata_legale", "DurataLegale", "durata_legale" };
-        private static readonly string[] MeritoCodTipoOrdinamentoCorsoCandidates = { "Cod_tipo_ordinamento", "CodTipoOrdinamento", "cod_tipo_ordinamento" };
-        private static readonly string[] MeritoCodCorsoLaureaPassaggioCandidates = { "Cod_corso_laurea_passaggio", "CodCorsoLaureaPassaggio", "cod_corso_laurea_passaggio" };
-        private static readonly string[] MeritoCodTipoOrdinamentoPassaggioCandidates = { "Cod_tipo_ordinam_passaggio", "Cod_TipoOrdinam_Passaggio", "CodTipoOrdinamentoPassaggio", "cod_tipo_ordinam_passaggio" };
-        private static readonly string[] MeritoAnnoAccadInizioPassaggioCandidates = { "Anno_accad_inizio_passaggio", "AnnoAccadInizioPassaggio", "anno_accad_inizio_passaggio" };
-        private static readonly string[] MeritoDurataLegalePassaggioCandidates = { "Durata_legale_passaggio", "DurataLegalePassaggio", "durata_legale_passaggio" };
-        private static readonly string[] MeritoConversioneCreditiEsamiPassaggioCandidates = { "Conversione_crediti_esami_passaggio", "ConversioneCreditiEsamiPassaggio", "conversione_crediti_esami_passaggio" };
-        private static readonly string[] MeritoNumeroEsamiPassaggioCandidates = { "Numero_esami_passaggio", "NumeroEsamiPassaggio", "numero_esami_passaggio" };
-        private static readonly string[] MeritoSommaVotiEsamiPassaggioCandidates = { "Somma_voti_esami", "SommaVotiEsami", "somma_voti_esami" };
+        private const string MeritoDurataLegaleCorsoColumn = "Durata_legale";
+        private const string MeritoCodTipoOrdinamentoCorsoColumn = "Cod_tipo_ordinamento";
 
         private static void ResetIscrizioneState(VerificaPipelineContext context)
         {
@@ -229,13 +245,6 @@ JOIN vCARRIERA_PREGRESSA cp
                 iscr.AACreditiRiconosciuti = string.Empty;
                 iscr.DurataLegaleCorso = null;
                 iscr.CodTipoOrdinamentoCorso = string.Empty;
-                iscr.CodCorsoLaureaPassaggio = string.Empty;
-                iscr.CodTipoOrdinamentoPassaggio = string.Empty;
-                iscr.AnnoAccadInizioPassaggio = string.Empty;
-                iscr.DurataLegalePassaggio = null;
-                iscr.ConversioneCreditiEsamiPassaggio = null;
-                iscr.NumeroEsamiPassaggio = null;
-                iscr.SommaVotiEsamiPassaggio = null;
                 iscr.EsamiMinimiRichiestiMerito = null;
                 iscr.CreditiMinimiRichiestiMerito = null;
                 iscr.EsamiMinimiRichiestiPassaggio = null;
@@ -255,9 +264,7 @@ JOIN vCARRIERA_PREGRESSA cp
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadBaseIscrizione", $"AA={context.AnnoAccademico}");
             LoadIscrizioneCore(context);
-            LoadAppartenenza(context);
             LoadMerito(context);
-            LoadMeritoPassaggioExtensions(context);
         }
 
         private void LoadIscrizioneCore(VerificaPipelineContext context)
@@ -269,11 +276,14 @@ JOIN vCARRIERA_PREGRESSA cp
                 iscr.TipoBando = reader.SafeGetString("TipoBando");
                 iscr.AnnoCorso = reader.SafeGetInt("Anno_corso");
                 iscr.CodCorsoLaurea = reader.SafeGetString("Cod_corso_laurea");
+                iscr.CodTipoOrdinamentoCorso = reader.SafeGetString("Cod_tipo_ordinamento");
                 iscr.DurataLegaleCorso = reader.SafeGetInt("Durata_legale");
                 iscr.CorsoMedicina = reader.SafeGetInt("Durata_legale") == 6;
                 iscr.CodFacolta = reader.SafeGetString("Cod_facolta");
                 iscr.AnnoAccadInizioCorso = reader.SafeGetString("Anno_accad_inizio");
                 iscr.CodSedeStudi = reader.SafeGetString("Cod_sede_studi");
+                iscr.CodEnte = reader.SafeGetString("Cod_ente");
+                iscr.CodSedeDistaccata = reader.SafeGetString("Cod_sede_distaccata");
                 iscr.ComuneSedeStudi = reader.SafeGetString("ComuneSedeStudi").Trim();
                 iscr.ProvinciaSedeStudi = reader.SafeGetString("ProvinciaSede").Trim().ToUpperInvariant();
                 iscr.CorsoStem = reader.SafeGetBool("Stem");
@@ -283,17 +293,6 @@ JOIN vCARRIERA_PREGRESSA cp
 
                 if (TryParseInt(reader.SafeGetString("Cod_tipologia_studi"), out var tipoCorso))
                     iscr.TipoCorso = tipoCorso;
-            });
-        }
-
-        private void LoadAppartenenza(VerificaPipelineContext context)
-        {
-            using var cmd = CreatePopulationCommand(AppartenenzaPopulationSql, context);
-            ReadAndMergeByStudentKey(cmd, (reader, info) =>
-            {
-                var iscr = info.InformazioniIscrizione;
-                iscr.CodSedeDistaccata = reader.SafeGetString("Cod_sede_distaccata");
-                iscr.CodEnte = reader.SafeGetString("Cod_ente");
             });
         }
 
@@ -315,48 +314,6 @@ JOIN vCARRIERA_PREGRESSA cp
             });
         }
 
-        private void LoadMeritoPassaggioExtensions(VerificaPipelineContext context)
-        {
-            var columns = GetObjectColumns(context.Connection, "vMerito");
-            if (columns.Count == 0)
-                return;
-
-            string sql = $@"
-SET NOCOUNT ON;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
-
-SELECT
-    CAST(t.NumDomanda AS INT) AS NumDomanda,
-    t.CodFiscale,
-    {BuildNullableIntExpression("m", columns, MeritoDurataLegaleCorsoCandidates)} AS DurataLegaleCorso,
-    {BuildNullableStringExpression("m", columns, MeritoCodTipoOrdinamentoCorsoCandidates)} AS CodTipoOrdinamentoCorso,
-    {BuildNullableStringExpression("m", columns, MeritoCodCorsoLaureaPassaggioCandidates)} AS CodCorsoLaureaPassaggio,
-    {BuildNullableStringExpression("m", columns, MeritoCodTipoOrdinamentoPassaggioCandidates)} AS CodTipoOrdinamentoPassaggio,
-    {BuildNullableStringExpression("m", columns, MeritoAnnoAccadInizioPassaggioCandidates)} AS AnnoAccadInizioPassaggio,
-    {BuildNullableIntExpression("m", columns, MeritoDurataLegalePassaggioCandidates)} AS DurataLegalePassaggio,
-    {BuildNullableDecimalExpression("m", columns, MeritoConversioneCreditiEsamiPassaggioCandidates)} AS ConversioneCreditiEsamiPassaggio,
-    {BuildNullableIntExpression("m", columns, MeritoNumeroEsamiPassaggioCandidates)} AS NumeroEsamiPassaggio,
-    {BuildNullableDecimalExpression("m", columns, MeritoSommaVotiEsamiPassaggioCandidates)} AS SommaVotiEsamiPassaggio
-FROM {{TEMP_TABLE}} t
-LEFT JOIN vMerito m
-  ON m.Anno_accademico = @AA
- AND m.Num_domanda = t.NumDomanda;";
-
-            using var cmd = CreatePopulationCommand(sql, context);
-            ReadAndMergeByStudentKey(cmd, (reader, info) =>
-            {
-                var iscr = info.InformazioniIscrizione;
-                iscr.DurataLegaleCorso ??= reader.SafeGetInt("DurataLegaleCorso");
-                iscr.CodTipoOrdinamentoCorso = reader.SafeGetString("CodTipoOrdinamentoCorso");
-                iscr.CodCorsoLaureaPassaggio = reader.SafeGetString("CodCorsoLaureaPassaggio");
-                iscr.CodTipoOrdinamentoPassaggio = reader.SafeGetString("CodTipoOrdinamentoPassaggio");
-                iscr.AnnoAccadInizioPassaggio = reader.SafeGetString("AnnoAccadInizioPassaggio");
-                iscr.DurataLegalePassaggio = reader.SafeGetInt("DurataLegalePassaggio");
-                iscr.ConversioneCreditiEsamiPassaggio = reader.SafeGetDecimal("ConversioneCreditiEsamiPassaggio");
-                iscr.NumeroEsamiPassaggio = reader.SafeGetInt("NumeroEsamiPassaggio");
-                iscr.SommaVotiEsamiPassaggio = reader.SafeGetDecimal("SommaVotiEsamiPassaggio");
-            });
-        }
 
         private void LoadCarrieraPregressa(VerificaPipelineContext context)
         {
@@ -380,9 +337,6 @@ LEFT JOIN vMerito m
                     NumeroCrediti = reader.SafeGetDecimal("numero_crediti"),
                     AnnoCorso = reader.SafeGetInt("anno_corso"),
                     Ripetente = reader.SafeGetInt("ripetente"),
-                    Ateneo = reader.SafeGetString("Ateneo"),
-                    CodComuneAteneo = reader.SafeGetString("CodComune_Ateneo"),
-                    CodAteneo = reader.SafeGetString("CodAteneo"),
                     ConfermaSemestreFiltroDi = reader.SafeGetInt("Iscritto_semestre_filtroDI")
                 });
             });

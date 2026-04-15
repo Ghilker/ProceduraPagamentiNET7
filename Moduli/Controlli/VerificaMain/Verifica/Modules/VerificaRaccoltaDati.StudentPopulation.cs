@@ -42,10 +42,10 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    CAST(ISNULL(v.status_compilazione,0) AS INT) AS StatusCompilazione
+    CAST(ISNULL(v.STATUS_COMPILAZIONE,0) AS INT) AS StatusCompilazione
 FROM {TEMP_TABLE} t
-JOIN vstatus_compilazione v
-  ON v.Num_domanda = t.NumDomanda
+JOIN vSTATUS_COMPILAZIONE v
+  ON v.Num_domanda = CAST(t.NumDomanda AS INT)
 WHERE v.Anno_accademico = @AA;";
 
         private const string SessoStudentePopulationSql = @"
@@ -67,12 +67,19 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    CAST(CASE WHEN ISNULL(v.Rifug_politico,0) = 1 THEN 1 ELSE 0 END AS BIT) AS RifugiatoPolitico,
-    CAST(CASE WHEN ISNULL(v.Invalido,0) = 1 THEN 1 ELSE 0 END AS BIT) AS Invalido
+    CAST(CASE WHEN ISNULL(dg.RIFUG_POLITICO,0) = 1 THEN 1 ELSE 0 END AS BIT) AS RifugiatoPolitico,
+    CAST(CASE WHEN ISNULL(dg.INVALIDO,0) = 1 THEN 1 ELSE 0 END AS BIT) AS Invalido
 FROM {TEMP_TABLE} t
-JOIN vDATIGENERALI_dom v
-  ON v.Num_domanda = t.NumDomanda
-WHERE v.Anno_accademico = @AA;";
+JOIN DATIGENERALI_DOM dg
+  ON dg.NUM_DOMANDA = CAST(t.NumDomanda AS INT)
+ AND dg.ANNO_ACCADEMICO = @AA
+ AND dg.DATA_VALIDITA =
+ (
+    SELECT MAX(dg2.DATA_VALIDITA)
+    FROM DATIGENERALI_DOM dg2
+    WHERE dg2.ANNO_ACCADEMICO = dg.ANNO_ACCADEMICO
+      AND dg2.NUM_DOMANDA = dg.NUM_DOMANDA
+ );";
 
         private const string MonetizzazioneMensaPopulationSql = @"
 SET NOCOUNT ON;
@@ -107,12 +114,13 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    ISNULL(r.Cod_comune,'') AS ComuneResidenza,
-    UPPER(ISNULL(r.provincia_residenza,'')) AS ProvinciaResidenza
+    ISNULL(r.COD_COMUNE,'') AS ComuneResidenza,
+    UPPER(ISNULL(r.PROVINCIA_RESIDENZA,'')) AS ProvinciaResidenza
 FROM {TEMP_TABLE} t
-JOIN vResidenza r
-  ON UPPER(LTRIM(RTRIM(r.Cod_fiscale))) = UPPER(LTRIM(RTRIM(t.CodFiscale)))
-WHERE r.Anno_accademico = @AA;";
+JOIN vRESIDENZA r
+  ON UPPER(LTRIM(RTRIM(r.COD_FISCALE))) = UPPER(LTRIM(RTRIM(t.CodFiscale)))
+WHERE r.ANNO_ACCADEMICO = @AA
+  AND r.TIPO_BANDO = 'LZ';";
 
         private const string StatusSedeAttualePopulationSql = @"
 SET NOCOUNT ON;
@@ -123,9 +131,16 @@ SELECT
     t.CodFiscale,
     ISNULL(v.Status_sede,'') AS StatusSedeAttuale
 FROM {TEMP_TABLE} t
-JOIN vValori_calcolati v
-  ON v.Num_domanda = t.NumDomanda
-WHERE v.Anno_accademico = @AA;";
+JOIN VALORI_CALCOLATI v
+  ON v.NUM_DOMANDA = CAST(t.NumDomanda AS INT)
+ AND v.ANNO_ACCADEMICO = @AA
+ AND v.DATA_VALIDITA =
+ (
+    SELECT MAX(v2.DATA_VALIDITA)
+    FROM VALORI_CALCOLATI v2
+    WHERE v2.ANNO_ACCADEMICO = v.ANNO_ACCADEMICO
+      AND v2.NUM_DOMANDA = v.NUM_DOMANDA
+ );";
 
         private const string ForzatureStatusSedePopulationSql = @"
 SET NOCOUNT ON;
@@ -161,40 +176,48 @@ RES AS
         D.CodFiscale,
         ISNULL(r.Cod_comune,'') AS ComuneResidenza
     FROM D
-    JOIN vResidenza r
-      ON UPPER(LTRIM(RTRIM(r.Cod_fiscale))) = UPPER(LTRIM(RTRIM(D.CodFiscale)))
-    WHERE r.Anno_accademico = @AA
+    JOIN vRESIDENZA r
+      ON UPPER(LTRIM(RTRIM(r.COD_FISCALE))) = UPPER(LTRIM(RTRIM(D.CodFiscale)))
+    WHERE r.ANNO_ACCADEMICO = @AA
+      AND r.TIPO_BANDO = 'LZ'
 ),
 ISCR AS
 (
     SELECT
         D.NumDomanda,
         D.CodFiscale,
-        i.Cod_sede_studi AS CodSedeStudi,
+        i.COD_SEDE_STUDI AS CodSedeStudi,
         CASE
-            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.Cod_sede_distaccata,''))), '') IS NULL THEN '00000'
-            ELSE LTRIM(RTRIM(cl.Cod_sede_distaccata))
+            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL THEN '00000'
+            ELSE LTRIM(RTRIM(cl.COD_SEDE_DISTACCATA))
         END AS CodSedeDistaccata,
         CAST(
             CASE
-                WHEN ISNULL(ss.Telematica,0) = 1 OR ISNULL(cl.corso_in_presenza,1) = 0 THEN 1
+                WHEN ISNULL(ss.TELEMATICA,0) = 1 OR ISNULL(cl.CORSO_IN_PRESENZA,1) = 0 THEN 1
                 ELSE 0
             END
         AS BIT) AS AlwaysA
     FROM D
-    JOIN vIscrizioni i
-      ON i.Anno_accademico = @AA
-     AND i.Cod_fiscale = D.CodFiscale
-     AND COALESCE(i.tipo_bando,'') = COALESCE(D.TipoBando,'')
-    JOIN Corsi_laurea cl
+    JOIN ISCRIZIONI i
+      ON i.ANNO_ACCADEMICO = @AA
+     AND i.COD_FISCALE = D.CodFiscale
+     AND i.DATA_VALIDITA =
+     (
+        SELECT MAX(i2.DATA_VALIDITA)
+        FROM ISCRIZIONI i2
+        WHERE i2.COD_FISCALE = i.COD_FISCALE
+          AND i2.ANNO_ACCADEMICO = i.ANNO_ACCADEMICO
+          AND (i2.TIPO_BANDO IS NULL OR i2.TIPO_BANDO LIKE 'L%')
+     )
+    JOIN CORSI_LAUREA cl
       ON i.Cod_corso_laurea     = cl.Cod_corso_laurea
      AND i.Anno_accad_inizio    = cl.Anno_accad_inizio
      AND i.Cod_tipo_ordinamento = cl.Cod_tipo_ordinamento
      AND i.Cod_facolta          = cl.Cod_facolta
      AND i.Cod_sede_studi       = cl.Cod_sede_studi
      AND i.Cod_tipologia_studi  = cl.Cod_tipologia_studi
-    LEFT JOIN Sede_studi ss
-      ON ss.Cod_sede_studi = i.Cod_sede_studi
+    LEFT JOIN SEDE_STUDI ss
+      ON ss.COD_SEDE_STUDI = i.COD_SEDE_STUDI
 )
 SELECT
     D.NumDomanda,
