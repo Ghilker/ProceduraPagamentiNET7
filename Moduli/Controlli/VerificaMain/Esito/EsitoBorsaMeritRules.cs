@@ -45,7 +45,7 @@ namespace ProcedureNet7
                 && context.AaNumero >= 20092010
                 && IsNuovoOrdinamento(context.Facts)
                 && context.AaInizio > 0
-                && !IsAnnoCorsoCongruente(iscr, context.AaInizio))
+                && !IsAnnoCorsoCongruente(context, iscr))
             {
                 evaluation.Add("MER072");
             }
@@ -57,7 +57,7 @@ namespace ProcedureNet7
                 if (context.Facts.EsameComplementare == false)
                     evaluation.Add("MER071");
 
-                if (context.AaInizio > 0 && !IsAnnoCorsoCongruente(iscr, context.AaInizio))
+                if (context.AaInizio > 0 && !IsAnnoCorsoCongruente(context, iscr))
                     evaluation.Add("MER072");
 
                 if (context.Facts.EsameComplementare.HasValue)
@@ -129,7 +129,7 @@ namespace ProcedureNet7
             if (context.Facts.IsConferma != true)
                 return false;
 
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, context.AaInizio);
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
             if (annoCorsoCalcolato != 2)
                 return false;
 
@@ -203,17 +203,28 @@ namespace ProcedureNet7
             return !(riconosciuti > 110m && riconosciuti < 150m);
         }
 
-        private static bool IsAnnoCorsoCongruente(InformazioniIscrizione iscr, int aaInizioCorrente)
+        private static bool IsAnnoCorsoCongruente(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
         {
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, aaInizioCorrente);
-            return annoCorsoCalcolato == 0 || annoCorsoCalcolato == iscr.AnnoCorso;
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
+            if (annoCorsoCalcolato == 0)
+                return true;
+
+            bool derogaRinuncia = context.AaNumero >= 20242025
+                                 && EsitoBorsaSupport.HasRiconoscimentoCreditiDaRinuncia(iscr)
+                                 && context.Facts.PassaggioTrasferimento != true;
+            bool derogaRipetenza = context.AaNumero >= 20252026 && EsitoBorsaSupport.HasRipetenzaDaPassaggio(context);
+
+            if (derogaRinuncia || derogaRipetenza)
+                return true;
+
+            return annoCorsoCalcolato == iscr.AnnoCorso;
         }
 
         private static bool PassaMeritoPassaggioVecchioNuovo(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
         {
             iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO";
 
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, context.AaInizio);
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
             decimal creditiMinimiCorrenti = GetCreditiMinimiRichiesti(iscr, context.Invalido, context.AaNumero, annoCorsoCalcolato);
             iscr.CreditiMinimiRichiestiMerito = creditiMinimiCorrenti > 0m ? creditiMinimiCorrenti : null;
             iscr.CreditiMinimiRichiestiPassaggio = creditiMinimiCorrenti > 0m ? creditiMinimiCorrenti : null;
@@ -241,7 +252,7 @@ namespace ProcedureNet7
 
         private static bool HaCreditiMinimiPerBorsa(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, bool invalido, int aaNumero)
         {
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, context.AaInizio);
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
             decimal creditiRichiesti = GetCreditiMinimiRichiesti(iscr, invalido, aaNumero, annoCorsoCalcolato);
             iscr.CreditiMinimiRichiestiMerito = creditiRichiesti;
             if (creditiRichiesti <= 0m)

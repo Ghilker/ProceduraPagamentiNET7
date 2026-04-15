@@ -5,7 +5,6 @@ namespace ProcedureNet7
 {
     internal sealed class EsitoBorsaGeneralRules
     {
-        private const int StatusCompilazioneMinimoTrasmessa = 90;
         private const int StatusCompilazioneMinimoCompilazione = 70;
 
         public void Apply(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
@@ -22,11 +21,11 @@ namespace ProcedureNet7
                 return;
             }
 
-            if (info.StatusCompilazione < StatusCompilazioneMinimoTrasmessa)
-                evaluation.Add("GEN001");
-
             if (facts.DomandaTrasmessa == false)
+            {
+                evaluation.Add("GEN001");
                 evaluation.Add("GEN094");
+            }
 
             ApplyPhaseSensitiveRules(context, evaluation);
             ApplyForzatureGenerali(context, evaluation);
@@ -47,8 +46,22 @@ namespace ProcedureNet7
 
             bool faseProvvisoria = context.Pipeline.FaseElaborativa == VerificaFaseElaborativa.GraduatorieProvvisorie;
 
+            if (context.AaNumero >= 20092010
+                && !faseProvvisoria
+                && RichiedeDocumentazioneConsolare(context)
+                && facts.RedditoUe != true
+                && facts.IsConferma != true
+                && context.Info?.InformazioniPersonali?.Rifugiato != true
+                && facts.DocConsolare == false)
+            {
+                evaluation.Add("GEN004");
+            }
+
             if (!faseProvvisoria && RichiedePermessoSoggiorno(facts) && facts.PermessoSoggiorno == false)
-                evaluation.Add("GEN005");
+            {
+                if (context.Pipeline.AnnoAccademico != "20122013" && context.Pipeline.AnnoAccademico != "20162017")
+                    evaluation.Add("GEN005");
+            }
         }
 
         private static void ApplyPhaseSensitiveRules(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
@@ -117,6 +130,19 @@ namespace ProcedureNet7
                 evaluation.Add($"GENF{code}");
         }
 
+        private static bool RichiedeDocumentazioneConsolare(EsitoBorsaStudentContext context)
+        {
+            var facts = context.Facts;
+            var info = context.Info;
+            string comuneResidenza = EsitoBorsaSupport.GetComuneResidenza(info);
+            bool residenzaEstera = !string.IsNullOrWhiteSpace(comuneResidenza)
+                                   && comuneResidenza.StartsWith("Z", StringComparison.OrdinalIgnoreCase);
+
+            return ((facts.Straniero == true && facts.CittadinanzaUe == false && facts.FamigliaResidenteItalia != true && residenzaEstera)
+                    || (facts.CittadinanzaUe == true && facts.ResidenzaUe == false && facts.FamigliaResidenteItalia != true)
+                    || (residenzaEstera && facts.Straniero != true));
+        }
+
         private static bool RichiedePermessoSoggiorno(EsitoBorsaFacts facts)
         {
             if (!facts.Straniero.HasValue || !facts.CittadinanzaUe.HasValue)
@@ -137,7 +163,7 @@ namespace ProcedureNet7
             int tipologiaTitolo = facts.TipologiaStudiTitoloConseguito.Value;
             int durataTitolo = facts.DurataLegTitoloConseguito ?? 0;
             int annoCorsoDichiarato = iscr.AnnoCorso;
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, context.AaInizio);
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
             int durataCorso = EsitoBorsaSupport.GetDurataNormaleCorso(iscr);
 
             switch (tipoCorso)

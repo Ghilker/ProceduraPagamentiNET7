@@ -40,7 +40,7 @@ namespace ProcedureNet7
                 return false;
 
             int annoCorsoRiferimento = EsitoBorsaSupport.GetAnnoCorsoRiferimentoBeneficio(context);
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, context.AaInizio);
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
             if (annoCorsoRiferimento == 0)
                 return false;
 

@@ -70,6 +70,12 @@ namespace ProcedureNet7.Verifica
         public bool? RipetenteDaPassaggio { get; set; }
         public bool? PassaggioVecchioNuovo { get; set; }
         public bool? EsameComplementare { get; set; }
+        public bool? CarrieraInterrotta { get; set; }
+        public int? NumAnniInterruzione { get; set; }
+        public decimal? CreditiExtraCurriculari { get; set; }
+        public int? MeseImmatricolazione { get; set; }
+        public int? Semestre { get; set; }
+        public bool? IscrittoRipetente { get; set; }
 
         public bool RinunciaBS { get; set; }
         public bool RinunciaPA { get; set; }

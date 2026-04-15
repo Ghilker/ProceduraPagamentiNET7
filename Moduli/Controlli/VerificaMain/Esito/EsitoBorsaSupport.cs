@@ -77,6 +77,12 @@ namespace ProcedureNet7
 
         public static int GetDurataNormaleCorso(InformazioniIscrizione iscr)
         {
+            if (iscr == null)
+                return 0;
+
+            if (iscr.TipoCorso == 6)
+                return 3;
+
             if (iscr?.DurataLegaleCorso.HasValue == true && iscr.DurataLegaleCorso.Value > 0)
                 return iscr.DurataLegaleCorso.Value;
 
@@ -85,6 +91,7 @@ namespace ProcedureNet7
                 3 => 3,
                 4 => iscr.CorsoMedicina ? 6 : 5,
                 5 => 2,
+                6 => 3,
                 _ => 0
             };
         }
@@ -94,27 +101,109 @@ namespace ProcedureNet7
             if (iscr == null)
                 return 0;
 
-            int annoCorsoDichiarato = iscr.AnnoCorso;
-            if (aaInizioCorrente <= 0)
-                return annoCorsoDichiarato;
+            if (iscr.TipoCorso == 7)
+                return iscr.AnnoCorso;
 
             int durataNormale = GetDurataNormaleCorso(iscr);
             if (durataNormale <= 0)
-                return annoCorsoDichiarato;
+                return 0;
 
             int aaInizioImmatricolazione = GetAnnoInizioDaAnnoAccademico(iscr.AnnoImmatricolazione ?? 0);
-            if (aaInizioImmatricolazione <= 0)
-                return annoCorsoDichiarato;
+            if (aaInizioCorrente <= 0 || aaInizioImmatricolazione <= 0)
+                return 0;
 
-            int anniTrascorsi = aaInizioCorrente - aaInizioImmatricolazione;
-            if (anniTrascorsi < 0)
-                return annoCorsoDichiarato;
+            int annoProgressivo = aaInizioCorrente - aaInizioImmatricolazione + 1;
+            if (annoProgressivo > durataNormale && annoProgressivo != 1)
+                return durataNormale - annoProgressivo;
 
-            int annoProgressivo = anniTrascorsi + 1;
-            if (annoProgressivo <= durataNormale)
-                return annoProgressivo;
+            return annoProgressivo;
+        }
 
-            return -(annoProgressivo - durataNormale);
+        public static int GetAnnoCorsoCalcolato(InformazioniIscrizione? iscr, EsitoBorsaFacts? facts, int aaInizioCorrente, int aaNumero)
+        {
+            if (iscr == null)
+                return 0;
+
+            if (facts == null)
+                return GetAnnoCorsoCalcolato(iscr, aaInizioCorrente);
+
+            if (iscr.TipoCorso == 7)
+                return iscr.AnnoCorso;
+
+            int durataNormale = GetDurataNormaleCorso(iscr);
+            if (durataNormale <= 0)
+                return 0;
+
+            int aaInizioImmatricolazione = GetAnnoInizioDaAnnoAccademico(iscr.AnnoImmatricolazione ?? 0);
+            if (aaInizioCorrente <= 0 || aaInizioImmatricolazione <= 0)
+                return 0;
+
+            int annoCorsoCalcolato = aaInizioCorrente - aaInizioImmatricolazione + 1;
+
+            if (facts.CarrieraInterrotta == true)
+            {
+                int anniInterruzione = Math.Max(facts.NumAnniInterruzione ?? 0, 0);
+                if (anniInterruzione > 2)
+                    anniInterruzione = 2;
+
+                annoCorsoCalcolato -= anniInterruzione;
+            }
+
+            bool haRinuncia = HasRiconoscimentoCreditiDaRinuncia(iscr);
+            bool passaggioTrasferimento = facts.PassaggioTrasferimento == true;
+            bool ripetenteDaPassaggio = aaNumero >= 20252026 && facts.RipetenteDaPassaggio == true;
+
+            if (aaNumero >= 20242025)
+            {
+                bool ricalcolaDaAaCrediti = false;
+                if (aaNumero == 20242025 && haRinuncia)
+                    ricalcolaDaAaCrediti = true;
+                else if (aaNumero > 20242025 && haRinuncia && !passaggioTrasferimento)
+                    ricalcolaDaAaCrediti = true;
+
+                if (ripetenteDaPassaggio)
+                    ricalcolaDaAaCrediti = true;
+
+                if (ricalcolaDaAaCrediti)
+                {
+                    int aaCrediti = ParseAnnoAccademicoStartFromString(iscr.AACreditiRiconosciuti);
+                    if (aaCrediti > 0)
+                        annoCorsoCalcolato = aaInizioCorrente - aaCrediti + 1;
+                }
+            }
+
+            if (annoCorsoCalcolato > durataNormale && annoCorsoCalcolato != 1)
+                annoCorsoCalcolato = durataNormale - annoCorsoCalcolato;
+
+            if (!((aaNumero >= 20242025 && haRinuncia) || ripetenteDaPassaggio))
+            {
+                int annoDichiaratoNorm = NormalizeAnnoCorsoPerConfronto(iscr.AnnoCorso, durataNormale);
+                int annoCalcolatoNorm = NormalizeAnnoCorsoPerConfronto(annoCorsoCalcolato, durataNormale);
+                if (annoCalcolatoNorm < annoDichiaratoNorm)
+                    return 0;
+            }
+
+            return annoCorsoCalcolato;
+        }
+
+        public static int GetAnnoCorsoCalcolato(EsitoBorsaStudentContext? context)
+        {
+            if (context?.Iscrizione == null)
+                return 0;
+
+            return GetAnnoCorsoCalcolato(context.Iscrizione, context.Facts, context.AaInizio, context.AaNumero);
+        }
+
+        private static int NormalizeAnnoCorsoPerConfronto(int annoCorso, int durataNormale)
+            => annoCorso < 0 ? Math.Abs(annoCorso) + durataNormale : annoCorso;
+
+        public static int ParseAnnoAccademicoStartFromString(string? value)
+        {
+            string normalized = (value ?? string.Empty).Trim();
+            if (normalized.Length >= 4 && int.TryParse(normalized.Substring(0, 4), NumberStyles.Integer, CultureInfo.InvariantCulture, out int result))
+                return result;
+
+            return 0;
         }
 
         public static bool HasRiconoscimentoCreditiDaRinuncia(InformazioniIscrizione? iscr)
@@ -170,7 +259,7 @@ namespace ProcedureNet7
             if (HasRipetenzaDaPassaggio(context))
                 return context.Iscrizione.AnnoCorso;
 
-            return GetAnnoCorsoCalcolato(context.Iscrizione, context.AaInizio);
+            return GetAnnoCorsoCalcolato(context);
         }
 
         public static string GetVariazioniEscludentiBsSummary(EsitoBorsaFacts? facts)
@@ -229,7 +318,7 @@ namespace ProcedureNet7
             if (context?.Pipeline == null || iscr == null)
                 return null;
 
-            int annoCorsoCalcolato = GetAnnoCorsoCalcolato(iscr, context.AaInizio);
+            int annoCorsoCalcolato = GetAnnoCorsoCalcolato(context);
             if (annoCorsoCalcolato == 0 || annoCorsoCalcolato == 1)
                 return 0m;
 

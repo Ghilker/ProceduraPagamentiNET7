@@ -85,7 +85,12 @@ D AS
     WHERE
         (@IncludeEsclusi = 1 OR ISNULL(bs.CodTipoEsitoBS,0) <> 0)
         AND
-        (@IncludeNonTrasmesse = 1 OR ISNULL(sc.StatusCompilazione,0) >= 90)
+        (@IncludeNonTrasmesse = 1 OR
+         (
+            (@AA >= '20202021' AND ISNULL(sc.StatusCompilazione,0) >= 80)
+            OR (@AA = '20192020' AND ISNULL(sc.StatusCompilazione,0) > 70)
+            OR (@AA < '20192020' AND ISNULL(sc.StatusCompilazione,0) > 70)
+         ))
 )
 SELECT
     NumDomanda,

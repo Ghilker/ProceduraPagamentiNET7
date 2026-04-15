@@ -223,8 +223,8 @@ namespace ProcedureNet7.Verifica
 
             int aaInizio = EsitoBorsaSupport.ParseAnnoAccademicoInizio(context.AnnoAccademico);
             int aaNumero = EsitoBorsaSupport.ParseAnnoAccademicoAsNumber(context.AnnoAccademico);
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, aaInizio);
             context.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts);
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, facts, aaInizio, aaNumero);
             bool ripetenteDaPassaggio = aaNumero >= 20252026
                                         && ((facts?.RipetenteDaPassaggio).HasValue == true
                                             ? facts!.RipetenteDaPassaggio!.Value
