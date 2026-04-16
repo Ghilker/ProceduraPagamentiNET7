@@ -19,6 +19,10 @@ namespace ProcedureNet7
             { "GEN005", "Permesso di soggiorno mancante" },
             { "GEN006", "Tipologia studi incompatibile con il titolo accademico già conseguito" },
             { "GEN007", "Rinuncia a tutti i benefici" },
+            { "ISC001", "Anno di immatricolazione mancante o non valido" },
+            { "ISC004", "Interruzione carriera dichiarata senza numero anni valido" },
+            { "ISC006", "Corso di laurea mancante per studente anni successivi" },
+            { "ISC008", "Anno di corso non classificabile" },
             { "GEN088", "Domanda non validabile nella fase elaborativa corrente" },
             { "GEN093", "Iscrizione fuori termine" },
             { "GEN094", "Domanda non trasmessa" },
@@ -31,6 +35,7 @@ namespace ProcedureNet7
             { "RED086", "Stato ISEE non ammesso" },
             { "RED087", "Codice fiscale dello studente indipendente presente nell'attestazione ISEE della famiglia di origine" },
             { "MER001", "Dati di merito assenti o non sufficienti per il calcolo" },
+            { "MER088", "Studente già in possesso di altra borsa" },
             { "MER005", "Crediti dichiarati incongruenti con il corso di studi" },
             { "MER071", "Esame complementare non valido per il merito AFAM" },
             { "MER072", "Anno di corso incongruente con l'anno accademico di immatricolazione" },
@@ -62,6 +67,60 @@ namespace ProcedureNet7
 
         public static string NormalizeUpper(string? value)
             => (value ?? string.Empty).Trim().ToUpperInvariant();
+
+
+        public static int NormalizeTipoStudente(int? tipoStudenteRaw)
+        {
+            return tipoStudenteRaw switch
+            {
+                2 or 3 or 6 => 2,
+                4 or 5 => 1,
+                0 => 0,
+                1 => 1,
+                _ => 0
+            };
+        }
+
+        public static IReadOnlyList<string> GetDiagnosticaIscrizione(EsitoBorsaStudentContext? context)
+        {
+            var result = new List<string>();
+            if (context?.Iscrizione == null)
+                return result;
+
+            var iscr = context.Iscrizione;
+            var facts = context.Facts;
+            int tipoStudente = facts.TipoStudenteNormalizzato ?? NormalizeTipoStudente(facts.TipoStudenteRaw);
+            string annoImmatr = Convert.ToString(iscr.AnnoImmatricolazione ?? 0, CultureInfo.InvariantCulture) ?? string.Empty;
+
+            if (!IsAnnoImmatricolazioneValido(annoImmatr))
+                AddMotivoEsclusione(result, "ISC001");
+
+            if (facts.CarrieraInterrotta == true && (!facts.NumAnniInterruzione.HasValue || facts.NumAnniInterruzione.Value <= 0))
+                AddMotivoEsclusione(result, "ISC004");
+
+            if (iscr.TipoCorso != 6 && iscr.TipoCorso != 7 && tipoStudente != 0 && string.IsNullOrWhiteSpace(iscr.CodCorsoLaurea))
+                AddMotivoEsclusione(result, "ISC006");
+
+            int annoCorsoCalcolato = GetAnnoCorsoCalcolato(context);
+            if (annoCorsoCalcolato == 0)
+                AddMotivoEsclusione(result, "ISC008");
+
+            return result;
+        }
+
+        public static bool IsAnnoImmatricolazioneValido(string? annoImmatricolazione)
+        {
+            string value = (annoImmatricolazione ?? string.Empty).Trim();
+            if (value.Length != 8)
+                return false;
+
+            if (!int.TryParse(value.Substring(0, 4), NumberStyles.Integer, CultureInfo.InvariantCulture, out int y1))
+                return false;
+            if (!int.TryParse(value.Substring(4, 4), NumberStyles.Integer, CultureInfo.InvariantCulture, out int y2))
+                return false;
+
+            return y2 == y1 + 1;
+        }
 
         public static string GetComuneResidenza(StudenteInfo info)
         {
@@ -388,6 +447,8 @@ namespace ProcedureNet7
 
             if (context.Invalido)
                 richiesti = Math.Floor(richiesti * 0.55m);
+            else if (context.Facts.NubileProle == true)
+                richiesti = Math.Floor(richiesti * 0.9m);
 
             return richiesti;
         }
@@ -481,7 +542,7 @@ namespace ProcedureNet7
             config.SogliaIsp = TryLoadDatiGeneraliConValue(
                 context.Connection,
                 context.AnnoAccademico,
-                new[] { "Soglia_Isp", "Soglia_ISP", "Soglia_isp", "Soglia_patrimonio", "Soglia_Patrimonio" });
+                new[] { "Soglia_Ispe", "Soglia_ISP", "Soglia_isp", "Soglia_patrimonio", "Soglia_Patrimonio" });
 
             return config;
         }

@@ -69,7 +69,8 @@ namespace ProcedureNet7.Verifica
                 FolderPath = _folderPath,
                 IncludeEsclusi = true,
                 IncludeNonTrasmesse = true,
-                TempPipelineTable = "#VerificaPipelineTargets"
+                TempPipelineTable = "#VerificaPipelineTargets",
+                FaseElaborativa = ResolveFaseElaborativa(args, _folderPath)
             };
 
             var cfFilter = GetStringListArg(args, "_codiciFiscali", "CodiciFiscali", "CodiciFiscale", "CF");
@@ -85,6 +86,82 @@ namespace ProcedureNet7.Verifica
 
     internal sealed partial class Verifica
     {
+
+        private static VerificaFaseElaborativa ResolveFaseElaborativa(object args, string? folderPath)
+        {
+            int? numeric = GetIntArg(args,
+                "_faseElaborativa", "FaseElaborativa", "Fase", "IterElaborativo",
+                "_iterElaborativo", "Iter", "FaseGraduatoria");
+
+            if (numeric.HasValue)
+            {
+                return numeric.Value switch
+                {
+                    1 => VerificaFaseElaborativa.GraduatorieProvvisorie,
+                    2 => VerificaFaseElaborativa.GraduatorieDefinitive,
+                    _ => VerificaFaseElaborativa.Unknown
+                };
+            }
+
+            bool? provvisoria = GetBoolArg(args,
+                "GraduatoriaProvvisoria", "IsProvvisoria", "Provvisoria", "GraduatorieProvvisorie");
+            if (provvisoria.HasValue)
+                return provvisoria.Value ? VerificaFaseElaborativa.GraduatorieProvvisorie : VerificaFaseElaborativa.GraduatorieDefinitive;
+
+            string folder = (folderPath ?? string.Empty).Trim();
+            if (folder.Length > 0)
+            {
+                string upper = folder.ToUpperInvariant();
+                if (upper.Contains("PROVV"))
+                    return VerificaFaseElaborativa.GraduatorieProvvisorie;
+                if (upper.Contains("DEFIN") || upper.Contains("DEF"))
+                    return VerificaFaseElaborativa.GraduatorieDefinitive;
+            }
+
+            return VerificaFaseElaborativa.Unknown;
+        }
+
+        private static int? GetIntArg(object args, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                var prop = args.GetType().GetProperty(name.Trim(), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                if (prop == null) continue;
+                var value = prop.GetValue(args);
+                if (value == null) continue;
+
+                try
+                {
+                    return Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+                }
+                catch { }
+            }
+            return null;
+        }
+
+        private static bool? GetBoolArg(object args, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                var prop = args.GetType().GetProperty(name.Trim(), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                if (prop == null) continue;
+                var value = prop.GetValue(args);
+                if (value == null) continue;
+
+                try
+                {
+                    if (value is bool b) return b;
+                    if (value is int i) return i != 0;
+                    if (bool.TryParse(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture), out var parsed))
+                        return parsed;
+                }
+                catch { }
+            }
+            return null;
+        }
+
         private static IReadOnlyCollection<string>? GetStringListArg(object args, params string[] names)
         {
             foreach (var name in names)

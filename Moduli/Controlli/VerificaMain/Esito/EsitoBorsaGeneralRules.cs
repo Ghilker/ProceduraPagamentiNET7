@@ -20,6 +20,16 @@ namespace ProcedureNet7
                 evaluation.Add("GEN000");
                 return;
             }
+            if (context.Key.CodFiscale == "BRZGLI05P46H703N")
+            {
+                string test = "";
+            }
+
+            var diagnosticaIscrizione = EsitoBorsaSupport.GetDiagnosticaIscrizione(context);
+            facts.IsAnnoClassificabile = diagnosticaIscrizione.Count == 0;
+            facts.DiagnosticaIscrizione = string.Join(";", diagnosticaIscrizione);
+            foreach (string code in diagnosticaIscrizione)
+                evaluation.Add(code);
 
             if (facts.DomandaTrasmessa == false)
             {

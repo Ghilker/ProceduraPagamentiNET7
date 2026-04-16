@@ -59,6 +59,8 @@ namespace ProcedureNet7.Verifica
         public string TipoCertificazione { get; set; } = string.Empty;
         public bool? TitoloAccademicoConseguito { get; set; }
         public bool? AttesaTitoloAccademicoConseguito { get; set; }
+        public int? TipoStudenteRaw { get; set; }
+        public int? TipoStudenteNormalizzato { get; set; }
         public bool? IsConferma { get; set; }
         public bool? Straniero { get; set; }
         public bool? CittadinanzaUe { get; set; }
@@ -76,6 +78,12 @@ namespace ProcedureNet7.Verifica
         public int? MeseImmatricolazione { get; set; }
         public int? Semestre { get; set; }
         public bool? IscrittoRipetente { get; set; }
+        public bool? IsAnnoClassificabile { get; set; }
+        public string DiagnosticaIscrizione { get; set; } = string.Empty;
+        public bool? NubileProle { get; set; }
+        public bool? NubileProleCalcolata { get; set; }
+        public bool? PossessoAltraBorsa { get; set; }
+        public bool? RichiestaCS { get; set; }
 
         public bool RinunciaBS { get; set; }
         public bool RinunciaPA { get; set; }

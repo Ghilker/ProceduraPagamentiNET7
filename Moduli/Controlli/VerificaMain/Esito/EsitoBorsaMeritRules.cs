@@ -12,16 +12,31 @@ namespace ProcedureNet7
             "30060", "30055", "30053", "28700", "28701", "30052", "31833", "S2-34"
         };
 
+        private static readonly HashSet<string> CorsiSpecialistica1FcRidottaStorici = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "NXT", "NXL", "NXR", "NXS", "30055", "30060", "30058"
+        };
+
         public void Apply(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
+            if(context.Key.CodFiscale == "BAIYIX99M68Z210I")
+            {
+                string test = "";
+            }
+
             var iscr = context.Iscrizione;
             if (iscr == null)
                 return;
 
-            bool richiedeMerito = RichiedeDatiMerito(iscr);
+            ResetCreditiUtilizzatiSeBonusNonRichiesto(iscr);
+
+            if (context.AaNumero < 20172018 && context.Facts.PossessoAltraBorsa == true)
+                evaluation.Add("MER088");
+
+            bool richiedeMerito = RichiedeDatiMerito(context);
             bool usaRegoleCrediti = UsesCreditoRules(context);
             bool consentiDerogaAnnoCorso = HasDerogaAnnoCorso(context);
-            bool meritoCalcolabile = HasDatiMeritoCalcolabili(iscr, usaRegoleCrediti);
+            bool meritoCalcolabile = HasDatiMeritoCalcolabili(context, usaRegoleCrediti);
             iscr.RegolaMeritoApplicata = usaRegoleCrediti ? "CREDITI" : "ESAMI";
             iscr.EsamiMinimiRichiestiMerito = null;
             iscr.CreditiMinimiRichiestiMerito = null;
@@ -50,71 +65,59 @@ namespace ProcedureNet7
                 evaluation.Add("MER072");
             }
 
-            if (EsitoBorsaSupport.IsAccademiaVecchioOrdinamento(iscr, context.Facts) && richiedeMerito)
+            if (richiedeMerito)
             {
-                iscr.RegolaMeritoApplicata = "AFAM_ESAME_COMPLEMENTARE";
-
-                if (context.Facts.EsameComplementare == false)
-                    evaluation.Add("MER071");
-
                 if (context.AaInizio > 0 && !IsAnnoCorsoCongruente(context, iscr))
                     evaluation.Add("MER072");
 
-                if (context.Facts.EsameComplementare.HasValue)
-                    return;
-            }
+                if (usaRegoleCrediti)
+                {
+                    if (HasCreditiDichiaratiIncongruenti(iscr))
+                        evaluation.Add("MER005");
 
-            if (usaRegoleCrediti)
-            {
-                if (HasCreditiDichiaratiIncongruenti(iscr))
-                    evaluation.Add("MER005");
+                    if (HasTirocinioSuperioreAiCrediti(iscr))
+                        evaluation.Add("MER092");
+                }
 
-                if (HasTirocinioSuperioreAiCrediti(iscr))
-                    evaluation.Add("MER092");
-            }
+                if (!PassaRequisitiSpecImmatricolati(context))
+                    evaluation.Add("MER089");
 
-            if (!PassaRequisitiSpecImmatricolati(context))
-                evaluation.Add("MER089");
+                if (IsVecchioOrdinamentoSapienzaNonAmmesso(context))
+                    evaluation.Add("MER170");
 
-            if (IsVecchioOrdinamentoSapienzaNonAmmesso(context))
-                evaluation.Add("MER170");
+                if (!PassaRegolaCreditiSpecialisticaPrimoAnno(context))
+                    evaluation.Add("MER074");
 
-            if (!PassaRegolaCreditiSpecialisticaPrimoAnno(context))
-                evaluation.Add("MER074");
-
-            if (EsitoBorsaSupport.IsPassaggioVecchioNuovo(context))
-            {
-                if (!PassaMeritoPassaggioVecchioNuovo(context, iscr))
-                    evaluation.Add("MER012");
-            }
-            else if (usaRegoleCrediti)
-            {
-                if (!HaCreditiMinimiPerBorsa(context, iscr, context.Invalido, context.AaNumero))
-                    evaluation.Add("MER012");
-            }
-            else if (!HaEsamiMinimiPerBorsa(context, iscr))
-            {
-                evaluation.Add("MER012");
+                if (EsitoBorsaSupport.IsPassaggioVecchioNuovo(context))
+                {
+                    if (!PassaMeritoPassaggioVecchioNuovo(context, iscr))
+                        evaluation.Add("MER012");
+                }
+                else if (usaRegoleCrediti)
+                {
+                    if (!HaCreditiMinimiPerBorsa(context, iscr, context.Invalido, context.AaNumero))
+                        evaluation.Add("MER012");
+                }
             }
         }
 
-        private static bool RichiedeDatiMerito(InformazioniIscrizione iscr)
+        private static bool RichiedeDatiMerito(EsitoBorsaStudentContext context)
         {
-            if (iscr.TipoCorso == 6 || iscr.TipoCorso == 7)
+            if (context.Iscrizione.TipoCorso == 6 || context.Iscrizione.TipoCorso == 7)
                 return false;
 
-            return iscr.AnnoCorso != 1;
+            return context.Iscrizione.AnnoCorso != 1 && EsitoBorsaSupport.GetAnnoCorsoCalcolato(context) != 1;
         }
 
-        private static bool HasDatiMeritoCalcolabili(InformazioniIscrizione iscr, bool usaRegoleCrediti)
+        private static bool HasDatiMeritoCalcolabili(EsitoBorsaStudentContext context, bool usaRegoleCrediti)
         {
-            if (!RichiedeDatiMerito(iscr))
+            if (!RichiedeDatiMerito(context))
                 return true;
 
             if (usaRegoleCrediti)
-                return (iscr.NumeroCrediti ?? 0m) > 0m;
+                return (context.Iscrizione.NumeroCrediti ?? 0m) > 0m;
 
-            return (iscr.NumeroEsami ?? 0) > 0;
+            return true;
         }
 
         private static bool UsesCreditoRules(EsitoBorsaStudentContext context)
@@ -225,7 +228,7 @@ namespace ProcedureNet7
             iscr.RegolaMeritoApplicata = "PASSAGGIO_VO_NUOVO";
 
             int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
-            decimal creditiMinimiCorrenti = GetCreditiMinimiRichiesti(iscr, context.Invalido, context.AaNumero, annoCorsoCalcolato);
+            decimal creditiMinimiCorrenti = GetCreditiMinimiRichiesti(context, iscr, context.Invalido, context.AaNumero, annoCorsoCalcolato);
             iscr.CreditiMinimiRichiestiMerito = creditiMinimiCorrenti > 0m ? creditiMinimiCorrenti : null;
             iscr.CreditiMinimiRichiestiPassaggio = creditiMinimiCorrenti > 0m ? creditiMinimiCorrenti : null;
 
@@ -253,7 +256,7 @@ namespace ProcedureNet7
         private static bool HaCreditiMinimiPerBorsa(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, bool invalido, int aaNumero)
         {
             int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
-            decimal creditiRichiesti = GetCreditiMinimiRichiesti(iscr, invalido, aaNumero, annoCorsoCalcolato);
+            decimal creditiRichiesti = GetCreditiMinimiRichiesti(context, iscr, invalido, aaNumero, annoCorsoCalcolato);
             iscr.CreditiMinimiRichiestiMerito = creditiRichiesti;
             if (creditiRichiesti <= 0m)
                 return true;
@@ -263,7 +266,22 @@ namespace ProcedureNet7
                 return true;
 
             decimal bonusUsabile = GetBonusUsabile(context, iscr, aaNumero, annoCorsoCalcolato);
-            return creditiStudente + bonusUsabile >= creditiRichiesti;
+            if (creditiStudente + bonusUsabile >= creditiRichiesti)
+            {
+                if (bonusUsabile > 0m)
+                    iscr.CreditiUtilizzati = Math.Max(creditiRichiesti - creditiStudente, 0m);
+                return true;
+            }
+
+            decimal bonusCovid = GetBonusCovidUsabile(context);
+            if (creditiStudente + bonusUsabile + bonusCovid >= creditiRichiesti)
+            {
+                if (bonusUsabile > 0m)
+                    iscr.CreditiUtilizzati = bonusUsabile;
+                return true;
+            }
+
+            return false;
         }
 
         private static decimal GetBonusUsabile(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, int aaNumero, int annoCorsoCalcolato)
@@ -319,10 +337,13 @@ namespace ProcedureNet7
             return true;
         }
 
-        private static decimal GetCreditiMinimiRichiesti(InformazioniIscrizione iscr, bool invalido, int aaNumero, int annoCorsoRiferimento)
+        private static decimal GetCreditiMinimiRichiesti(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, bool invalido, int aaNumero, int annoCorsoRiferimento)
         {
             decimal value = GetCreditiMinimiBase(iscr, invalido, aaNumero, annoCorsoRiferimento);
-            return ApplySpecialisticaPrimoFuoriCorsoRidotta(value, iscr, invalido, annoCorsoRiferimento);
+            value = ApplySpecialisticaPrimoFuoriCorsoRidotta(value, iscr, invalido, aaNumero, annoCorsoRiferimento);
+            if (!invalido && context.Facts.NubileProle == true)
+                value = Math.Floor(value * 0.9m);
+            return value;
         }
 
         private static decimal GetCreditiMinimiBase(InformazioniIscrizione iscr, bool invalido, int aaNumero, int anno)
@@ -398,29 +419,45 @@ namespace ProcedureNet7
             }
         }
 
-        private static decimal ApplySpecialisticaPrimoFuoriCorsoRidotta(decimal currentValue, InformazioniIscrizione iscr, bool invalido, int annoCorsoRiferimento)
+        private static decimal ApplySpecialisticaPrimoFuoriCorsoRidotta(decimal currentValue, InformazioniIscrizione iscr, bool invalido, int aaNumero, int annoCorsoRiferimento)
         {
             if (iscr.TipoCorso != 5 || (annoCorsoRiferimento != -1 && annoCorsoRiferimento != -2))
                 return currentValue;
 
             string corso = (iscr.CodCorsoLaurea ?? string.Empty).Trim();
-            if (!CorsiSpecialistica1FcRidotta.Contains(corso))
+            bool corsoRidotto = aaNumero >= 20232024
+                ? CorsiSpecialistica1FcRidotta.Contains(corso)
+                : CorsiSpecialistica1FcRidottaStorici.Contains(corso);
+
+            if (!corsoRidotto)
                 return currentValue;
 
-            return annoCorsoRiferimento == -1 ? (invalido ? 56m : 63m) : (invalido ? 94m : currentValue);
+            if (annoCorsoRiferimento == -1)
+                return invalido ? 56m : 63m;
+
+            return invalido ? 94m : currentValue;
         }
 
-
-
-        private static bool HaEsamiMinimiPerBorsa(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
+        private static decimal GetBonusCovidUsabile(EsitoBorsaStudentContext context)
         {
-            decimal? esamiRichiesti = EsitoBorsaSupport.GetEsamiMinimiRichiesti(context, iscr);
-            iscr.EsamiMinimiRichiestiMerito = esamiRichiesti;
-            if (!esamiRichiesti.HasValue || esamiRichiesti.Value <= 0m)
-                return true;
+            if (context.AaNumero != 20202021 || context.Facts.RichiestaCS != true)
+                return 0m;
 
-            int esamiStudente = iscr.NumeroEsami ?? 0;
-            return esamiStudente >= esamiRichiesti.Value;
+            string sede = EsitoBorsaSupport.NormalizeUpper(context.Iscrizione?.CodSedeStudi);
+            return sede switch
+            {
+                "AA" or "AB" or "AC" or "AIT" or "ANT" or "CL" or "CLR" or "G" or "L" or "O" or "P" or "Q" or "QDU" or "S" or "SC" or "SLC" or "U" => 10m,
+                _ => 5m
+            };
+        }
+
+        private static void ResetCreditiUtilizzatiSeBonusNonRichiesto(InformazioniIscrizione iscr)
+        {
+            if (iscr == null)
+                return;
+
+            if (iscr.UtilizzoBonus == 0 && (iscr.CreditiUtilizzati ?? 0m) > 0m)
+                iscr.CreditiUtilizzati = 0m;
         }
 
         private static bool HasCreditiDichiaratiIncongruenti(InformazioniIscrizione iscr)

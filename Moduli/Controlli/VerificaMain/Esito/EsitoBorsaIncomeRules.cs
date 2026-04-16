@@ -12,6 +12,11 @@ namespace ProcedureNet7
             if (info == null)
                 return;
 
+            if (context.Key.CodFiscale == "BFFJNF05E43F611V")
+            {
+                string test = "";
+            }
+
             if (facts.IsConferma == true)
             {
                 if (facts.ConfermaReddito != true)
