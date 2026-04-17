@@ -30,9 +30,8 @@ namespace ProcedureNet7.Verifica
 
         public Dictionary<StudentKey, StudenteInfo> Students { get; } = new();
         public Dictionary<StudentKey, EsitoBorsaFacts> EsitoBorsaFactsByStudent { get; } = new();
-        public Dictionary<StudentKey, HashSet<string>> BeneficiRichiestiByStudent { get; } = new();
-        public Dictionary<StudentKey, Dictionary<string, EsitoConcorsoBenefitRaw>> EsitiConcorsoByStudent { get; } = new();
-        public Dictionary<StudentKey, Dictionary<string, EsitoBorsaBenefitEvaluation>> EsitiBorsaPerBeneficioByStudent { get; } = new();
+        public Dictionary<StudentKey, Dictionary<string, EsitoConcorsoBenefitRaw>> EsitiConcorsoByStudentBenefit { get; } = new();
+        public Dictionary<StudentKey, Dictionary<string, EsitoBeneficioCalcolato>> EsitiCalcolatiByStudentBenefit { get; } = new();
         public HashSet<(string ComuneA, string ComuneB)> ComuniEquiparati { get; } = new();
         public CalcParams CalcParams { get; set; } = new();
         public List<string> CodiciFiscaliFiltro { get; } = new();
@@ -78,6 +77,12 @@ namespace ProcedureNet7.Verifica
         public string DiagnosticaIscrizione { get; set; } = string.Empty;
         public bool? NubileProle { get; set; }
         public bool? RichiestaCS { get; set; }
+        public HashSet<string> BeneficiRichiesti { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> BeneficiPregressiNonRestituiti { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> BeneficiRinunciaPregressa { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> SlashMotiviEsclusioneByBenefit { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool? RiconoscimentoTitoloEstero { get; set; }
+        public string SedeIstituzioneUniversitariaTitolo { get; set; } = string.Empty;
 
         public bool RinunciaBS { get; set; }
         public bool RinunciaPA { get; set; }
@@ -117,21 +122,20 @@ namespace ProcedureNet7.Verifica
         public int? DurataLegTitoloConseguito { get; set; }
     }
 
-
     internal sealed class EsitoConcorsoBenefitRaw
     {
         public string CodBeneficio { get; set; } = string.Empty;
-        public int CodTipoEsito { get; set; }
-        public decimal ImportoBeneficio { get; set; }
+        public int? CodTipoEsito { get; set; }
+        public decimal? ImportoAssegnato { get; set; }
     }
 
-    internal sealed class EsitoBorsaBenefitEvaluation
+    internal sealed class EsitoBeneficioCalcolato
     {
         public string CodBeneficio { get; set; } = string.Empty;
+        public bool Richiesto { get; set; }
         public int EsitoCalcolato { get; set; }
         public string CodiciMotivo { get; set; } = string.Empty;
         public string Motivi { get; set; } = string.Empty;
-        public bool HasErrors { get; set; }
     }
 
     internal sealed class EsamiCatalog
