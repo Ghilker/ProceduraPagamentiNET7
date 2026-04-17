@@ -10,7 +10,8 @@ namespace ProcedureNet7
             StudenteInfo info,
             int aaInizio,
             int aaNumero,
-            EsitoBorsaRuleConfig config)
+            EsitoBorsaRuleConfig config,
+            string codBeneficio)
         {
             Pipeline = pipeline;
             Key = key;
@@ -18,6 +19,7 @@ namespace ProcedureNet7
             AaInizio = aaInizio;
             AaNumero = aaNumero;
             Config = config;
+            CodBeneficio = EsitoBorsaSupport.NormalizeUpper(codBeneficio);
             Facts = GetFacts(pipeline, key);
         }
 
@@ -28,6 +30,7 @@ namespace ProcedureNet7
         public int AaInizio { get; }
         public int AaNumero { get; }
         public EsitoBorsaRuleConfig Config { get; }
+        public string CodBeneficio { get; }
 
         public InformazioniIscrizione? Iscrizione => Info?.InformazioniIscrizione;
         public bool Invalido => Info?.InformazioniPersonali?.Disabile == true;

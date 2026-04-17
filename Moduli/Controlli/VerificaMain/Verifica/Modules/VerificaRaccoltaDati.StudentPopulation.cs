@@ -17,22 +17,22 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
     SELECT CAST(t.NumDomanda AS INT) AS NumDomanda, t.CodFiscale
     FROM {TEMP_TABLE} t
 ),
-BS_LAST AS
+ESITI_LAST AS
 (
     SELECT
         D.NumDomanda,
         D.CodFiscale,
-        CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsitoBS,
+        UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio,'')))) AS CodBeneficio,
+        CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsito,
         TRY_CONVERT(DECIMAL(18,2), ec.Imp_beneficio) AS ImportoAssegnato,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY ec.Data_validita DESC) AS rn
+        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda, UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio,'')))) ORDER BY ec.Data_validita DESC) AS rn
     FROM D
     JOIN ESITI_CONCORSI ec
       ON ec.Num_domanda = D.NumDomanda
     WHERE ec.Anno_accademico = @AA
-      AND ec.Cod_beneficio = 'BS'
 )
-SELECT NumDomanda, CodFiscale, CodTipoEsitoBS, ISNULL(ImportoAssegnato, 0) AS ImportoAssegnato
-FROM BS_LAST
+SELECT NumDomanda, CodFiscale, CodBeneficio, CodTipoEsito, ISNULL(ImportoAssegnato, 0) AS ImportoAssegnato
+FROM ESITI_LAST
 WHERE rn = 1;";
 
         private const string StatusCompilazionePopulationSql = @"
@@ -461,12 +461,32 @@ WHERE rn = 1;";
 
         private void LoadEsitoBs(VerificaPipelineContext context)
         {
-            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadEsitoBs", $"AA={context.AnnoAccademico}");
+            context.EsitiConcorsoByStudentBenefit.Clear();
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadEsitiConcorso", $"AA={context.AnnoAccademico}");
             using var cmd = CreatePopulationCommand(EsitoBsPopulationSql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
-                info.InformazioniEconomiche.Raw.CodTipoEsitoBS = reader.SafeGetInt("CodTipoEsitoBS");
-                info.InformazioniEconomiche.Raw.ImportoAssegnato = Convert.ToDouble(reader.SafeGetDecimal("ImportoAssegnato"), CultureInfo.InvariantCulture);
+                var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                if (!context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var byBenefit) || byBenefit == null)
+                {
+                    byBenefit = new System.Collections.Generic.Dictionary<string, EsitoConcorsoBenefitRaw>(StringComparer.OrdinalIgnoreCase);
+                    context.EsitiConcorsoByStudentBenefit[key] = byBenefit;
+                }
+
+                string codBeneficio = EsitoBorsaSupport.NormalizeUpper(reader.SafeGetString("CodBeneficio"));
+                var raw = new EsitoConcorsoBenefitRaw
+                {
+                    CodBeneficio = codBeneficio,
+                    CodTipoEsito = reader.SafeGetInt("CodTipoEsito"),
+                    ImportoAssegnato = reader.SafeGetDecimal("ImportoAssegnato")
+                };
+                byBenefit[codBeneficio] = raw;
+
+                if (string.Equals(codBeneficio, "BS", StringComparison.OrdinalIgnoreCase))
+                {
+                    info.InformazioniEconomiche.Raw.CodTipoEsitoBS = raw.CodTipoEsito ?? 0;
+                    info.InformazioniEconomiche.Raw.ImportoAssegnato = Convert.ToDouble(raw.ImportoAssegnato ?? 0m, CultureInfo.InvariantCulture);
+                }
             });
         }
 

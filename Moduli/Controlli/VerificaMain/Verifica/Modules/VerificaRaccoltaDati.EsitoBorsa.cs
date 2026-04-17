@@ -103,8 +103,12 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    CONVERT(NVARCHAR(MAX), dbo.SlashMotiviEsclusioneTest(CAST(t.NumDomanda AS INT), @AA, 'BS')) AS SlashMotiviEsclusioneBS
-FROM {TEMP_TABLE} t;";
+    UPPER(LTRIM(RTRIM(ISNULL(vb.Cod_beneficio,'')))) AS CodBeneficio,
+    CONVERT(NVARCHAR(MAX), dbo.SlashMotiviEsclusioneTest(CAST(t.NumDomanda AS INT), @AA, UPPER(LTRIM(RTRIM(ISNULL(vb.Cod_beneficio,'')))))) AS SlashMotiviEsclusione
+FROM {TEMP_TABLE} t
+JOIN vBenefici_richiesti vb
+  ON vb.Anno_accademico = @AA
+ AND vb.Num_domanda = CAST(t.NumDomanda AS INT);";
 
         private const string EsitoBorsaIscrizioneAlignmentSql = @"
 SET NOCOUNT ON;
@@ -291,7 +295,14 @@ LEFT JOIN TSCP ON TSCP.NumDomanda = D.NumDomanda AND TSCP.rn = 1;";
             {
                 var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
                 var facts = GetOrCreateEsitoBorsaFacts(context, key);
-                facts.SlashMotiviEsclusioneBS = reader.SafeGetString("SlashMotiviEsclusioneBS").Trim();
+                string beneficio = NormalizeUpper(reader.SafeGetString("CodBeneficio"));
+                string slash = reader.SafeGetString("SlashMotiviEsclusione").Trim();
+                if (beneficio.Length == 0)
+                    return;
+
+                facts.SlashMotiviEsclusioneByBenefit[beneficio] = slash;
+                if (string.Equals(beneficio, "BS", StringComparison.OrdinalIgnoreCase))
+                    facts.SlashMotiviEsclusioneBS = slash;
             });
         }
 
@@ -814,22 +825,24 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    CAST(CASE WHEN EXISTS
-    (
-        SELECT 1
-        FROM vBenefici_richiesti vb
-        WHERE vb.Anno_accademico = @AA
-          AND vb.Num_domanda = CAST(t.NumDomanda AS INT)
-          AND UPPER(LTRIM(RTRIM(ISNULL(vb.Cod_beneficio,'')))) = 'CS'
-    ) THEN 1 ELSE 0 END AS BIT) AS RichiestaCS
-FROM {TEMP_TABLE} t;";
+    UPPER(LTRIM(RTRIM(ISNULL(vb.Cod_beneficio,'')))) AS CodBeneficio
+FROM {TEMP_TABLE} t
+JOIN vBenefici_richiesti vb
+  ON vb.Anno_accademico = @AA
+ AND vb.Num_domanda = CAST(t.NumDomanda AS INT);";
 
             using var cmd = CreatePopulationCommand(sql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
                 var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
                 var facts = GetOrCreateEsitoBorsaFacts(context, key);
-                facts.RichiestaCS = GetNullableBool(reader, "RichiestaCS") ?? false;
+                string beneficio = NormalizeUpper(reader.SafeGetString("CodBeneficio"));
+                if (beneficio.Length == 0)
+                    return;
+
+                facts.BeneficiRichiesti.Add(beneficio);
+                if (string.Equals(beneficio, "CS", StringComparison.OrdinalIgnoreCase))
+                    facts.RichiestaCS = true;
             });
         }
 
@@ -956,6 +969,8 @@ WHERE ANNO_ACCADEMICO = @AA
 
                     if (IsRinunciaBorsa(codAvvenimento, benefici))
                         facts.RinunciaBorsa = true;
+
+                    AddPregressaBenefitFacts(facts, benefici, restituzioni, codAvvenimento);
                 }
             }
         }
@@ -1071,6 +1086,43 @@ WHERE ANNO_ACCADEMICO = @AA
             bool rinuncia = codAvvenimento.Contains("RIN", StringComparison.OrdinalIgnoreCase)
                             || benefici.Contains("RINUNC", StringComparison.OrdinalIgnoreCase);
             return rinuncia && (HasBorsaMarker(benefici) || codAvvenimento.Contains("BS", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static readonly string[] KnownBenefitCodes = { "BS", "PA", "CS", "CM", "CT", "CI" };
+
+        private static bool HasBenefitMarker(string value, string beneficio)
+        {
+            beneficio = NormalizeUpper(beneficio);
+            if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(beneficio))
+                return false;
+
+            if (beneficio == "BS")
+                return HasBorsaMarker(value);
+
+            string pattern = $@"(^|[^A-Z])({Regex.Escape(beneficio)})([^A-Z]|$)";
+            return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+
+        private static void AddPregressaBenefitFacts(EsitoBorsaFacts facts, string benefici, string restituzioni, string codAvvenimento)
+        {
+            foreach (string beneficio in KnownBenefitCodes)
+            {
+                bool hasBenefit = HasBenefitMarker(benefici, beneficio);
+                bool hasRestituzione = HasMeaningfulRestitution(restituzioni);
+
+                if (hasBenefit && !hasRestituzione)
+                    facts.BeneficiPregressiNonRestituiti.Add(beneficio);
+
+                if (IsRinunciaBenefit(codAvvenimento, benefici, beneficio))
+                    facts.BeneficiRinunciaPregressa.Add(beneficio);
+            }
+        }
+
+        private static bool IsRinunciaBenefit(string codAvvenimento, string benefici, string beneficio)
+        {
+            bool rinuncia = codAvvenimento.Contains("RIN", StringComparison.OrdinalIgnoreCase)
+                            || benefici.Contains("RINUNC", StringComparison.OrdinalIgnoreCase);
+            return rinuncia && (HasBenefitMarker(benefici, beneficio) || codAvvenimento.Contains(beneficio, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool HasBorsaMarker(string value)

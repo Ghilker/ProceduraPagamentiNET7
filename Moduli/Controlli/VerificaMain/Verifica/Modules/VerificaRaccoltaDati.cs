@@ -50,26 +50,34 @@ SC AS
     FROM vstatus_compilazione v
     WHERE v.anno_accademico = @AA
 ),
-BS_LAST AS
+ESITI_LAST AS
 (
     SELECT
         CAST(ec.Num_domanda AS INT) AS NumDomanda,
-        CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsitoBS,
+        UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio,'')))) AS CodBeneficio,
+        CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsito,
         ROW_NUMBER() OVER
         (
-            PARTITION BY ec.Num_domanda
+            PARTITION BY ec.Num_domanda, UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio,''))))
             ORDER BY ec.Data_validita DESC
         ) AS rn
     FROM ESITI_CONCORSI ec
     JOIN D0 ON D0.NumDomanda = ec.Num_domanda
     WHERE ec.Anno_accademico = @AA
-      AND ec.Cod_beneficio = 'BS'
 ),
-BS AS
+ESITI AS
 (
-    SELECT NumDomanda, CodTipoEsitoBS
-    FROM BS_LAST
+    SELECT NumDomanda, CodBeneficio, CodTipoEsito
+    FROM ESITI_LAST
     WHERE rn = 1
+),
+ESITI_AGG AS
+(
+    SELECT
+        NumDomanda,
+        MAX(CASE WHEN ISNULL(CodTipoEsito,0) <> 0 THEN 1 ELSE 0 END) AS HasEsitoNonZero
+    FROM ESITI
+    GROUP BY NumDomanda
 ),
 D AS
 (
@@ -77,13 +85,13 @@ D AS
         d0.NumDomanda,
         d0.CodFiscale,
         d0.TipoBando,
-        ISNULL(bs.CodTipoEsitoBS,0) AS CodTipoEsitoBS,
+        ISNULL(es.HasEsitoNonZero,0) AS HasEsitoNonZero,
         ISNULL(sc.StatusCompilazione,0) AS StatusCompilazione
     FROM D0 d0
-    LEFT JOIN BS bs ON bs.NumDomanda = d0.NumDomanda
+    LEFT JOIN ESITI_AGG es ON es.NumDomanda = d0.NumDomanda
     LEFT JOIN SC sc ON sc.NumDomanda = d0.NumDomanda
     WHERE
-        (@IncludeEsclusi = 1 OR ISNULL(bs.CodTipoEsitoBS,0) <> 0)
+        (@IncludeEsclusi = 1 OR ISNULL(es.HasEsitoNonZero,0) <> 0)
         AND
         (@IncludeNonTrasmesse = 1 OR
          (
@@ -127,7 +135,7 @@ FROM D;";
             try
             {
                 VerificaExecutionSupport.ExecuteTimed(
-                    "VerificaRaccoltaDati.BeneficioBS",
+                    "VerificaRaccoltaDati.EsitiConcorso",
                     () => LoadEsitoBs(context),
                     () => $"students={context.Students.Count}");
 

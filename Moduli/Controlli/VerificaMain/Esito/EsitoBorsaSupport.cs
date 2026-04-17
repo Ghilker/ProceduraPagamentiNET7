@@ -495,6 +495,156 @@ namespace ProcedureNet7
             return codice;
         }
 
+        private static readonly string[] PreferredBenefitOrder = { "BS", "PA", "CS", "CM", "CT", "CI" };
+
+        public static IReadOnlyList<string> GetBenefitCodes(VerificaPipelineContext pipeline, StudentKey key, EsitoBorsaFacts? facts)
+        {
+            var items = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (facts != null)
+            {
+                foreach (var beneficio in facts.BeneficiRichiesti)
+                {
+                    if (!string.IsNullOrWhiteSpace(beneficio))
+                        items.Add(NormalizeUpper(beneficio));
+                }
+            }
+
+            if (pipeline != null
+                && pipeline.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var rawByBenefit)
+                && rawByBenefit != null)
+            {
+                foreach (var beneficio in rawByBenefit.Keys)
+                {
+                    if (!string.IsNullOrWhiteSpace(beneficio))
+                        items.Add(NormalizeUpper(beneficio));
+                }
+            }
+
+            if (pipeline != null
+                && pipeline.EsitiCalcolatiByStudentBenefit.TryGetValue(key, out var calcolatiByBenefit)
+                && calcolatiByBenefit != null)
+            {
+                foreach (var beneficio in calcolatiByBenefit.Keys)
+                {
+                    if (!string.IsNullOrWhiteSpace(beneficio))
+                        items.Add(NormalizeUpper(beneficio));
+                }
+            }
+
+            if (items.Count == 0)
+                items.Add("BS");
+
+            return items
+                .OrderBy(GetBenefitSortOrder)
+                .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        private static int GetBenefitSortOrder(string? beneficio)
+        {
+            string normalized = NormalizeUpper(beneficio);
+            for (int i = 0; i < PreferredBenefitOrder.Length; i++)
+            {
+                if (string.Equals(PreferredBenefitOrder[i], normalized, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            return PreferredBenefitOrder.Length + 1;
+        }
+
+        public static bool IsBenefitRequested(EsitoBorsaFacts? facts, string? beneficio)
+            => facts != null && facts.BeneficiRichiesti.Contains(NormalizeUpper(beneficio));
+
+        public static string GetSlashMotiviEsclusione(EsitoBorsaFacts? facts, string? beneficio)
+        {
+            if (facts == null)
+                return string.Empty;
+
+            string normalized = NormalizeUpper(beneficio);
+            return facts.SlashMotiviEsclusioneByBenefit.TryGetValue(normalized, out var value)
+                ? (value ?? string.Empty)
+                : string.Empty;
+        }
+
+        public static bool HasRinunciaVariazione(EsitoBorsaFacts? facts, string? beneficio)
+        {
+            if (facts == null)
+                return false;
+
+            string normalized = NormalizeUpper(beneficio);
+            return normalized switch
+            {
+                "BS" => facts.RinunciaBS,
+                "PA" => facts.RinunciaPA,
+                "CM" => facts.RinunciaCM,
+                "CT" => facts.RinunciaCT,
+                "CI" => facts.RinunciaCI,
+                _ => false
+            };
+        }
+
+        public static bool HasDecadenzaVariazione(EsitoBorsaFacts? facts, string? beneficio)
+        {
+            if (facts == null)
+                return false;
+
+            string normalized = NormalizeUpper(beneficio);
+            return normalized switch
+            {
+                "BS" => facts.DecadutoBS,
+                "PA" => facts.DecadutoPA,
+                "CM" => facts.DecadutoCM,
+                "CT" => facts.DecadutoCT,
+                "CI" => facts.DecadutoCI,
+                _ => false
+            };
+        }
+
+        public static bool HasRevocaBandoVariazione(EsitoBorsaFacts? facts, string? beneficio)
+        {
+            if (facts == null)
+                return false;
+
+            string normalized = NormalizeUpper(beneficio);
+            return normalized switch
+            {
+                "BS" => facts.RevocatoBandoBS,
+                "PA" => facts.RevocatoBandoPA,
+                "CM" => facts.RevocatoBandoCM,
+                "CT" => facts.RevocatoBandoCT,
+                "CI" => facts.RevocatoBandoCI,
+                _ => false
+            };
+        }
+
+        public static string GetVariazioniEscludentiSummary(EsitoBorsaFacts? facts, string? beneficio)
+        {
+            if (facts == null)
+                return string.Empty;
+
+            string normalized = NormalizeUpper(beneficio);
+            var items = new List<string>();
+
+            if (HasRinunciaVariazione(facts, normalized)) items.Add($"RINUNCIA_{normalized}");
+            if (HasDecadenzaVariazione(facts, normalized)) items.Add($"DECADENZA_{normalized}");
+            if (facts.Revocato) items.Add("REVOCA_TOTALE");
+            if (HasRevocaBandoVariazione(facts, normalized)) items.Add($"REVOCA_BANDO_{normalized}");
+            if (facts.RevocatoMancataIscrizione) items.Add("REVOCA_MANCATA_ISCRIZIONE");
+            if (facts.RevocatoIscrittoRipetente) items.Add("REVOCA_RIPETENTE");
+            if (facts.RevocatoISEE) items.Add("REVOCA_ISEE");
+            if (facts.RevocatoLaureato) items.Add("REVOCA_LAUREATO");
+            if (facts.RevocatoPatrimonio) items.Add("REVOCA_PATRIMONIO");
+            if (facts.RevocatoReddito) items.Add("REVOCA_REDDITO");
+            if (facts.RevocatoEsami) items.Add("REVOCA_ESAMI");
+            if (facts.RevocatoFuoriTermine) items.Add("REVOCA_FUORI_TERMINE");
+            if (facts.RevocatoIseeFuoriTermine) items.Add("REVOCA_ISEE_FUORI_TERMINE");
+            if (facts.RevocatoIseeNonProdotta) items.Add("REVOCA_ISEE_NON_PRODOTTA");
+            if (facts.RevocatoTrasmissioneIseeFuoriTermine) items.Add("REVOCA_TRASMISSIONE_ISEE_FUORI_TERMINE");
+            if (facts.RevocatoNoContrattoLocazione) items.Add("REVOCA_NO_CONTRATTO");
+            return string.Join(";", items);
+        }
+
         public static EsitoBorsaRuleConfig LoadRuleConfig(VerificaPipelineContext context)
         {
             var config = new EsitoBorsaRuleConfig
