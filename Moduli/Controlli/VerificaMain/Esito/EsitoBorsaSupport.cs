@@ -40,11 +40,11 @@ namespace ProcedureNet7
             { "MER071", "Esame complementare non valido per il merito AFAM" },
             { "MER072", "Anno di corso incongruente con l'anno accademico di immatricolazione" },
             { "MER074", "Crediti riconosciuti insufficienti per il primo anno di specialistica" },
+            { "MER085", "Utilizzo del bonus non ammesso per il titolo di accesso dichiarato" },
             { "MER012", "Merito insufficiente per la borsa" },
             { "MER092", "Crediti di tirocinio superiori ai crediti dichiarati" },
             { "MER089", "Titolo di accesso non ammesso per immatricolazione alla specialistica" },
             { "MER170", "Iscrizione non ammessa per Sapienza in vecchio ordinamento" },
-            { "MER171", "Passaggio vecchio→nuovo non calcolabile con i dati esposti" },
             { "BS001", "Anno di corso oltre il limite ammesso per la borsa" },
             { "BS002", "Beneficio borsa già fruito e non restituito" },
             { "BS003", "Rinuncia pregressa alla borsa di studio" },
@@ -68,19 +68,6 @@ namespace ProcedureNet7
         public static string NormalizeUpper(string? value)
             => (value ?? string.Empty).Trim().ToUpperInvariant();
 
-
-        public static int NormalizeTipoStudente(int? tipoStudenteRaw)
-        {
-            return tipoStudenteRaw switch
-            {
-                2 or 3 or 6 => 2,
-                4 or 5 => 1,
-                0 => 0,
-                1 => 1,
-                _ => 0
-            };
-        }
-
         public static IReadOnlyList<string> GetDiagnosticaIscrizione(EsitoBorsaStudentContext? context)
         {
             var result = new List<string>();
@@ -89,7 +76,7 @@ namespace ProcedureNet7
 
             var iscr = context.Iscrizione;
             var facts = context.Facts;
-            int tipoStudente = facts.TipoStudenteNormalizzato ?? NormalizeTipoStudente(facts.TipoStudenteRaw);
+            int tipoStudente = facts.TipoStudenteNormalizzato ?? 0;
             string annoImmatr = Convert.ToString(iscr.AnnoImmatricolazione ?? 0, CultureInfo.InvariantCulture) ?? string.Empty;
 
             if (!IsAnnoImmatricolazioneValido(annoImmatr))
@@ -227,7 +214,15 @@ namespace ProcedureNet7
                 {
                     int aaCrediti = ParseAnnoAccademicoStartFromString(iscr.AACreditiRiconosciuti);
                     if (aaCrediti > 0)
+                    {
                         annoCorsoCalcolato = aaInizioCorrente - aaCrediti + 1;
+                    }
+                    else if (ripetenteDaPassaggio)
+                    {
+                        int aaTs = GetAnnoInizioDaAnnoAccademico(facts.AaTrasferimento ?? 0);
+                        if (aaTs > 0)
+                            annoCorsoCalcolato = aaInizioCorrente - aaTs + 1;
+                    }
                 }
             }
 
@@ -289,27 +284,6 @@ namespace ProcedureNet7
             return context.Iscrizione?.HaRipetenzaCarrieraPregressa != 0;
         }
 
-        public static bool IsPassaggioVecchioNuovo(EsitoBorsaStudentContext context)
-            => context?.Facts?.PassaggioVecchioNuovo == true;
-
-        public static bool IsPassaggioVecchioNuovoCalcolabile(EsitoBorsaStudentContext context)
-        {
-            if (context?.Iscrizione == null || !IsPassaggioVecchioNuovo(context))
-                return true;
-
-            var iscr = context.Iscrizione;
-            string ordCorrente = NormalizeUpper(context.Facts.CodTipoOrdinamento);
-            int aaImmatricolazioneInizio = GetAnnoInizioDaAnnoAccademico(iscr.AnnoImmatricolazione ?? 0);
-
-            if (ordCorrente != "3")
-                return false;
-
-            if (aaImmatricolazioneInizio > 2001 && IsEnte(iscr, "01"))
-                return false;
-
-            return true;
-        }
-
         public static int GetAnnoCorsoRiferimentoBeneficio(EsitoBorsaStudentContext context)
         {
             if (context?.Iscrizione == null)
@@ -361,16 +335,6 @@ namespace ProcedureNet7
 
         public static bool IsEnte(InformazioniIscrizione iscr, string codEnte)
             => string.Equals((iscr?.CodEnte ?? string.Empty).Trim(), (codEnte ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
-
-        public static bool IsAccademiaVecchioOrdinamento(InformazioniIscrizione? iscr, EsitoBorsaFacts? facts)
-        {
-            if (iscr == null || facts == null)
-                return false;
-
-            string sede = NormalizeUpper(iscr.CodSedeStudi);
-            string ord = NormalizeUpper(facts.CodTipoOrdinamento);
-            return ord == "1" && (sede == "O" || sede == "Q" || sede == "P" || sede == "L" || sede == "T" || sede == "G");
-        }
 
         public static decimal? GetEsamiMinimiRichiesti(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
         {

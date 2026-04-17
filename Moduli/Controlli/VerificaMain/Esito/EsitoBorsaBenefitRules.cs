@@ -6,10 +6,6 @@ namespace ProcedureNet7
 {
     internal sealed class EsitoBorsaBenefitRules
     {
-        private static readonly HashSet<string> SediAccademiaVecchioOrdinamento = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "O", "Q", "P", "L", "T", "G"
-        };
 
         public void Apply(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
@@ -50,24 +46,10 @@ namespace ProcedureNet7
             if (annoCorsoRiferimento > 0)
                 return true;
 
-            string codOrd = (context.Facts.CodTipoOrdinamento ?? string.Empty).Trim();
-            bool accademiaVo = SediAccademiaVecchioOrdinamento.Contains((iscr.CodSedeStudi ?? string.Empty).Trim())
-                               && string.Equals(codOrd, "1", StringComparison.OrdinalIgnoreCase);
-
             if (!context.Invalido)
-            {
-                if (accademiaVo)
-                    return annoCorsoCalcolato >= 0;
-
                 return annoCorsoRiferimento >= -1;
-            }
 
-            int limiteFuoriCorso = string.Equals(codOrd, "3", StringComparison.OrdinalIgnoreCase)
-                                   || EsitoBorsaSupport.IsPassaggioVecchioNuovo(context)
-                ? -2
-                : -3;
-
-            return annoCorsoRiferimento >= limiteFuoriCorso;
+            return annoCorsoRiferimento >= -2;
         }
 
         private static bool HasBeneficioPregressoNonRestituito(EsitoBorsaFacts facts)

@@ -45,33 +45,26 @@ namespace ProcedureNet7.Verifica
         public string CodTipoOrdinamento { get; set; } = string.Empty;
 
         public bool? CartaceoInviato { get; set; }
-        public bool? Firmata { get; set; }
-        public bool? FotocopiaDocumento { get; set; }
-        public bool? FuoriTermine { get; set; }
         public bool? IscrizioneFuoriTermine { get; set; }
-        public bool? DocConsolare { get; set; }
         public bool? PermessoSoggiorno { get; set; }
         public bool? RinunciaBenefici { get; set; }
         public bool? DomandaTrasmessa { get; set; }
         public bool? DomandaTrasmessaPin { get; set; }
-        public bool? ConfermaReddito { get; set; }
         public int? StatusIsee { get; set; }
         public string TipoCertificazione { get; set; } = string.Empty;
         public bool? TitoloAccademicoConseguito { get; set; }
         public bool? AttesaTitoloAccademicoConseguito { get; set; }
-        public int? TipoStudenteRaw { get; set; }
         public int? TipoStudenteNormalizzato { get; set; }
         public bool? IsConferma { get; set; }
         public bool? Straniero { get; set; }
         public bool? CittadinanzaUe { get; set; }
         public bool? ResidenzaUe { get; set; }
-        public bool? FamigliaResidenteItalia { get; set; }
         public bool? RedditoUe { get; set; }
         public bool RichiedeControlloLaureaSpec { get; set; }
         public bool? PassaggioTrasferimento { get; set; }
         public bool? RipetenteDaPassaggio { get; set; }
-        public bool? PassaggioVecchioNuovo { get; set; }
-        public bool? EsameComplementare { get; set; }
+        public int? PrimaImmatricolazTs { get; set; }
+        public int? AaTrasferimento { get; set; }
         public bool? CarrieraInterrotta { get; set; }
         public int? NumAnniInterruzione { get; set; }
         public decimal? CreditiExtraCurriculari { get; set; }
@@ -81,9 +74,9 @@ namespace ProcedureNet7.Verifica
         public bool? IsAnnoClassificabile { get; set; }
         public string DiagnosticaIscrizione { get; set; } = string.Empty;
         public bool? NubileProle { get; set; }
-        public bool? NubileProleCalcolata { get; set; }
-        public bool? PossessoAltraBorsa { get; set; }
         public bool? RichiestaCS { get; set; }
+        public bool? RiconoscimentoTitoloEstero { get; set; }
+        public string SedeIstituzioneUniversitariaTitolo { get; set; } = string.Empty;
 
         public bool RinunciaBS { get; set; }
         public bool RinunciaPA { get; set; }

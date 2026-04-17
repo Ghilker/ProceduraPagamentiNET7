@@ -22,8 +22,8 @@ namespace ProcedureNet7
 
             const string sql = @"
 SELECT
-    UPPER(LTRIM(RTRIM(Cod_Comune_A))) AS Cod_Comune_A,
-    UPPER(LTRIM(RTRIM(Cod_Comune_B))) AS Cod_Comune_B
+    UPPER(Cod_Comune_A) AS Cod_Comune_A,
+    UPPER(Cod_Comune_B) AS Cod_Comune_B
 FROM dbo.STATUS_SEDE_COMUNI_EQUIVALENTI
 WHERE Data_Fine_Validita IS NULL;";
 

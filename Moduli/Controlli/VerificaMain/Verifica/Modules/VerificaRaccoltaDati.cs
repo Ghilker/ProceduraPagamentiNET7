@@ -25,7 +25,7 @@ DomandeRaw AS
 (
     SELECT
         CAST(d.Num_domanda AS INT) AS NumDomanda,
-        LTRIM(RTRIM(d.Cod_fiscale)) AS CodFiscale,
+        d.Cod_fiscale AS CodFiscale,
         COALESCE(d.Tipo_bando,'') AS TipoBando,
         ROW_NUMBER() OVER
         (

@@ -20,11 +20,6 @@ namespace ProcedureNet7
                 evaluation.Add("GEN000");
                 return;
             }
-            if (context.Key.CodFiscale == "BRZGLI05P46H703N")
-            {
-                string test = "";
-            }
-
             var diagnosticaIscrizione = EsitoBorsaSupport.GetDiagnosticaIscrizione(context);
             facts.IsAnnoClassificabile = diagnosticaIscrizione.Count == 0;
             facts.DiagnosticaIscrizione = string.Join(";", diagnosticaIscrizione);
@@ -40,9 +35,6 @@ namespace ProcedureNet7
             ApplyPhaseSensitiveRules(context, evaluation);
             ApplyForzatureGenerali(context, evaluation);
 
-            if (facts.FuoriTermine == true)
-                evaluation.Add("GEN003");
-
             if (facts.IscrizioneFuoriTermine == true)
                 evaluation.Add("GEN093");
 
@@ -55,17 +47,6 @@ namespace ProcedureNet7
                 evaluation.Add("GEN006");
 
             bool faseProvvisoria = context.Pipeline.FaseElaborativa == VerificaFaseElaborativa.GraduatorieProvvisorie;
-
-            if (context.AaNumero >= 20092010
-                && !faseProvvisoria
-                && RichiedeDocumentazioneConsolare(context)
-                && facts.RedditoUe != true
-                && facts.IsConferma != true
-                && context.Info?.InformazioniPersonali?.Rifugiato != true
-                && facts.DocConsolare == false)
-            {
-                evaluation.Add("GEN004");
-            }
 
             if (!faseProvvisoria && RichiedePermessoSoggiorno(facts) && facts.PermessoSoggiorno == false)
             {
@@ -90,15 +71,6 @@ namespace ProcedureNet7
                     {
                         evaluation.Add("GEN088");
                         break;
-                    }
-
-                    if (facts.CartaceoInviato == true)
-                    {
-                        if (facts.Firmata == false)
-                            evaluation.Add("GENSIG");
-
-                        if (facts.FotocopiaDocumento == false)
-                            evaluation.Add("GENDOC");
                     }
                     break;
             }
@@ -139,20 +111,6 @@ namespace ProcedureNet7
             foreach (var code in context.Facts.ForzatureGenerali)
                 evaluation.Add($"GENF{code}");
         }
-
-        private static bool RichiedeDocumentazioneConsolare(EsitoBorsaStudentContext context)
-        {
-            var facts = context.Facts;
-            var info = context.Info;
-            string comuneResidenza = EsitoBorsaSupport.GetComuneResidenza(info);
-            bool residenzaEstera = !string.IsNullOrWhiteSpace(comuneResidenza)
-                                   && comuneResidenza.StartsWith("Z", StringComparison.OrdinalIgnoreCase);
-
-            return ((facts.Straniero == true && facts.CittadinanzaUe == false && facts.FamigliaResidenteItalia != true && residenzaEstera)
-                    || (facts.CittadinanzaUe == true && facts.ResidenzaUe == false && facts.FamigliaResidenteItalia != true)
-                    || (residenzaEstera && facts.Straniero != true));
-        }
-
         private static bool RichiedePermessoSoggiorno(EsitoBorsaFacts facts)
         {
             if (!facts.Straniero.HasValue || !facts.CittadinanzaUe.HasValue)

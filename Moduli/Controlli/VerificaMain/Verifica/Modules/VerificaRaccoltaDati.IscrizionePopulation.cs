@@ -61,7 +61,7 @@ ISCR AS
         CONVERT(NVARCHAR(50), ss.COD_ENTE) AS Cod_ente,
         CASE
             WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL THEN '00000'
-            ELSE LTRIM(RTRIM(cl.COD_SEDE_DISTACCATA))
+            ELSE cl.COD_SEDE_DISTACCATA
         END AS Cod_sede_distaccata,
         CASE
             WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL

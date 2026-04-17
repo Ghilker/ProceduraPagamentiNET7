@@ -58,7 +58,7 @@ SELECT
     ISNULL(s.Sesso,'') AS StudenteSesso
 FROM {TEMP_TABLE} t
 JOIN Studente s
-  ON UPPER(LTRIM(RTRIM(s.Cod_fiscale))) = UPPER(LTRIM(RTRIM(t.CodFiscale)));";
+  ON UPPER(s.Cod_fiscale) = UPPER(t.CodFiscale);";
 
         private const string DatiGeneraliDomandaPopulationSql = @"
 SET NOCOUNT ON;
@@ -118,7 +118,7 @@ SELECT
     UPPER(ISNULL(r.PROVINCIA_RESIDENZA,'')) AS ProvinciaResidenza
 FROM {TEMP_TABLE} t
 JOIN vRESIDENZA r
-  ON UPPER(LTRIM(RTRIM(r.COD_FISCALE))) = UPPER(LTRIM(RTRIM(t.CodFiscale)))
+  ON UPPER(r.COD_FISCALE) = UPPER(t.CodFiscale)
 WHERE r.ANNO_ACCADEMICO = @AA
   AND r.TIPO_BANDO = 'LZ';";
 
@@ -149,10 +149,10 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    UPPER(LTRIM(RTRIM(f.Status_sede))) AS ForcedStatus
+    UPPER(f.Status_sede) AS ForcedStatus
 FROM {TEMP_TABLE} t
 JOIN Forzature_StatusSede f
-  ON UPPER(LTRIM(RTRIM(f.Cod_Fiscale))) = UPPER(LTRIM(RTRIM(t.CodFiscale)))
+  ON UPPER(f.Cod_Fiscale) = UPPER(t.CodFiscale)
 WHERE f.Anno_Accademico = @AA
   AND f.Data_fine_validita IS NULL
   AND f.Status_sede IN ('A','B','C','D');";
@@ -177,7 +177,7 @@ RES AS
         ISNULL(r.Cod_comune,'') AS ComuneResidenza
     FROM D
     JOIN vRESIDENZA r
-      ON UPPER(LTRIM(RTRIM(r.COD_FISCALE))) = UPPER(LTRIM(RTRIM(D.CodFiscale)))
+      ON UPPER(r.COD_FISCALE) = UPPER(D.CodFiscale)
     WHERE r.ANNO_ACCADEMICO = @AA
       AND r.TIPO_BANDO = 'LZ'
 ),
@@ -189,7 +189,7 @@ ISCR AS
         i.COD_SEDE_STUDI AS CodSedeStudi,
         CASE
             WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL THEN '00000'
-            ELSE LTRIM(RTRIM(cl.COD_SEDE_DISTACCATA))
+            ELSE cl.COD_SEDE_DISTACCATA
         END AS CodSedeDistaccata,
         CAST(
             CASE
@@ -328,7 +328,7 @@ DOM_LRS AS
         ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY lrs.DATA_VALIDITA DESC) AS rn
     FROM D
     JOIN LUOGO_REPERIBILITA_STUDENTE lrs
-      ON UPPER(LTRIM(RTRIM(lrs.COD_FISCALE))) = UPPER(LTRIM(RTRIM(D.CodFiscale)))
+      ON UPPER(lrs.COD_FISCALE) = UPPER(D.CodFiscale)
     WHERE lrs.ANNO_ACCADEMICO = @AA
       AND lrs.TIPO_LUOGO = 'DOM'
 )
@@ -385,7 +385,7 @@ IST_OPEN AS
         ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY idg.Data_validita DESC, idg.Num_istanza DESC) AS rn
     FROM D
     JOIN Istanza_dati_generali idg
-      ON UPPER(LTRIM(RTRIM(idg.Cod_fiscale))) = UPPER(LTRIM(RTRIM(D.CodFiscale)))
+      ON UPPER(idg.Cod_fiscale) = UPPER(D.CodFiscale)
     JOIN Istanza_status iis
       ON iis.Num_istanza = idg.Num_istanza
      AND iis.data_fine_validita IS NULL
@@ -439,7 +439,7 @@ IST_CLOSED_LAST AS
         ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY idg.Data_validita DESC, idg.Num_istanza DESC) AS rn
     FROM D
     JOIN Istanza_dati_generali idg
-      ON UPPER(LTRIM(RTRIM(idg.Cod_fiscale))) = UPPER(LTRIM(RTRIM(D.CodFiscale)))
+      ON UPPER(idg.Cod_fiscale) = UPPER(D.CodFiscale)
     JOIN Istanza_status iis
       ON iis.Num_istanza = idg.Num_istanza
      AND iis.data_fine_validita IS NOT NULL
