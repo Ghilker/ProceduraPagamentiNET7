@@ -446,8 +446,8 @@ LEFT JOIN TSCP ON TSCP.NumDomanda = D.NumDomanda AND TSCP.rn = 1;";
                 facts.MeseImmatricolazione = GetNullableInt(reader, "MeseImmatricolaz");
                 facts.Semestre = GetNullableInt(reader, "Semestre");
                 facts.IscrittoRipetente = GetNullableBool(reader, "Ripetente");
-                facts.PassaggioTrasferimento = context.AnnoAccademico.CompareTo("20252026") >= 0 && (GetNullableBool(reader, "PassaggioTrasferimento") ?? false);
-                facts.RipetenteDaPassaggio = context.AnnoAccademico.CompareTo("20252026") >= 0 && (GetNullableBool(reader, "RipetenteDaPassaggio") ?? false);
+                facts.PassaggioTrasferimento = GetNullableBool(reader, "PassaggioTrasferimento") ?? false;
+                facts.RipetenteDaPassaggio = GetNullableBool(reader, "RipetenteDaPassaggio") ?? false;
                 facts.PrimaImmatricolazTs = GetNullableInt(reader, "PrimaImmatricolazTs");
                 facts.AaTrasferimento = GetNullableInt(reader, "AnnoAvvenimentoTs");
 
@@ -726,21 +726,15 @@ SELECT
     D.NumDomanda,
     D.CodFiscale,
     CAST(CASE
-            WHEN @AA = '20152016' AND ISNULL(SC.StatusCompilazione, 0) = 75 THEN 1
-            WHEN @AA IN ('20162017','20172018','20182019','20192020') AND ISNULL(SC.StatusCompilazione, 0) = 90 THEN 1
-            WHEN @AA >= '20202021' AND ISNULL(SC.StatusCompilazione, 0) >= 80 THEN 1
-            WHEN ISNULL(SC.StatusCompilazione, 0) = 100 THEN 1
+            WHEN ISNULL(SC.StatusCompilazione, 0) >= 90 THEN 1
             ELSE 0 END AS BIT) AS CartaceoInviato,
     DG.IscrizioneFuoriTermine,
     CAST(CASE WHEN ISNULL(DG.PermessoSoggiorno, CAST(0 AS BIT)) = 1 OR ISNULL(DG.PermessoSoggProvv, CAST(0 AS BIT)) = 1 THEN 1 ELSE 0 END AS BIT) AS PermessoSoggiorno,
     CAST(CASE
-            WHEN @AA > '20192020' AND ISNULL(SC.StatusCompilazione, 0) >= 80 THEN 1
-            WHEN @AA <= '20192020' AND ISNULL(SC.StatusCompilazione, 0) > 70 THEN 1
+            WHEN ISNULL(SC.StatusCompilazione, 0) >= 90 THEN 1
             ELSE 0 END AS BIT) AS DomandaTrasmessa,
     CAST(CASE
-            WHEN @AA > '20192020' AND ISNULL(SC.StatusCompilazione, 0) >= 80 THEN 1
-            WHEN @AA = '20192020' AND ISNULL(SC.StatusCompilazione, 0) >= 80 THEN 1
-            WHEN @AA < '20192020' AND ISNULL(SC.StatusCompilazione, 0) > 70 THEN 1
+            WHEN ISNULL(SC.StatusCompilazione, 0) >= 90 THEN 1
             ELSE 0 END AS BIT) AS DomandaTrasmessaPin,
     ISNULL(VC.StatusIsee, 0) AS StatusIsee,
     ISNULL(CERT.TipoCertificazione, '') AS TipoCertificazione,

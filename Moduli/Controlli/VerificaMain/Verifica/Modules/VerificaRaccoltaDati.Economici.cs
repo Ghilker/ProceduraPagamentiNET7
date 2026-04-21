@@ -21,7 +21,7 @@ namespace ProcedureNet7
 
             string aa = (context.AnnoAccademico ?? "").Trim();
             if (string.IsNullOrWhiteSpace(aa) || aa.Length != 8)
-                throw new ArgumentException("Anno accademico non valido (atteso char(8), es: 20242025).");
+                throw new ArgumentException("Anno accademico non valido (atteso char(8), es: 20252026).");
 
             _currentContext = context;
             ResetComuniEquiparatiState();
