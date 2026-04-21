@@ -237,7 +237,7 @@ namespace ProcedureNet7.Verifica
                                         && ((facts?.RipetenteDaPassaggio).HasValue == true
                                             ? facts!.RipetenteDaPassaggio!.Value
                                             : iscr.HaRipetenzaCarrieraPregressa != 0);
-            int annoCorsoRiferimentoBeneficio = ripetenteDaPassaggio ? iscr.AnnoCorso : annoCorsoCalcolato;
+            int annoCorsoRiferimentoBeneficio = iscr.AnnoCorso;
 
             row["AnnoCorsoCalcolatoMerito"] = annoCorsoCalcolato != 0 ? annoCorsoCalcolato : DBNull.Value;
             row["AnnoCorsoRiferimentoBeneficio"] = annoCorsoRiferimentoBeneficio != 0 ? annoCorsoRiferimentoBeneficio : DBNull.Value;

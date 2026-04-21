@@ -289,10 +289,7 @@ namespace ProcedureNet7
             if (context?.Iscrizione == null)
                 return 0;
 
-            if (HasRipetenzaDaPassaggio(context))
-                return context.Iscrizione.AnnoCorso;
-
-            return GetAnnoCorsoCalcolato(context);
+            return context.Iscrizione.AnnoCorso;
         }
 
         public static string GetVariazioniEscludentiBsSummary(EsitoBorsaFacts? facts)
