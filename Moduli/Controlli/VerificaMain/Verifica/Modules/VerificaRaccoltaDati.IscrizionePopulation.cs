@@ -410,6 +410,20 @@ GROUP BY
     CONVERT(NVARCHAR(20), e.Anno_Accad_Inizio),
     TRY_CONVERT(INT, e.ANNO_CORSO);";
 
+        private const string CreditiRichiestiCatalogSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    TRY_CONVERT(INT, cr.Tipologia_corso) AS Tipologia_corso,
+    TRY_CONVERT(INT, cr.Anno_corso) AS Anno_corso,
+    CONVERT(NVARCHAR(50), ISNULL(cr.Cod_corso_laurea, '')) AS Cod_corso_laurea,
+    TRY_CONVERT(DECIMAL(18,2), cr.Crediti_richiesti) AS Crediti_richiesti,
+    CAST(CASE WHEN TRY_CONVERT(INT, cr.Disabile) = 1 THEN 1 ELSE 0 END AS BIT) AS Disabile,
+    TRY_CONVERT(INT, cr.Id_Crediti_richiesti) AS Id_Crediti_richiesti
+FROM Crediti_richiesti cr
+WHERE cr.Anno_accademico = @AA;";
+
         private void LoadEsamiCatalog(VerificaPipelineContext context)
         {
             context.EsamiCatalog.Clear();
@@ -433,6 +447,35 @@ GROUP BY
                     reader.SafeGetString("Anno_accad_inizio"),
                     reader.SafeGetInt("Anno_corso"),
                     reader.SafeGetDecimal("Numero_esami"));
+            }
+        }
+
+        private void LoadCreditiRichiestiCatalog(VerificaPipelineContext context)
+        {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadCreditiRichiestiCatalog", $"AA={context.AnnoAccademico}");
+
+            context.CreditiRichiestiCatalog.Clear();
+
+            if (!ObjectExists(context.Connection, "Crediti_richiesti"))
+                return;
+
+            using var cmd = new SqlCommand(CreditiRichiestiCatalogSql, context.Connection)
+            {
+                CommandType = CommandType.Text,
+                CommandTimeout = 9999999
+            };
+            cmd.Parameters.Add("@AA", SqlDbType.Char, 8).Value = context.AnnoAccademico;
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                context.CreditiRichiestiCatalog.Add(
+                    reader.SafeGetInt("Tipologia_corso"),
+                    reader.SafeGetInt("Anno_corso"),
+                    reader.SafeGetString("Cod_corso_laurea"),
+                    reader.SafeGetDecimal("Crediti_richiesti"),
+                    reader.SafeGetBool("Disabile"),
+                    reader.SafeGetInt("Id_Crediti_richiesti"));
             }
         }
 

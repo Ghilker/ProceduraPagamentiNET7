@@ -131,7 +131,7 @@ namespace ProcedureNet7
             int tipologiaTitolo = facts.TipologiaStudiTitoloConseguito.Value;
             int durataTitolo = facts.DurataLegTitoloConseguito ?? 0;
             int annoCorsoDichiarato = iscr.AnnoCorso;
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
+            int annoCorsoRiferimento = annoCorsoDichiarato;
             int durataCorso = EsitoBorsaSupport.GetDurataNormaleCorso(iscr);
 
             switch (tipoCorso)
@@ -158,7 +158,7 @@ namespace ProcedureNet7
 
             if (tipoCorso == 5 && (tipologiaTitolo == 1 || tipologiaTitolo == 2))
             {
-                if (durataTitolo == 4 && annoCorsoCalcolato == 1)
+                if (durataTitolo == 4 && annoCorsoRiferimento == 1)
                     return false;
                 if (durataTitolo > 4)
                     return false;
@@ -166,15 +166,15 @@ namespace ProcedureNet7
 
             if (tipoCorso == 4 && (tipologiaTitolo == 1 || tipologiaTitolo == 2))
             {
-                if (durataTitolo == 3 && (annoCorsoCalcolato == 1 || annoCorsoCalcolato == 2 || annoCorsoCalcolato == 3))
+                if (durataTitolo == 3 && (annoCorsoRiferimento == 1 || annoCorsoRiferimento == 2 || annoCorsoRiferimento == 3))
                     return false;
-                if (durataTitolo == 4 && (annoCorsoCalcolato == 1 || annoCorsoCalcolato == 2 || annoCorsoCalcolato == 3 || annoCorsoCalcolato == 4))
+                if (durataTitolo == 4 && (annoCorsoRiferimento == 1 || annoCorsoRiferimento == 2 || annoCorsoRiferimento == 3 || annoCorsoRiferimento == 4))
                     return false;
                 if (durataTitolo == 5)
                 {
                     if (durataCorso == 5)
                         return false;
-                    if (durataCorso == 6 && annoCorsoCalcolato != 6 && annoCorsoCalcolato != -1 && annoCorsoCalcolato != -2)
+                    if (durataCorso == 6 && annoCorsoRiferimento != 6 && annoCorsoRiferimento != -1 && annoCorsoRiferimento != -2)
                         return false;
                 }
                 else if (durataTitolo > 0)
@@ -190,7 +190,7 @@ namespace ProcedureNet7
                     if (annoCorsoDichiarato > 0 && annoCorsoDichiarato < 4)
                         return false;
                 }
-                else if (annoCorsoCalcolato == 1 || annoCorsoCalcolato == 2 || annoCorsoCalcolato == 3)
+                else if (annoCorsoRiferimento == 1 || annoCorsoRiferimento == 2 || annoCorsoRiferimento == 3)
                 {
                     return false;
                 }

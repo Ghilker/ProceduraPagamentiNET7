@@ -38,20 +38,22 @@ namespace ProcedureNet7
             if (iscr == null)
                 return false;
 
-            int annoCorsoRiferimento = EsitoBorsaSupport.GetAnnoCorsoRiferimentoBeneficio(context);
-            if (annoCorsoRiferimento == 0)
+            if (EsitoBorsaSupport.HasLegacyFuoriCorsoInammissibile(context.Facts, context.CodBeneficio))
+                return false;
+
+            int annoCorsoDichiarato = iscr.AnnoCorso;
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
+
+            if (annoCorsoDichiarato == 0 || annoCorsoCalcolato == 0)
                 return false;
 
             if (iscr.TipoCorso == 6 || iscr.TipoCorso == 7)
-                return annoCorsoRiferimento > 0;
+                return annoCorsoDichiarato > 0 && annoCorsoCalcolato > 0;
 
-            if (annoCorsoRiferimento > 0)
-                return true;
+            int sogliaFuoriCorsoMinima = context.Invalido ? -2 : -1;
 
-            if (!context.Invalido)
-                return annoCorsoRiferimento >= -1;
-
-            return annoCorsoRiferimento >= -2;
+            return annoCorsoDichiarato >= sogliaFuoriCorsoMinima
+                && annoCorsoCalcolato >= sogliaFuoriCorsoMinima;
         }
 
         private static bool HasBeneficioPregressoNonRestituito(EsitoBorsaFacts facts, string beneficio)

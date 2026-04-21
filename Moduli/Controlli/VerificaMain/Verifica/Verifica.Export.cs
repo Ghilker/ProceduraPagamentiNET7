@@ -25,6 +25,9 @@ namespace ProcedureNet7.Verifica
                 dt.Columns.Add($"EsitoCalcolato_{codBeneficio}", typeof(int));
             }
 
+            dt.Columns.Add("CodiciEsclusioneCalcolata_BS", typeof(string));
+            dt.Columns.Add("DescrizioneEsclusioneCalcolata_BS", typeof(string));
+
             dt.Columns.Add("TipoRedditoOrigine", typeof(string));
             dt.Columns.Add("TipoRedditoIntegrazione", typeof(string));
             dt.Columns.Add("ISR", typeof(decimal));
@@ -282,6 +285,9 @@ namespace ProcedureNet7.Verifica
             context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var rawByBenefit);
             context.EsitiCalcolatiByStudentBenefit.TryGetValue(key, out var calcolatiByBenefit);
 
+            row["CodiciEsclusioneCalcolata_BS"] = string.Empty;
+            row["DescrizioneEsclusioneCalcolata_BS"] = string.Empty;
+
             foreach (var codBeneficio in OutputBenefitCodes)
             {
                 bool richiesto = facts != null && EsitoBorsaSupport.IsBenefitRequested(facts, codBeneficio);
@@ -307,6 +313,12 @@ namespace ProcedureNet7.Verifica
                     calcolato != null)
                 {
                     esitoCalcolato = calcolato.EsitoCalcolato;
+
+                    if (string.Equals(codBeneficio, "BS", StringComparison.OrdinalIgnoreCase))
+                    {
+                        row["CodiciEsclusioneCalcolata_BS"] = calcolato.CodiciMotivo ?? string.Empty;
+                        row["DescrizioneEsclusioneCalcolata_BS"] = calcolato.Motivi ?? string.Empty;
+                    }
                 }
 
                 SetNullableInt(row, $"EsitoAttuale_{codBeneficio}", esitoAttuale);

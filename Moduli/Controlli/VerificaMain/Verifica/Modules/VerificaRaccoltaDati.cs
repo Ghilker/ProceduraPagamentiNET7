@@ -159,6 +159,7 @@ FROM D;";
                         LoadCarrieraPregressa(context);
                         BuildCarrieraPregressaAggregate(context);
                         LoadEsamiCatalog(context);
+                        LoadCreditiRichiestiCatalog(context);
                     },
                     () => $"students={context.Students.Count}");
 

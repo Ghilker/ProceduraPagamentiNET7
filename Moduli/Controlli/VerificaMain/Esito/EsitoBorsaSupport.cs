@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -88,8 +88,7 @@ namespace ProcedureNet7
             if (iscr.TipoCorso != 6 && iscr.TipoCorso != 7 && tipoStudente != 0 && string.IsNullOrWhiteSpace(iscr.CodCorsoLaurea))
                 AddMotivoEsclusione(result, "ISC006");
 
-            int annoCorsoCalcolato = GetAnnoCorsoCalcolato(context);
-            if (annoCorsoCalcolato == 0)
+            if (iscr.AnnoCorso == 0)
                 AddMotivoEsclusione(result, "ISC008");
 
             return result;
@@ -576,6 +575,23 @@ namespace ProcedureNet7
             return facts.SlashMotiviEsclusioneByBenefit.TryGetValue(normalized, out var value)
                 ? (value ?? string.Empty)
                 : string.Empty;
+        }
+
+        public static bool HasLegacyFuoriCorsoInammissibile(EsitoBorsaFacts? facts, string? beneficio)
+        {
+            string slash = GetSlashMotiviEsclusione(facts, beneficio);
+            if (string.IsNullOrWhiteSpace(slash))
+                return false;
+
+            string normalized = NormalizeUpper(slash)
+                .Replace("#", string.Empty, StringComparison.Ordinal)
+                .Replace(";", " ", StringComparison.Ordinal)
+                .Trim();
+
+            return normalized.Contains("ANNI DI FUORI CORSO INAMMISSIBILI PER LA BORSA DI STUDIO", StringComparison.OrdinalIgnoreCase)
+                || normalized.Contains("ANNO DI FUORI CORSO INAMMISSIBILE PER LA BORSA DI STUDIO", StringComparison.OrdinalIgnoreCase)
+                || normalized.Contains("FUORI CORSO INAMMISSIBILI PER LA BORSA DI STUDIO", StringComparison.OrdinalIgnoreCase)
+                || normalized.Contains("FUORI CORSO INAMMISSIBILE PER LA BORSA DI STUDIO", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool HasRinunciaVariazione(EsitoBorsaFacts? facts, string? beneficio)

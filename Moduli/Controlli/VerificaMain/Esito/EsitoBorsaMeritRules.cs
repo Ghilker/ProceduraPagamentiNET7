@@ -1,26 +1,16 @@
-using System;
-using System.Collections.Generic;
+﻿using System;
 using ProcedureNet7.Verifica;
 
 namespace ProcedureNet7
 {
     internal sealed class EsitoBorsaMeritRules
     {
-        private static readonly HashSet<string> CorsiSpecialistica1FcRidotta = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "30060", "30055", "30053", "28700", "28701", "30052", "31833", "S2-34"
-        };
-
         public void Apply(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
             var iscr = context.Iscrizione;
             if (iscr == null)
                 return;
 
-            if(context.Key.CodFiscale == "DEIRRT02D46H501T")
-            {
-                string test = "";
-            }
 
             ResetCreditiUtilizzatiSeBonusNonRichiesto(iscr);
 
@@ -48,8 +38,6 @@ namespace ProcedureNet7
                 return;
             }
 
-            if (!IsAnnoCorsoCongruente(context, iscr))
-                evaluation.Add("MER072");
 
             if (HasCreditiDichiaratiIncongruenti(iscr))
                 evaluation.Add("MER005");
@@ -63,10 +51,17 @@ namespace ProcedureNet7
 
         private static bool RichiedeDatiMerito(EsitoBorsaStudentContext context)
         {
+            if (context?.Iscrizione == null)
+                return false;
+
             if (context.Iscrizione.TipoCorso == 6 || context.Iscrizione.TipoCorso == 7)
                 return false;
 
-            return context.Iscrizione.AnnoCorso != 1 && EsitoBorsaSupport.GetAnnoCorsoCalcolato(context) != 1;
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
+            if (annoCorsoCalcolato != 0)
+                return annoCorsoCalcolato != 1;
+
+            return context.Iscrizione.AnnoCorso != 1;
         }
 
         private static bool HasDatiMeritoCalcolabili(EsitoBorsaStudentContext context, bool usaRegoleCrediti)
@@ -113,23 +108,6 @@ namespace ProcedureNet7
             return !(riconosciuti > 110m && riconosciuti < 150m);
         }
 
-        private static bool IsAnnoCorsoCongruente(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
-        {
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
-            if (annoCorsoCalcolato == 0)
-                return true;
-
-            bool derogaRinuncia = context.AaNumero >= 20242025
-                                 && EsitoBorsaSupport.HasRiconoscimentoCreditiDaRinuncia(iscr)
-                                 && context.Facts.PassaggioTrasferimento != true;
-            bool derogaRipetenza = context.AaNumero >= 20252026 && EsitoBorsaSupport.HasRipetenzaDaPassaggio(context);
-
-            if (derogaRinuncia || derogaRipetenza)
-                return true;
-
-            return annoCorsoCalcolato == iscr.AnnoCorso;
-        }
-
         private static bool HaCreditiMinimiPerBorsa(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, EsitoBorsaEvaluation evaluation)
         {
             int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
@@ -145,7 +123,7 @@ namespace ProcedureNet7
             if (HasBloccoBonusTitolo(context, iscr))
                 evaluation.Add("MER085");
 
-            decimal bonusUsabile = GetBonusUsabile(context, iscr, annoCorsoCalcolato);
+            decimal bonusUsabile = GetBonusUsabile(context, iscr, iscr.AnnoCorso);
             if (creditiStudente + bonusUsabile >= creditiRichiesti)
             {
                 if (bonusUsabile > 0m)
@@ -156,7 +134,7 @@ namespace ProcedureNet7
             return false;
         }
 
-        private static decimal GetBonusUsabile(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, int annoCorsoCalcolato)
+        private static decimal GetBonusUsabile(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, int annoCorsoDichiarato)
         {
             bool bonusRichiesto = iscr.UtilizzoBonus != 0 || (iscr.CreditiUtilizzati ?? 0m) > 0m;
             if (!bonusRichiesto)
@@ -174,7 +152,7 @@ namespace ProcedureNet7
                 if (iscr.TipoCorso == 5)
                     return 12m;
 
-                return annoCorsoCalcolato switch
+                return annoCorsoDichiarato switch
                 {
                     2 => 5m,
                     3 => 12m,
@@ -237,99 +215,24 @@ namespace ProcedureNet7
 
         private static decimal GetCreditiMinimiRichiesti(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, bool invalido, int annoCorsoRiferimento)
         {
-            decimal value = GetCreditiMinimiBase(iscr, invalido, context.AaNumero, annoCorsoRiferimento);
-            value = ApplySpecialisticaPrimoFuoriCorsoRidotta(value, iscr, invalido, annoCorsoRiferimento);
+            decimal value = GetCreditiMinimiBase(context, iscr, invalido, annoCorsoRiferimento);
             if (!invalido && context.Facts.NubileProle == true)
                 value = Math.Floor(value * 0.9m);
             return value;
         }
 
-        private static decimal GetCreditiMinimiBase(InformazioniIscrizione iscr, bool invalido, int aaNumero, int anno)
+        private static decimal GetCreditiMinimiBase(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, bool invalido, int anno)
         {
-            bool ente09 = EsitoBorsaSupport.IsEnte(iscr, "09");
-            bool ente07 = aaNumero >= 20252026 && EsitoBorsaSupport.IsEnte(iscr, "07");
-            bool boost38 = ente09 || ente07;
+            if (context?.Pipeline?.CreditiRichiestiCatalog == null || iscr == null)
+                return 0m;
 
-            switch (anno)
-            {
-                case 1:
-                    return 0m;
-
-                case 2:
-                    if (iscr.TipoCorso == 5)
-                        return invalido ? 18m : (boost38 ? 38m : 30m);
-                    return invalido ? 15m : (boost38 ? 31m : 25m);
-
-                case 3:
-                    return invalido ? 56m : (boost38 ? 100m : 80m);
-
-                case 4:
-                    if (invalido)
-                        return 94m;
-                    if (ente07)
-                        return 160m;
-                    return boost38 ? 168m : 135m;
-
-                case 5:
-                    if (invalido)
-                        return 133m;
-                    if (ente07)
-                        return 210m;
-                    return boost38 ? 230m : 190m;
-
-                case 6:
-                    if (invalido)
-                        return 171m;
-                    return ente07 ? 265m : 245m;
-
-                case -1:
-                    switch (iscr.TipoCorso)
-                    {
-                        case 3:
-                            return invalido ? 94m : (boost38 ? 155m : 135m);
-                        case 4:
-                            if (EsitoBorsaSupport.GetDurataNormaleCorso(iscr) > 5)
-                                return invalido ? 222m : (ente07 ? 315m : 300m);
-                            return invalido ? 171m : (ente07 ? 315m : (boost38 ? 265m : 245m));
-                        case 5:
-                            return invalido ? 56m : (boost38 ? 90m : 80m);
-                        default:
-                            return 0m;
-                    }
-
-                case -2:
-                    if (!invalido)
-                        return 0m;
-                    return iscr.TipoCorso switch
-                    {
-                        3 => 133m,
-                        5 => 94m,
-                        4 when EsitoBorsaSupport.GetDurataNormaleCorso(iscr) > 5 => 228m,
-                        4 => 222m,
-                        _ => 0m
-                    };
-
-                case -3:
-                    return invalido && iscr.TipoCorso == 5 ? 94m : 0m;
-
-                default:
-                    return 0m;
-            }
-        }
-
-        private static decimal ApplySpecialisticaPrimoFuoriCorsoRidotta(decimal currentValue, InformazioniIscrizione iscr, bool invalido, int annoCorsoRiferimento)
-        {
-            if (iscr.TipoCorso != 5 || (annoCorsoRiferimento != -1 && annoCorsoRiferimento != -2))
-                return currentValue;
-
-            string corso = (iscr.CodCorsoLaurea ?? string.Empty).Trim();
-            if (!CorsiSpecialistica1FcRidotta.Contains(corso))
-                return currentValue;
-
-            if (annoCorsoRiferimento == -1)
-                return invalido ? 56m : 63m;
-
-            return invalido ? 94m : currentValue;
+            return context.Pipeline.CreditiRichiestiCatalog.Resolve(
+                       iscr.TipoCorso,
+                       anno,
+                       invalido,
+                       iscr.CodCorsoLaurea,
+                       iscr.CodSedeStudi)
+                   ?? 0m;
         }
 
         private static void ResetCreditiUtilizzatiSeBonusNonRichiesto(InformazioniIscrizione iscr)

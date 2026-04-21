@@ -36,6 +36,7 @@ namespace ProcedureNet7.Verifica
         public CalcParams CalcParams { get; set; } = new();
         public List<string> CodiciFiscaliFiltro { get; } = new();
         public EsamiCatalog EsamiCatalog { get; } = new();
+        public CreditiRichiestiCatalog CreditiRichiestiCatalog { get; } = new();
     }
 
     internal sealed class EsitoBorsaFacts
@@ -220,6 +221,112 @@ namespace ProcedureNet7.Verifica
 
         private static string BuildKey(string? codCorsoLaurea, string? codTipoOrdinamento, string? annoAccadInizio)
             => string.Concat(Normalize(codCorsoLaurea), "|", Normalize(codTipoOrdinamento), "|", Normalize(annoAccadInizio));
+
+        private static string Normalize(string? value)
+            => (value ?? string.Empty).Trim().ToUpperInvariant();
+    }
+
+
+    internal sealed class CreditoRichiestoRow
+    {
+        public int TipologiaCorso { get; set; }
+        public int AnnoCorso { get; set; }
+        public string CodCorsoLaurea { get; set; } = string.Empty;
+        public decimal CreditiRichiesti { get; set; }
+        public bool Disabile { get; set; }
+        public int IdCreditiRichiesti { get; set; }
+    }
+
+    internal sealed class CreditiRichiestiCatalog
+    {
+        private readonly List<CreditoRichiestoRow> _items = new();
+
+        private static readonly Dictionary<string, string> AteneoBySede = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["J"] = "LUISS",
+            ["X"] = "UNINT",
+            ["K"] = "LUMSA",
+            ["R"] = "CAMPUSBIO"
+        };
+
+        public void Clear() => _items.Clear();
+
+        public void Add(int? tipologiaCorso, int? annoCorso, string? codCorsoLaurea, decimal? creditiRichiesti, bool? disabile, int? idCreditiRichiesti)
+        {
+            if (!tipologiaCorso.HasValue || !annoCorso.HasValue || !creditiRichiesti.HasValue || !disabile.HasValue)
+                return;
+
+            _items.Add(new CreditoRichiestoRow
+            {
+                TipologiaCorso = tipologiaCorso.Value,
+                AnnoCorso = annoCorso.Value,
+                CodCorsoLaurea = NormalizeCodCorsoLaurea(codCorsoLaurea),
+                CreditiRichiesti = creditiRichiesti.Value,
+                Disabile = disabile.Value,
+                IdCreditiRichiesti = idCreditiRichiesti ?? 0
+            });
+        }
+
+        public decimal? Resolve(int tipologiaCorso, int annoCorso, bool invalido, string? codCorsoLaurea, string? codSedeStudi)
+        {
+            string corso = NormalizeCodCorsoLaurea(codCorsoLaurea);
+            string gruppoAteneo = ResolveGruppoAteneo(codSedeStudi);
+
+            CreditoRichiestoRow? best = null;
+            int bestPriority = int.MaxValue;
+            int bestId = int.MinValue;
+
+            foreach (var item in _items)
+            {
+                if (item.TipologiaCorso != tipologiaCorso || item.AnnoCorso != annoCorso || item.Disabile != invalido)
+                    continue;
+
+                int priority;
+                if (!string.IsNullOrEmpty(corso) && string.Equals(item.CodCorsoLaurea, corso, StringComparison.OrdinalIgnoreCase))
+                {
+                    priority = 0;
+                }
+                else if (!string.IsNullOrEmpty(gruppoAteneo) && string.Equals(item.CodCorsoLaurea, gruppoAteneo, StringComparison.OrdinalIgnoreCase))
+                {
+                    priority = 1;
+                }
+                else if (IsDefaultCodCorso(item.CodCorsoLaurea))
+                {
+                    priority = 2;
+                }
+                else
+                {
+                    continue;
+                }
+
+                if (best == null || priority < bestPriority || (priority == bestPriority && item.IdCreditiRichiesti > bestId))
+                {
+                    best = item;
+                    bestPriority = priority;
+                    bestId = item.IdCreditiRichiesti;
+                }
+            }
+
+            return best?.CreditiRichiesti;
+        }
+
+        private static string ResolveGruppoAteneo(string? codSedeStudi)
+        {
+            string sede = Normalize(codSedeStudi);
+            return AteneoBySede.TryGetValue(sede, out var gruppo) ? gruppo : string.Empty;
+        }
+
+        private static bool IsDefaultCodCorso(string? codCorsoLaurea)
+        {
+            string value = NormalizeCodCorsoLaurea(codCorsoLaurea);
+            return string.IsNullOrEmpty(value) || value == "0";
+        }
+
+        private static string NormalizeCodCorsoLaurea(string? value)
+        {
+            string normalized = Normalize(value);
+            return normalized == "00000" ? "0" : normalized;
+        }
 
         private static string Normalize(string? value)
             => (value ?? string.Empty).Trim().ToUpperInvariant();
