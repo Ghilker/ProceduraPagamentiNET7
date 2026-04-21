@@ -8,6 +8,8 @@ namespace ProcedureNet7.Verifica
 {
     internal sealed partial class Verifica
     {
+        private static readonly string[] OutputBenefitCodes = { "BS", "PA", "CS", "CM", "CT", "CI" };
+
         private static DataTable BuildOutputTable()
         {
             var dt = new DataTable("Verifica");
@@ -15,18 +17,12 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("CodFiscale", typeof(string));
             dt.Columns.Add("NumDomanda", typeof(string));
             dt.Columns.Add("StatusCompilazione", typeof(int));
-            dt.Columns.Add("CodBeneficio", typeof(string));
-            dt.Columns.Add("BeneficioRichiesto", typeof(bool));
             dt.Columns.Add("EsitoBorsaCalcolato", typeof(int));
             dt.Columns.Add("CodiceMotivoEsitoBorsaCalcolato", typeof(string));
             dt.Columns.Add("MotivoEsitoBorsaCalcolato", typeof(string));
-            dt.Columns.Add("EsitoBeneficioCalcolato", typeof(int));
-            dt.Columns.Add("CodiceMotivoEsitoBeneficioCalcolato", typeof(string));
-            dt.Columns.Add("MotivoEsitoBeneficioCalcolato", typeof(string));
             dt.Columns.Add("TipoRedditoOrigine", typeof(string));
             dt.Columns.Add("TipoRedditoIntegrazione", typeof(string));
             dt.Columns.Add("CodTipoEsitoBS", typeof(int));
-            dt.Columns.Add("CodTipoEsitoBeneficio", typeof(int));
             dt.Columns.Add("ISR", typeof(decimal));
             dt.Columns.Add("ISP", typeof(decimal));
             dt.Columns.Add("Detrazioni", typeof(decimal));
@@ -104,16 +100,11 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("EsamiMinimiRichiestiPassaggioMerito", typeof(decimal));
             dt.Columns.Add("CreditiMinimiRichiestiPassaggioMerito", typeof(decimal));
             dt.Columns.Add("SlashMotiviEsclusioneBS", typeof(string));
-            dt.Columns.Add("SlashMotiviEsclusioneBeneficio", typeof(string));
             dt.Columns.Add("VariazioniEscludentiBS", typeof(string));
-            dt.Columns.Add("VariazioniEscludentiBeneficio", typeof(string));
             dt.Columns.Add("RinunciaBSDaVariazioni", typeof(bool));
-            dt.Columns.Add("RinunciaBeneficioDaVariazioni", typeof(bool));
             dt.Columns.Add("DecadutoBSDaVariazioni", typeof(bool));
-            dt.Columns.Add("DecadutoBeneficioDaVariazioni", typeof(bool));
             dt.Columns.Add("RevocatoDaVariazioni", typeof(bool));
             dt.Columns.Add("RevocatoBandoBSDaVariazioni", typeof(bool));
-            dt.Columns.Add("RevocatoBandoBeneficioDaVariazioni", typeof(bool));
 
             dt.Columns.Add("NumeroEventiCarrieraPregressa", typeof(int));
             dt.Columns.Add("UltimoAnnoAvvenimentoCarrieraPregressa", typeof(int));
@@ -127,7 +118,18 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("ImportoFinaleBorsa", typeof(decimal));
             dt.Columns.Add("ImportoAssegnato", typeof(decimal));
 
+            AddBenefitOutcomeColumns(dt);
+
             return dt;
+        }
+
+        private static void AddBenefitOutcomeColumns(DataTable dt)
+        {
+            foreach (var benefit in OutputBenefitCodes)
+            {
+                dt.Columns.Add($"{benefit}_EsitoAttuale", typeof(int));
+                dt.Columns.Add($"{benefit}_EsitoCalcolato", typeof(int));
+            }
         }
 
         private static (IReadOnlyList<StudenteInfo> Items, DataTable Table) BuildOrderedOutputs(VerificaPipelineContext context)
@@ -144,10 +146,7 @@ namespace ProcedureNet7.Verifica
                 {
                     var info = pair.Value;
                     items.Add(info);
-                    context.EsitoBorsaFactsByStudent.TryGetValue(pair.Key, out var facts);
-                    var benefitCodes = EsitoBorsaSupport.GetBenefitCodes(context, pair.Key, facts);
-                    foreach (var codBeneficio in benefitCodes)
-                        AddOutputRow(dt, context, pair.Key, info, codBeneficio);
+                    AddOutputRow(dt, context, pair.Key, info);
                 }
             }
             finally
@@ -158,7 +157,7 @@ namespace ProcedureNet7.Verifica
             return (items, dt);
         }
 
-        private static void AddOutputRow(DataTable dt, VerificaPipelineContext context, StudentKey key, StudenteInfo info, string codBeneficio)
+        private static void AddOutputRow(DataTable dt, VerificaPipelineContext context, StudentKey key, StudenteInfo info)
         {
             var eco = info.InformazioniEconomiche;
             var sede = info.InformazioniSede;
@@ -169,29 +168,24 @@ namespace ProcedureNet7.Verifica
             var row = dt.NewRow();
             row["CodFiscale"] = info.InformazioniPersonali.CodFiscale ?? "";
             row["NumDomanda"] = info.InformazioniPersonali.NumDomanda ?? "";
+
             context.EsitiCalcolatiByStudentBenefit.TryGetValue(key, out var calcolatiByBenefit);
-            EsitoBeneficioCalcolato esitoBeneficio = new();
-            EsitoConcorsoBenefitRaw rawBeneficio = new();
-            calcolatiByBenefit?.TryGetValue(codBeneficio, out esitoBeneficio);
             context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var rawByBenefit);
-            rawByBenefit?.TryGetValue(codBeneficio, out rawBeneficio);
-            bool richiesto = context.EsitoBorsaFactsByStudent.TryGetValue(key, out var factsTmp) && EsitoBorsaSupport.IsBenefitRequested(factsTmp, codBeneficio);
+
+            EsitoBeneficioCalcolato? esitoBs = null;
+            calcolatiByBenefit?.TryGetValue("BS", out esitoBs);
 
             row["StatusCompilazione"] = info.StatusCompilazione;
-            row["CodBeneficio"] = codBeneficio;
-            row["BeneficioRichiesto"] = richiesto;
-            row["EsitoBorsaCalcolato"] = esitoBeneficio?.EsitoCalcolato ?? info.EsitoBorsaCalcolato;
-            row["CodiceMotivoEsitoBorsaCalcolato"] = esitoBeneficio?.CodiciMotivo ?? info.CodiciMotivoEsitoBorsaCalcolato ?? "";
-            row["MotivoEsitoBorsaCalcolato"] = esitoBeneficio?.Motivi ?? info.MotiviEsitoBorsaCalcolato ?? "";
-            row["EsitoBeneficioCalcolato"] = esitoBeneficio?.EsitoCalcolato ?? 0;
-            row["CodiceMotivoEsitoBeneficioCalcolato"] = esitoBeneficio?.CodiciMotivo ?? "";
-            row["MotivoEsitoBeneficioCalcolato"] = esitoBeneficio?.Motivi ?? "";
+            row["EsitoBorsaCalcolato"] = esitoBs?.EsitoCalcolato ?? info.EsitoBorsaCalcolato;
+            row["CodiceMotivoEsitoBorsaCalcolato"] = esitoBs?.CodiciMotivo ?? info.CodiciMotivoEsitoBorsaCalcolato ?? "";
+            row["MotivoEsitoBorsaCalcolato"] = esitoBs?.Motivi ?? info.MotiviEsitoBorsaCalcolato ?? "";
 
             row["TipoRedditoOrigine"] = eco.Raw.TipoRedditoOrigine ?? "";
             row["TipoRedditoIntegrazione"] = eco.Raw.TipoRedditoIntegrazione ?? "";
             row["CodTipoEsitoBS"] = eco.Raw.CodTipoEsitoBS ?? 0;
-            row["CodTipoEsitoBeneficio"] = rawBeneficio?.CodTipoEsito ?? 0;
-            row["ImportoAssegnato"] = rawBeneficio?.ImportoAssegnato ?? ToDecimalOrZero(eco.Raw.ImportoAssegnato);
+            row["ImportoAssegnato"] = rawByBenefit != null && rawByBenefit.TryGetValue("BS", out var rawBs)
+                ? (rawBs?.ImportoAssegnato ?? 0m)
+                : ToDecimalOrZero(eco.Raw.ImportoAssegnato);
             row["ISR"] = eco.Calcolate.ISRDSU;
             row["ISP"] = eco.Calcolate.ISPDSU;
             row["Detrazioni"] = eco.Calcolate.Detrazioni;
@@ -280,16 +274,11 @@ namespace ProcedureNet7.Verifica
             SetIfHasValue(row, "EsamiMinimiRichiestiPassaggioMerito", iscr.EsamiMinimiRichiestiPassaggio);
             SetIfHasValue(row, "CreditiMinimiRichiestiPassaggioMerito", iscr.CreditiMinimiRichiestiPassaggio);
             row["SlashMotiviEsclusioneBS"] = facts?.SlashMotiviEsclusioneBS ?? "";
-            row["SlashMotiviEsclusioneBeneficio"] = EsitoBorsaSupport.GetSlashMotiviEsclusione(facts, codBeneficio);
             row["VariazioniEscludentiBS"] = EsitoBorsaSupport.GetVariazioniEscludentiBsSummary(facts);
-            row["VariazioniEscludentiBeneficio"] = EsitoBorsaSupport.GetVariazioniEscludentiSummary(facts, codBeneficio);
             row["RinunciaBSDaVariazioni"] = facts?.RinunciaBS == true;
-            row["RinunciaBeneficioDaVariazioni"] = EsitoBorsaSupport.HasRinunciaVariazione(facts, codBeneficio);
             row["DecadutoBSDaVariazioni"] = facts?.DecadutoBS == true;
-            row["DecadutoBeneficioDaVariazioni"] = EsitoBorsaSupport.HasDecadenzaVariazione(facts, codBeneficio);
             row["RevocatoDaVariazioni"] = facts != null && (facts.Revocato || facts.RevocatoMancataIscrizione || facts.RevocatoIscrittoRipetente || facts.RevocatoISEE || facts.RevocatoLaureato || facts.RevocatoPatrimonio || facts.RevocatoReddito || facts.RevocatoEsami || facts.RevocatoFuoriTermine || facts.RevocatoIseeFuoriTermine || facts.RevocatoIseeNonProdotta || facts.RevocatoTrasmissioneIseeFuoriTermine || facts.RevocatoNoContrattoLocazione);
             row["RevocatoBandoBSDaVariazioni"] = facts?.RevocatoBandoBS == true;
-            row["RevocatoBandoBeneficioDaVariazioni"] = EsitoBorsaSupport.HasRevocaBandoVariazione(facts, codBeneficio);
 
             SetIfPositiveInt(row, "NumeroEventiCarrieraPregressa", iscr.NumeroEventiCarrieraPregressa);
             SetIfHasValue(row, "UltimoAnnoAvvenimentoCarrieraPregressa", iscr.UltimoAnnoAvvenimentoCarrieraPregressa);
@@ -298,11 +287,35 @@ namespace ProcedureNet7.Verifica
             row["HaRipetenzaCarrieraPregressa"] = iscr.HaRipetenzaCarrieraPregressa != 0;
             row["CodiciAvvenimentoCarrieraPregressa"] = iscr.CodiciAvvenimentoCarrieraPregressa ?? "";
 
-            row["StatusSedeRiferimentoImportoBorsa"] = string.Equals(codBeneficio, "BS", StringComparison.OrdinalIgnoreCase) ? (impBorsa.StatusSedeRiferimento ?? "") : "";
-            row["ImportoBaseBorsa"] = string.Equals(codBeneficio, "BS", StringComparison.OrdinalIgnoreCase) ? impBorsa.ImportoBase : DBNull.Value;
-            row["ImportoFinaleBorsa"] = string.Equals(codBeneficio, "BS", StringComparison.OrdinalIgnoreCase) ? impBorsa.ImportoFinale : DBNull.Value;
+            row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
+            row["ImportoBaseBorsa"] = impBorsa.ImportoBase;
+            row["ImportoFinaleBorsa"] = impBorsa.ImportoFinale;
+
+            SetBenefitOutcomeValues(row, rawByBenefit, calcolatiByBenefit);
 
             dt.Rows.Add(row);
+        }
+
+        private static void SetBenefitOutcomeValues(
+            DataRow row,
+            IReadOnlyDictionary<string, EsitoConcorsoBenefitRaw>? rawByBenefit,
+            IReadOnlyDictionary<string, EsitoBeneficioCalcolato>? calcolatiByBenefit)
+        {
+            foreach (var benefit in OutputBenefitCodes)
+            {
+                string currentColumn = $"{benefit}_EsitoAttuale";
+                string calculatedColumn = $"{benefit}_EsitoCalcolato";
+
+                if (rawByBenefit != null && rawByBenefit.TryGetValue(benefit, out var raw) && raw?.CodTipoEsito.HasValue == true)
+                    row[currentColumn] = raw.CodTipoEsito.Value;
+                else
+                    row[currentColumn] = DBNull.Value;
+
+                if (calcolatiByBenefit != null && calcolatiByBenefit.TryGetValue(benefit, out var calc))
+                    row[calculatedColumn] = calc?.EsitoCalcolato ?? (object)DBNull.Value;
+                else
+                    row[calculatedColumn] = DBNull.Value;
+            }
         }
 
         private static decimal ToDecimalOrZero(object? value)
