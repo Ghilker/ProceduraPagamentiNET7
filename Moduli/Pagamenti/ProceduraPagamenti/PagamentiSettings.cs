@@ -123,7 +123,6 @@ namespace ProcedureNet7
                                     SELECT
                                         Valori_calcolati.Anno_accademico
                                         ,Valori_calcolati.Num_domanda
-                                        ,Valori_calcolati.Anno_corso
                                         ,Valori_calcolati.Status_sede
                                     FROM
                                         Valori_calcolati INNER JOIN MaxValoriCalcolati ON Valori_calcolati.Num_domanda = MaxValoriCalcolati.Num_domanda AND Valori_calcolati.Anno_accademico = MaxValoriCalcolati.Anno_accademico
@@ -196,6 +195,7 @@ namespace ProcedureNet7
                                         ,i.cod_facolta AS facolta
                                         ,i.cod_sede_studi AS sede_studi
                                         ,i.conferma_semestre_filtro
+                                        ,i.anno_corso
                                     FROM
                                         iscrizioni i
                                         INNER JOIN MaxIscrizioni mdv ON i.anno_accademico = mdv.anno_accademico AND i.cod_fiscale = mdv.cod_fiscale AND i.data_validita = mdv.MaxDataValidita
@@ -239,7 +239,6 @@ namespace ProcedureNet7
                                         ,EsitiConcorsiTotali.Cod_beneficio
                                         ,EsitiConcorsiTotali.Imp_beneficio
 	                                    ,ValoriCalcolatiTotali.Status_sede
-                                        ,ValoriCalcolatiTotali.Anno_corso
 	                                    ,AppartenenzaTotali.Cod_ente
 	                                    ,DatiGeneraliDomTotali.Tipo_studente
                                         ,DatiGeneraliDomTotali.Invalido
@@ -293,7 +292,7 @@ namespace ProcedureNet7
 		                            ,EsitiTotali.Cod_ente
 		                            ,EsitiTotali.Cod_beneficio
                                     ,COALESCE(EsitiTotali.EsitoPA, 0) as EsitoPA
-		                            ,EsitiTotali.Anno_corso
+		                            ,IscrizioniTotali.Anno_corso
 		                            ,invalido AS disabile
 		                            ,esonero_pag_tassa_reg AS esonero_tassa_regionale
 		                            ,imp_beneficio AS imp_beneficio

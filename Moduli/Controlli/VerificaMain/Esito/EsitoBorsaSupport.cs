@@ -497,6 +497,20 @@ namespace ProcedureNet7
 
         private static readonly string[] PreferredBenefitOrder = { "BS", "PA", "CS", "CM", "CT", "CI" };
 
+        public static IReadOnlyList<string> GetRequestedBenefitCodes(EsitoBorsaFacts? facts)
+        {
+            if (facts == null || facts.BeneficiRichiesti.Count == 0)
+                return Array.Empty<string>();
+
+            return facts.BeneficiRichiesti
+                .Where(beneficio => !string.IsNullOrWhiteSpace(beneficio))
+                .Select(NormalizeUpper)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(GetBenefitSortOrder)
+                .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
         public static IReadOnlyList<string> GetBenefitCodes(VerificaPipelineContext pipeline, StudentKey key, EsitoBorsaFacts? facts)
         {
             var items = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

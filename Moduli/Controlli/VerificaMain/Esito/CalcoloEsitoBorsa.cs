@@ -34,7 +34,7 @@ namespace ProcedureNet7
                 Reset(info);
 
                 context.EsitoBorsaFactsByStudent.TryGetValue(pair.Key, out var facts);
-                var benefitCodes = EsitoBorsaSupport.GetBenefitCodes(context, pair.Key, facts);
+                var benefitCodes = EsitoBorsaSupport.GetRequestedBenefitCodes(facts);
                 var results = new System.Collections.Generic.Dictionary<string, EsitoBeneficioCalcolato>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var codBeneficio in benefitCodes)
