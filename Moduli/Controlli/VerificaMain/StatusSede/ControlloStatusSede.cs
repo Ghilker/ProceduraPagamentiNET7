@@ -343,12 +343,35 @@ namespace ProcedureNet7
                 int mesi = CoveredMonths(effStart, effEnd);
                 if (mesi < min)
                 {
-                    if (referenceDate.Date <= dom.DataScadenza.Date.AddDays(30))
+                    bool haBuchiInizialiRilevanti = false;
+                    if (effStart > aaStart)
+                    {
+                        DateTime periodoScopertoFine = effStart.AddDays(-1);
+                        haBuchiInizialiRilevanti = CoveredMonths(aaStart, periodoScopertoFine) > 0;
+                    }
+
+                    bool finestraProrogaApplicabile =
+                        !haBuchiInizialiRilevanti
+                        && dom.DataScadenza.Date < aaEnd.Date
+                        && referenceDate.Date <= dom.DataScadenza.Date.AddDays(30);
+
+                    if (finestraProrogaApplicabile)
                     {
                         return new DomResult(
                             true,
                             true,
                             $"Valido in finestra proroga 30 giorni (mesi coperti={mesi}, minimo={min}, scadenza={dom.DataScadenza:dd/MM/yyyy})",
+                            comuneDom,
+                            tipoEnte,
+                            source);
+                    }
+
+                    if (haBuchiInizialiRilevanti && dom.DataScadenza.Date >= aaEnd.Date)
+                    {
+                        return new DomResult(
+                            true,
+                            false,
+                            $"Mesi coperti {mesi} < minimo {min}: copertura concentrata sugli ultimi mesi dell'AA e non prorogabile oltre il termine annuale ({aaEnd:dd/MM/yyyy})",
                             comuneDom,
                             tipoEnte,
                             source);

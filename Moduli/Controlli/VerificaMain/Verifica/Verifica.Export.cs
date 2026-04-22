@@ -1,4 +1,4 @@
-﻿using ProcedureNet7.Storni;
+using ProcedureNet7.Storni;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -97,7 +97,6 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("RipetenteDaPassaggioMerito", typeof(bool));
             dt.Columns.Add("PrimaImmatricolazTsMerito", typeof(int));
             dt.Columns.Add("RichiestaCSMerito", typeof(bool));
-            dt.Columns.Add("NubileProleMerito", typeof(bool));
             dt.Columns.Add("RegolaMeritoApplicata", typeof(string));
             dt.Columns.Add("FaseElaborativaVerifica", typeof(string));
             dt.Columns.Add("TipoStudenteNormalizzato", typeof(int));
@@ -249,7 +248,6 @@ namespace ProcedureNet7.Verifica
             row["RipetenteDaPassaggioMerito"] = ripetenteDaPassaggio;
             row["PrimaImmatricolazTsMerito"] = facts?.PrimaImmatricolazTs ?? (object)DBNull.Value;
             row["RichiestaCSMerito"] = facts?.RichiestaCS == true;
-            row["NubileProleMerito"] = facts?.NubileProle == true;
             row["RegolaMeritoApplicata"] = iscr.RegolaMeritoApplicata ?? "";
             row["FaseElaborativaVerifica"] = context.FaseElaborativa.ToString();
             SetIfHasValue(row, "TipoStudenteNormalizzato", facts?.TipoStudenteNormalizzato);

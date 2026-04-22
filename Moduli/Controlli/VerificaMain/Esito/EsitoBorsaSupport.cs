@@ -26,7 +26,6 @@ namespace ProcedureNet7
             { "GEN088", "Domanda non validabile nella fase elaborativa corrente" },
             { "GEN093", "Iscrizione fuori termine" },
             { "GEN094", "Domanda non trasmessa" },
-            { "GENSIG", "Domanda non firmata" },
             { "GENDOC", "Documento di riconoscimento mancante" },
             { "RED001", "Conferma del reddito mancante" },
             { "RED011", "Valore ISEE assente o non valido" },
@@ -328,91 +327,6 @@ namespace ProcedureNet7
 
             return 0;
         }
-
-        public static bool IsEnte(InformazioniIscrizione iscr, string codEnte)
-            => string.Equals((iscr?.CodEnte ?? string.Empty).Trim(), (codEnte ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
-
-        public static decimal? GetEsamiMinimiRichiesti(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
-        {
-            if (context?.Pipeline == null || iscr == null)
-                return null;
-
-            int annoCorsoCalcolato = GetAnnoCorsoCalcolato(context);
-            if (annoCorsoCalcolato == 0 || annoCorsoCalcolato == 1)
-                return 0m;
-
-            string codOrd = NormalizeUpper(context.Facts.CodTipoOrdinamento);
-            string annoAccadInizio = !string.IsNullOrWhiteSpace(iscr.AnnoAccadInizioCorso)
-                ? iscr.AnnoAccadInizioCorso
-                : (iscr.AnnoImmatricolazione?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
-
-            decimal totaleEsami = annoCorsoCalcolato < 0
-                ? context.Pipeline.EsamiCatalog.GetTotal(iscr.CodCorsoLaurea, codOrd, annoAccadInizio)
-                : context.Pipeline.EsamiCatalog.GetSumBeforeYear(iscr.CodCorsoLaurea, codOrd, annoAccadInizio, annoCorsoCalcolato);
-
-            if (totaleEsami <= 0m)
-                return null;
-
-            bool corsoNormale = !NormalizeUpper(iscr.CodCorsoLaurea).StartsWith("Q00", StringComparison.Ordinal)
-                               && !NormalizeUpper(iscr.CodCorsoLaurea).StartsWith("U00", StringComparison.Ordinal)
-                               && NormalizeUpper(iscr.CodSedeStudi) != "P"
-                               && NormalizeUpper(iscr.CodSedeStudi) != "O";
-
-            decimal richiesti;
-            switch (annoCorsoCalcolato)
-            {
-                case 2:
-                    richiesti = corsoNormale ? (totaleEsami > 4m ? 2m : 1m) : totaleEsami;
-                    break;
-
-                case 3:
-                case 4:
-                case 5:
-                case 6:
-                    if (corsoNormale)
-                    {
-                        bool isUltimoAnno = annoCorsoCalcolato == GetDurataNormaleCorso(iscr);
-                        richiesti = isUltimoAnno ? Math.Floor(totaleEsami * 0.6m) : Math.Floor(totaleEsami / 2m) + 1m;
-                    }
-                    else
-                    {
-                        richiesti = totaleEsami;
-                    }
-                    break;
-
-                case -1:
-                    richiesti = !NormalizeUpper(iscr.CodCorsoLaurea).StartsWith("U00", StringComparison.Ordinal)
-                                && NormalizeUpper(iscr.CodSedeStudi) != "P"
-                                && NormalizeUpper(iscr.CodSedeStudi) != "O"
-                        ? Math.Floor(totaleEsami * 0.66m)
-                        : totaleEsami;
-                    break;
-
-                case -2:
-                    richiesti = Math.Floor(totaleEsami * 0.9m);
-                    break;
-
-                case -3:
-                    richiesti = Math.Floor(totaleEsami * 1.063636363m);
-                    break;
-
-                case -4:
-                    richiesti = Math.Floor(totaleEsami * 1.227272727m);
-                    break;
-
-                default:
-                    richiesti = 0m;
-                    break;
-            }
-
-            if (context.Invalido)
-                richiesti = Math.Floor(richiesti * 0.55m);
-            else if (context.Facts.NubileProle == true)
-                richiesti = Math.Floor(richiesti * 0.9m);
-
-            return richiesti;
-        }
-
 
         public static decimal GetIseeRiferimento(StudenteInfo info)
         {

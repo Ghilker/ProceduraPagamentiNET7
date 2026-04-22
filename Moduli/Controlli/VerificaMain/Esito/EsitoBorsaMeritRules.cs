@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using ProcedureNet7.Verifica;
 
 namespace ProcedureNet7
@@ -226,13 +226,35 @@ namespace ProcedureNet7
             if (context?.Pipeline?.CreditiRichiestiCatalog == null || iscr == null)
                 return 0m;
 
+            int annoCatalogo = NormalizeAnnoCorsoCreditiRichiesti(iscr, anno);
+
             return context.Pipeline.CreditiRichiestiCatalog.Resolve(
                        iscr.TipoCorso,
-                       anno,
+                       annoCatalogo,
                        invalido,
                        iscr.CodCorsoLaurea,
                        iscr.CodSedeStudi)
                    ?? 0m;
+        }
+
+        private static int NormalizeAnnoCorsoCreditiRichiesti(InformazioniIscrizione iscr, int anno)
+        {
+            if (iscr == null)
+                return anno;
+
+            if (iscr.TipoCorso != 4)
+                return anno;
+
+            int durataLegale = EsitoBorsaSupport.GetDurataNormaleCorso(iscr);
+            if (durataLegale != 5)
+                return anno;
+
+            return anno switch
+            {
+                -1 => 6,
+                <= -2 => anno + 1,
+                _ => anno
+            };
         }
 
         private static void ResetCreditiUtilizzatiSeBonusNonRichiesto(InformazioniIscrizione iscr)
@@ -250,12 +272,14 @@ namespace ProcedureNet7
             if (crediti <= 0m)
                 return false;
 
+            int durataLegale = EsitoBorsaSupport.GetDurataNormaleCorso(iscr);
+
             return iscr.TipoCorso switch
             {
                 5 => crediti > 120m,
                 3 => crediti >= 180m,
-                4 when EsitoBorsaSupport.GetDurataNormaleCorso(iscr) >= 6 => crediti >= 360m,
-                4 => crediti >= 300m,
+                4 when durataLegale == 5 => crediti >= 300m,
+                4 when durataLegale == 6 => crediti >= 360m,
                 _ => false
             };
         }

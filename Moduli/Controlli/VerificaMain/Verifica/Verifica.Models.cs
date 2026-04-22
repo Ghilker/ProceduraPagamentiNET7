@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
@@ -47,12 +47,10 @@ namespace ProcedureNet7.Verifica
         public bool RinunciaBorsa { get; set; }
         public string CodTipoOrdinamento { get; set; } = string.Empty;
 
-        public bool? CartaceoInviato { get; set; }
         public bool? IscrizioneFuoriTermine { get; set; }
         public bool? PermessoSoggiorno { get; set; }
         public bool? RinunciaBenefici { get; set; }
         public bool? DomandaTrasmessa { get; set; }
-        public bool? DomandaTrasmessaPin { get; set; }
         public int? StatusIsee { get; set; }
         public string TipoCertificazione { get; set; } = string.Empty;
         public bool? TitoloAccademicoConseguito { get; set; }

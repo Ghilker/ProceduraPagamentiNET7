@@ -29,7 +29,6 @@ namespace ProcedureNet7
             if (facts.DomandaTrasmessa == false)
             {
                 evaluation.Add("GEN001");
-                evaluation.Add("GEN094");
             }
 
             ApplyPhaseSensitiveRules(context, evaluation);
@@ -57,22 +56,11 @@ namespace ProcedureNet7
 
         private static void ApplyPhaseSensitiveRules(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
-            var facts = context.Facts;
-
-            switch (context.Pipeline.FaseElaborativa)
+            if (context.Pipeline.FaseElaborativa == VerificaFaseElaborativa.GraduatorieProvvisorie
+                || context.Pipeline.FaseElaborativa == VerificaFaseElaborativa.GraduatorieDefinitive)
             {
-                case VerificaFaseElaborativa.GraduatorieProvvisorie:
-                    if (facts.DomandaTrasmessaPin == false)
-                        evaluation.Add("GEN088");
-                    break;
-
-                case VerificaFaseElaborativa.GraduatorieDefinitive:
-                    if (facts.CartaceoInviato == false)
-                    {
-                        evaluation.Add("GEN088");
-                        break;
-                    }
-                    break;
+                if (context.Facts.DomandaTrasmessa == false)
+                    evaluation.Add("GEN088");
             }
         }
 

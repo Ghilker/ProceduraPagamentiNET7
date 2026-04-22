@@ -1,4 +1,4 @@
-﻿using ProcedureNet7.Verifica;
+using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -725,17 +725,11 @@ CP_AT AS
 SELECT
     D.NumDomanda,
     D.CodFiscale,
-    CAST(CASE
-            WHEN ISNULL(SC.StatusCompilazione, 0) >= 90 THEN 1
-            ELSE 0 END AS BIT) AS CartaceoInviato,
     DG.IscrizioneFuoriTermine,
     CAST(CASE WHEN ISNULL(DG.PermessoSoggiorno, CAST(0 AS BIT)) = 1 OR ISNULL(DG.PermessoSoggProvv, CAST(0 AS BIT)) = 1 THEN 1 ELSE 0 END AS BIT) AS PermessoSoggiorno,
     CAST(CASE
             WHEN ISNULL(SC.StatusCompilazione, 0) >= 90 THEN 1
             ELSE 0 END AS BIT) AS DomandaTrasmessa,
-    CAST(CASE
-            WHEN ISNULL(SC.StatusCompilazione, 0) >= 90 THEN 1
-            ELSE 0 END AS BIT) AS DomandaTrasmessaPin,
     ISNULL(VC.StatusIsee, 0) AS StatusIsee,
     ISNULL(CERT.TipoCertificazione, '') AS TipoCertificazione,
     CAST(CASE WHEN ISNULL(CP_CD.RigaValida, 1) = 0 THEN 1 ELSE 0 END AS BIT) AS TitoloAccademicoConseguito,
@@ -790,11 +784,9 @@ OPTION (RECOMPILE);";
                 var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
                 var facts = GetOrCreateEsitoBorsaFacts(context, key);
 
-                facts.CartaceoInviato = GetNullableBool(reader, "CartaceoInviato");
                 facts.IscrizioneFuoriTermine = GetNullableBool(reader, "IscrizioneFuoriTermine");
                 facts.PermessoSoggiorno = GetNullableBool(reader, "PermessoSoggiorno");
                 facts.DomandaTrasmessa = GetNullableBool(reader, "DomandaTrasmessa");
-                facts.DomandaTrasmessaPin = GetNullableBool(reader, "DomandaTrasmessaPin");
                 facts.StatusIsee = GetNullableInt(reader, "StatusIsee");
                 facts.TipoCertificazione = reader.SafeGetString("TipoCertificazione").Trim();
                 facts.TipoStudenteNormalizzato = GetNullableInt(reader, "TipoStudenteNormalizzato");

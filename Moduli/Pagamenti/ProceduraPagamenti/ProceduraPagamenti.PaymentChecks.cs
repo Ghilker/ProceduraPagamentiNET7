@@ -2308,7 +2308,7 @@ namespace ProcedureNet7
                             importoDaPagare = importoMassimo * 0.5;
                             importoMassimo *= 0.5;
 
-                            if (studente.InformazioniBeneficio.HaServizioSanitario)
+                            if (studente.InformazioniBeneficio.HaServizioSanitario && DateTime.Today < new DateTime(int.Parse(currentYear), 12, 27))
                             {
                                 importoDaPagare -= 100;
                                 importoMassimo -= 100;

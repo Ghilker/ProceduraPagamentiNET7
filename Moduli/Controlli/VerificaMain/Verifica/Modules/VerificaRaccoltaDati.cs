@@ -1,4 +1,4 @@
-﻿using ProcedureNet7.Verifica;
+using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
 using System.Data;
