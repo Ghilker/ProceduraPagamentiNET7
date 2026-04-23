@@ -600,45 +600,6 @@ RES AS
        AND r.ANNO_ACCADEMICO = @AA
        AND r.TIPO_BANDO = 'LZ'
 ),
-VC_RANKED AS
-(
-    SELECT
-        vc.NUM_DOMANDA AS NumDomanda,
-        TRY_CONVERT(INT, vc.STATUS_ISEE) AS StatusIsee,
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY vc.NUM_DOMANDA
-            ORDER BY vc.DATA_VALIDITA DESC
-        ) AS RN
-    FROM VALORI_CALCOLATI vc
-    INNER JOIN D
-        ON D.NumDomanda = vc.NUM_DOMANDA
-),
-VC AS
-(
-    SELECT
-        NumDomanda,
-        StatusIsee
-    FROM VC_RANKED
-    WHERE RN = 1
-),
-CERT AS
-(
-    SELECT
-        D.NumDomanda,
-        CASE
-            WHEN MAX(CASE WHEN UPPER(ISNULL(ci.Cod_tipo_attestazione, '')) = 'UNIVERSITARIO' THEN 1 ELSE 0 END) = 1 THEN 'UNIV'
-            WHEN MAX(CASE WHEN UPPER(ISNULL(ci.Cod_tipo_attestazione, '')) = 'RIDOTTO' THEN 1 ELSE 0 END) = 1 THEN 'RID'
-            WHEN MAX(CASE WHEN ISNULL(ci.Cod_tipo_attestazione, '') <> '' THEN 1 ELSE 0 END) = 1 THEN 'ORD'
-            ELSE ''
-        END AS TipoCertificazione
-    FROM D
-    LEFT JOIN vCertificaz_ISEE ci
-        ON ci.anno_accademico = @AA
-       AND ci.num_domanda = D.NumDomanda
-       AND ci.Tipologia_certificazione = 'CO'
-    GROUP BY D.NumDomanda
-),
 CP_CD_RANKED AS
 (
     SELECT
@@ -730,8 +691,6 @@ SELECT
     CAST(CASE
             WHEN ISNULL(SC.StatusCompilazione, 0) >= 90 THEN 1
             ELSE 0 END AS BIT) AS DomandaTrasmessa,
-    ISNULL(VC.StatusIsee, 0) AS StatusIsee,
-    ISNULL(CERT.TipoCertificazione, '') AS TipoCertificazione,
     CAST(CASE WHEN ISNULL(CP_CD.RigaValida, 1) = 0 THEN 1 ELSE 0 END AS BIT) AS TitoloAccademicoConseguito,
     CAST(CASE WHEN ISNULL(CP_AT.RigaValida, 1) = 0 THEN 1 ELSE 0 END AS BIT) AS AttesaTitoloAccademicoConseguito,
     CASE
@@ -768,10 +727,6 @@ LEFT JOIN CIT
     ON CIT.NumDomanda = D.NumDomanda
 LEFT JOIN RES
     ON RES.NumDomanda = D.NumDomanda
-LEFT JOIN VC
-    ON VC.NumDomanda = D.NumDomanda
-LEFT JOIN CERT
-    ON CERT.NumDomanda = D.NumDomanda
 LEFT JOIN CP_CD
     ON CP_CD.NumDomanda = D.NumDomanda
 LEFT JOIN CP_AT
@@ -787,8 +742,6 @@ OPTION (RECOMPILE);";
                 facts.IscrizioneFuoriTermine = GetNullableBool(reader, "IscrizioneFuoriTermine");
                 facts.PermessoSoggiorno = GetNullableBool(reader, "PermessoSoggiorno");
                 facts.DomandaTrasmessa = GetNullableBool(reader, "DomandaTrasmessa");
-                facts.StatusIsee = GetNullableInt(reader, "StatusIsee");
-                facts.TipoCertificazione = reader.SafeGetString("TipoCertificazione").Trim();
                 facts.TipoStudenteNormalizzato = GetNullableInt(reader, "TipoStudenteNormalizzato");
                 facts.TitoloAccademicoConseguito = GetNullableBool(reader, "TitoloAccademicoConseguito");
                 facts.AttesaTitoloAccademicoConseguito = GetNullableBool(reader, "AttesaTitoloAccademicoConseguito");

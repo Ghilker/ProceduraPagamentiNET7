@@ -32,7 +32,7 @@ namespace ProcedureNet7
 
         private void ExecuteEconomiciCollectionPipeline(string aa, string pipelineTableName, Action<int, string> log)
         {
-            log(18, "Caricamento valori attuali da vValori_calcolati.");
+            log(18, "Caricamento valori attuali da Valori_calcolati con ultimo max data_validita.");
             LoadValoriCalcolatiAttuali(aa, pipelineTableName);
 
             LoadCalcParams(aa);
@@ -57,6 +57,23 @@ namespace ProcedureNet7
             log(70, $"Raccolta dati economici completata. Studenti nel contesto: {CurrentStudents.Count}");
         }
 
+        private static DateTime GetFirmataIlMaxPerAa(string aa)
+        {
+            string value = (aa ?? string.Empty).Trim();
+            if (value.Length < 4 || !int.TryParse(value.Substring(0, 4), out int startYear))
+                throw new ArgumentException($"Anno accademico non valido per il cutoff Firmata_il: {aa}", nameof(aa));
+
+            return new DateTime(startYear, 12, 31);
+        }
+
+        private static void AddFirmataIlMaxParameter(SqlCommand command, string aa)
+        {
+            if (command == null)
+                throw new ArgumentNullException(nameof(command));
+
+            command.Parameters.Add("@FirmataIlMax", SqlDbType.DateTime).Value = GetFirmataIlMaxPerAa(aa);
+        }
+
         private void LoadInpsAndAttestazioni_StoredLike(string aa, string sourceTableName)
         {
             sourceTableName = ResolveTempTableName(sourceTableName);
@@ -72,34 +89,72 @@ FROM {sourceTableName} t
 OUTER APPLY
 (
     SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsOrigine
-    FROM vStatus_INPS si
+    FROM Status_INPS si
     WHERE si.anno_accademico = @AA
       AND si.cod_fiscale = t.CodFiscale
       AND si.num_domanda = t.NumDomanda
       AND si.data_fine_validita IS NULL
       AND si.tipo_certificaz NOT IN ('CI','DI')
+      AND si.data_validita =
+      (
+          SELECT MAX(si2.data_validita)
+          FROM Status_INPS si2
+          WHERE si2.anno_accademico = si.anno_accademico
+            AND si2.cod_fiscale = si.cod_fiscale
+            AND si2.num_domanda = si.num_domanda
+            AND si2.tipo_certificaz = si.tipo_certificaz
+            AND si2.data_fine_validita IS NULL
+      )
 ) sio
 OUTER APPLY
 (
     SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsIntegrazione
-    FROM vStatus_INPS si
+    FROM Status_INPS si
     WHERE si.anno_accademico = @AA
       AND si.cod_fiscale = t.CodFiscale
       AND si.num_domanda = t.NumDomanda
       AND si.data_fine_validita IS NULL
       AND si.tipo_certificaz IN ('CI','DI')
+      AND si.data_validita =
+      (
+          SELECT MAX(si2.data_validita)
+          FROM Status_INPS si2
+          WHERE si2.anno_accademico = si.anno_accademico
+            AND si2.cod_fiscale = si.cod_fiscale
+            AND si2.num_domanda = si.num_domanda
+            AND si2.tipo_certificaz = si.tipo_certificaz
+            AND si2.data_fine_validita IS NULL
+      )
 ) sii
 OUTER APPLY
 (
-    SELECT MAX(CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))), '') IS NULL THEN 0 ELSE 1 END) AS CoAttestazioneOk
-    FROM vCertificaz_ISEE cte
+    SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
+    FROM ISCRIZIONI i
+    WHERE i.COD_FISCALE = t.CodFiscale
+      AND i.ANNO_ACCADEMICO = @AA
+      AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
+    ORDER BY i.DATA_VALIDITA DESC
+) semf
+OUTER APPLY
+(
+    SELECT TOP 1 CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))), '') IS NULL THEN 0 ELSE 1 END AS CoAttestazioneOk
+    FROM Certificaz_ISEE cte
     WHERE cte.Anno_accademico = @AA
       AND cte.Num_domanda = t.NumDomanda
       AND cte.tipologia_certificazione = 'CO'
+      AND (
+            ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
+            OR cte.firmata_il <= @FirmataIlMax
+          )
+    ORDER BY
+        CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
+        cte.data_validita DESC
 ) att;";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
+            AddFirmataIlMaxParameter(command, aa);
             ReadAndMergeSingleDto(
                 command,
                 reader => ReadStudentKey(reader),
@@ -135,6 +190,7 @@ WHERE Anno_accademico = @AA;";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             if (reader.Read())
@@ -162,12 +218,20 @@ SELECT
     ISNULL(nf.Cod_tipologia_nucleo, '') AS Cod_tipologia_nucleo,
     ISNULL(nf.Numero_conviventi_estero, 0) AS Numero_conviventi_estero
 FROM {sourceTableName} t
-INNER JOIN vNucleo_familiare nf
+INNER JOIN Nucleo_familiare nf
     ON nf.Anno_accademico = @AA
-   AND nf.Num_domanda     = t.NumDomanda;";
+   AND nf.Num_domanda     = t.NumDomanda
+   AND nf.data_validita =
+   (
+       SELECT MAX(nf2.data_validita)
+       FROM Nucleo_familiare nf2
+       WHERE nf2.Anno_accademico = nf.Anno_accademico
+         AND nf2.Num_domanda = nf.Num_domanda
+   );";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -216,39 +280,89 @@ INNER JOIN vNucleo_familiare nf
         ISNULL(sii.StatusInpsIntegrazione, 0) AS StatusInpsIntegrazione,
         ISNULL(att.CoAttestazioneOk, 0) AS CoAttestazioneOk
     FROM {pipelineTableName} t
-    LEFT JOIN vTipologie_redditi tr
+    LEFT JOIN Tipologie_redditi tr
         ON tr.Anno_accademico = @AA
        AND tr.Num_domanda = t.NumDomanda
-    LEFT JOIN vNucleo_familiare nf
+       AND tr.data_validita =
+       (
+           SELECT MAX(tr2.data_validita)
+           FROM Tipologie_redditi tr2
+           WHERE tr2.Anno_accademico = tr.Anno_accademico
+             AND tr2.Num_domanda = tr.Num_domanda
+       )
+    LEFT JOIN Nucleo_familiare nf
         ON nf.Anno_accademico = @AA
        AND nf.Num_domanda = t.NumDomanda
+       AND nf.data_validita =
+       (
+           SELECT MAX(nf2.data_validita)
+           FROM Nucleo_familiare nf2
+           WHERE nf2.Anno_accademico = nf.Anno_accademico
+             AND nf2.Num_domanda = nf.Num_domanda
+       )
     OUTER APPLY
     (
         SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsOrigine
-        FROM vStatus_INPS si
+        FROM Status_INPS si
         WHERE si.anno_accademico = @AA
           AND si.cod_fiscale = t.CodFiscale
           AND si.num_domanda = t.NumDomanda
           AND si.data_fine_validita IS NULL
           AND si.tipo_certificaz NOT IN ('CI','DI')
+          AND si.data_validita =
+          (
+              SELECT MAX(si2.data_validita)
+              FROM Status_INPS si2
+              WHERE si2.anno_accademico = si.anno_accademico
+                AND si2.cod_fiscale = si.cod_fiscale
+                AND si2.num_domanda = si.num_domanda
+                AND si2.tipo_certificaz = si.tipo_certificaz
+                AND si2.data_fine_validita IS NULL
+          )
     ) sio
     OUTER APPLY
     (
         SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsIntegrazione
-        FROM vStatus_INPS si
+        FROM Status_INPS si
         WHERE si.anno_accademico = @AA
           AND si.cod_fiscale = t.CodFiscale
           AND si.num_domanda = t.NumDomanda
           AND si.data_fine_validita IS NULL
           AND si.tipo_certificaz IN ('CI','DI')
+          AND si.data_validita =
+          (
+              SELECT MAX(si2.data_validita)
+              FROM Status_INPS si2
+              WHERE si2.anno_accademico = si.anno_accademico
+                AND si2.cod_fiscale = si.cod_fiscale
+                AND si2.num_domanda = si.num_domanda
+                AND si2.tipo_certificaz = si.tipo_certificaz
+                AND si2.data_fine_validita IS NULL
+          )
     ) sii
     OUTER APPLY
     (
-        SELECT MAX(CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))), '') IS NULL THEN 0 ELSE 1 END) AS CoAttestazioneOk
-        FROM vCertificaz_ISEE cte
+        SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
+        FROM ISCRIZIONI i
+        WHERE i.COD_FISCALE = t.CodFiscale
+          AND i.ANNO_ACCADEMICO = @AA
+          AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
+        ORDER BY i.DATA_VALIDITA DESC
+    ) semf
+    OUTER APPLY
+    (
+        SELECT TOP 1 CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))), '') IS NULL THEN 0 ELSE 1 END AS CoAttestazioneOk
+        FROM Certificaz_ISEE cte
         WHERE cte.Anno_accademico = @AA
           AND cte.Num_domanda = t.NumDomanda
           AND cte.tipologia_certificazione = 'CO'
+          AND (
+                ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
+                OR cte.firmata_il <= @FirmataIlMax
+              )
+        ORDER BY
+            CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
+            cte.data_validita DESC
     ) att
 ),
 Flags AS
@@ -280,6 +394,8 @@ INNER JOIN Flags f
                 CommandTimeout = 9999999
             };
             AddAaParameter(command, CurrentContext.AnnoAccademico);
+            AddDataValiditaMaxParameter(command, CurrentContext.AnnoAccademico);
+            AddFirmataIlMaxParameter(command, CurrentContext.AnnoAccademico);
             command.ExecuteNonQuery();
         }
 
@@ -305,12 +421,35 @@ WITH sumPagamenti AS (
 ),
 impAltreBorse AS (
     SELECT vb.num_domanda, vb.anno_accademico, SUM(vb.importo_borsa) AS importo_borsa
-    FROM vimporti_borsa_percepiti vb
+    FROM Importi_borsa_percepiti vb
     INNER JOIN Allegati a ON vb.anno_accademico = a.anno_accademico AND vb.num_domanda = a.num_domanda
-    INNER JOIN vstatus_allegati vs ON a.id_allegato = vs.id_allegato
+    INNER JOIN Status_allegati vs ON a.id_allegato = vs.id_allegato
     WHERE vb.data_fine_validita IS NULL
+      AND vb.data_validita =
+      (
+          SELECT MAX(vb2.data_validita)
+          FROM Importi_borsa_percepiti vb2
+          WHERE vb2.anno_accademico = vb.anno_accademico
+            AND vb2.num_domanda = vb.num_domanda
+            AND vb2.data_fine_validita IS NULL
+      )
       AND a.data_fine_validita IS NULL
+      AND a.data_validita =
+      (
+          SELECT MAX(a2.data_validita)
+          FROM Allegati a2
+          WHERE a2.id_allegato = a.id_allegato
+            AND a2.data_fine_validita IS NULL
+      )
       AND a.cod_tipo_allegato = '07'
+      AND vs.data_fine_validita IS NULL
+      AND vs.data_validita =
+      (
+          SELECT MAX(vs2.data_validita)
+          FROM Status_allegati vs2
+          WHERE vs2.id_allegato = vs.id_allegato
+            AND vs2.data_fine_validita IS NULL
+      )
       AND vs.cod_status IN ('03','05')
       AND vb.anno_accademico = @AA
     GROUP BY vb.num_domanda, vb.anno_accademico
@@ -336,13 +475,34 @@ SELECT
     ISNULL(cte.patr_imm_50_frat_sor,0) AS patr_imm_50_frat_sor
 FROM {sourceTableName} t
 INNER JOIN Domanda d ON d.Anno_accademico = @AA AND d.Num_domanda = t.NumDomanda
-INNER JOIN vCertificaz_ISEE cte
-    ON cte.Anno_accademico = @AA
-   AND cte.Num_domanda     = t.NumDomanda
-   AND cte.tipologia_certificazione = 'CO'
+OUTER APPLY
+(
+    SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
+    FROM ISCRIZIONI i
+    WHERE i.COD_FISCALE = t.CodFiscale
+      AND i.ANNO_ACCADEMICO = @AA
+      AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
+    ORDER BY i.DATA_VALIDITA DESC
+) semf
+OUTER APPLY
+(
+    SELECT TOP 1 *
+    FROM Certificaz_ISEE cte
+    WHERE cte.Anno_accademico = @AA
+      AND cte.Num_domanda = t.NumDomanda
+      AND cte.tipologia_certificazione = 'CO'
+      AND (
+            ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
+            OR cte.firmata_il <= @FirmataIlMax
+          )
+    ORDER BY
+        CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
+        cte.data_validita DESC
+) cte
 LEFT JOIN sumPagamenti sp ON t.CodFiscale = sp.Cod_fiscale
 LEFT JOIN impAltreBorse iab ON t.NumDomanda = iab.num_domanda AND @AA = iab.anno_accademico
-WHERE t.IsOrigIT_CO = 1;";
+WHERE t.IsOrigIT_CO = 1
+  AND cte.Num_domanda IS NOT NULL;";
 
             var dtoMap = new Dictionary<StudentKey, EconomiciOrigineCoDto>(CurrentStudents.Count);
 
@@ -353,6 +513,8 @@ WHERE t.IsOrigIT_CO = 1;";
 
             command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
             command.Parameters.Add("@EseFin", SqlDbType.Int).Value = eseFin;
+            AddDataValiditaMaxParameter(command, aa);
+            AddFirmataIlMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
 
@@ -473,13 +635,23 @@ SELECT
     ISNULL(nf.Redd_lordo_fratell,0) AS Redd_lordo_fratell,
     ISNULL(nf.Patr_mob_fratell,0) AS Patr_mob_fratell
 FROM {sourceTableName} t
-INNER JOIN vNucleo_fam_stranieri_DO nf
+INNER JOIN Nucleo_fam_stranieri nf
     ON nf.Anno_accademico = @AA
    AND nf.Num_domanda     = t.NumDomanda
+   AND nf.Tipologia_redditi = 'DO'
+   AND nf.data_validita =
+   (
+       SELECT MAX(nf2.data_validita)
+       FROM Nucleo_fam_stranieri nf2
+       WHERE nf2.Anno_accademico = nf.Anno_accademico
+         AND nf2.Num_domanda = nf.Num_domanda
+         AND nf2.Tipologia_redditi = nf.Tipologia_redditi
+   )
 WHERE t.IsOrigEE = 1;";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -523,14 +695,37 @@ SELECT
     ISNULL(cte.Redd_fam_50_est,0) AS Redd_fam_50_est,
     ISNULL(cte.patr_imm_50_frat_sor,0) AS patr_imm_50_frat_sor
 FROM {sourceTableName} t
-INNER JOIN vCertificaz_ISEE cte
-    ON cte.Anno_accademico = @AA
-   AND cte.Num_domanda     = t.NumDomanda
-   AND cte.tipologia_certificazione = 'DO'
-WHERE t.IsOrigIT_DO = 1;";
+OUTER APPLY
+(
+    SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
+    FROM ISCRIZIONI i
+    WHERE i.COD_FISCALE = t.CodFiscale
+      AND i.ANNO_ACCADEMICO = @AA
+      AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
+    ORDER BY i.DATA_VALIDITA DESC
+) semf
+OUTER APPLY
+(
+    SELECT TOP 1 *
+    FROM Certificaz_ISEE cte
+    WHERE cte.Anno_accademico = @AA
+      AND cte.Num_domanda = t.NumDomanda
+      AND cte.tipologia_certificazione = 'DO'
+      AND (
+            ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
+            OR cte.firmata_il <= @FirmataIlMax
+          )
+    ORDER BY
+        CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
+        cte.data_validita DESC
+) cte
+WHERE t.IsOrigIT_DO = 1
+  AND cte.Num_domanda IS NOT NULL;";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
+            AddFirmataIlMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -577,14 +772,37 @@ SELECT
     ISNULL(cte.Metri_quadri,0) AS Metri_quadri,
     ISNULL(cte.Redd_fam_50_est,0) AS Redd_fam_50_est
 FROM {sourceTableName} t
-INNER JOIN vCertificaz_ISEE cte
-    ON cte.Anno_accademico = @AA
-   AND cte.Num_domanda     = t.NumDomanda
-   AND cte.tipologia_certificazione = 'CI'
-WHERE t.IsIntIT_CI = 1;";
+OUTER APPLY
+(
+    SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
+    FROM ISCRIZIONI i
+    WHERE i.COD_FISCALE = t.CodFiscale
+      AND i.ANNO_ACCADEMICO = @AA
+      AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
+    ORDER BY i.DATA_VALIDITA DESC
+) semf
+OUTER APPLY
+(
+    SELECT TOP 1 *
+    FROM Certificaz_ISEE cte
+    WHERE cte.Anno_accademico = @AA
+      AND cte.Num_domanda = t.NumDomanda
+      AND cte.tipologia_certificazione = 'CI'
+      AND (
+            ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
+            OR cte.firmata_il <= @FirmataIlMax
+          )
+    ORDER BY
+        CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
+        cte.data_validita DESC
+) cte
+WHERE t.IsIntIT_CI = 1
+  AND cte.Num_domanda IS NOT NULL;";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
+            AddFirmataIlMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -626,13 +844,23 @@ SELECT
     ISNULL(nf.Redd_lordo_fratell,0) AS Redd_lordo_fratell,
     ISNULL(nf.Patr_mob_fratell,0) AS Patr_mob_fratell
 FROM {sourceTableName} t
-INNER JOIN vNucleo_fam_stranieri_DI nf
+INNER JOIN Nucleo_fam_stranieri nf
     ON nf.Anno_accademico = @AA
    AND nf.Num_domanda     = t.NumDomanda
+   AND nf.Tipologia_redditi = 'DI'
+   AND nf.data_validita =
+   (
+       SELECT MAX(nf2.data_validita)
+       FROM Nucleo_fam_stranieri nf2
+       WHERE nf2.Anno_accademico = nf.Anno_accademico
+         AND nf2.Num_domanda = nf.Num_domanda
+         AND nf2.Tipologia_redditi = nf.Tipologia_redditi
+   )
 WHERE t.IsIntDI = 1;";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -665,7 +893,7 @@ WHERE t.IsIntDI = 1;";
         private SplitResult LoadTipologieRedditiAndSplit(string aa, string sourceTableName)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadTipologieRedditiAndSplit", $"AA={aa}");
-            Logger.LogInfo(30, "Esecuzione query tipologie reddito (vTipologie_redditi) + split per studente/domanda.");
+            Logger.LogInfo(30, "Esecuzione query tipologie reddito (Tipologie_redditi con ultimo max data_validita) + split per studente/domanda.");
 
             sourceTableName = ResolveTempTableName(sourceTableName);
             var result = new SplitResult();
@@ -678,13 +906,21 @@ SELECT
     tr.Tipo_redd_nucleo_fam_integr,
     ISNULL(tr.altri_mezzi,0) AS altri_mezzi
 FROM {sourceTableName} t
-INNER JOIN vTipologie_redditi tr
+INNER JOIN Tipologie_redditi tr
     ON tr.Anno_accademico = @AA
    AND tr.Num_domanda     = t.NumDomanda
+   AND tr.data_validita =
+   (
+       SELECT MAX(tr2.data_validita)
+       FROM Tipologie_redditi tr2
+       WHERE tr2.Anno_accademico = tr.Anno_accademico
+         AND tr2.Num_domanda = tr.Num_domanda
+   )
 ;";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
 
             int readCount = 0;
             using var reader = command.ExecuteReader();
@@ -755,12 +991,20 @@ SELECT
     vv.ISPDSU,
     vv.ISEEDSU
 FROM {sourceTableName} t
-LEFT JOIN vValori_calcolati vv
+LEFT JOIN Valori_calcolati vv
     ON vv.Anno_accademico = @AA
-   AND vv.Num_domanda     = t.NumDomanda;";
+   AND vv.Num_domanda     = t.NumDomanda
+   AND vv.data_validita =
+   (
+       SELECT MAX(vv2.data_validita)
+       FROM Valori_calcolati vv2
+       WHERE vv2.Anno_accademico = vv.Anno_accademico
+         AND vv2.Num_domanda = vv.Num_domanda
+   );";
 
             using var command = new SqlCommand(sql, _conn);
             AddAaParameter(command, aa);
+            AddDataValiditaMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
             while (reader.Read())

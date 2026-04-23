@@ -27,6 +27,23 @@ namespace ProcedureNet7
             command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
         }
 
+        private static DateTime GetDataValiditaMaxEconomici(string aa)
+        {
+            string value = (aa ?? string.Empty).Trim();
+            if (value.Length < 4 || !int.TryParse(value.Substring(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out int startYear))
+                throw new ArgumentException($"Anno accademico non valido per cutoff economici: {aa}", nameof(aa));
+
+            return new DateTime(startYear, 12, 31, 23, 59, 59, 997, DateTimeKind.Unspecified);
+        }
+
+        private static void AddDataValiditaMaxParameter(SqlCommand command, string aa)
+        {
+            if (command == null)
+                throw new ArgumentNullException(nameof(command));
+
+            command.Parameters.Add("@DataValiditaMax", SqlDbType.DateTime).Value = GetDataValiditaMaxEconomici(aa);
+        }
+
         private static string NormalizeCf(string? value)
             => Utilities.RemoveAllSpaces((value ?? string.Empty).Trim().ToUpperInvariant());
 

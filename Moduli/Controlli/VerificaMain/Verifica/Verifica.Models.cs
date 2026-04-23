@@ -51,8 +51,6 @@ namespace ProcedureNet7.Verifica
         public bool? PermessoSoggiorno { get; set; }
         public bool? RinunciaBenefici { get; set; }
         public bool? DomandaTrasmessa { get; set; }
-        public int? StatusIsee { get; set; }
-        public string TipoCertificazione { get; set; } = string.Empty;
         public bool? TitoloAccademicoConseguito { get; set; }
         public bool? AttesaTitoloAccademicoConseguito { get; set; }
         public int? TipoStudenteNormalizzato { get; set; }

@@ -330,24 +330,89 @@ namespace ProcedureNet7
 
         public static decimal GetIseeRiferimento(StudenteInfo info)
         {
-            if (TryReadDecimal(info?.InformazioniEconomiche?.Calcolate?.ISEEDSU, out var ordinario) && ordinario > 0m)
-                return ordinario;
-
-            if (TryReadDecimal(info?.InformazioniEconomiche?.Attuali?.ISEEDSU, out var attuale) && attuale > 0m)
-                return attuale;
+            if (TryReadDecimal(info?.InformazioniEconomiche?.Calcolate?.ISEEDSU, out var value))
+                return value;
 
             return 0m;
         }
 
         public static decimal GetIspRiferimento(StudenteInfo info)
         {
-            if (TryReadDecimal(info?.InformazioniEconomiche?.Calcolate?.ISPEDSU, out var ordinario) && ordinario > 0m)
-                return ordinario;
-
-            if (TryReadDecimal(info?.InformazioniEconomiche?.Attuali?.ISPEDSU, out var attuale) && attuale > 0m)
-                return attuale;
+            if (TryReadDecimal(info?.InformazioniEconomiche?.Calcolate?.ISPEDSU, out var value))
+                return value;
 
             return 0m;
+        }
+
+        public static int? GetStatusIseeDaEconomici(StudenteInfo? info, int aaNumero)
+        {
+            var raw = info?.InformazioniEconomiche?.Raw;
+            var calcolate = info?.InformazioniEconomiche?.Calcolate;
+            if (raw == null)
+                return null;
+
+            bool redditoEstero = string.Equals(NormalizeUpper(raw.TipoRedditoOrigine), "EE", StringComparison.OrdinalIgnoreCase);
+            bool integrazioneIt = string.Equals(NormalizeUpper(raw.TipoNucleo), "I", StringComparison.OrdinalIgnoreCase)
+                                 && string.Equals(NormalizeUpper(raw.TipoRedditoIntegrazione), "IT", StringComparison.OrdinalIgnoreCase);
+
+            if (integrazioneIt && raw.StatusInpsIntegrazione == 444)
+                return 13;
+
+            if (integrazioneIt && raw.StatusInpsIntegrazione != 0 && raw.StatusInpsIntegrazione != 2)
+                return 3;
+
+            if (redditoEstero)
+                return 2;
+
+            int statusOrigine = raw.StatusInpsOrigine;
+            if (aaNumero > 20092010 && (statusOrigine == 5 || statusOrigine == 6 || statusOrigine == 7 || statusOrigine == 8 || statusOrigine == 9))
+                statusOrigine = 2;
+
+            if (statusOrigine == 2)
+            {
+                decimal isee = 0m;
+                TryReadDecimal(calcolate?.ISEEDSU, out isee);
+
+                if (string.Equals(NormalizeUpper(raw.TipoRedditoOrigine), "IT", StringComparison.OrdinalIgnoreCase)
+                    && isee == 0m
+                    && raw.OrigineSommaRedditi > 0m)
+                {
+                    return 11;
+                }
+
+                return 2;
+            }
+
+            return statusOrigine;
+        }
+
+        public static bool IsSituazioneEconomicaValidaPerEsito(StudenteInfo? info, int aaNumero)
+        {
+            var raw = info?.InformazioniEconomiche?.Raw;
+            if (raw == null)
+                return false;
+
+            int? statusIsee = GetStatusIseeDaEconomici(info, aaNumero);
+            if (!statusIsee.HasValue || statusIsee.Value == 0)
+                return true;
+
+            if (statusIsee.Value == 11)
+                return true;
+
+            if (statusIsee.Value == 13)
+                return false;
+
+            string tipoOrigine = NormalizeUpper(raw.TipoRedditoOrigine);
+            string origineFonte = NormalizeUpper(raw.OrigineFonte);
+
+            if (string.Equals(tipoOrigine, "EE", StringComparison.OrdinalIgnoreCase))
+                return string.Equals(origineFonte, "EE", StringComparison.OrdinalIgnoreCase);
+
+            if (statusIsee.Value == 2)
+                return string.Equals(origineFonte, "CO", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(origineFonte, "DO", StringComparison.OrdinalIgnoreCase);
+
+            return false;
         }
 
         public static bool TryReadDecimal(object? value, out decimal result)

@@ -29,7 +29,11 @@ namespace ProcedureNet7
 
         private static void ApplyStatusIseeRules(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
-            int? statusIsee = context.Facts.StatusIsee;
+            var info = context.Info;
+            if (info == null)
+                return;
+
+            int? statusIsee = EsitoBorsaSupport.GetStatusIseeDaEconomici(info, context.AaNumero);
             if (!statusIsee.HasValue || statusIsee.Value == 0)
                 return;
 
@@ -39,21 +43,11 @@ namespace ProcedureNet7
                 return;
             }
 
-            string tipoCertificazione = EsitoBorsaSupport.NormalizeUpper(context.Facts.TipoCertificazione);
-            bool redditoEstero = string.Equals((context.Info?.InformazioniEconomiche?.Raw?.TipoRedditoOrigine ?? string.Empty).Trim(), "EE", StringComparison.OrdinalIgnoreCase);
-
-            if (redditoEstero && statusIsee.Value == 2)
+            if (statusIsee.Value == 11)
                 return;
 
-            bool certificazioneValida = tipoCertificazione == "UNIV"
-                                        || tipoCertificazione == "RID"
-                                        || tipoCertificazione == "ORD";
-
-            if ((statusIsee.Value != 2 && statusIsee.Value != 11)
-                || (statusIsee.Value == 2 && !certificazioneValida))
-            {
+            if (!EsitoBorsaSupport.IsSituazioneEconomicaValidaPerEsito(info, context.AaNumero))
                 evaluation.Add("RED086");
-            }
         }
     }
 }
