@@ -37,6 +37,7 @@
             genRevEnteComboBox = new ComboBox();
             label3 = new Label();
             folderBrowserDialog = new FolderBrowserDialog();
+            btnGeneraLettere = new Button();
             SuspendLayout();
             // 
             // label1
@@ -113,12 +114,23 @@
             label3.TabIndex = 39;
             label3.Text = "Ente di Gestione";
             // 
+            // btnGeneraLettere
+            // 
+            btnGeneraLettere.Location = new Point(29, 204);
+            btnGeneraLettere.Name = "btnGeneraLettere";
+            btnGeneraLettere.Size = new Size(180, 35);
+            btnGeneraLettere.TabIndex = 40;
+            btnGeneraLettere.Text = "Genera Lettere Revoche";
+            btnGeneraLettere.UseVisualStyleBackColor = true;
+            btnGeneraLettere.Click += btnGeneraLettere_Click;
+            // 
             // FormGenerazioneFileRevoche
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
+            Controls.Add(btnGeneraLettere);
             Controls.Add(label3);
             Controls.Add(genRevEnteComboBox);
             Controls.Add(genRevAAText);
@@ -145,5 +157,6 @@
         private ComboBox genRevEnteComboBox;
         private Label label3;
         private FolderBrowserDialog folderBrowserDialog;
+        private Button btnGeneraLettere;
     }
 }
