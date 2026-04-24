@@ -1,13 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Data;
 using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ProcedureNet7
@@ -15,39 +9,48 @@ namespace ProcedureNet7
     public partial class FormGenerazioneFileRevoche : Form
     {
         MasterForm? _masterForm;
-        string selectedFolderPath;
+
+        string selectedFolderPath = "";
+
         public FormGenerazioneFileRevoche(MasterForm masterForm)
         {
             _masterForm = masterForm;
+
             InitializeComponent();
             Initialize();
         }
+
         private readonly Dictionary<string, string> genRevEnti = new()
         {
             { "-1", "Tutti gli enti e sedi" },
             { "0", "Roma 1" },
-            { "1", "Roma 2/ Roma 3" },
+            { "1", "Roma 2 / Roma 3" },
             { "2", "Cassino" },
-            { "3", "Viterbo" },
-            };
-        void Initialize()
+            { "3", "Viterbo" }
+        };
+
+        private void Initialize()
         {
             genRevEnteComboBox.Items.Clear();
-            foreach (KeyValuePair<string, string> item in genRevEnti)
+
+            foreach (var item in genRevEnti)
             {
-                _ = genRevEnteComboBox.Items.Add(new { Text = item.Value, Value = item.Key });
+                genRevEnteComboBox.Items.Add(
+                    new { Text = item.Value, Value = item.Key });
             }
 
             genRevEnteComboBox.DisplayMember = "Text";
             genRevEnteComboBox.ValueMember = "Value";
+            genRevEnteComboBox.SelectedIndex = 0;
         }
 
+        // =====================================================
+        // FASE 1
+        // =====================================================
         private void RunProcedureBtnClick(object sender, EventArgs e)
         {
             if (_masterForm == null)
-            {
                 return;
-            }
 
             _masterForm.RunBackgroundWorker(RunGenerazioneFileRevoche);
         }
@@ -56,40 +59,100 @@ namespace ProcedureNet7
         {
             try
             {
-                if (_masterForm == null)
+                dynamic selectedItem = null;
+
+                Invoke(new MethodInvoker(() =>
                 {
-                    throw new Exception("Master form non può essere nullo a questo punto!");
-                }
-                ArgsValidation argsValidation = new ArgsValidation();
-                string selectedEnte = "";
-                _ = Invoke(new MethodInvoker(() =>
-                {
-                    dynamic selectedItem = genRevEnteComboBox.SelectedItem;
-                    selectedEnte = selectedItem?.Value ?? "";
+                    selectedItem = genRevEnteComboBox.SelectedItem;
                 }));
-                ArgsGenerazioneFileRevoche _argsGenerazioneFileRevoche = new ArgsGenerazioneFileRevoche
+
+                string selectedEnte =
+                    selectedItem?.Value?.ToString() ?? "-1";
+
+                var args = new ArgsGenerazioneFileRevoche
                 {
                     _aaGenerazioneRev = genRevAAText.Text,
                     _selectedCodEnte = selectedEnte,
-                    _selectedFolderPath = selectedFolderPath,
+                    _selectedFolderPath = selectedFolderPath
                 };
-                argsValidation.Validate(_argsGenerazioneFileRevoche);
-                GenerazioneFileRevoche GenerazioneFileRevoche = new(_masterForm, mainConnection);
-                GenerazioneFileRevoche.RunProcedure(_argsGenerazioneFileRevoche);
+
+                ArgsValidation validation = new();
+                validation.Validate(args);
+
+                var proc =
+                    new GenerazioneFileRevoche(
+                        _masterForm,
+                        mainConnection);
+
+                proc.RunProcedure(args);
             }
             catch (ValidationException ex)
             {
-                Logger.LogWarning(100, "Errore compilazione procedura: " + ex.Message);
+                Logger.LogWarning(100, ex.Message);
             }
-            catch
+            catch (Exception ex)
             {
-                throw;
+                Logger.LogWarning(100, ex.Message);
             }
         }
 
+        // =====================================================
+        // FASE 2
+        // =====================================================
+        private void btnGeneraLettere_Click(object sender, EventArgs e)
+        {
+            if (_masterForm == null)
+                return;
+
+            using (FolderBrowserDialog dlg = new FolderBrowserDialog())
+            {
+                dlg.Description =
+                    "Seleziona la cartella contenente le revoche generate";
+
+                dlg.UseDescriptionForTitle = true;
+
+                if (dlg.ShowDialog() != DialogResult.OK)
+                    return;
+
+                selectedFolderPath = dlg.SelectedPath;
+            }
+
+            _masterForm.RunBackgroundWorker(
+                RunGenerazioneLettere);
+        }
+
+        private void RunGenerazioneLettere(SqlConnection mainConnection)
+        {
+            try
+            {
+                GenerazioneLettereRevoche proc =
+                    new GenerazioneLettereRevoche(
+                        selectedFolderPath);
+
+                proc.RunProcedure();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(100, ex.Message);
+
+                MessageBox.Show(
+                    ex.Message,
+                    "Errore",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        // =====================================================
+        // CARTELLA
+        // =====================================================
         private void genRevSaveBtn_Click(object sender, EventArgs e)
         {
-            Utilities.ChooseFolder(genRevSaveLbl, folderBrowserDialog, ref selectedFolderPath);
+            Utilities.ChooseFolder(
+                genRevSaveLbl,
+                folderBrowserDialog,
+                ref selectedFolderPath);
         }
+
     }
 }
