@@ -110,99 +110,35 @@ JOIN vBenefici_richiesti vb
   ON vb.Anno_accademico = @AA
  AND vb.Num_domanda = CAST(t.NumDomanda AS INT);";
 
-        private const string EsitoBorsaIscrizioneAlignmentSql = @"
+        private const string EsitoBorsaBlocchiPagamentoSql = @"
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-;WITH D AS
-(
-    SELECT DISTINCT
-        CAST(t.NumDomanda AS INT) AS NumDomanda,
-        t.CodFiscale AS CodFiscale
-    FROM {TEMP_TABLE} t
-),
-MER AS
-(
-    SELECT
-        D.NumDomanda,
-        TRY_CONVERT(INT, m.CARRIERA_INTERR) AS CarrieraInterr,
-        TRY_CONVERT(INT, m.NUM_ANNI_INTERR) AS NumAnniInterr,
-        TRY_CONVERT(DECIMAL(18,2), m.CREDITI_EXTRA_CURRICULARI) AS CreditiExtraCurriculari,
-        TRY_CONVERT(INT, m.MESE_IMMATRICOLAZ) AS MeseImmatricolaz
-    FROM D
-    LEFT JOIN MERITO m
-      ON m.ANNO_ACCADEMICO = @AA
-     AND m.NUM_DOMANDA = D.NumDomanda
-     AND m.DATA_VALIDITA =
-     (
-        SELECT MAX(m2.DATA_VALIDITA)
-        FROM MERITO m2
-        WHERE m2.ANNO_ACCADEMICO = m.ANNO_ACCADEMICO
-          AND m2.NUM_DOMANDA = m.NUM_DOMANDA
-     )
-),
-ISCR AS
-(
-    SELECT
-        D.NumDomanda,
-        TRY_CONVERT(INT, i.SEMESTRE) AS Semestre,
-        TRY_CONVERT(INT, i.RIPETENTE) AS Ripetente
-    FROM D
-    LEFT JOIN ISCRIZIONI i
-      ON i.COD_FISCALE = D.CodFiscale
-     AND i.ANNO_ACCADEMICO = @AA
-     AND i.DATA_VALIDITA =
-     (
-        SELECT MAX(i2.DATA_VALIDITA)
-        FROM ISCRIZIONI i2
-        WHERE i2.COD_FISCALE = i.COD_FISCALE
-          AND i2.ANNO_ACCADEMICO = i.ANNO_ACCADEMICO
-          AND (i2.TIPO_BANDO IS NULL OR i2.TIPO_BANDO LIKE 'L%')
-     )
-),
-TSPASS AS
-(
-    SELECT
-        D.NumDomanda,
-        CAST(1 AS BIT) AS PassaggioTrasferimento,
-        CAST(CASE WHEN ISNULL(ts.RIPETENTE,0) = 1 THEN 1 ELSE 0 END AS BIT) AS RipetenteDaPassaggio,
-        TRY_CONVERT(INT, ts.ANNO_AVVENIMENTO) AS AnnoAvvenimentoTs,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY TRY_CONVERT(INT, ts.ANNO_AVVENIMENTO) DESC, ts.COD_FISCALE) AS rn
-    FROM D
-    INNER JOIN {TS_PASSAGGIO_SOURCE} ts
-      ON ts.ANNO_ACCADEMICO = @AA
-     AND ts.COD_FISCALE = D.CodFiscale
-),
-TSCP AS
-(
-    SELECT
-        D.NumDomanda,
-        TRY_CONVERT(INT, ts.PRIMA_IMMATRICOLAZ) AS PrimaImmatricolazTs,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY ts.DATA_VALIDITA DESC) AS rn
-    FROM D
-    INNER JOIN CARRIERA_PREGRESSA ts
-      ON ts.ANNO_ACCADEMICO = @AA
-     AND ts.COD_FISCALE = D.CodFiscale
-     AND ts.COD_AVVENIMENTO = 'TS'
-)
 SELECT
-    D.NumDomanda,
-    D.CodFiscale,
-    ISNULL(MER.CarrieraInterr, 0) AS CarrieraInterr,
-    ISNULL(MER.NumAnniInterr, 0) AS NumAnniInterr,
-    ISNULL(MER.CreditiExtraCurriculari, 0) AS CreditiExtraCurriculari,
-    ISNULL(MER.MeseImmatricolaz, 0) AS MeseImmatricolaz,
-    ISNULL(ISCR.Semestre, 0) AS Semestre,
-    ISNULL(ISCR.Ripetente, 0) AS Ripetente,
-    ISNULL(TSPASS.PassaggioTrasferimento, CAST(0 AS BIT)) AS PassaggioTrasferimento,
-    ISNULL(TSPASS.RipetenteDaPassaggio, CAST(0 AS BIT)) AS RipetenteDaPassaggio,
-    TSCP.PrimaImmatricolazTs,
-    TSPASS.AnnoAvvenimentoTs
-FROM D
-LEFT JOIN MER ON MER.NumDomanda = D.NumDomanda
-LEFT JOIN ISCR ON ISCR.NumDomanda = D.NumDomanda
-LEFT JOIN TSPASS ON TSPASS.NumDomanda = D.NumDomanda AND TSPASS.rn = 1
-LEFT JOIN TSCP ON TSCP.NumDomanda = D.NumDomanda AND TSCP.rn = 1;";
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    UPPER(LTRIM(RTRIM(ISNULL(mbp.Cod_tipologia_blocco,'')))) AS CodTipologiaBlocco,
+    CASE WHEN ISNULL(TRY_CONVERT(INT, mbp.blocco_pagamento_attivo), 0) = 1 THEN 1 ELSE 0 END AS BloccoPagamentoAttivo
+FROM {TEMP_TABLE} t
+JOIN Motivazioni_blocco_pagamenti mbp
+  ON mbp.Anno_accademico = @AA
+ AND mbp.Num_domanda = CAST(t.NumDomanda AS INT);";
+
+        private const string EsitoBorsaIncongruenzeSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    UPPER(LTRIM(RTRIM(ISNULL(i.Cod_incongruenza,'')))) AS CodIncongruenza,
+    CASE WHEN i.Data_fine_validita IS NULL THEN 1 ELSE 0 END AS IncongruenzaAttiva,
+    UPPER(LTRIM(RTRIM(ISNULL(i.Cod_forzatura,'')))) AS CodForzatura,
+    UPPER(LTRIM(RTRIM(ISNULL(i.EliminataDa,'')))) AS EliminataDa
+FROM {TEMP_TABLE} t
+JOIN Incongruenze i
+  ON i.Anno_accademico = @AA
+ AND i.Num_domanda = CAST(t.NumDomanda AS INT);";
 
         private static readonly string[] CarrieraTitoloAvvenimentoMarkers =
         {
@@ -214,9 +150,11 @@ LEFT JOIN TSCP ON TSCP.NumDomanda = D.NumDomanda AND TSCP.rn = 1;";
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-            context.EsitoBorsaFactsByStudent.Clear();
             foreach (var key in context.Students.Keys)
-                context.EsitoBorsaFactsByStudent[key] = new EsitoBorsaFacts();
+            {
+                if (!context.EsitoBorsaFactsByStudent.ContainsKey(key))
+                    context.EsitoBorsaFactsByStudent[key] = new EsitoBorsaFacts();
+            }
 
             LoadEsitoBorsaForzature(context);
             LoadEsitoBorsaForzatureRinuncia(context);
@@ -227,6 +165,8 @@ LEFT JOIN TSCP ON TSCP.NumDomanda = D.NumDomanda AND TSCP.rn = 1;";
             LoadEsitoBorsaVariazioni(context);
             LoadEsitoBorsaRinunceUfficio(context);
             LoadEsitoBorsaSlashMotiviEsclusione(context);
+            LoadEsitoBorsaBlocchiPagamento(context);
+            LoadEsitoBorsaIncongruenze(context);
             LoadEsitoBorsaRedditoUeFacts(context);
             LoadEsitoBorsaLaureaSpecFacts(context);
             BuildEsitoBorsaPregressaFacts(context);
@@ -312,7 +252,7 @@ LEFT JOIN TSCP ON TSCP.NumDomanda = D.NumDomanda AND TSCP.rn = 1;";
                 return;
 
             string beneficio = NormalizeUpper(codBeneficio);
-            if(rigaValida == 0)
+            if (rigaValida == 0)
             {
                 ApplyVariazione(facts, 2, beneficio);
             }
@@ -428,39 +368,27 @@ LEFT JOIN TSCP ON TSCP.NumDomanda = D.NumDomanda AND TSCP.rn = 1;";
 
         private void LoadEsitoBorsaIscrizioneAlignmentFacts(VerificaPipelineContext context)
         {
-            string tsPassaggioSource = ObjectExists(context.Connection, "vCarriera_pregressa_TS")
-                ? "vCarriera_pregressa_TS"
-                : "(SELECT CAST(NULL AS NVARCHAR(50)) AS COD_FISCALE, CAST(NULL AS NVARCHAR(8)) AS ANNO_ACCADEMICO, CAST(NULL AS INT) AS RIPETENTE, CAST(NULL AS INT) AS ANNO_AVVENIMENTO WHERE 1=0)";
-
-            string sql = EsitoBorsaIscrizioneAlignmentSql.Replace("{TS_PASSAGGIO_SOURCE}", tsPassaggioSource);
-            using var cmd = CreatePopulationCommand(sql, context);
-            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            foreach (var pair in context.Students)
             {
-                var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
-                var facts = GetOrCreateEsitoBorsaFacts(context, key);
-                var iscr = info.InformazioniIscrizione;
+                var facts = GetOrCreateEsitoBorsaFacts(context, pair.Key);
 
-                facts.CarrieraInterrotta = GetNullableBool(reader, "CarrieraInterr");
-                facts.NumAnniInterruzione = GetNullableInt(reader, "NumAnniInterr");
-                facts.CreditiExtraCurriculari = reader.SafeGetDecimal("CreditiExtraCurriculari");
-                facts.MeseImmatricolazione = GetNullableInt(reader, "MeseImmatricolaz");
-                facts.Semestre = GetNullableInt(reader, "Semestre");
-                facts.IscrittoRipetente = GetNullableBool(reader, "Ripetente");
-                facts.PassaggioTrasferimento = GetNullableBool(reader, "PassaggioTrasferimento") ?? false;
-                facts.RipetenteDaPassaggio = GetNullableBool(reader, "RipetenteDaPassaggio") ?? false;
-                facts.PrimaImmatricolazTs = GetNullableInt(reader, "PrimaImmatricolazTs");
-                facts.AaTrasferimento = GetNullableInt(reader, "AnnoAvvenimentoTs");
+                if (!context.IscrizioneEsitoFactsByStudent.TryGetValue(pair.Key, out var raw) || raw == null)
+                    continue;
+
+                facts.CarrieraInterrotta = raw.CarrieraInterrotta;
+                facts.NumAnniInterruzione = raw.NumAnniInterruzione;
+                facts.CreditiExtraCurriculari = raw.CreditiExtraCurriculari;
+                facts.MeseImmatricolazione = raw.MeseImmatricolazione;
+                facts.Semestre = raw.Semestre;
+                facts.IscrittoRipetente = raw.IscrittoRipetente;
+                facts.PassaggioTrasferimento = raw.PassaggioTrasferimento ?? false;
+                facts.RipetenteDaPassaggio = raw.RipetenteDaPassaggio ?? false;
+                facts.PrimaImmatricolazTs = raw.PrimaImmatricolazTs;
+                facts.AaTrasferimento = raw.AaTrasferimento;
 
                 if (facts.IscrittoRipetente == true)
                     facts.RevocatoIscrittoRipetente = true;
-
-                decimal rawCrediti = iscr.NumeroCrediti ?? 0m;
-                decimal creditiDaRinuncia = iscr.CreditiRiconosciutiDaRinuncia ?? 0m;
-                decimal creditiExtra = facts.CreditiExtraCurriculari ?? 0m;
-                if (rawCrediti != 0m && (facts.PassaggioTrasferimento != true || facts.RipetenteDaPassaggio == true))
-                    iscr.NumeroCrediti = rawCrediti - creditiDaRinuncia - creditiExtra;
-
-            });
+            }
         }
 
         private void LoadEsitoBorsaGeneralFacts(VerificaPipelineContext context)
@@ -493,6 +421,8 @@ DG_RANKED AS
         TRY_CONVERT(BIT, dg.ISCRIZIONE_FUORITERMINE) AS IscrizioneFuoriTermine,
         TRY_CONVERT(BIT, dg.RINUNCIA_IN_CORSO) AS RinunciaBenefici,
         TRY_CONVERT(BIT, dg.NUBILE_PROLE) AS NubileProle,
+        TRY_CONVERT(BIT, dg.RIFUG_POLITICO) AS RifugiatoPolitico,
+        TRY_CONVERT(BIT, dg.INVALIDO) AS Invalido,
         ROW_NUMBER() OVER
         (
             PARTITION BY dg.NUM_DOMANDA
@@ -511,19 +441,11 @@ DG AS
         PermessoSoggProvv,
         IscrizioneFuoriTermine,
         RinunciaBenefici,
-        NubileProle
+        NubileProle,
+        RifugiatoPolitico,
+        Invalido
     FROM DG_RANKED
     WHERE RN = 1
-),
-SC AS
-(
-    SELECT
-        sc.NUM_DOMANDA AS NumDomanda,
-        CAST(ISNULL(sc.STATUS_COMPILAZIONE, 0) AS INT) AS StatusCompilazione
-    FROM vSTATUS_COMPILAZIONE sc
-    INNER JOIN D
-        ON D.NumDomanda = sc.NUM_DOMANDA
-    WHERE sc.ANNO_ACCADEMICO = @AA
 ),
 CIT_RANKED AS
 (
@@ -599,100 +521,12 @@ RES AS
         ON r.COD_FISCALE = D.CodFiscale
        AND r.ANNO_ACCADEMICO = @AA
        AND r.TIPO_BANDO = 'LZ'
-),
-CP_CD_RANKED AS
-(
-    SELECT
-        cp.ANNO_ACCADEMICO AS AnnoAccademico,
-        cp.COD_FISCALE AS CodFiscale,
-        TRY_CONVERT(INT, cp.RIGA_VALIDA) AS RigaValida,
-        TRY_CONVERT(INT, cp.TIPOLOGIA_CORSO) AS TipologiaCorso,
-        TRY_CONVERT(INT, cp.DURATA_LEG_TITOLO_CONSEGUITO) AS DurataLegTitoloConseguito,
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY cp.ANNO_ACCADEMICO, cp.COD_FISCALE
-            ORDER BY cp.DATA_VALIDITA DESC
-        ) AS RN
-    FROM CARRIERA_PREGRESSA cp
-    INNER JOIN D_CF
-        ON D_CF.AnnoAccademico = cp.ANNO_ACCADEMICO
-       AND D_CF.CodFiscale = cp.COD_FISCALE
-    WHERE cp.ANNO_ACCADEMICO = @AA
-      AND cp.COD_AVVENIMENTO = 'CD'
-),
-CP_CD_LATEST AS
-(
-    SELECT
-        AnnoAccademico,
-        CodFiscale,
-        RigaValida,
-        TipologiaCorso,
-        DurataLegTitoloConseguito
-    FROM CP_CD_RANKED
-    WHERE RN = 1
-),
-CP_CD AS
-(
-    SELECT
-        D.NumDomanda,
-        cp.RigaValida,
-        cp.TipologiaCorso,
-        cp.DurataLegTitoloConseguito
-    FROM D
-    LEFT JOIN CP_CD_LATEST cp
-        ON cp.AnnoAccademico = @AA
-       AND cp.CodFiscale = D.CodFiscale
-),
-CP_AT_RANKED AS
-(
-    SELECT
-        cp.ANNO_ACCADEMICO AS AnnoAccademico,
-        cp.COD_FISCALE AS CodFiscale,
-        TRY_CONVERT(INT, cp.RIGA_VALIDA) AS RigaValida,
-        TRY_CONVERT(INT, cp.TIPOLOGIA_CORSO) AS TipologiaCorso,
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY cp.ANNO_ACCADEMICO, cp.COD_FISCALE
-            ORDER BY cp.DATA_VALIDITA DESC
-        ) AS RN
-    FROM CARRIERA_PREGRESSA cp
-    INNER JOIN D_CF
-        ON D_CF.AnnoAccademico = cp.ANNO_ACCADEMICO
-       AND D_CF.CodFiscale = cp.COD_FISCALE
-    WHERE cp.ANNO_ACCADEMICO = @AA
-      AND cp.COD_AVVENIMENTO = 'AT'
-),
-CP_AT_LATEST AS
-(
-    SELECT
-        AnnoAccademico,
-        CodFiscale,
-        RigaValida,
-        TipologiaCorso
-    FROM CP_AT_RANKED
-    WHERE RN = 1
-),
-CP_AT AS
-(
-    SELECT
-        D.NumDomanda,
-        cp.RigaValida,
-        cp.TipologiaCorso
-    FROM D
-    LEFT JOIN CP_AT_LATEST cp
-        ON cp.AnnoAccademico = @AA
-       AND cp.CodFiscale = D.CodFiscale
 )
 SELECT
     D.NumDomanda,
     D.CodFiscale,
     DG.IscrizioneFuoriTermine,
     CAST(CASE WHEN ISNULL(DG.PermessoSoggiorno, CAST(0 AS BIT)) = 1 OR ISNULL(DG.PermessoSoggProvv, CAST(0 AS BIT)) = 1 THEN 1 ELSE 0 END AS BIT) AS PermessoSoggiorno,
-    CAST(CASE
-            WHEN ISNULL(SC.StatusCompilazione, 0) >= 90 THEN 1
-            ELSE 0 END AS BIT) AS DomandaTrasmessa,
-    CAST(CASE WHEN ISNULL(CP_CD.RigaValida, 1) = 0 THEN 1 ELSE 0 END AS BIT) AS TitoloAccademicoConseguito,
-    CAST(CASE WHEN ISNULL(CP_AT.RigaValida, 1) = 0 THEN 1 ELSE 0 END AS BIT) AS AttesaTitoloAccademicoConseguito,
     CASE
         WHEN ISNULL(DG.TipoStudente, 0) IN (2,3,6) THEN 2
         WHEN ISNULL(DG.TipoStudente, 0) IN (4,5) THEN 1
@@ -709,28 +543,15 @@ SELECT
     ISNULL(CIT.CittadinanzaUe, CAST(0 AS BIT)) AS CittadinanzaUe,
     ISNULL(RES.ResidenzaUe, CAST(0 AS BIT)) AS ResidenzaUe,
     ISNULL(DG.NubileProle, CAST(0 AS BIT)) AS NubileProle,
-    CASE
-        WHEN ISNULL(CP_CD.RigaValida, 1) = 0 THEN ISNULL(CP_CD.TipologiaCorso, 0)
-        WHEN ISNULL(CP_AT.RigaValida, 1) = 0 THEN ISNULL(CP_AT.TipologiaCorso, 0)
-        ELSE 0
-    END AS TipologiaStudiTitoloConseguito,
-    CASE
-        WHEN ISNULL(CP_CD.RigaValida, 1) = 0 THEN ISNULL(CP_CD.DurataLegTitoloConseguito, 0)
-        ELSE 0
-    END AS DurataLegTitoloConseguito
+    ISNULL(DG.RifugiatoPolitico, CAST(0 AS BIT)) AS RifugiatoPolitico,
+    ISNULL(DG.Invalido, CAST(0 AS BIT)) AS Invalido
 FROM D
 LEFT JOIN DG
     ON DG.NumDomanda = D.NumDomanda
-LEFT JOIN SC
-    ON SC.NumDomanda = D.NumDomanda
 LEFT JOIN CIT
     ON CIT.NumDomanda = D.NumDomanda
 LEFT JOIN RES
     ON RES.NumDomanda = D.NumDomanda
-LEFT JOIN CP_CD
-    ON CP_CD.NumDomanda = D.NumDomanda
-LEFT JOIN CP_AT
-    ON CP_AT.NumDomanda = D.NumDomanda
 OPTION (RECOMPILE);";
 
             using var cmd = CreatePopulationCommand(sql, context);
@@ -741,17 +562,16 @@ OPTION (RECOMPILE);";
 
                 facts.IscrizioneFuoriTermine = GetNullableBool(reader, "IscrizioneFuoriTermine");
                 facts.PermessoSoggiorno = GetNullableBool(reader, "PermessoSoggiorno");
-                facts.DomandaTrasmessa = GetNullableBool(reader, "DomandaTrasmessa");
+                facts.DomandaTrasmessa = info.StatusCompilazione >= 90;
                 facts.TipoStudenteNormalizzato = GetNullableInt(reader, "TipoStudenteNormalizzato");
-                facts.TitoloAccademicoConseguito = GetNullableBool(reader, "TitoloAccademicoConseguito");
-                facts.AttesaTitoloAccademicoConseguito = GetNullableBool(reader, "AttesaTitoloAccademicoConseguito");
                 facts.IsConferma = GetNullableBool(reader, "IsConferma");
                 facts.Straniero = GetNullableBool(reader, "Straniero");
                 facts.CittadinanzaUe = GetNullableBool(reader, "CittadinanzaUe");
                 facts.ResidenzaUe = GetNullableBool(reader, "ResidenzaUe");
                 facts.NubileProle = GetNullableBool(reader, "NubileProle");
-                facts.TipologiaStudiTitoloConseguito = GetNullableInt(reader, "TipologiaStudiTitoloConseguito");
-                facts.DurataLegTitoloConseguito = GetNullableInt(reader, "DurataLegTitoloConseguito");
+
+                info.InformazioniPersonali.Rifugiato = reader.SafeGetBool("RifugiatoPolitico");
+                info.InformazioniPersonali.Disabile = reader.SafeGetBool("Invalido");
             });
         }
 
@@ -782,6 +602,68 @@ JOIN vBenefici_richiesti vb
                 facts.BeneficiRichiesti.Add(beneficio);
                 if (string.Equals(beneficio, "CS", StringComparison.OrdinalIgnoreCase))
                     facts.RichiestaCS = true;
+            });
+        }
+
+        private void LoadEsitoBorsaBlocchiPagamento(VerificaPipelineContext context)
+        {
+            using var cmd = CreatePopulationCommand(EsitoBorsaBlocchiPagamentoSql, context);
+            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            {
+                var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                var facts = GetOrCreateEsitoBorsaFacts(context, key);
+
+                string code = reader.SafeGetString("CodTipologiaBlocco").Trim().ToUpperInvariant();
+                int active = reader.SafeGetInt("BloccoPagamentoAttivo");
+
+                if (string.IsNullOrWhiteSpace(code))
+                    return;
+
+                facts.BlocchiPagamento.Add(new BloccoPagamentoRaw
+                {
+                    CodTipologiaBlocco = code,
+                    BloccoPagamentoAttivo = active == 1
+                });
+
+                if (code == "BIS" || code == "BST")
+                {
+                    if (active == 0)
+                        facts.HasBloccoPagamentoBISBSTRimosso = true;
+                    else
+                        facts.HasBloccoPagamentoBISBSTAttivo = true;
+                }
+            });
+        }
+
+        private void LoadEsitoBorsaIncongruenze(VerificaPipelineContext context)
+        {
+            using var cmd = CreatePopulationCommand(EsitoBorsaIncongruenzeSql, context);
+            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            {
+                var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                var facts = GetOrCreateEsitoBorsaFacts(context, key);
+
+                string code = reader.SafeGetString("CodIncongruenza").Trim().ToUpperInvariant();
+                int active = reader.SafeGetInt("IncongruenzaAttiva");
+
+                if (string.IsNullOrWhiteSpace(code))
+                    return;
+
+                facts.Incongruenze.Add(new IncongruenzaRaw
+                {
+                    CodIncongruenza = code,
+                    Attiva = active == 1,
+                    CodForzatura = reader.SafeGetString("CodForzatura").Trim().ToUpperInvariant(),
+                    EliminataDa = reader.SafeGetString("EliminataDa").Trim().ToUpperInvariant()
+                });
+
+                if (code == "27")
+                {
+                    if (active == 0)
+                        facts.HasIncongruenza27NonAttiva = true;
+                    else
+                        facts.HasIncongruenza27Attiva = true;
+                }
             });
         }
 
@@ -928,6 +810,8 @@ WHERE ANNO_ACCADEMICO = @AA
                 int bestCdYear = int.MinValue;
                 InformazioniCarrieraPregressa? bestAt = null;
                 int bestAtYear = int.MinValue;
+                InformazioniCarrieraPregressa? bestAtCicloUnico = null;
+                int bestAtCicloUnicoYear = int.MinValue;
                 InformazioniCarrieraPregressa? bestGeneric = null;
                 int bestGenericYear = int.MinValue;
 
@@ -960,6 +844,18 @@ WHERE ANNO_ACCADEMICO = @AA
                             bestAt = item;
                             bestAtYear = year;
                         }
+
+                        int? tipologiaAtScan = null;
+                        if (TryParseCareerTitleType(item.TipologiaCorso, out int tipoAtScan))
+                            tipologiaAtScan = tipoAtScan;
+
+                        if (IsTitoloAttesoIncompatibilePerMagistraleBiennale(tipologiaAtScan, item.DurataLegTitoloConseguito)
+                            && (bestAtCicloUnico == null || year > bestAtCicloUnicoYear))
+                        {
+                            bestAtCicloUnico = item;
+                            bestAtCicloUnicoYear = year;
+                        }
+
                         continue;
                     }
 
@@ -970,17 +866,120 @@ WHERE ANNO_ACCADEMICO = @AA
                     }
                 }
 
-                InformazioniCarrieraPregressa? best = bestCd ?? bestAt ?? bestGeneric;
-                if (best == null)
+                int aaInizio = EsitoBorsaSupport.ParseAnnoAccademicoStartFromString(context.AnnoAccademico);
+                DateTime? scadenzaAttesaTitolo = EsitoBorsaSupport.GetScadenzaAttesaTitolo(aaInizio);
+                bool atValida = EsitoBorsaSupport.IsAttesaTitoloValidaAllaData(context.ReferenceDate, aaInizio);
+                bool atValidataDaBloccoPagamento = bestAt != null
+                                     && bestCd == null
+                                     && facts.HasBloccoPagamentoBISBSTRimosso
+                                     && !facts.HasBloccoPagamentoBISBSTAttivo;
+
+                bool atValidataDaIncongruenza27 = bestAt != null
+                                                  && bestCd == null
+                                                  && facts.HasIncongruenza27NonAttiva
+                                                  && !facts.HasIncongruenza27Attiva;
+
+                bool atValidaPerTitoloAccesso = atValida
+                                                || atValidataDaBloccoPagamento
+                                                || atValidataDaIncongruenza27;
+
+
+                InformazioniCarrieraPregressa? best = bestCd ?? (atValidaPerTitoloAccesso ? bestAt : null) ?? bestGeneric;
+                InformazioniCarrieraPregressa? titoloPerDiagnostica = bestCd ?? bestAt ?? bestGeneric;
+                if (titoloPerDiagnostica == null)
                     continue;
 
-                string bestCodAvvenimento = NormalizeUpper(best.CodAvvenimento);
+                string bestCodAvvenimento = NormalizeUpper((best ?? titoloPerDiagnostica).CodAvvenimento);
+                bool hasCd = bestCd != null;
+                bool hasAt = bestAt != null;
 
                 if (!facts.TitoloAccademicoConseguito.HasValue)
-                    facts.TitoloAccademicoConseguito = bestCodAvvenimento == "CD";
+                    facts.TitoloAccademicoConseguito = hasCd;
 
                 if (!facts.AttesaTitoloAccademicoConseguito.HasValue)
-                    facts.AttesaTitoloAccademicoConseguito = bestCodAvvenimento == "AT";
+                    facts.AttesaTitoloAccademicoConseguito = hasAt && !hasCd;
+
+                if (!facts.ScadenzaAttesaTitolo.HasValue && scadenzaAttesaTitolo.HasValue)
+                    facts.ScadenzaAttesaTitolo = scadenzaAttesaTitolo.Value;
+
+                if (!facts.AttesaTitoloValidaAllaDataValutazione.HasValue && hasAt && !hasCd)
+                    facts.AttesaTitoloValidaAllaDataValutazione = atValidaPerTitoloAccesso;
+
+                if (!facts.AttesaTitoloValidataDaBloccoPagamentoRimosso.HasValue && hasAt && !hasCd)
+                    facts.AttesaTitoloValidataDaBloccoPagamentoRimosso = atValidataDaBloccoPagamento;
+
+                if (!facts.AttesaTitoloValidataDaIncongruenza27.HasValue && hasAt && !hasCd)
+                    facts.AttesaTitoloValidataDaIncongruenza27 = atValidataDaIncongruenza27;
+
+                if (!facts.AttesaTitoloScaduta.HasValue && hasAt && !hasCd)
+                    facts.AttesaTitoloScaduta = !atValidaPerTitoloAccesso;
+
+                if (!facts.TitoloAccessoValidoPerIscrizione.HasValue)
+                    facts.TitoloAccessoValidoPerIscrizione = hasCd || (hasAt && atValidaPerTitoloAccesso);
+
+                if (string.IsNullOrWhiteSpace(facts.CodAvvenimentoTitoloAccesso))
+                    facts.CodAvvenimentoTitoloAccesso = hasCd ? "CD" : hasAt ? "AT" : bestCodAvvenimento;
+
+                int? tipologiaTitoloAccesso = null;
+                int? durataTitoloAccesso = null;
+                int? tipologiaTitoloAtteso = null;
+                int? durataTitoloAtteso = null;
+                int? tipologiaTitoloAttesoCicloUnico = null;
+                int? durataTitoloAttesoCicloUnico = null;
+
+                if (hasCd)
+                {
+                    if (TryParseCareerTitleType(bestCd!.TipologiaCorso, out int tipoCd))
+                        tipologiaTitoloAccesso = tipoCd;
+
+                    durataTitoloAccesso = bestCd.DurataLegTitoloConseguito;
+
+                    if (!facts.AnnoAvvenimentoTitoloAccesso.HasValue && bestCd.AnnoAvvenimento.HasValue)
+                        facts.AnnoAvvenimentoTitoloAccesso = bestCd.AnnoAvvenimento.Value;
+                }
+
+                if (hasAt)
+                {
+                    if (TryParseCareerTitleType(bestAt!.TipologiaCorso, out int tipoAt))
+                        tipologiaTitoloAtteso = tipoAt;
+
+                    durataTitoloAtteso = bestAt.DurataLegTitoloConseguito;
+
+                    if (!facts.TipologiaStudiTitoloAtteso.HasValue && tipologiaTitoloAtteso.HasValue)
+                        facts.TipologiaStudiTitoloAtteso = tipologiaTitoloAtteso.Value;
+
+                    if (!facts.DurataLegTitoloAtteso.HasValue && durataTitoloAtteso.HasValue)
+                        facts.DurataLegTitoloAtteso = durataTitoloAtteso.Value;
+
+                    if (!facts.AnnoAvvenimentoTitoloAtteso.HasValue && bestAt.AnnoAvvenimento.HasValue)
+                        facts.AnnoAvvenimentoTitoloAtteso = bestAt.AnnoAvvenimento.Value;
+                }
+
+                if (bestAtCicloUnico != null)
+                {
+                    if (TryParseCareerTitleType(bestAtCicloUnico.TipologiaCorso, out int tipoAtCicloUnico))
+                        tipologiaTitoloAttesoCicloUnico = tipoAtCicloUnico;
+
+                    durataTitoloAttesoCicloUnico = bestAtCicloUnico.DurataLegTitoloConseguito;
+                }
+
+                bool titoloAccessoTriennaleConseguito = hasCd && IsTitoloAccessoTriennale(tipologiaTitoloAccesso, durataTitoloAccesso);
+                bool attesaTitoloIncompatibile = bestAtCicloUnico != null
+                                                   && IsTitoloAttesoIncompatibilePerMagistraleBiennale(tipologiaTitoloAttesoCicloUnico, durataTitoloAttesoCicloUnico);
+
+                if (!facts.TitoloAccessoTriennaleConseguito.HasValue)
+                    facts.TitoloAccessoTriennaleConseguito = titoloAccessoTriennaleConseguito;
+
+                // Nome mantenuto per compatibilità: da questa versione include AT su ciclo unico
+                // e AT su magistrale biennale (tipologia 5).
+                if (!facts.AttesaTitoloCicloUnicoPresente.HasValue)
+                    facts.AttesaTitoloCicloUnicoPresente = attesaTitoloIncompatibile;
+
+                if (!facts.TitoloGiaConseguitoConAttesaCicloUnico.HasValue)
+                    facts.TitoloGiaConseguitoConAttesaCicloUnico = titoloAccessoTriennaleConseguito && attesaTitoloIncompatibile;
+
+                if (best == null)
+                    continue;
 
                 if (!facts.TipologiaStudiTitoloConseguito.HasValue && TryParseCareerTitleType(best.TipologiaCorso, out int tipologiaTitolo))
                     facts.TipologiaStudiTitoloConseguito = tipologiaTitolo;
@@ -996,15 +995,55 @@ WHERE ANNO_ACCADEMICO = @AA
             }
         }
 
+        private static bool IsTitoloAccessoTriennale(int? tipologiaTitolo, int? durataTitolo)
+        {
+            if (!tipologiaTitolo.HasValue)
+                return false;
+
+            int tipo = tipologiaTitolo.Value;
+            int durata = durataTitolo ?? 0;
+
+            return (tipo == 2 && durata == 3)
+                   || tipo == 3
+                   || tipo == 9;
+        }
+
+        private static bool IsTitoloCicloUnico(int? tipologiaTitolo, int? durataTitolo)
+        {
+            int tipo = tipologiaTitolo ?? 0;
+            int durata = durataTitolo ?? 0;
+
+            return tipo == 4 || durata >= 5;
+        }
+
+        private static bool IsTitoloAttesoIncompatibilePerMagistraleBiennale(int? tipologiaTitolo, int? durataTitolo)
+        {
+            int tipo = tipologiaTitolo ?? 0;
+            int durata = durataTitolo ?? 0;
+
+            // Per l'iscrizione a magistrale biennale, dopo un CD triennale valido,
+            // un ulteriore AT su ciclo unico o su altra magistrale biennale indica
+            // titolo ulteriore già in corso/atteso e rende non ammissibile la richiesta.
+            // AT normalmente non valorizza la durata legale: la tipologia corso è decisiva.
+            return tipo == 4 || tipo == 5 || durata >= 5;
+        }
+
         private static bool LooksLikeCareerTitleRecord(InformazioniCarrieraPregressa item)
         {
             if (item == null)
                 return false;
 
+            string code = NormalizeUpper(item.CodAvvenimento);
+
+            // AT = attesa conseguimento titolo.
+            // Nel tracciato AT normalmente non valorizza DurataLegTitoloConseguito,
+            // quindi la durata legale non può essere usata come requisito per riconoscere il record titolo.
+            if (code == "AT" || code == "CD")
+                return true;
+
             if (item.DurataLegTitoloConseguito.HasValue && item.DurataLegTitoloConseguito.Value > 0)
                 return true;
 
-            string code = NormalizeUpper(item.CodAvvenimento);
             foreach (string marker in CarrieraTitoloAvvenimentoMarkers)
             {
                 if (code.Contains(marker, StringComparison.OrdinalIgnoreCase))

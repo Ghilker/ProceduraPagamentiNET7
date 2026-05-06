@@ -140,23 +140,23 @@ FROM D;";
                     () => $"students={context.Students.Count}");
 
                 VerificaExecutionSupport.ExecuteTimed(
-                    "VerificaRaccoltaDati.Economici",
-                    () => RaccogliEconomiciDaContesto(context),
-                    () => $"students={context.Students.Count}");
-                context.CalcParams = _calc.Clone();
-
-                VerificaExecutionSupport.ExecuteTimed(
                     "VerificaRaccoltaDati.IscrizioneBase",
                     () =>
                     {
-                        ResetIscrizioneState(context);
                         LoadBaseIscrizione(context);
                         LoadCarrieraPregressa(context);
                         BuildCarrieraPregressaAggregate(context);
+                        ApplyCreditiMeritoDerivati(context);
                         LoadEsamiCatalog(context);
                         LoadCreditiRichiestiCatalog(context);
                     },
                     () => $"students={context.Students.Count}");
+
+                VerificaExecutionSupport.ExecuteTimed(
+                    "VerificaRaccoltaDati.Economici",
+                    () => RaccogliEconomiciDaContesto(context),
+                    () => $"students={context.Students.Count}");
+                context.CalcParams = _calc.Clone();
 
                 VerificaExecutionSupport.ExecuteTimed(
                     "VerificaRaccoltaDati.EsitoBorsaFacts",
@@ -187,7 +187,6 @@ FROM D;";
             LoadStatusSedeAttuale(context);
             LoadForzatureStatusSede(context);
             LoadSessoStudente(context);
-            LoadDatiGeneraliDomanda(context);
             LoadMonetizzazioneMensa(context);
             LoadNucleoFamiliarePerStatusSede(context);
             LoadResidenza(context);

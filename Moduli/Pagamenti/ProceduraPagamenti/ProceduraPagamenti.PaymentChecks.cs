@@ -937,13 +937,16 @@ namespace ProcedureNet7
 
         private void PopulateStudentsInformations()
         {
+            HashSet<(string ComuneA, string ComuneB)> comuniEquiparatiStatusSede =
+                ControlloStatusSede.LoadComuniEquiparatiFromDb(CONNECTION, sqlTransaction);
+
             PopulateStudentLuogoNascita();
             PopulateStudentResidenza();
-            PopulateStudentDomicilio();
             PopulateStudentForzature();
-            PopulateStudentPaymentMethod();
             PopulateStudentiVecchioEsitoPA();
             PopulateStudentiIscrizioni();
+            PopulateStudentDomicilio();
+            PopulateStudentPaymentMethod();
             if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR)
             {
                 PopulateStudentReversali();
@@ -958,6 +961,7 @@ namespace ProcedureNet7
             PopulateStudentServizioSanitario();
             PopulateStudentEconomia();
             PopulateStudentMonetizzazioneMensa();
+            PopulateStudentStatusSedeCalcolato();
             PopulateImportoDaPagare();
 
             void PopulateStudentLuogoNascita()
@@ -1057,55 +1061,42 @@ namespace ProcedureNet7
             }
             void PopulateStudentDomicilio()
             {
-                // -----------------------
-                // 0) Parse the academic year
-                // -----------------------
-                int startYear = int.Parse(selectedAA.Substring(0, 4));
-                int endYear = int.Parse(selectedAA.Substring(4, 4));
-                DateTime dateRangeStart = new DateTime(startYear, 10, 1);
-                DateTime dateRangeEnd = new DateTime(endYear, 9, 30);
-
-                // -----------------------
-                // 1) Prepare the query
-                // -----------------------
                 string dataQuery = $@"
                     SELECT 
-                        LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE, 
-	                    LUOGO_REPERIBILITA_STUDENTE.COD_COMUNE,
-                        LUOGO_REPERIBILITA_STUDENTE.TITOLO_ONEROSO, 
-                        LUOGO_REPERIBILITA_STUDENTE.N_SERIE_CONTRATTO, 
-                        LUOGO_REPERIBILITA_STUDENTE.DATA_REG_CONTRATTO,  
-                        LUOGO_REPERIBILITA_STUDENTE.DATA_DECORRENZA, 
-                        LUOGO_REPERIBILITA_STUDENTE.DATA_SCADENZA, 
-                        LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO, 
-                        LUOGO_REPERIBILITA_STUDENTE.PROROGA, 
-                        LUOGO_REPERIBILITA_STUDENTE.DURATA_PROROGA, 
-                        LUOGO_REPERIBILITA_STUDENTE.ESTREMI_PROROGA,
-                        LUOGO_REPERIBILITA_STUDENTE.TIPO_CONTRATTO_TITOLO_ONEROSO,
-                        LUOGO_REPERIBILITA_STUDENTE.DENOM_ENTE,
-                        LUOGO_REPERIBILITA_STUDENTE.DURATA_CONTRATTO,
-                        LUOGO_REPERIBILITA_STUDENTE.IMPORTO_RATA
-                    FROM LUOGO_REPERIBILITA_STUDENTE
-                    INNER JOIN Comuni ON LUOGO_REPERIBILITA_STUDENTE.COD_COMUNE = Comuni.Cod_comune
-                    INNER JOIN #CFEstrazione cfe ON LUOGO_REPERIBILITA_STUDENTE.Cod_fiscale = cfe.Cod_fiscale 
+                        lrs.COD_FISCALE, 
+                        lrs.COD_COMUNE,
+                        lrs.TITOLO_ONEROSO, 
+                        lrs.N_SERIE_CONTRATTO, 
+                        lrs.DATA_REG_CONTRATTO,  
+                        lrs.DATA_DECORRENZA, 
+                        lrs.DATA_SCADENZA, 
+                        lrs.DURATA_CONTRATTO, 
+                        lrs.PROROGA, 
+                        lrs.DURATA_PROROGA, 
+                        lrs.ESTREMI_PROROGA,
+                        lrs.TIPO_CONTRATTO_TITOLO_ONEROSO,
+                        lrs.DENOM_ENTE,
+                        lrs.IMPORTO_RATA
+                    FROM LUOGO_REPERIBILITA_STUDENTE lrs
+                    INNER JOIN Comuni 
+                        ON lrs.COD_COMUNE = Comuni.Cod_comune
+                    INNER JOIN #CFEstrazione cfe 
+                        ON lrs.Cod_fiscale = cfe.Cod_fiscale 
                     WHERE 
-                        (LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO = '{selectedAA}') 
-                        AND (LUOGO_REPERIBILITA_STUDENTE.TIPO_LUOGO   = 'DOM') 
-                        AND (LUOGO_REPERIBILITA_STUDENTE.DATA_VALIDITA = (
-                            SELECT MAX(DATA_VALIDITA)
-                            FROM LUOGO_REPERIBILITA_STUDENTE AS rsd
-                            WHERE 
-                                (COD_FISCALE    = LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE) 
-                                AND (ANNO_ACCADEMICO = LUOGO_REPERIBILITA_STUDENTE.ANNO_ACCADEMICO) 
-                                AND (TIPO_LUOGO     = 'DOM')
-                        ))
-                ";
+                        lrs.ANNO_ACCADEMICO = '{selectedAA}'
+                        AND lrs.TIPO_LUOGO = 'DOM'
+                        AND lrs.DATA_VALIDITA =
+                        (
+                            SELECT MAX(rsd.DATA_VALIDITA)
+                            FROM LUOGO_REPERIBILITA_STUDENTE rsd
+                            WHERE rsd.COD_FISCALE = lrs.COD_FISCALE
+                              AND rsd.ANNO_ACCADEMICO = lrs.ANNO_ACCADEMICO
+                              AND rsd.TIPO_LUOGO = 'DOM'
+                        )";
 
-                // -----------------------
-                // 2) Read data into DTOs
-                // -----------------------
                 var domicilioRows = new List<StudentiDomicilioDTO>();
-                Logger.LogInfo(35, "Lavorazione studenti - inserimento in domicilio");
+
+                Logger.LogInfo(35, "Lavorazione studenti - raccolta dati domicilio");
 
                 using (SqlCommand readData = new SqlCommand(dataQuery, CONNECTION, sqlTransaction))
                 {
@@ -1138,118 +1129,69 @@ namespace ProcedureNet7
                     }
                 }
 
-                // -----------------------
-                // 3) Process the rows
-                // -----------------------
                 foreach (var row in domicilioRows)
                 {
                     if (!studentiDaPagare.TryGetValue(row.CodFiscale, out StudentePagamenti? studente))
                         continue;
+
                     if (studente == null)
                         continue;
 
-                    // Debug check
                     if (studente.InformazioniPersonali.CodFiscale == debugStudente)
                     {
-                        string test = ""; // Just to set a breakpoint, presumably
+                        string test = "";
                     }
 
-                    // ----- TITOLO ONEROSO -----
-                    bool titoloOneroso = row.TitoloOneroso;
-                    DateTime.TryParse(row.DataRegistrazioneString, out DateTime dataRegistrazione);
-                    DateTime.TryParse(row.DataDecorrenzaString, out DateTime dataDecorrenza);
-                    DateTime.TryParse(row.DataScadenzaString, out DateTime dataScadenza);
+                    DateTime dataRegistrazione = ParseDomicilioDate(row.DataRegistrazioneString);
+                    DateTime dataDecorrenza = ParseDomicilioDate(row.DataDecorrenzaString);
+                    DateTime dataScadenza = ParseDomicilioDate(row.DataScadenzaString);
 
-                    // Only if there's a real contract
-                    if (titoloOneroso)
-                    {
-                        // Calculate the overlap between the contract and the academic year period
-                        DateTime effectiveStart = (dataDecorrenza > dateRangeStart) ? dataDecorrenza : dateRangeStart;
-                        DateTime effectiveEnd = (dataScadenza < dateRangeEnd) ? dataScadenza : dateRangeEnd;
-
-                        if (effectiveStart <= effectiveEnd)
-                        {
-                            int monthsCovered = ((effectiveEnd.Year - effectiveStart.Year) * 12)
-                                              + (effectiveEnd.Month - effectiveStart.Month + 1);
-                            if (monthsCovered >= 10)
-                            {
-                                // Mark the student as having a valid domicile for >=10 months
-                                studente.SetDomicilioCheck(true);
-                            }
-                        }
-                    }
-
-                    // ----- CONTRATTO ENTE -----
-                    bool contrattoEnte = row.ContrattoEnte;
-                    string denominazioneEnte = row.DenominazioneEnte;
-                    int durataContratto = row.DurataContratto;
-                    double importoRataEnte = row.ImportoRataEnte;
-                    bool contrattoEnteValido = false;
-
-                    if (contrattoEnte)
-                    {
-                        if (string.IsNullOrWhiteSpace(denominazioneEnte))
-                        {
-                            // If there's no "Ente" name, consider invalid
-                            studente.SetDomicilioCheck(false);
-                        }
-                        else
-                        {
-                            // Must have at least 10 months and a rate > 0
-                            if (durataContratto < 10 || importoRataEnte <= 0)
-                            {
-                                studente.SetDomicilioCheck(false);
-                            }
-                            else
-                            {
-                                studente.SetDomicilioCheck(true);
-                                contrattoEnteValido = true;
-                            }
-                        }
-                    }
-
-                    // ----- Serie Contratto & Serie Proroga -----
-                    string serieContratto = row.SerieContratto;
-                    string serieProroga = row.SerieProroga;
-
-                    bool contrattoValido = contrattoEnteValido || DomicilioUtils.IsValidSerie(serieContratto);
-                    bool prorogaValido = DomicilioUtils.IsValidSerie(serieProroga);
-
-                    // If the proroga contains the same base as the contract, we consider that invalid
-                    if (!string.IsNullOrEmpty(serieContratto)
-                        && !string.IsNullOrEmpty(serieProroga)
-                        && serieProroga.IndexOf(serieContratto, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        prorogaValido = false;
-                    }
-
-                    // Debug check
-                    if (studente.InformazioniPersonali.CodFiscale == debugStudente)
-                    {
-                        string test = ""; // Another debugging breakpoint
-                    }
-
-                    // Finally, store all the domicile info into the Studente object
                     studente.SetDomicilio(
                         row.ComuneDomicilio,
-                        titoloOneroso,
-                        serieContratto,
+                        row.TitoloOneroso,
+                        (row.SerieContratto ?? "").Trim(),
                         dataRegistrazione,
                         dataDecorrenza,
                         dataScadenza,
                         row.DurataContratto,
                         row.Prorogato ?? false,
                         row.DurataProroga,
-                        serieProroga,
-                        contrattoValido,
-                        prorogaValido,
-                        contrattoEnte,
-                        denominazioneEnte,
-                        importoRataEnte
+                        (row.SerieProroga ?? "").Trim(),
+                        false,
+                        false,
+                        row.ContrattoEnte,
+                        row.DenominazioneEnte,
+                        row.ImportoRataEnte
                     );
                 }
 
-                Logger.LogInfo(35, "UPDATE:Lavorazione studenti - inserimento in domicilio - completato");
+                Logger.LogInfo(35, "UPDATE:Lavorazione studenti - raccolta dati domicilio - completato");
+
+                DateTime ParseDomicilioDate(string value)
+                {
+                    value = (value ?? "").Trim();
+
+                    if (string.IsNullOrWhiteSpace(value))
+                        return DateTime.MinValue;
+
+                    string[] formats =
+                    {
+                        "dd/MM/yyyy",
+                        "d/M/yyyy",
+                        "dd/MM/yyyy HH:mm:ss",
+                        "d/M/yyyy HH:mm:ss",
+                        "yyyy-MM-dd",
+                        "yyyy-MM-dd HH:mm:ss"
+                    };
+
+                    if (DateTime.TryParseExact(value, formats, CultureInfo.GetCultureInfo("it-IT"), DateTimeStyles.None, out DateTime exact))
+                        return exact.Date;
+
+                    if (DateTime.TryParse(value, CultureInfo.GetCultureInfo("it-IT"), DateTimeStyles.None, out DateTime parsed))
+                        return parsed.Date;
+
+                    return DateTime.MinValue;
+                }
             }
             void PopulateStudentPaymentMethod()
             {
@@ -1797,7 +1739,7 @@ namespace ProcedureNet7
             void PopulateStudentiImpegni()
             {
                 string currentBeneficio = isTR ? "TR" : tipoBeneficio;
-                if(currentBeneficio == "TR")
+                if (currentBeneficio == "TR")
                 {
                     string test = "";
                 }
@@ -1993,11 +1935,32 @@ namespace ProcedureNet7
                         studentiDaPagare.TryGetValue(codFiscale, out StudentePagamenti? studente);
                         if (studente != null)
                         {
-                            studente.InformazioniPagamento.ConcessaMonetizzazioneMensa = Utilities.SafeGetInt(reader, "Concessa_monetizzazione") == 1 ? true : false ;
+                            studente.InformazioniPagamento.ConcessaMonetizzazioneMensa = Utilities.SafeGetInt(reader, "Concessa_monetizzazione") == 1 ? true : false;
                         }
                     }
                 }
                 Logger.LogInfo(30, $"UPDATE:Lavorazione studenti - inserimento monetizzazione mensa - completato");
+            }
+
+            void PopulateStudentStatusSedeCalcolato()
+            {
+                Logger.LogInfo(50, "Lavorazione studenti - calcolo Status Sede da ControlloStatusSede");
+
+                foreach (var studente in studentiDaPagare.Values)
+                {
+                    if (studente == null)
+                        continue;
+
+                    var statusSede = ControlloStatusSede.ApplicaStatusSede(
+                        studente,
+                        selectedAA,
+                        comuniEquiparatiStatusSede,
+                        DateTime.Today.Date);
+
+                    studente.SetDomicilioCheck(statusSede.DomicilioValido);
+                }
+
+                Logger.LogInfo(50, "UPDATE:Lavorazione studenti - calcolo Status Sede da ControlloStatusSede - completato");
             }
 
             void PopulateImportoDaPagare()
@@ -2025,44 +1988,10 @@ namespace ProcedureNet7
                     }
                 }
 
-                if(sogliaISEE == 0 || importoPendolare == 0)
+                if (sogliaISEE == 0 || importoPendolare == 0)
                 {
                     throw new Exception("PORCO GIUDA COME");
                 }
-
-                var listaStudInfo = studentiDaPagare
-                    .Values                          // IEnumerable<StudentePagamenti>
-                    .Cast<StudenteInfo>()            // up-cast each element
-                    .ToList();                       // List<StudenteInfo>
-
-                //var result = StatusSedeUtils.CalcolaSedeStudiBulk(CONNECTION, selectedAA, listaStudInfo, sqlTransaction);
-                //// convert to DataTable
-                //var table = new DataTable();
-                //table.Columns.Add("CodFiscale", typeof(string));
-                //table.Columns.Add("StatusSede", typeof(string));
-                //table.Columns.Add("statusSedeDB", typeof(string)); 
-
-                //foreach (var kvp in result)
-                //{
-                //    string codiceFiscale = kvp.Key;
-                //    string statusSede = kvp.Value;
-
-                //    // try to get the custom object from your other dictionary
-                //    studentiDaPagare.TryGetValue(codiceFiscale, out var studInfo);
-
-                //    // extract the DB‐status (or default to empty/whatever you like)
-                //    string statusSedeDB = studInfo.InformazioniSede.StatusSede;
-
-                //    // add to DataTable
-                //    var row = table.NewRow();
-                //    row["CodFiscale"] = codiceFiscale;
-                //    row["StatusSede"] = statusSede;
-                //    row["StatusSedeDB"] = statusSedeDB;
-                //    table.Rows.Add(row);
-                //}
-
-                //Utilities.ExportDataTableToExcel(table, selectedSaveFolder);
-
 
                 // Use thread-safe collections
                 ConcurrentDictionary<string, bool> studentiDaRimuovereDallaTabella = new();
@@ -2092,7 +2021,11 @@ namespace ProcedureNet7
                             ref importoMassimo,
                             studentiPagatiComePendolari,
                             sogliaISEE,
-                            importoPendolare
+                            importoPendolare,
+                            categoriaPagam,
+                            selectedAA,
+                            comuniEquiparatiStatusSede,
+                            DateTime.Today.Date
                         );
                     }
 
@@ -2268,10 +2201,10 @@ namespace ProcedureNet7
                         return;
                     }
 
-                    if(tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR &&
+                    if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR &&
                     studente.InformazioniIscrizione.ConfermaSemestreFiltro == 1 && studente.InformazioniIscrizione.AnnoCorso == 1)
                     {
-                        if(categoriaPagam == "PR")
+                        if (categoriaPagam == "PR")
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
                             studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Semestre filtro solo saldo"));

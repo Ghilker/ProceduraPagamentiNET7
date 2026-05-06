@@ -10,7 +10,7 @@ namespace ProcedureNet7
             var iscr = context.Iscrizione;
             if (iscr == null)
                 return;
-
+            
 
             ResetCreditiUtilizzatiSeBonusNonRichiesto(iscr);
 
@@ -23,8 +23,9 @@ namespace ProcedureNet7
             iscr.EsamiMinimiRichiestiPassaggio = null;
             iscr.CreditiMinimiRichiestiPassaggio = null;
 
-            if (!PassaRequisitiSpecImmatricolati(context))
-                evaluation.Add("MER089");
+            string? motivoSpecImmatricolati = GetMotivoEsclusioneSpecImmatricolati(context);
+            if (!string.IsNullOrWhiteSpace(motivoSpecImmatricolati))
+                evaluation.Add(motivoSpecImmatricolati);
 
             if (!PassaRegolaCreditiSpecialisticaPrimoAnno(context))
                 evaluation.Add("MER074");
@@ -75,21 +76,46 @@ namespace ProcedureNet7
             return false;
         }
 
-        private static bool PassaRequisitiSpecImmatricolati(EsitoBorsaStudentContext context)
+        private static string? GetMotivoEsclusioneSpecImmatricolati(EsitoBorsaStudentContext context)
         {
             var iscr = context.Iscrizione;
             if (iscr == null || iscr.TipoCorso != 5 || iscr.AnnoCorso != 1)
-                return true;
+                return null;
+
+
+            if(context.Key.CodFiscale == "BNCDSR01L59H501Y")
+            {
+                string test = "";
+            }
+
+            if (context.Facts.TitoloGiaConseguitoConAttesaCicloUnico == true)
+                return "MER093";
+
+            if (context.Facts.AttesaTitoloValidataDaBloccoPagamentoRimosso == true
+                && context.Facts.TitoloAccademicoConseguito != true)
+                return null;
+
+            if (context.Facts.AttesaTitoloValidataDaIncongruenza27 == true
+                && context.Facts.TitoloAccademicoConseguito != true)
+                return null;
+
+            if (context.Facts.AttesaTitoloScaduta == true && context.Facts.TitoloAccademicoConseguito != true)
+                return "MER090";
+
+            if (!EsitoBorsaSupport.HasTitoloAccessoValido(context))
+                return "MER091";
 
             if (!context.Facts.TipologiaStudiTitoloConseguito.HasValue)
-                return true;
+                return "MER091";
 
             int tipologiaTitolo = context.Facts.TipologiaStudiTitoloConseguito.Value;
             int durataTitolo = context.Facts.DurataLegTitoloConseguito ?? 0;
 
-            return (tipologiaTitolo == 2 && durataTitolo == 3)
-                   || tipologiaTitolo == 3
-                   || tipologiaTitolo == 9;
+            bool titoloAmmesso = (tipologiaTitolo == 2 && durataTitolo == 3)
+                                || tipologiaTitolo == 3
+                                || tipologiaTitolo == 9;
+
+            return titoloAmmesso ? null : "MER089";
         }
 
         private static bool PassaRegolaCreditiSpecialisticaPrimoAnno(EsitoBorsaStudentContext context)
@@ -196,6 +222,9 @@ namespace ProcedureNet7
             if (!bonusRichiesto)
                 return false;
 
+            if (!EsitoBorsaSupport.HasTitoloAccessoValido(context))
+                return false;
+
             string sedeIstituzione = (context.Facts.SedeIstituzioneUniversitariaTitolo ?? string.Empty).Trim();
             bool sedeCompatibile = string.IsNullOrEmpty(sedeIstituzione) || sedeIstituzione == "0";
             if (!sedeCompatibile)
@@ -268,7 +297,7 @@ namespace ProcedureNet7
 
         private static bool HasCreditiDichiaratiIncongruenti(InformazioniIscrizione iscr)
         {
-            decimal crediti = iscr.NumeroCrediti ?? 0m;
+            decimal crediti = iscr.NumeroCreditiRaw ?? 0m;
             if (crediti <= 0m)
                 return false;
 
@@ -276,7 +305,7 @@ namespace ProcedureNet7
 
             return iscr.TipoCorso switch
             {
-                5 => crediti > 120m,
+                5 => crediti >= 120m,
                 3 => crediti >= 180m,
                 4 when durataLegale == 5 => crediti >= 300m,
                 4 when durataLegale == 6 => crediti >= 360m,

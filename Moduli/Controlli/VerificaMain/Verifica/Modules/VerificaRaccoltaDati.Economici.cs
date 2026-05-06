@@ -32,30 +32,110 @@ namespace ProcedureNet7
 
         private void ExecuteEconomiciCollectionPipeline(string aa, string pipelineTableName, Action<int, string> log)
         {
-            log(18, "Caricamento valori attuali da Valori_calcolati con ultimo max data_validita.");
-            LoadValoriCalcolatiAttuali(aa, pipelineTableName);
+            CreateEconomicSemestreFlagsTempTable();
 
-            LoadCalcParams(aa);
-            LoadNucleoFamiliare(aa, pipelineTableName);
+            try
+            {
+                log(18, "Caricamento valori attuali da Valori_calcolati con ultimo max data_validita.");
+                LoadValoriCalcolatiAttuali(aa, pipelineTableName);
 
-            log(22, "Caricamento INPS e attestazioni CO.");
-            LoadInpsAndAttestazioni_StoredLike(aa, pipelineTableName);
+                LoadCalcParams(aa);
+                LoadNucleoFamiliare(aa, pipelineTableName);
 
-            log(30, "Lettura tipologie reddito e split per studente/domanda.");
-            var split = LoadTipologieRedditiAndSplit(aa, pipelineTableName);
-            ApplyEconomicSplitFlagsToPipelineTable(pipelineTableName, split);
+                log(22, "Caricamento INPS e attestazioni CO.");
+                LoadInpsAndAttestazioni_StoredLike(aa, pipelineTableName);
 
-            log(40, "Estrazione dati economici origine.");
-            if (split.OrigIT_CO.Count > 0) AddDatiEconomiciItaliani_CO(aa, pipelineTableName);
-            if (split.OrigIT_DO.Count > 0) AddDatiEconomiciItaliani_DOFromCert(aa, pipelineTableName);
-            if (split.OrigEE.Count > 0) AddDatiEconomiciStranieri_DO(aa, pipelineTableName);
+                log(30, "Lettura tipologie reddito e split per studente/domanda.");
+                var split = LoadTipologieRedditiAndSplit(aa, pipelineTableName);
+                ApplyEconomicSplitFlagsToPipelineTable(pipelineTableName, split);
 
-            log(60, "Estrazione dati economici integrazione.");
-            if (split.IntIT_CI.Count > 0) AddDatiEconomiciItaliani_CI(aa, pipelineTableName);
-            if (split.IntDI.Count > 0) AddDatiEconomiciStranieri_DI(aa, pipelineTableName);
+                log(40, "Estrazione dati economici origine.");
+                AddDatiEconomiciItaliani_CO(aa, pipelineTableName);
+                AddDatiEconomiciItaliani_DOFromCert(aa, pipelineTableName);
+                AddDatiEconomiciStranieri_DO(aa, pipelineTableName);
 
-            log(70, $"Raccolta dati economici completata. Studenti nel contesto: {CurrentStudents.Count}");
+                log(60, "Estrazione dati economici integrazione.");
+                AddDatiEconomiciItaliani_CI(aa, pipelineTableName);
+                AddDatiEconomiciStranieri_DI(aa, pipelineTableName);
+
+                log(70, $"Raccolta dati economici completata. Studenti nel contesto: {CurrentStudents.Count}");
+            }
+            finally
+            {
+                DropEconomicSemestreFlagsTempTable();
+            }
         }
+
+        private const string EconomicSemestreFlagsTempTableName = "#VerificaEconomiciSemestreFlags";
+
+        private void CreateEconomicSemestreFlagsTempTable()
+        {
+            const string sql = @"
+IF OBJECT_ID('tempdb..#VerificaEconomiciSemestreFlags') IS NOT NULL
+    DROP TABLE #VerificaEconomiciSemestreFlags;
+
+CREATE TABLE #VerificaEconomiciSemestreFlags
+(
+    CodFiscale NVARCHAR(32) NOT NULL,
+    NumDomanda NUMERIC(18,0) NOT NULL,
+    ConfermaSemestreFiltro BIT NOT NULL,
+    CONSTRAINT PK_VerificaEconomiciSemestreFlags PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
+);";
+
+            using (var command = new SqlCommand(sql, _conn) { CommandTimeout = 9999999 })
+            {
+                command.ExecuteNonQuery();
+            }
+
+            var table = BuildEconomicSemestreFlagsTable();
+            if (table.Rows.Count == 0)
+                return;
+
+            using var bulk = new SqlBulkCopy(_conn, SqlBulkCopyOptions.TableLock, null)
+            {
+                DestinationTableName = EconomicSemestreFlagsTempTableName,
+                BulkCopyTimeout = 9999999,
+                BatchSize = 10000
+            };
+
+            bulk.ColumnMappings.Add("CodFiscale", "CodFiscale");
+            bulk.ColumnMappings.Add("NumDomanda", "NumDomanda");
+            bulk.ColumnMappings.Add("ConfermaSemestreFiltro", "ConfermaSemestreFiltro");
+            bulk.WriteToServer(table);
+        }
+
+        private void DropEconomicSemestreFlagsTempTable()
+        {
+            const string sql = @"
+IF OBJECT_ID('tempdb..#VerificaEconomiciSemestreFlags') IS NOT NULL
+    DROP TABLE #VerificaEconomiciSemestreFlags;";
+
+            using var command = new SqlCommand(sql, _conn) { CommandTimeout = 9999999 };
+            command.ExecuteNonQuery();
+        }
+
+        private DataTable BuildEconomicSemestreFlagsTable()
+        {
+            var table = new DataTable();
+            table.Columns.Add("CodFiscale", typeof(string));
+            table.Columns.Add("NumDomanda", typeof(decimal));
+            table.Columns.Add("ConfermaSemestreFiltro", typeof(bool));
+
+            foreach (var info in CurrentStudents.Values)
+            {
+                string codFiscale = NormalizeCf(info.InformazioniPersonali.CodFiscale);
+                string numDomandaText = NormalizeDomanda(info.InformazioniPersonali.NumDomanda);
+
+                if (string.IsNullOrWhiteSpace(codFiscale) || !TryParseNumDomanda(numDomandaText, out var numDomanda))
+                    continue;
+
+                bool confermaSemestreFiltro = info.InformazioniIscrizione.ConfermaSemestreFiltro == 1;
+                table.Rows.Add(codFiscale, numDomanda, confermaSemestreFiltro);
+            }
+
+            return table;
+        }
+
 
         private static DateTime GetFirmataIlMaxPerAa(string aa)
         {
@@ -65,6 +145,31 @@ namespace ProcedureNet7
 
             return new DateTime(startYear, 12, 31);
         }
+
+        private static DateTime GetScadenzaIseeBasePerAa(string aa)
+        {
+            string value = (aa ?? string.Empty).Trim();
+            if (value.Length < 4 || !int.TryParse(value.Substring(0, 4), out int startYear))
+                throw new ArgumentException($"Anno accademico non valido per la scadenza ISEE base: {aa}", nameof(aa));
+
+            // Regola 20252026+: ISEE base, anche ordinario/corrente, firmato entro il 22 luglio dell'anno di avvio AA.
+            // Per ConfermaSemestreFiltro = 1 il limite viene gestito nelle query e diventa il 31 dicembre.
+            return new DateTime(startYear, 7, 22);
+        }
+
+        private static void AddScadenzaIseeBaseParameter(SqlCommand command, string aa)
+        {
+            if (command == null)
+                throw new ArgumentNullException(nameof(command));
+
+            command.Parameters.Add("@ScadenzaIseeBase", SqlDbType.DateTime).Value = GetScadenzaIseeBasePerAa(aa);
+        }
+
+        private static string GetSqlPredicateAttestazioneIseeBase(string alias)
+            => $"(UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%ORD%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%UNIV%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%RID%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%CORRENTE%')";
+
+        private static string GetSqlPredicateAttestazioneUniversitaria(string alias)
+            => $"(UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%UNIV%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%RID%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%CORRENTE%')";
 
         private static void AddFirmataIlMaxParameter(SqlCommand command, string aa)
         {
@@ -76,84 +181,147 @@ namespace ProcedureNet7
 
         private void LoadInpsAndAttestazioni_StoredLike(string aa, string sourceTableName)
         {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadInpsAndAttestazioni", $"AA={aa}");
             sourceTableName = ResolveTempTableName(sourceTableName);
 
+            string attestazioneBasePredicate = GetSqlPredicateAttestazioneIseeBase("cte");
+            string attestazioneUniversitariaPredicate = GetSqlPredicateAttestazioneUniversitaria("cte");
+
             string sql = $@"
+;WITH Targets AS
+(
+    SELECT DISTINCT
+        t.CodFiscale,
+        t.NumDomanda,
+        ISNULL(sf.ConfermaSemestreFiltro, 0) AS ConfermaSemestreFiltro
+    FROM {sourceTableName} t
+    LEFT JOIN #VerificaEconomiciSemestreFlags sf
+        ON sf.CodFiscale = t.CodFiscale
+       AND sf.NumDomanda = t.NumDomanda
+),
+BaseIsee AS
+(
+    SELECT
+        cte.Num_domanda,
+        COUNT_BIG(*) AS NumeroIseeBaseEntroScadenza
+    FROM Certificaz_ISEE cte
+    INNER JOIN Targets t
+        ON t.NumDomanda = cte.Num_domanda
+    WHERE cte.Anno_accademico = @AA
+      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) IN ('CO','DO')
+      AND cte.firmata_il IS NOT NULL
+      AND cte.firmata_il <= CASE WHEN ISNULL(t.ConfermaSemestreFiltro, 0) = 1 THEN @FirmataIlMax ELSE @ScadenzaIseeBase END
+      AND {attestazioneBasePredicate}
+    GROUP BY cte.Num_domanda
+),
+CertUniversitarieRanked AS
+(
+    SELECT
+        cte.Num_domanda,
+        x.TipoCert,
+        cte.Utente,
+        cte.firmata_il,
+        cte.data_validita,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY cte.Num_domanda, x.TipoCert
+            ORDER BY
+                cte.firmata_il DESC,
+                cte.data_validita DESC
+        ) AS rn
+    FROM Certificaz_ISEE cte
+    INNER JOIN Targets t
+        ON t.NumDomanda = cte.Num_domanda
+    CROSS APPLY
+    (
+        SELECT UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) AS TipoCert
+    ) x
+    WHERE cte.Anno_accademico = @AA
+      AND x.TipoCert IN ('CO','CI')
+      AND cte.firmata_il IS NOT NULL
+      AND cte.firmata_il <= @FirmataIlMax
+      AND {attestazioneUniversitariaPredicate}
+),
+LatestCert AS
+(
+    SELECT
+        Num_domanda,
+        TipoCert,
+        Utente,
+        firmata_il,
+        data_validita
+    FROM CertUniversitarieRanked
+    WHERE rn = 1
+),
+StatusRanked AS
+(
+    SELECT
+        t.CodFiscale,
+        t.NumDomanda,
+        c.TipoCert,
+        TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(si.status_inps)), '')) AS StatusInps,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY t.CodFiscale, t.NumDomanda, c.TipoCert
+            ORDER BY si.data_validita DESC
+        ) AS rn
+    FROM LatestCert c
+    INNER JOIN Targets t
+        ON t.NumDomanda = c.Num_domanda
+    INNER JOIN Status_INPS si
+        ON si.anno_accademico = @AA
+       AND si.cod_fiscale = t.CodFiscale
+       AND si.num_domanda = t.NumDomanda
+       AND si.data_fine_validita IS NULL
+       AND UPPER(LTRIM(RTRIM(ISNULL(si.tipo_certificaz,'')))) = c.TipoCert
+       AND ISNULL(NULLIF(LTRIM(RTRIM(si.Utente)), ''), '#NULL#') = ISNULL(NULLIF(LTRIM(RTRIM(c.Utente)), ''), '#NULL#')
+),
+LatestStatus AS
+(
+    SELECT
+        CodFiscale,
+        NumDomanda,
+        TipoCert,
+        StatusInps
+    FROM StatusRanked
+    WHERE rn = 1
+)
 SELECT
     t.CodFiscale AS Cod_fiscale,
     t.NumDomanda AS Num_domanda,
-    ISNULL(sio.StatusInpsOrigine, 0) AS StatusInpsOrigine,
-    ISNULL(sii.StatusInpsIntegrazione, 0) AS StatusInpsIntegrazione,
-    ISNULL(att.CoAttestazioneOk, 0) AS CoAttestazioneOk
-FROM {sourceTableName} t
-OUTER APPLY
-(
-    SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsOrigine
-    FROM Status_INPS si
-    WHERE si.anno_accademico = @AA
-      AND si.cod_fiscale = t.CodFiscale
-      AND si.num_domanda = t.NumDomanda
-      AND si.data_fine_validita IS NULL
-      AND si.tipo_certificaz NOT IN ('CI','DI')
-      AND si.data_validita =
-      (
-          SELECT MAX(si2.data_validita)
-          FROM Status_INPS si2
-          WHERE si2.anno_accademico = si.anno_accademico
-            AND si2.cod_fiscale = si.cod_fiscale
-            AND si2.num_domanda = si.num_domanda
-            AND si2.tipo_certificaz = si.tipo_certificaz
-            AND si2.data_fine_validita IS NULL
-      )
-) sio
-OUTER APPLY
-(
-    SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsIntegrazione
-    FROM Status_INPS si
-    WHERE si.anno_accademico = @AA
-      AND si.cod_fiscale = t.CodFiscale
-      AND si.num_domanda = t.NumDomanda
-      AND si.data_fine_validita IS NULL
-      AND si.tipo_certificaz IN ('CI','DI')
-      AND si.data_validita =
-      (
-          SELECT MAX(si2.data_validita)
-          FROM Status_INPS si2
-          WHERE si2.anno_accademico = si.anno_accademico
-            AND si2.cod_fiscale = si.cod_fiscale
-            AND si2.num_domanda = si.num_domanda
-            AND si2.tipo_certificaz = si.tipo_certificaz
-            AND si2.data_fine_validita IS NULL
-      )
-) sii
-OUTER APPLY
-(
-    SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
-    FROM ISCRIZIONI i
-    WHERE i.COD_FISCALE = t.CodFiscale
-      AND i.ANNO_ACCADEMICO = @AA
-      AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
-    ORDER BY i.DATA_VALIDITA DESC
-) semf
-OUTER APPLY
-(
-    SELECT TOP 1 CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))), '') IS NULL THEN 0 ELSE 1 END AS CoAttestazioneOk
-    FROM Certificaz_ISEE cte
-    WHERE cte.Anno_accademico = @AA
-      AND cte.Num_domanda = t.NumDomanda
-      AND cte.tipologia_certificazione = 'CO'
-      AND (
-            ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
-            OR cte.firmata_il <= @FirmataIlMax
-          )
-    ORDER BY
-        CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
-        cte.data_validita DESC
-) att;";
+    CASE
+        WHEN base.Num_domanda IS NOT NULL AND coCert.Num_domanda IS NOT NULL THEN ISNULL(coStatus.StatusInps, 0)
+        ELSE 0
+    END AS StatusInpsOrigine,
+    CASE
+        WHEN ciCert.Num_domanda IS NOT NULL THEN ISNULL(ciStatus.StatusInps, 0)
+        ELSE 0
+    END AS StatusInpsIntegrazione,
+    CASE WHEN base.Num_domanda IS NOT NULL AND coCert.Num_domanda IS NOT NULL THEN 1 ELSE 0 END AS CoAttestazioneOk
+FROM Targets t
+LEFT JOIN BaseIsee base
+    ON base.Num_domanda = t.NumDomanda
+LEFT JOIN LatestCert coCert
+    ON coCert.Num_domanda = t.NumDomanda
+   AND coCert.TipoCert = 'CO'
+LEFT JOIN LatestStatus coStatus
+    ON coStatus.CodFiscale = t.CodFiscale
+   AND coStatus.NumDomanda = t.NumDomanda
+   AND coStatus.TipoCert = 'CO'
+LEFT JOIN LatestCert ciCert
+    ON ciCert.Num_domanda = t.NumDomanda
+   AND ciCert.TipoCert = 'CI'
+LEFT JOIN LatestStatus ciStatus
+    ON ciStatus.CodFiscale = t.CodFiscale
+   AND ciStatus.NumDomanda = t.NumDomanda
+   AND ciStatus.TipoCert = 'CI';";
 
-            using var command = new SqlCommand(sql, _conn);
+            using var command = new SqlCommand(sql, _conn)
+            {
+                CommandTimeout = 9999999
+            };
             AddAaParameter(command, aa);
-            AddDataValiditaMaxParameter(command, aa);
+            AddScadenzaIseeBaseParameter(command, aa);
             AddFirmataIlMaxParameter(command, aa);
             ReadAndMergeSingleDto(
                 command,
@@ -172,6 +340,7 @@ OUTER APPLY
                     raw.CoAttestazioneOk = dto.CoAttestazioneOk;
                 });
         }
+
 
         private sealed class InpsAttestazioneDto
         {
@@ -267,116 +436,61 @@ INNER JOIN Nucleo_familiare nf
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.ApplyEconomicSplitFlags", $"students={CurrentStudents.Count}");
             pipelineTableName = ResolveTempTableName(pipelineTableName);
 
-            string sql = $@"
-;WITH Tipologie AS
+            string resetSql = $@"
+UPDATE {pipelineTableName}
+SET
+    IsOrigIT_CO = 0,
+    IsOrigIT_DO = 0,
+    IsOrigEE = 0,
+    IsIntIT_CI = 0,
+    IsIntDI = 0;";
+
+            using (var resetCommand = new SqlCommand(resetSql, _conn) { CommandTimeout = 9999999 })
+            {
+                resetCommand.ExecuteNonQuery();
+            }
+
+            if (split == null)
+                return;
+
+            var flags = BuildSplitFlagMap(split);
+            if (flags.Count == 0)
+                return;
+
+            const string createSql = @"
+CREATE TABLE #EconomicSplitFlags
 (
-    SELECT
-        t.NumDomanda,
-        t.CodFiscale,
-        UPPER(LTRIM(RTRIM(ISNULL(tr.Tipo_redd_nucleo_fam_origine,'')))) AS TipoOrigine,
-        UPPER(LTRIM(RTRIM(ISNULL(tr.Tipo_redd_nucleo_fam_integr,'')))) AS TipoIntegrazione,
-        UPPER(LTRIM(RTRIM(ISNULL(nf.Cod_tipologia_nucleo,'')))) AS TipoNucleo,
-        ISNULL(sio.StatusInpsOrigine, 0) AS StatusInpsOrigine,
-        ISNULL(sii.StatusInpsIntegrazione, 0) AS StatusInpsIntegrazione,
-        ISNULL(att.CoAttestazioneOk, 0) AS CoAttestazioneOk
-    FROM {pipelineTableName} t
-    LEFT JOIN Tipologie_redditi tr
-        ON tr.Anno_accademico = @AA
-       AND tr.Num_domanda = t.NumDomanda
-       AND tr.data_validita =
-       (
-           SELECT MAX(tr2.data_validita)
-           FROM Tipologie_redditi tr2
-           WHERE tr2.Anno_accademico = tr.Anno_accademico
-             AND tr2.Num_domanda = tr.Num_domanda
-       )
-    LEFT JOIN Nucleo_familiare nf
-        ON nf.Anno_accademico = @AA
-       AND nf.Num_domanda = t.NumDomanda
-       AND nf.data_validita =
-       (
-           SELECT MAX(nf2.data_validita)
-           FROM Nucleo_familiare nf2
-           WHERE nf2.Anno_accademico = nf.Anno_accademico
-             AND nf2.Num_domanda = nf.Num_domanda
-       )
-    OUTER APPLY
-    (
-        SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsOrigine
-        FROM Status_INPS si
-        WHERE si.anno_accademico = @AA
-          AND si.cod_fiscale = t.CodFiscale
-          AND si.num_domanda = t.NumDomanda
-          AND si.data_fine_validita IS NULL
-          AND si.tipo_certificaz NOT IN ('CI','DI')
-          AND si.data_validita =
-          (
-              SELECT MAX(si2.data_validita)
-              FROM Status_INPS si2
-              WHERE si2.anno_accademico = si.anno_accademico
-                AND si2.cod_fiscale = si.cod_fiscale
-                AND si2.num_domanda = si.num_domanda
-                AND si2.tipo_certificaz = si.tipo_certificaz
-                AND si2.data_fine_validita IS NULL
-          )
-    ) sio
-    OUTER APPLY
-    (
-        SELECT MAX(CAST(si.status_inps AS INT)) AS StatusInpsIntegrazione
-        FROM Status_INPS si
-        WHERE si.anno_accademico = @AA
-          AND si.cod_fiscale = t.CodFiscale
-          AND si.num_domanda = t.NumDomanda
-          AND si.data_fine_validita IS NULL
-          AND si.tipo_certificaz IN ('CI','DI')
-          AND si.data_validita =
-          (
-              SELECT MAX(si2.data_validita)
-              FROM Status_INPS si2
-              WHERE si2.anno_accademico = si.anno_accademico
-                AND si2.cod_fiscale = si.cod_fiscale
-                AND si2.num_domanda = si.num_domanda
-                AND si2.tipo_certificaz = si.tipo_certificaz
-                AND si2.data_fine_validita IS NULL
-          )
-    ) sii
-    OUTER APPLY
-    (
-        SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
-        FROM ISCRIZIONI i
-        WHERE i.COD_FISCALE = t.CodFiscale
-          AND i.ANNO_ACCADEMICO = @AA
-          AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
-        ORDER BY i.DATA_VALIDITA DESC
-    ) semf
-    OUTER APPLY
-    (
-        SELECT TOP 1 CASE WHEN NULLIF(LTRIM(RTRIM(ISNULL(cte.Cod_tipo_attestazione,''))), '') IS NULL THEN 0 ELSE 1 END AS CoAttestazioneOk
-        FROM Certificaz_ISEE cte
-        WHERE cte.Anno_accademico = @AA
-          AND cte.Num_domanda = t.NumDomanda
-          AND cte.tipologia_certificazione = 'CO'
-          AND (
-                ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
-                OR cte.firmata_il <= @FirmataIlMax
-              )
-        ORDER BY
-            CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
-            cte.data_validita DESC
-    ) att
-),
-Flags AS
-(
-    SELECT
-        NumDomanda,
-        CodFiscale,
-        CAST(CASE WHEN TipoOrigine = 'IT' AND StatusInpsOrigine = 2 AND CoAttestazioneOk = 1 THEN 1 ELSE 0 END AS BIT) AS IsOrigIT_CO,
-        CAST(CASE WHEN TipoOrigine = 'IT' AND NOT (StatusInpsOrigine = 2 AND CoAttestazioneOk = 1) THEN 1 ELSE 0 END AS BIT) AS IsOrigIT_DO,
-        CAST(CASE WHEN TipoOrigine = 'EE' THEN 1 ELSE 0 END AS BIT) AS IsOrigEE,
-        CAST(CASE WHEN TipoNucleo = 'I' AND TipoIntegrazione = 'IT' AND StatusInpsIntegrazione = 2 THEN 1 ELSE 0 END AS BIT) AS IsIntIT_CI,
-        CAST(CASE WHEN TipoNucleo = 'I' AND ((TipoIntegrazione = 'IT' AND StatusInpsIntegrazione <> 2) OR TipoIntegrazione = 'EE') THEN 1 ELSE 0 END AS BIT) AS IsIntDI
-    FROM Tipologie
-)
+    CodFiscale varchar(16) NOT NULL,
+    NumDomanda numeric(18,0) NOT NULL,
+    IsOrigIT_CO bit NOT NULL,
+    IsOrigIT_DO bit NOT NULL,
+    IsOrigEE bit NOT NULL,
+    IsIntIT_CI bit NOT NULL,
+    IsIntDI bit NOT NULL,
+    CONSTRAINT PK_EconomicSplitFlags PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
+);";
+
+            using (var createCommand = new SqlCommand(createSql, _conn) { CommandTimeout = 9999999 })
+            {
+                createCommand.ExecuteNonQuery();
+            }
+
+            using (var bulk = new SqlBulkCopy(_conn, SqlBulkCopyOptions.TableLock, null))
+            {
+                bulk.DestinationTableName = "#EconomicSplitFlags";
+                bulk.BatchSize = 10000;
+                bulk.BulkCopyTimeout = 9999999;
+                bulk.ColumnMappings.Add("CodFiscale", "CodFiscale");
+                bulk.ColumnMappings.Add("NumDomanda", "NumDomanda");
+                bulk.ColumnMappings.Add("IsOrigIT_CO", "IsOrigIT_CO");
+                bulk.ColumnMappings.Add("IsOrigIT_DO", "IsOrigIT_DO");
+                bulk.ColumnMappings.Add("IsOrigEE", "IsOrigEE");
+                bulk.ColumnMappings.Add("IsIntIT_CI", "IsIntIT_CI");
+                bulk.ColumnMappings.Add("IsIntDI", "IsIntDI");
+                bulk.WriteToServer(BuildSplitFlagTable(flags));
+            }
+
+            string updateSql = $@"
 UPDATE p
 SET
     p.IsOrigIT_CO = f.IsOrigIT_CO,
@@ -385,21 +499,97 @@ SET
     p.IsIntIT_CI = f.IsIntIT_CI,
     p.IsIntDI = f.IsIntDI
 FROM {pipelineTableName} p
-INNER JOIN Flags f
-    ON f.NumDomanda = p.NumDomanda
-   AND f.CodFiscale = p.CodFiscale;";
+INNER JOIN #EconomicSplitFlags f
+    ON f.CodFiscale = p.CodFiscale
+   AND f.NumDomanda = p.NumDomanda;";
 
-            using var command = new SqlCommand(sql, _conn)
+            using (var updateCommand = new SqlCommand(updateSql, _conn) { CommandTimeout = 9999999 })
             {
-                CommandTimeout = 9999999
-            };
-            AddAaParameter(command, CurrentContext.AnnoAccademico);
-            AddDataValiditaMaxParameter(command, CurrentContext.AnnoAccademico);
-            AddFirmataIlMaxParameter(command, CurrentContext.AnnoAccademico);
-            command.ExecuteNonQuery();
+                updateCommand.ExecuteNonQuery();
+            }
         }
 
         private readonly record struct Target(string CodFiscale, string NumDomanda);
+
+        private sealed class SplitFlagsDto
+        {
+            public bool IsOrigIT_CO { get; set; }
+            public bool IsOrigIT_DO { get; set; }
+            public bool IsOrigEE { get; set; }
+            public bool IsIntIT_CI { get; set; }
+            public bool IsIntDI { get; set; }
+        }
+
+        private static Dictionary<Target, SplitFlagsDto> BuildSplitFlagMap(SplitResult split)
+        {
+            var flags = new Dictionary<Target, SplitFlagsDto>();
+
+            foreach (var target in split.OrigIT_CO)
+                SetSplitFlag(flags, target, static f => f.IsOrigIT_CO = true);
+
+            foreach (var target in split.OrigIT_DO)
+                SetSplitFlag(flags, target, static f => f.IsOrigIT_DO = true);
+
+            foreach (var target in split.OrigEE)
+                SetSplitFlag(flags, target, static f => f.IsOrigEE = true);
+
+            foreach (var target in split.IntIT_CI)
+                SetSplitFlag(flags, target, static f => f.IsIntIT_CI = true);
+
+            foreach (var target in split.IntDI)
+                SetSplitFlag(flags, target, static f => f.IsIntDI = true);
+
+            return flags;
+        }
+
+        private static void SetSplitFlag(Dictionary<Target, SplitFlagsDto> flags, Target target, Action<SplitFlagsDto> setter)
+        {
+            if (!flags.TryGetValue(target, out var dto))
+            {
+                dto = new SplitFlagsDto();
+                flags[target] = dto;
+            }
+
+            setter(dto);
+        }
+
+        private static DataTable BuildSplitFlagTable(Dictionary<Target, SplitFlagsDto> flags)
+        {
+            var table = new DataTable();
+            table.Columns.Add("CodFiscale", typeof(string));
+            table.Columns.Add("NumDomanda", typeof(decimal));
+            table.Columns.Add("IsOrigIT_CO", typeof(bool));
+            table.Columns.Add("IsOrigIT_DO", typeof(bool));
+            table.Columns.Add("IsOrigEE", typeof(bool));
+            table.Columns.Add("IsIntIT_CI", typeof(bool));
+            table.Columns.Add("IsIntDI", typeof(bool));
+
+            foreach (var pair in flags)
+            {
+                if (!TryParseNumDomanda(pair.Key.NumDomanda, out var numDomanda))
+                    continue;
+
+                var dto = pair.Value;
+                table.Rows.Add(
+                    pair.Key.CodFiscale,
+                    numDomanda,
+                    dto.IsOrigIT_CO,
+                    dto.IsOrigIT_DO,
+                    dto.IsOrigEE,
+                    dto.IsIntIT_CI,
+                    dto.IsIntDI);
+            }
+
+            return table;
+        }
+
+        private static bool TryParseNumDomanda(string value, out decimal numDomanda)
+        {
+            string normalized = (value ?? string.Empty).Trim();
+            return decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out numDomanda)
+                || decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.GetCultureInfo("it-IT"), out numDomanda);
+        }
+
 
         private void AddDatiEconomiciItaliani_CO(string aa, string sourceTableName)
         {
@@ -477,26 +667,16 @@ FROM {sourceTableName} t
 INNER JOIN Domanda d ON d.Anno_accademico = @AA AND d.Num_domanda = t.NumDomanda
 OUTER APPLY
 (
-    SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
-    FROM ISCRIZIONI i
-    WHERE i.COD_FISCALE = t.CodFiscale
-      AND i.ANNO_ACCADEMICO = @AA
-      AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
-    ORDER BY i.DATA_VALIDITA DESC
-) semf
-OUTER APPLY
-(
     SELECT TOP 1 *
     FROM Certificaz_ISEE cte
     WHERE cte.Anno_accademico = @AA
       AND cte.Num_domanda = t.NumDomanda
-      AND cte.tipologia_certificazione = 'CO'
-      AND (
-            ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
-            OR cte.firmata_il <= @FirmataIlMax
-          )
+      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
+      AND cte.firmata_il IS NOT NULL
+      AND cte.firmata_il <= @FirmataIlMax
+      AND {GetSqlPredicateAttestazioneUniversitaria("cte")}
     ORDER BY
-        CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
+        cte.firmata_il DESC,
         cte.data_validita DESC
 ) cte
 LEFT JOIN sumPagamenti sp ON t.CodFiscale = sp.Cod_fiscale
@@ -568,6 +748,7 @@ WHERE t.IsOrigIT_CO = 1
 
             MergeOrigineCoDtos(dtoMap);
         }
+
         private sealed class EconomiciOrigineCoDto
         {
             public string OrigineFonte { get; set; } = "CO";
@@ -586,8 +767,10 @@ WHERE t.IsOrigIT_CO = 1
             public decimal OrigineReddFam50Est { get; set; }
             public decimal OriginePatrImm50FratSor { get; set; }
         }
+
         private static StudentKey ReadStudentKey(SqlDataReader reader, string cfColumn = "Cod_fiscale", string domandaColumn = "Num_domanda")
             => CreateStudentKey(reader.SafeGetString(cfColumn), reader.SafeGetString(domandaColumn));
+
         private void MergeOrigineCoDtos(Dictionary<StudentKey, EconomiciOrigineCoDto> dtoMap)
         {
             foreach (var pair in dtoMap)
@@ -617,6 +800,7 @@ WHERE t.IsOrigIT_CO = 1
                 raw.OriginePatrImm50FratSor = dto.OriginePatrImm50FratSor;
             }
         }
+
         private void AddDatiEconomiciStranieri_DO(string aa, string sourceTableName)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.AddDatiEconomiciStranieri_DO", $"AA={aa}");
@@ -697,26 +881,14 @@ SELECT
 FROM {sourceTableName} t
 OUTER APPLY
 (
-    SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
-    FROM ISCRIZIONI i
-    WHERE i.COD_FISCALE = t.CodFiscale
-      AND i.ANNO_ACCADEMICO = @AA
-      AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
-    ORDER BY i.DATA_VALIDITA DESC
-) semf
-OUTER APPLY
-(
     SELECT TOP 1 *
     FROM Certificaz_ISEE cte
     WHERE cte.Anno_accademico = @AA
       AND cte.Num_domanda = t.NumDomanda
-      AND cte.tipologia_certificazione = 'DO'
-      AND (
-            ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
-            OR cte.firmata_il <= @FirmataIlMax
-          )
+      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'DO'
+      AND (cte.firmata_il IS NULL OR cte.firmata_il <= @FirmataIlMax)
     ORDER BY
-        CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
+        cte.firmata_il DESC,
         cte.data_validita DESC
 ) cte
 WHERE t.IsOrigIT_DO = 1
@@ -774,26 +946,16 @@ SELECT
 FROM {sourceTableName} t
 OUTER APPLY
 (
-    SELECT TOP 1 TRY_CONVERT(INT, i.CONFERMA_SEMESTRE_FILTRO) AS ConfermaSemestreFiltro
-    FROM ISCRIZIONI i
-    WHERE i.COD_FISCALE = t.CodFiscale
-      AND i.ANNO_ACCADEMICO = @AA
-      AND (i.TIPO_BANDO IS NULL OR i.TIPO_BANDO LIKE 'L%')
-    ORDER BY i.DATA_VALIDITA DESC
-) semf
-OUTER APPLY
-(
     SELECT TOP 1 *
     FROM Certificaz_ISEE cte
     WHERE cte.Anno_accademico = @AA
       AND cte.Num_domanda = t.NumDomanda
-      AND cte.tipologia_certificazione = 'CI'
-      AND (
-            ISNULL(semf.ConfermaSemestreFiltro, 0) = 1
-            OR cte.firmata_il <= @FirmataIlMax
-          )
+      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CI'
+      AND cte.firmata_il IS NOT NULL
+      AND cte.firmata_il <= @FirmataIlMax
+      AND {GetSqlPredicateAttestazioneUniversitaria("cte")}
     ORDER BY
-        CASE WHEN ISNULL(semf.ConfermaSemestreFiltro, 0) = 1 THEN cte.data_validita ELSE cte.firmata_il END DESC,
+        cte.firmata_il DESC,
         cte.data_validita DESC
 ) cte
 WHERE t.IsIntIT_CI = 1
@@ -893,36 +1055,114 @@ WHERE t.IsIntDI = 1;";
         private SplitResult LoadTipologieRedditiAndSplit(string aa, string sourceTableName)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadTipologieRedditiAndSplit", $"AA={aa}");
-            Logger.LogInfo(30, "Esecuzione query tipologie reddito (Tipologie_redditi con ultimo max data_validita) + split per studente/domanda.");
+            Logger.LogInfo(30, "Esecuzione query tipologie reddito set-based senza OUTER APPLY per studente.");
 
             sourceTableName = ResolveTempTableName(sourceTableName);
             var result = new SplitResult();
 
+            string attestazioneBasePredicate = GetSqlPredicateAttestazioneIseeBase("cte");
+            string attestazioneUniversitariaPredicate = GetSqlPredicateAttestazioneUniversitaria("cte");
+
             string sql = $@"
+;WITH Targets AS
+(
+    SELECT DISTINCT
+        t.CodFiscale,
+        t.NumDomanda,
+        ISNULL(sf.ConfermaSemestreFiltro, 0) AS ConfermaSemestreFiltro
+    FROM {sourceTableName} t
+    LEFT JOIN #VerificaEconomiciSemestreFlags sf
+        ON sf.CodFiscale = t.CodFiscale
+       AND sf.NumDomanda = t.NumDomanda
+),
+TipologieRanked AS
+(
+    SELECT
+        tr.Num_domanda,
+        tr.Tipo_redd_nucleo_fam_origine,
+        tr.Tipo_redd_nucleo_fam_integr,
+        tr.altri_mezzi,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY tr.Num_domanda
+            ORDER BY tr.data_validita DESC
+        ) AS rn
+    FROM Tipologie_redditi tr
+    INNER JOIN Targets t
+        ON t.NumDomanda = tr.Num_domanda
+    WHERE tr.Anno_accademico = @AA
+),
+UltimeTipologie AS
+(
+    SELECT
+        Num_domanda,
+        Tipo_redd_nucleo_fam_origine,
+        Tipo_redd_nucleo_fam_integr,
+        altri_mezzi
+    FROM TipologieRanked
+    WHERE rn = 1
+),
+CertFlags AS
+(
+    SELECT
+        cte.Num_domanda,
+        MAX(CASE
+                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) IN ('CO','DO')
+                 AND cte.firmata_il IS NOT NULL
+                 AND cte.firmata_il <= CASE WHEN ISNULL(t.ConfermaSemestreFiltro, 0) = 1 THEN @FirmataIlMax ELSE @ScadenzaIseeBase END
+                 AND {attestazioneBasePredicate}
+                THEN 1 ELSE 0 END) AS HasIseeBaseEntroScadenza,
+        MAX(CASE
+                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
+                 AND cte.firmata_il IS NOT NULL
+                 AND cte.firmata_il <= @FirmataIlMax
+                 AND {attestazioneUniversitariaPredicate}
+                THEN 1 ELSE 0 END) AS HasCOUniversitarioEntroScadenza,
+        MAX(CASE
+                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CI'
+                 AND cte.firmata_il IS NOT NULL
+                 AND cte.firmata_il <= @FirmataIlMax
+                 AND {attestazioneUniversitariaPredicate}
+                THEN 1 ELSE 0 END) AS HasCIUniversitarioEntroScadenza,
+        COUNT_BIG(*) AS NumeroCertificazioniImportate,
+        SUM(CASE WHEN cte.firmata_il > CASE WHEN ISNULL(t.ConfermaSemestreFiltro, 0) = 1 THEN @FirmataIlMax ELSE @ScadenzaIseeBase END THEN 1 ELSE 0 END) AS NumeroModificheDopoScadenzaBase
+    FROM Certificaz_ISEE cte
+    INNER JOIN Targets t
+        ON t.NumDomanda = cte.Num_domanda
+    WHERE cte.Anno_accademico = @AA
+      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) IN ('CO','DO','CI','DI')
+    GROUP BY cte.Num_domanda
+)
 SELECT
     t.CodFiscale AS Cod_fiscale,
     t.NumDomanda AS Num_domanda,
-    tr.Tipo_redd_nucleo_fam_origine,
-    tr.Tipo_redd_nucleo_fam_integr,
-    ISNULL(tr.altri_mezzi,0) AS altri_mezzi
-FROM {sourceTableName} t
-INNER JOIN Tipologie_redditi tr
-    ON tr.Anno_accademico = @AA
-   AND tr.Num_domanda     = t.NumDomanda
-   AND tr.data_validita =
-   (
-       SELECT MAX(tr2.data_validita)
-       FROM Tipologie_redditi tr2
-       WHERE tr2.Anno_accademico = tr.Anno_accademico
-         AND tr2.Num_domanda = tr.Num_domanda
-   )
-;";
+    ISNULL(tr.Tipo_redd_nucleo_fam_origine, '') AS Tipo_redd_nucleo_fam_origine,
+    ISNULL(tr.Tipo_redd_nucleo_fam_integr, '') AS Tipo_redd_nucleo_fam_integr,
+    ISNULL(tr.altri_mezzi, 0) AS altri_mezzi,
+    ISNULL(cf.HasIseeBaseEntroScadenza, 0) AS HasIseeBaseEntroScadenza,
+    ISNULL(cf.HasCOUniversitarioEntroScadenza, 0) AS CoAttestazioneOk,
+    ISNULL(cf.HasCIUniversitarioEntroScadenza, 0) AS CiAttestazioneOk,
+    ISNULL(cf.NumeroCertificazioniImportate, 0) AS NumeroCertificazioniImportate,
+    ISNULL(cf.NumeroModificheDopoScadenzaBase, 0) AS NumeroModificheDopoScadenzaBase
+FROM Targets t
+LEFT JOIN UltimeTipologie tr
+    ON tr.Num_domanda = t.NumDomanda
+LEFT JOIN CertFlags cf
+    ON cf.Num_domanda = t.NumDomanda;";
 
-            using var command = new SqlCommand(sql, _conn);
+            using var command = new SqlCommand(sql, _conn)
+            {
+                CommandTimeout = 9999999
+            };
             AddAaParameter(command, aa);
-            AddDataValiditaMaxParameter(command, aa);
+            AddScadenzaIseeBaseParameter(command, aa);
+            AddFirmataIlMaxParameter(command, aa);
 
             int readCount = 0;
+            int origineItBaseMancanteCount = 0;
+            int origineItUniversitariaMancanteCount = 0;
+            int integrazioneItUniversitariaMancanteCount = 0;
+            int studentiConModificheMultipleCount = 0;
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
@@ -943,12 +1183,31 @@ INNER JOIN Tipologie_redditi tr
                 raw.TipoRedditoIntegrazione = tipoIntegrazione;
                 raw.AltriMezzi = reader.SafeGetDecimal("altri_mezzi");
 
+                if (reader.SafeGetInt("NumeroModificheDopoScadenzaBase") > 0)
+                    studentiConModificheMultipleCount++;
+
                 if (tipoOrigine.Equals("it", StringComparison.OrdinalIgnoreCase))
                 {
-                    int statusInps = raw.StatusInpsOrigine;
-                    bool coOk = statusInps == 2 && raw.CoAttestazioneOk;
-                    if (coOk) result.OrigIT_CO.Add(target);
-                    else result.OrigIT_DO.Add(target);
+                    bool baseOk = reader.SafeGetInt("HasIseeBaseEntroScadenza") != 0;
+                    bool coOk = reader.SafeGetInt("CoAttestazioneOk") != 0;
+                    raw.CoAttestazioneOk = baseOk && coOk;
+
+                    // Regola 20252026+: non si usa più il fallback DO per rendere idoneo lo studente.
+                    // Prima deve esistere un ISEE base firmato entro il 22/07; per ConfermaSemestreFiltro=1 entro il 31/12. Poi l'ultima attestazione UNIVERSITARIA/RIDOTTA/CORRENTE entro il 31/12.
+                    // Se manca una delle due condizioni non viene caricata una fonte economica italiana: EsitoBorsaIncomeRules produrrà RED086.
+                    if (baseOk && coOk)
+                    {
+                        result.OrigIT_CO.Add(target);
+                    }
+                    else
+                    {
+                        if (!baseOk)
+                            origineItBaseMancanteCount++;
+                        else
+                            origineItUniversitariaMancanteCount++;
+
+                        raw.OrigineFonte = string.Empty;
+                    }
                 }
                 else if (tipoOrigine.Equals("ee", StringComparison.OrdinalIgnoreCase))
                 {
@@ -962,9 +1221,16 @@ INNER JOIN Tipologie_redditi tr
 
                 if (tipoIntegrazione.Equals("it", StringComparison.OrdinalIgnoreCase))
                 {
-                    int statusInpsI = raw.StatusInpsIntegrazione;
-                    if (statusInpsI == 2) result.IntIT_CI.Add(target);
-                    else result.IntDI.Add(target);
+                    bool ciOk = reader.SafeGetInt("CiAttestazioneOk") != 0;
+                    if (ciOk)
+                    {
+                        result.IntIT_CI.Add(target);
+                    }
+                    else
+                    {
+                        integrazioneItUniversitariaMancanteCount++;
+                        raw.IntegrazioneFonte = string.Empty;
+                    }
                 }
                 else if (tipoIntegrazione.Equals("ee", StringComparison.OrdinalIgnoreCase))
                 {
@@ -972,9 +1238,10 @@ INNER JOIN Tipologie_redditi tr
                 }
             }
 
-            Logger.LogInfo(33, $"Tipologie reddito lette: {readCount}");
+            Logger.LogInfo(33, $"Tipologie reddito lette: {readCount} | OrigIT_CO={result.OrigIT_CO.Count} | OrigIT_DO={result.OrigIT_DO.Count} | OrigEE={result.OrigEE.Count} | IntIT_CI={result.IntIT_CI.Count} | IntDI={result.IntDI.Count} | OrigIT senza ISEE base entro scadenza effettiva={origineItBaseMancanteCount} | OrigIT senza UNIVERSITARIO entro 31/12={origineItUniversitariaMancanteCount} | IntIT senza UNIVERSITARIO entro 31/12={integrazioneItUniversitariaMancanteCount} | Certificazioni modificate dopo scadenza base effettiva={studentiConModificheMultipleCount}");
             return result;
         }
+
 
         private void LoadValoriCalcolatiAttuali(string aa, string sourceTableName)
         {
@@ -1020,6 +1287,5 @@ LEFT JOIN Valori_calcolati vv
                 attuali.ISEEDSU = reader.SafeGetDouble("ISEEDSU");
             }
         }
-
     }
 }

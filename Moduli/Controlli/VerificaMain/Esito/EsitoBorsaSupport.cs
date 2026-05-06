@@ -33,6 +33,16 @@ namespace ProcedureNet7
             { "RED013", "Valore ISEE oltre la soglia ammessa" },
             { "RED086", "Stato ISEE non ammesso" },
             { "RED087", "Codice fiscale dello studente indipendente presente nell'attestazione ISEE della famiglia di origine" },
+            { "RED029", "ISEE base assente entro la scadenza effettiva" },
+            { "RED030", "ISEE base presente ma firmato oltre la scadenza effettiva" },
+            { "RED031", "Attestazione ISEE universitaria/corrente origine non presente entro il 31/12/2025" },
+            { "RED032", "Attestazione ISEE universitaria/corrente origine presente ma firmata oltre il 31/12/2025" },
+            { "RED033", "Integrazione ISEE universitaria/corrente nucleo di origine non presente entro il 31/12/2025" },
+            { "RED034", "Integrazione ISEE universitaria/corrente nucleo di origine presente ma firmata oltre il 31/12/2025" },
+            { "RED035", "Status INPS origine mancante per la certificazione ISEE universitaria/corrente selezionata" },
+            { "RED036", "Status INPS integrazione mancante per la certificazione ISEE universitaria/corrente selezionata" },
+            { "RED037", "Status INPS origine non valido per la certificazione ISEE universitaria/corrente selezionata" },
+            { "RED038", "Status INPS integrazione non valido per la certificazione ISEE universitaria/corrente selezionata" },
             { "MER001", "Dati di merito assenti o non sufficienti per il calcolo" },
             { "MER088", "Studente già in possesso di altra borsa" },
             { "MER005", "Crediti dichiarati incongruenti con il corso di studi" },
@@ -43,6 +53,9 @@ namespace ProcedureNet7
             { "MER012", "Merito insufficiente per la borsa" },
             { "MER092", "Crediti di tirocinio superiori ai crediti dichiarati" },
             { "MER089", "Titolo di accesso non ammesso per immatricolazione alla specialistica" },
+            { "MER090", "Titolo di accesso in attesa di conseguimento non valido dopo il 10/02" },
+            { "MER091", "Titolo di accesso mancante per immatricolazione alla magistrale/specialistica" },
+            { "MER093", "Iscrizione magistrale biennale non ammissibile: presente titolo triennale già conseguito e ulteriore titolo di ciclo unico/magistrale biennale in attesa" },
             { "MER170", "Iscrizione non ammessa per Sapienza in vecchio ordinamento" },
             { "BS001", "Anno di corso oltre il limite ammesso per la borsa" },
             { "BS002", "Beneficio borsa già fruito e non restituito" },
@@ -326,6 +339,37 @@ namespace ProcedureNet7
                 return annoAccademico;
 
             return 0;
+        }
+
+        public static DateTime? GetScadenzaAttesaTitolo(int aaInizio)
+        {
+            if (aaInizio <= 0)
+                return null;
+
+            return new DateTime(aaInizio + 1, 2, 10);
+        }
+
+        public static bool IsAttesaTitoloValidaAllaData(DateTime referenceDate, int aaInizio)
+        {
+            DateTime? scadenza = GetScadenzaAttesaTitolo(aaInizio);
+            if (!scadenza.HasValue)
+                return false;
+
+            return referenceDate.Date <= scadenza.Value.Date;
+        }
+
+        public static bool HasTitoloAccessoValido(EsitoBorsaStudentContext? context)
+        {
+            if (context?.Facts == null)
+                return false;
+
+            if (context.Facts.TitoloAccademicoConseguito == true)
+                return true;
+
+            if (context.Facts.AttesaTitoloAccademicoConseguito == true)
+                return context.Facts.AttesaTitoloValidaAllaDataValutazione == true;
+
+            return false;
         }
 
         public static decimal GetIseeRiferimento(StudenteInfo info)

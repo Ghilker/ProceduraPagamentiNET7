@@ -24,6 +24,7 @@ namespace ProcedureNet7
         public int? AnnoImmatricolazione { get; set; }
         public int? NumeroEsami { get; set; }
         public decimal? NumeroCrediti { get; set; }
+        public decimal? NumeroCreditiRaw { get; set; }
         public decimal? SommaVoti { get; set; }
         public int UtilizzoBonus { get; set; }
         public decimal? CreditiUtilizzati { get; set; }

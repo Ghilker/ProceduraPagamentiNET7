@@ -26,12 +26,9 @@ namespace ProcedureNet7
             int idonei = 0;
             int benefitRows = 0;
 
-            context.EsitiCalcolatiByStudentBenefit.Clear();
-
             foreach (var pair in context.Students)
             {
                 var info = pair.Value;
-                Reset(info);
 
                 context.EsitoBorsaFactsByStudent.TryGetValue(pair.Key, out var facts);
                 var benefitCodes = EsitoBorsaSupport.GetRequestedBenefitCodes(facts);
@@ -100,12 +97,5 @@ namespace ProcedureNet7
             info.MotiviEsitoBorsaCalcolato = string.Empty;
         }
 
-        private static void Reset(StudenteInfo info)
-        {
-            info.EsitoBorsaCalcolato = EsitoIdoneo;
-            info.CodiciMotivoEsitoBorsaCalcolato = string.Empty;
-            info.MotiviEsitoBorsaCalcolato = string.Empty;
-            info.CalcoloEsitoBorsaEseguito = false;
-        }
     }
 }

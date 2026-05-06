@@ -32,11 +32,42 @@ namespace ProcedureNet7.Verifica
         public Dictionary<StudentKey, EsitoBorsaFacts> EsitoBorsaFactsByStudent { get; } = new();
         public Dictionary<StudentKey, Dictionary<string, EsitoConcorsoBenefitRaw>> EsitiConcorsoByStudentBenefit { get; } = new();
         public Dictionary<StudentKey, Dictionary<string, EsitoBeneficioCalcolato>> EsitiCalcolatiByStudentBenefit { get; } = new();
+        public Dictionary<StudentKey, IscrizioneEsitoFactsRaw> IscrizioneEsitoFactsByStudent { get; } = new();
         public HashSet<(string ComuneA, string ComuneB)> ComuniEquiparati { get; } = new();
         public CalcParams CalcParams { get; set; } = new();
         public List<string> CodiciFiscaliFiltro { get; } = new();
         public EsamiCatalog EsamiCatalog { get; } = new();
         public CreditiRichiestiCatalog CreditiRichiestiCatalog { get; } = new();
+    }
+
+
+    internal sealed class IscrizioneEsitoFactsRaw
+    {
+        public bool? CarrieraInterrotta { get; set; }
+        public int? NumAnniInterruzione { get; set; }
+        public decimal? CreditiExtraCurriculari { get; set; }
+        public int? MeseImmatricolazione { get; set; }
+        public int? Semestre { get; set; }
+        public bool? IscrittoRipetente { get; set; }
+        public bool? PassaggioTrasferimento { get; set; }
+        public bool? RipetenteDaPassaggio { get; set; }
+        public int? PrimaImmatricolazTs { get; set; }
+        public int? AaTrasferimento { get; set; }
+        public bool CreditiMeritoNormalizzati { get; set; }
+    }
+
+    internal sealed class BloccoPagamentoRaw
+    {
+        public string CodTipologiaBlocco { get; set; } = string.Empty;
+        public bool BloccoPagamentoAttivo { get; set; }
+    }
+
+    internal sealed class IncongruenzaRaw
+    {
+        public string CodIncongruenza { get; set; } = string.Empty;
+        public bool Attiva { get; set; }
+        public string CodForzatura { get; set; } = string.Empty;
+        public string EliminataDa { get; set; } = string.Empty;
     }
 
     internal sealed class EsitoBorsaFacts
@@ -53,6 +84,26 @@ namespace ProcedureNet7.Verifica
         public bool? DomandaTrasmessa { get; set; }
         public bool? TitoloAccademicoConseguito { get; set; }
         public bool? AttesaTitoloAccademicoConseguito { get; set; }
+        public bool? AttesaTitoloValidaAllaDataValutazione { get; set; }
+        public bool? AttesaTitoloScaduta { get; set; }
+        public DateTime? ScadenzaAttesaTitolo { get; set; }
+        public bool? TitoloAccessoValidoPerIscrizione { get; set; }
+        public string CodAvvenimentoTitoloAccesso { get; set; } = string.Empty;
+        public bool? AttesaTitoloCicloUnicoPresente { get; set; }
+        public bool? TitoloAccessoTriennaleConseguito { get; set; }
+        public bool? TitoloGiaConseguitoConAttesaCicloUnico { get; set; }
+        public List<BloccoPagamentoRaw> BlocchiPagamento { get; } = new();
+        public bool HasBloccoPagamentoBISBSTRimosso { get; set; }
+        public bool HasBloccoPagamentoBISBSTAttivo { get; set; }
+        public bool? AttesaTitoloValidataDaBloccoPagamentoRimosso { get; set; }
+
+        public bool HasIncongruenza27NonAttiva { get; set; }
+        public bool HasIncongruenza27Attiva { get; set; }
+        public bool? AttesaTitoloValidataDaIncongruenza27 { get; set; }
+        public List<IncongruenzaRaw> Incongruenze { get; } = new();
+        public bool HasIncongruenza27 { get; set; }
+        public int? AnnoAvvenimentoTitoloAccesso { get; set; }
+        public int? AnnoAvvenimentoTitoloAtteso { get; set; }
         public int? TipoStudenteNormalizzato { get; set; }
         public bool? IsConferma { get; set; }
         public bool? Straniero { get; set; }
@@ -117,6 +168,8 @@ namespace ProcedureNet7.Verifica
 
         public int? TipologiaStudiTitoloConseguito { get; set; }
         public int? DurataLegTitoloConseguito { get; set; }
+        public int? TipologiaStudiTitoloAtteso { get; set; }
+        public int? DurataLegTitoloAtteso { get; set; }
     }
 
     internal sealed class EsitoConcorsoBenefitRaw
