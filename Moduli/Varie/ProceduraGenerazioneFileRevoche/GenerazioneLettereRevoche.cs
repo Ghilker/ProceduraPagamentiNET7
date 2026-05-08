@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.IO;
@@ -8,22 +9,20 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using iText.Kernel.Pdf;
 using iText.Kernel.Utils;
-using System.Runtime.InteropServices;
-using Word = Microsoft.Office.Interop.Word;
 
 namespace ProcedureNet7
 {
-
     internal class GenerazioneLettereRevoche
     {
         private readonly string _rootFolder;
+
         public GenerazioneLettereRevoche(string rootFolder)
         {
             _rootFolder = rootFolder;
         }
 
         // =====================================================
-        // AVVIO OTTIMIZZATO
+        // AVVIO
         // =====================================================
         public void RunProcedure()
         {
@@ -43,7 +42,6 @@ namespace ProcedureNet7
             if (folders.Count == 0)
                 throw new Exception("Nessuna cartella valida trovata.");
 
-            // WORD APERTO UNA SOLA VOLTA
             using WordPdfService wordService =
                 new WordPdfService();
 
@@ -113,7 +111,9 @@ namespace ProcedureNet7
         {
             string nome = S(row, "Nome");
             string cognome = S(row, "Cognome");
-            string cf = S(row, "Cod_fiscale").Trim().ToUpper();
+            string cf = S(row, "Cod_fiscale")
+                .Trim()
+                .ToUpper();
 
             if (cf == "")
                 return;
@@ -157,27 +157,28 @@ namespace ProcedureNet7
                 tempDocx,
                 tempPdf);
 
-            string generatedPdf =
-                Path.Combine(
-                    studentFolder,
-                    "temp.pdf");
-
-            string bollettino =
+            // ============================================
+            // TROVA TUTTI I BOLLETTINI
+            // ============================================
+            List<string> bollettini =
                 FindPagoPaByCF(
                     pagoPaFolder,
                     cf);
 
-            if (bollettino != "")
+            // ============================================
+            // MERGE
+            // ============================================
+            if (bollettini.Count > 0)
             {
-                MergePdf(
-                    generatedPdf,
-                    bollettino,
+                MergePdfMultiplo(
+                    tempPdf,
+                    bollettini,
                     finalPdf);
             }
             else
             {
                 File.Copy(
-                    generatedPdf,
+                    tempPdf,
                     finalPdf,
                     true);
             }
@@ -215,21 +216,21 @@ namespace ProcedureNet7
                 Replace(t, "«Cod_fiscale»", S(row, "Cod_fiscale"));
 
                 Replace(t,
-                    "«Recupero_somme_Borsa_di_studio»",
+                    "«Recupero_borsa_di_studio»",
                     Euro(S(row,
-                        "Recupero somme Borsa di studio")));
+                        "Recupero_borsa_di_studio")));
 
                 Replace(t,
                     "«Recupero_servizio_abitativo»",
                     Euro(S(row,
-                        "Recupero servizio abitativo")));
+                        "Recupero_servizio_abitativo")));
 
                 if (isPec)
                 {
                     Replace(t, "«Indirizzo_residenza»", "");
                     Replace(t, "«Civico_residenza»", "");
                     Replace(t, "«CAP_residenza»", "");
-                    Replace(t, "«Comune_residenza»", "");
+                    Replace(t, "«comune_residenza»", "");
                     Replace(t, "«provincia_residenza»", "");
 
                     Replace(t,
@@ -240,23 +241,23 @@ namespace ProcedureNet7
                 {
                     Replace(t,
                         "«Indirizzo_residenza»",
-                        S(row, "Indirizzo residenza"));
+                        S(row, "Indirizzo_residenza"));
 
                     Replace(t,
                         "«Civico_residenza»",
-                        S(row, "Civico residenza"));
+                        S(row, "Civico_residenza"));
 
                     Replace(t,
                         "«CAP_residenza»",
-                        S(row, "CAP residenza"));
+                        S(row, "CAP_residenza"));
 
                     Replace(t,
-                        "«Comune_residenza»",
-                        S(row, "Comune residenza"));
+                        "«comune_residenza»",
+                        S(row, "comune_residenza"));
 
                     Replace(t,
-                        "«Provincia_residenza»",
-                        S(row, "Provincia residenza"));
+                        "«provincia_residenza»",
+                        S(row, "provincia_residenza"));
 
                     Replace(t, "«Indirizzo_PEC»", "");
                 }
@@ -274,12 +275,12 @@ namespace ProcedureNet7
                 t.Text = t.Text.Replace(tag, value);
         }
 
-    // =====================================================
-    // MERGE PDF
-    // =====================================================
-    private void MergePdf(
-            string pdf1,
-            string pdf2,
+        // =====================================================
+        // MERGE PDF MULTIPLO
+        // =====================================================
+        private void MergePdfMultiplo(
+            string firstPdf,
+            List<string> allegati,
             string output)
         {
             using PdfDocument dest =
@@ -289,39 +290,50 @@ namespace ProcedureNet7
             PdfMerger merger =
                 new PdfMerger(dest);
 
-            using PdfDocument src1 =
+            // ============================================
+            // LETTERA PRINCIPALE
+            // ============================================
+            using (PdfDocument src =
                 new PdfDocument(
-                    new PdfReader(pdf1));
+                    new PdfReader(firstPdf)))
+            {
+                merger.Merge(
+                    src,
+                    1,
+                    src.GetNumberOfPages());
+            }
 
-            merger.Merge(
-                src1,
-                1,
-                src1.GetNumberOfPages());
+            // ============================================
+            // ALLEGATI PAGOPA
+            // ============================================
+            foreach (string file in allegati)
+            {
+                using PdfDocument src =
+                    new PdfDocument(
+                        new PdfReader(file));
 
-            using PdfDocument src2 =
-                new PdfDocument(
-                    new PdfReader(pdf2));
-
-            merger.Merge(
-                src2,
-                1,
-                src2.GetNumberOfPages());
+                merger.Merge(
+                    src,
+                    1,
+                    src.GetNumberOfPages());
+            }
         }
 
         // =====================================================
-        // CERCA PAGOPA
+        // CERCA TUTTI I PAGOPA DEL CF
         // =====================================================
-        private string FindPagoPaByCF(
+        private List<string> FindPagoPaByCF(
             string folder,
             string cf)
         {
             return Directory
-                .GetFiles(folder)
-                .FirstOrDefault(x =>
+                .GetFiles(folder, "*.pdf")
+                .Where(x =>
                     Path.GetFileName(x)
-                    .ToUpper()
-                    .Contains(cf))
-                ?? "";
+                        .ToUpper()
+                        .Contains(cf))
+                .OrderBy(x => x)
+                .ToList();
         }
 
         // =====================================================
@@ -384,24 +396,33 @@ namespace ProcedureNet7
                     Path.Combine(folder, "PAGOPA"));
         }
 
-        private string GetMainExcel(
-            string folder)
+        private string GetMainExcel(string folder)
         {
             return Directory
                 .GetFiles(folder, "*.xlsx")
                 .FirstOrDefault(x =>
-                    !Path.GetFileName(x)
-                    .Contains("allegato",
-                    StringComparison.OrdinalIgnoreCase))
+                {
+                    var fileName = Path.GetFileName(x);
+
+                    return !fileName.Contains(
+                               "allegato",
+                               StringComparison.OrdinalIgnoreCase)
+                        && !fileName.Contains(
+                               "tracciato",
+                               StringComparison.OrdinalIgnoreCase);
+                })
                 ?? "";
         }
 
-        private string GetTemplate(
-            string folder)
+        private string GetTemplate(string folder)
         {
             return Directory
                 .GetFiles(folder, "*.docx")
-                .FirstOrDefault()
+                .FirstOrDefault(x =>
+                    Path.GetFileName(x)
+                        .Contains(
+                            "SCHEMA",
+                            StringComparison.OrdinalIgnoreCase))
                 ?? "";
         }
 
