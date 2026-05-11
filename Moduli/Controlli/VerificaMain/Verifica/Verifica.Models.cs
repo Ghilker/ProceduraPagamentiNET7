@@ -33,6 +33,7 @@ namespace ProcedureNet7.Verifica
         public Dictionary<StudentKey, Dictionary<string, EsitoConcorsoBenefitRaw>> EsitiConcorsoByStudentBenefit { get; } = new();
         public Dictionary<StudentKey, Dictionary<string, EsitoBeneficioCalcolato>> EsitiCalcolatiByStudentBenefit { get; } = new();
         public Dictionary<StudentKey, IscrizioneEsitoFactsRaw> IscrizioneEsitoFactsByStudent { get; } = new();
+        public Dictionary<StudentKey, List<CarrieraPregressaBeneficiRiRaw>> CarrieraPregressaBeneficiRiByStudent { get; } = new();
         public HashSet<(string ComuneA, string ComuneB)> ComuniEquiparati { get; } = new();
         public CalcParams CalcParams { get; set; } = new();
         public List<string> CodiciFiscaliFiltro { get; } = new();
@@ -40,6 +41,17 @@ namespace ProcedureNet7.Verifica
         public CreditiRichiestiCatalog CreditiRichiestiCatalog { get; } = new();
     }
 
+
+    internal sealed class CarrieraPregressaBeneficiRiRaw
+    {
+        public string CodAvvenimento { get; set; } = string.Empty;
+        public string BeneficiUsufruiti { get; set; } = string.Empty;
+        public string ImportiRestituiti { get; set; } = string.Empty;
+        public string AnniBeneficiUsufruitiLz { get; set; } = string.Empty;
+        public string AnniImportiRestituitiLz { get; set; } = string.Empty;
+        public string TipologiaCorso { get; set; } = string.Empty;
+        public int? DurataLegTitoloConseguito { get; set; }
+    }
 
     internal sealed class IscrizioneEsitoFactsRaw
     {
@@ -128,6 +140,19 @@ namespace ProcedureNet7.Verifica
         public HashSet<string> BeneficiRichiesti { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> BeneficiPregressiNonRestituiti { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> BeneficiRinunciaPregressa { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool BorsaPregressaNonRestituitaConfliggente { get; set; }
+        public int? AnnoBorsaRichiestoNormalizzato { get; set; }
+        public string AnniBorsaPregressaUsufruitiNormalizzati { get; set; } = string.Empty;
+        public string AnniBorsaPregressaRestituitiNormalizzati { get; set; } = string.Empty;
+        public string AnniBorsaPregressaNonRestituitaConfliggenti { get; set; } = string.Empty;
+        public string DiagnosticaBorsaPregressaRestituzioni { get; set; } = string.Empty;
+        public bool HasIseeBaseEntroScadenza { get; set; }
+        public bool HasCoUniversitarioEntroScadenza { get; set; }
+        public bool HasCoOrdinarioConIntegrazioneEsteriEntroScadenza { get; set; }
+        public bool HasCoOrdinarioSemestreFiltroEntroScadenza { get; set; }
+        public bool HasCiUniversitarioEntroScadenza { get; set; }
+        public bool OrigineEconomicaAdeguata { get; set; }
+        public string MotivoAdeguatezzaOrigine { get; set; } = string.Empty;
         public Dictionary<string, string> SlashMotiviEsclusioneByBenefit { get; } = new(StringComparer.OrdinalIgnoreCase);
         public bool? RiconoscimentoTitoloEstero { get; set; }
         public string SedeIstituzioneUniversitariaTitolo { get; set; } = string.Empty;

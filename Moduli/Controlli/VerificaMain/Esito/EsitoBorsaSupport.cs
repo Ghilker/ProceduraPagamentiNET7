@@ -35,7 +35,7 @@ namespace ProcedureNet7
             { "RED087", "Codice fiscale dello studente indipendente presente nell'attestazione ISEE della famiglia di origine" },
             { "RED029", "ISEE base assente entro la scadenza effettiva" },
             { "RED030", "ISEE base presente ma firmato oltre la scadenza effettiva" },
-            { "RED031", "Attestazione ISEE universitaria/corrente origine non presente entro il 31/12/2025" },
+            { "RED031", "Attestazione ISEE origine non adeguata: manca CO universitaria/ridotta/corrente oppure CO ordinaria valida con integrazione redditi esteri" },
             { "RED032", "Attestazione ISEE universitaria/corrente origine presente ma firmata oltre il 31/12/2025" },
             { "RED033", "Integrazione ISEE universitaria/corrente nucleo di origine non presente entro il 31/12/2025" },
             { "RED034", "Integrazione ISEE universitaria/corrente nucleo di origine presente ma firmata oltre il 31/12/2025" },
@@ -50,6 +50,8 @@ namespace ProcedureNet7
             { "MER072", "Anno di corso incongruente con l'anno accademico di immatricolazione" },
             { "MER074", "Crediti riconosciuti insufficienti per il primo anno di specialistica" },
             { "MER085", "Utilizzo del bonus non ammesso per il titolo di accesso dichiarato" },
+            { "MER086", "Utilizzo del bonus non ammesso in presenza di crediti riconosciuti non derivanti da trasferimento TS o con ripetenza" },
+            { "MER087", "Utilizzo del bonus non ammesso per carriera pregressa CD/AT con tipologia corso 9 o sede istituzione universitaria 2" },
             { "MER012", "Merito insufficiente per la borsa" },
             { "MER092", "Crediti di tirocinio superiori ai crediti dichiarati" },
             { "MER089", "Titolo di accesso non ammesso per immatricolazione alla specialistica" },
@@ -77,8 +79,41 @@ namespace ProcedureNet7
             { "VAR031", "Revoca per mancanza contratto di locazione" }
         };
 
+        public const string MotivoAdeguatezzaOrigineCoUniversitario = "CO_UNIVERSITARIO";
+        public const string MotivoAdeguatezzaOrigineCoOrdinarioConIntegrazioneEsteri = "CO_ORDINARIO_CON_INTEGRAZIONE_ESTERI";
+        public const string MotivoAdeguatezzaOrigineCoOrdinarioSemestreFiltro = "CO_ORDINARIO_SEMESTRE_FILTRO";
+        public const string MotivoAdeguatezzaOrigineMancanteIseeBase = "MANCANTE_ISEE_BASE";
+        public const string MotivoAdeguatezzaOrigineMancanteCoAdeguata = "MANCANTE_CO_ADEGUATA";
+
         public static string NormalizeUpper(string? value)
             => (value ?? string.Empty).Trim().ToUpperInvariant();
+
+        public static bool IsCoAdeguataOrigine(
+            bool hasCoUniversitario,
+            bool hasCoOrdinarioConIntegrazioneEsteri,
+            bool hasCoOrdinarioSemestreFiltro)
+            => hasCoUniversitario || hasCoOrdinarioConIntegrazioneEsteri || hasCoOrdinarioSemestreFiltro;
+
+        public static string GetMotivoAdeguatezzaOrigine(
+            bool hasIseeBaseEntroScadenza,
+            bool hasCoUniversitarioEntroScadenza,
+            bool hasCoOrdinarioConIntegrazioneEsteriEntroScadenza,
+            bool hasCoOrdinarioSemestreFiltroEntroScadenza)
+        {
+            if (!hasIseeBaseEntroScadenza)
+                return MotivoAdeguatezzaOrigineMancanteIseeBase;
+
+            if (hasCoUniversitarioEntroScadenza)
+                return MotivoAdeguatezzaOrigineCoUniversitario;
+
+            if (hasCoOrdinarioConIntegrazioneEsteriEntroScadenza)
+                return MotivoAdeguatezzaOrigineCoOrdinarioConIntegrazioneEsteri;
+
+            if (hasCoOrdinarioSemestreFiltroEntroScadenza)
+                return MotivoAdeguatezzaOrigineCoOrdinarioSemestreFiltro;
+
+            return MotivoAdeguatezzaOrigineMancanteCoAdeguata;
+        }
 
         public static IReadOnlyList<string> GetDiagnosticaIscrizione(EsitoBorsaStudentContext? context)
         {

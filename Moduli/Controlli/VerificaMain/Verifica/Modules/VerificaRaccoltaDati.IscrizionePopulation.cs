@@ -203,6 +203,8 @@ SELECT
     CONVERT(NVARCHAR(250), cp.SEDE_ISTITUZIONE_UNIVERSITARIA) AS Sede_istituzione_universitaria,
     CONVERT(NVARCHAR(250), cp.BENEFICI_USUFRUITI) AS benefici_usufruiti,
     CONVERT(NVARCHAR(250), cp.IMPORTI_RESTITUITI) AS importi_restituiti,
+    ISNULL(bu.AnniBeneficiUsufruitiLz, '') AS Anni_benefici_usufruiti_LZ,
+    ISNULL(ir.AnniImportiRestituitiLz, '') AS Anni_importi_restituiti_LZ,
     TRY_CONVERT(DECIMAL(18,2), cp.NUMERO_CREDITI) AS numero_crediti,
     TRY_CONVERT(INT, cp.ANNO_CORSO) AS anno_corso,
     TRY_CONVERT(INT, cp.RIPETENTE) AS ripetente,
@@ -219,7 +221,59 @@ JOIN CARRIERA_PREGRESSA cp
     WHERE cp2.COD_FISCALE = cp.COD_FISCALE
       AND cp2.ANNO_ACCADEMICO = cp.ANNO_ACCADEMICO
       AND cp2.COD_AVVENIMENTO = cp.COD_AVVENIMENTO
- );
+ )
+OUTER APPLY
+(
+    SELECT
+        STUFF
+        (
+            (
+                SELECT '|' + CONVERT(NVARCHAR(10), x.AnnoCarriera)
+                FROM
+                (
+                    SELECT DISTINCT TRY_CONVERT(INT, b.Anno_carriera) AS AnnoCarriera
+                    FROM Benefici_usufruiti_LZ b
+                    WHERE b.Cod_fiscale = D.CodFiscale
+                      AND b.Anno_accademico = @AA
+                      AND ISNULL(b.Riga_valida, 0) = 1
+                      AND TRY_CONVERT(INT, b.Anno_carriera) IS NOT NULL
+                      AND UPPER(LTRIM(RTRIM(ISNULL(cp.COD_AVVENIMENTO, '')))) = 'RI'
+                      AND ISNULL(TRY_CONVERT(INT, cp.BENEFICI_USUFRUITI), 0) = 1
+                ) x
+                ORDER BY x.AnnoCarriera
+                FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)'),
+            1,
+            1,
+            ''
+        ) AS AnniBeneficiUsufruitiLz
+) bu
+OUTER APPLY
+(
+    SELECT
+        STUFF
+        (
+            (
+                SELECT '|' + CONVERT(NVARCHAR(10), x.AnnoCarriera)
+                FROM
+                (
+                    SELECT DISTINCT TRY_CONVERT(INT, r.Anno_carriera) AS AnnoCarriera
+                    FROM Importi_restituiti_LZ r
+                    WHERE r.Cod_fiscale = D.CodFiscale
+                      AND r.Anno_accademico = @AA
+                      AND ISNULL(r.Riga_valida, 0) = 1
+                      AND TRY_CONVERT(INT, r.Anno_carriera) IS NOT NULL
+                      AND UPPER(LTRIM(RTRIM(ISNULL(cp.COD_AVVENIMENTO, '')))) = 'RI'
+                      AND ISNULL(TRY_CONVERT(INT, cp.IMPORTI_RESTITUITI), 0) = 1
+                ) x
+                ORDER BY x.AnnoCarriera
+                FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)'),
+            1,
+            1,
+            ''
+        ) AS AnniImportiRestituitiLz
+) ir;
 ";
 
         private const string MeritoDurataLegaleCorsoColumn = "Durata_legale";
@@ -310,9 +364,13 @@ JOIN CARRIERA_PREGRESSA cp
             using var cmd = CreatePopulationCommand(CarrieraPregressaSql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
+                string codAvvenimento = reader.SafeGetString("Cod_avvenimento");
+                string beneficiUsufruiti = reader.SafeGetString("benefici_usufruiti");
+                string importiRestituiti = reader.SafeGetString("importi_restituiti");
+
                 info.InformazioniIscrizione.CarrierePregresse.Add(new InformazioniCarrieraPregressa
                 {
-                    CodAvvenimento = reader.SafeGetString("Cod_avvenimento"),
+                    CodAvvenimento = codAvvenimento,
                     AnnoAvvenimento = reader.SafeGetInt("Anno_avvenimento"),
                     UnivDiConseguim = reader.SafeGetString("Univ_di_conseguim"),
                     UnivProvenienza = reader.SafeGetString("Univ_provenienza"),
@@ -321,13 +379,34 @@ JOIN CARRIERA_PREGRESSA cp
                     DurataLegTitoloConseguito = reader.SafeGetInt("Durata_leg_titolo_conseguito"),
                     PassaggioCorsoEstero = reader.SafeGetInt("Passaggio_corso_estero"),
                     SedeIstituzioneUniversitaria = reader.SafeGetString("Sede_istituzione_universitaria"),
-                    BeneficiUsufruiti = reader.SafeGetString("benefici_usufruiti"),
-                    ImportiRestituiti = reader.SafeGetString("importi_restituiti"),
+                    BeneficiUsufruiti = beneficiUsufruiti,
+                    ImportiRestituiti = importiRestituiti,
                     NumeroCrediti = reader.SafeGetDecimal("numero_crediti"),
                     AnnoCorso = reader.SafeGetInt("anno_corso"),
                     Ripetente = reader.SafeGetInt("ripetente"),
                     ConfermaSemestreFiltroDi = reader.SafeGetInt("Iscritto_semestre_filtroDI")
                 });
+
+                if (string.Equals((codAvvenimento ?? string.Empty).Trim(), "RI", StringComparison.OrdinalIgnoreCase))
+                {
+                    var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                    if (!context.CarrieraPregressaBeneficiRiByStudent.TryGetValue(key, out var items))
+                    {
+                        items = new List<CarrieraPregressaBeneficiRiRaw>();
+                        context.CarrieraPregressaBeneficiRiByStudent[key] = items;
+                    }
+
+                    items.Add(new CarrieraPregressaBeneficiRiRaw
+                    {
+                        CodAvvenimento = codAvvenimento,
+                        BeneficiUsufruiti = beneficiUsufruiti,
+                        ImportiRestituiti = importiRestituiti,
+                        AnniBeneficiUsufruitiLz = reader.SafeGetString("Anni_benefici_usufruiti_LZ"),
+                        AnniImportiRestituitiLz = reader.SafeGetString("Anni_importi_restituiti_LZ"),
+                        TipologiaCorso = reader.SafeGetString("Tipologia_corso"),
+                        DurataLegTitoloConseguito = reader.SafeGetInt("Durata_leg_titolo_conseguito")
+                    });
+                }
             });
         }
 

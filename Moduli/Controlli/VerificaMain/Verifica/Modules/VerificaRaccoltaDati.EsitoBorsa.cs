@@ -1,4 +1,4 @@
-using ProcedureNet7.Verifica;
+ï»¿using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -771,6 +771,12 @@ WHERE ANNO_ACCADEMICO = @AA
                 var facts = GetOrCreateEsitoBorsaFacts(context, pair.Key);
                 facts.UsufruitoBeneficioBorsaNonRestituito = false;
                 facts.RinunciaBorsa = false;
+                facts.BorsaPregressaNonRestituitaConfliggente = false;
+                facts.AnnoBorsaRichiestoNormalizzato = null;
+                facts.AnniBorsaPregressaUsufruitiNormalizzati = string.Empty;
+                facts.AnniBorsaPregressaRestituitiNormalizzati = string.Empty;
+                facts.AnniBorsaPregressaNonRestituitaConfliggenti = string.Empty;
+                facts.DiagnosticaBorsaPregressaRestituzioni = string.Empty;
 
                 var items = info.InformazioniIscrizione?.CarrierePregresse;
                 if (items == null || items.Count == 0)
@@ -785,7 +791,9 @@ WHERE ANNO_ACCADEMICO = @AA
                     bool hasBorsa = HasBorsaMarker(benefici);
                     bool hasRestituzione = HasMeaningfulRestitution(restituzioni);
 
-                    if (hasBorsa && !hasRestituzione)
+                    // La rinuncia (RI) con Benefici_usufruiti_LZ/Importi_restituiti_LZ viene gestita sotto con mappatura 3+2/ciclo unico.
+                    // Evita il vecchio confronto secco 1Â° anno con 1Â° anno, non valido per studenti che richiedono una magistrale.
+                    if (codAvvenimento != "RI" && hasBorsa && !hasRestituzione)
                         facts.UsufruitoBeneficioBorsaNonRestituito = true;
 
                     if (IsRinunciaBorsa(codAvvenimento, benefici))
@@ -793,7 +801,221 @@ WHERE ANNO_ACCADEMICO = @AA
 
                     AddPregressaBenefitFacts(facts, benefici, restituzioni, codAvvenimento);
                 }
+
+                if (HasBeneficiRiUsufruitiNonRestituiti(context, pair.Key, facts))
+                {
+                    facts.UsufruitoBeneficioBorsaNonRestituito = true;
+                    facts.BeneficiPregressiNonRestituiti.Add("BS");
+                }
             }
+        }
+
+        private static bool HasBeneficiRiUsufruitiNonRestituiti(VerificaPipelineContext context, StudentKey key, EsitoBorsaFacts facts)
+        {
+            if (context == null || facts == null || !context.CarrieraPregressaBeneficiRiByStudent.TryGetValue(key, out var rows) || rows == null || rows.Count == 0)
+                return false;
+
+            if (!context.Students.TryGetValue(key, out var info) || info?.InformazioniIscrizione == null)
+                return false;
+
+            int annoCarrieraDomanda = GetAnnoCarrieraBeneficiLz(info.InformazioniIscrizione);
+            if (annoCarrieraDomanda <= 0)
+                return false;
+
+            int annoRichiestoNormalizzato = NormalizeAnnoBeneficioCorrente(info.InformazioniIscrizione, annoCarrieraDomanda);
+            facts.AnnoBorsaRichiestoNormalizzato = annoRichiestoNormalizzato;
+
+            var usufruitiNormalizzati = new HashSet<int>();
+            var restituitiNormalizzati = new HashSet<int>();
+            var confliggenti = new HashSet<int>();
+            var diagnostica = new List<string>();
+
+            foreach (var row in rows)
+            {
+                if (row == null)
+                    continue;
+
+                string codAvvenimento = NormalizeUpper(row.CodAvvenimento);
+                if (codAvvenimento != "RI")
+                    continue;
+
+                if (!IsFlagOne(row.BeneficiUsufruiti))
+                    continue;
+
+                var anniUsufruiti = ParseAnnoCarrieraSet(row.AnniBeneficiUsufruitiLz);
+                if (anniUsufruiti.Count == 0)
+                    continue;
+
+                var anniRestituiti = IsFlagOne(row.ImportiRestituiti)
+                    ? ParseAnnoCarrieraSet(row.AnniImportiRestituitiLz)
+                    : new HashSet<int>();
+
+                string tipoPregresso = ResolvePercorsoBeneficiPregressi(row.TipologiaCorso, row.DurataLegTitoloConseguito);
+                bool fallbackOrdinale = tipoPregresso == "UNKNOWN";
+
+                foreach (int annoUsufruito in anniUsufruiti)
+                {
+                    int annoUsufruitoNormalizzato = fallbackOrdinale
+                        ? annoUsufruito
+                        : NormalizeAnnoBeneficioPregresso(annoUsufruito, tipoPregresso);
+
+                    usufruitiNormalizzati.Add(annoUsufruitoNormalizzato);
+
+                    bool restituito = false;
+                    foreach (int annoRestituito in anniRestituiti)
+                    {
+                        int annoRestituitoNormalizzato = fallbackOrdinale
+                            ? annoRestituito
+                            : NormalizeAnnoBeneficioPregresso(annoRestituito, tipoPregresso);
+
+                        restituitiNormalizzati.Add(annoRestituitoNormalizzato);
+                        if (annoRestituitoNormalizzato == annoUsufruitoNormalizzato)
+                            restituito = true;
+                    }
+
+                    bool confligge = fallbackOrdinale
+                        ? annoUsufruito == annoCarrieraDomanda
+                        : annoUsufruitoNormalizzato == annoRichiestoNormalizzato;
+
+                    if (confligge && !restituito)
+                        confliggenti.Add(annoUsufruitoNormalizzato);
+                }
+
+                diagnostica.Add(BuildDiagnosticaBeneficiRi(row, tipoPregresso, fallbackOrdinale));
+            }
+
+            facts.AnniBorsaPregressaUsufruitiNormalizzati = FormatIntSet(usufruitiNormalizzati);
+            facts.AnniBorsaPregressaRestituitiNormalizzati = FormatIntSet(restituitiNormalizzati);
+            facts.AnniBorsaPregressaNonRestituitaConfliggenti = FormatIntSet(confliggenti);
+            facts.BorsaPregressaNonRestituitaConfliggente = confliggenti.Count > 0;
+            facts.DiagnosticaBorsaPregressaRestituzioni = string.Join(" || ", diagnostica);
+
+            return confliggenti.Count > 0;
+        }
+
+        private static string BuildDiagnosticaBeneficiRi(CarrieraPregressaBeneficiRiRaw row, string tipoPregresso, bool fallbackOrdinale)
+        {
+            string tipo = fallbackOrdinale ? "UNKNOWN_FALLBACK_ORDINALE" : tipoPregresso;
+            return string.Concat(
+                "RI;TipoPregresso=", tipo,
+                ";TipologiaCorso=", NormalizeUpper(row.TipologiaCorso),
+                ";Durata=", row.DurataLegTitoloConseguito?.ToString(CultureInfo.InvariantCulture) ?? "",
+                ";AnniUsufruitiRaw=", row.AnniBeneficiUsufruitiLz ?? string.Empty,
+                ";AnniRestituitiRaw=", row.AnniImportiRestituitiLz ?? string.Empty);
+        }
+
+        private static int NormalizeAnnoBeneficioCorrente(InformazioniIscrizione iscr, int annoCarrieraDomanda)
+        {
+            if (iscr == null || annoCarrieraDomanda <= 0)
+                return 0;
+
+            string tipoCorrente = ResolvePercorsoBeneficiCorrente(iscr);
+            if (tipoCorrente == "MAGISTRALE")
+                return annoCarrieraDomanda + 3;
+
+            return annoCarrieraDomanda;
+        }
+
+        private static int NormalizeAnnoBeneficioPregresso(int annoCarriera, string tipoPregresso)
+        {
+            if (annoCarriera <= 0)
+                return 0;
+
+            return tipoPregresso == "MAGISTRALE" ? annoCarriera + 3 : annoCarriera;
+        }
+
+        private static string ResolvePercorsoBeneficiCorrente(InformazioniIscrizione iscr)
+        {
+            if (iscr == null)
+                return "UNKNOWN";
+
+            if (iscr.TipoCorso == 5)
+                return "MAGISTRALE";
+
+            if (iscr.TipoCorso == 4)
+                return "CICLO_UNICO";
+
+            if (iscr.TipoCorso == 3 || iscr.TipoCorso == 6)
+                return "TRIENNALE";
+
+            int durata = EsitoBorsaSupport.GetDurataNormaleCorso(iscr);
+            if (durata >= 5)
+                return "CICLO_UNICO";
+
+            if (durata == 3)
+                return "TRIENNALE";
+
+            if (durata == 2)
+                return "MAGISTRALE";
+
+            return "UNKNOWN";
+        }
+
+        private static string ResolvePercorsoBeneficiPregressi(string? tipologiaCorso, int? durataLegale)
+        {
+            int tipologia = 0;
+            int.TryParse((tipologiaCorso ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out tipologia);
+            int durata = durataLegale ?? 0;
+
+            if (tipologia == 5 || durata == 2)
+                return "MAGISTRALE";
+
+            if (tipologia == 4 || durata >= 5)
+                return "CICLO_UNICO";
+
+            if (tipologia == 3 || tipologia == 6 || durata == 3)
+                return "TRIENNALE";
+
+            return "UNKNOWN";
+        }
+
+        private static string FormatIntSet(HashSet<int> values)
+        {
+            if (values == null || values.Count == 0)
+                return string.Empty;
+
+            return string.Join("|", values.OrderBy(v => v));
+        }
+
+        private static int GetAnnoCarrieraBeneficiLz(InformazioniIscrizione iscr)
+        {
+            if (iscr == null)
+                return 0;
+
+            int annoCorso = iscr.AnnoCorso;
+            if (annoCorso > 0)
+                return annoCorso;
+
+            if (annoCorso < 0)
+            {
+                int durataNormale = EsitoBorsaSupport.GetDurataNormaleCorso(iscr);
+                if (durataNormale > 0)
+                    return durataNormale + Math.Abs(annoCorso);
+            }
+
+            return 0;
+        }
+
+        private static HashSet<int> ParseAnnoCarrieraSet(string? value)
+        {
+            var result = new HashSet<int>();
+            if (string.IsNullOrWhiteSpace(value))
+                return result;
+
+            string[] parts = value.Split(new[] { '|', ',', ';', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string part in parts)
+            {
+                if (int.TryParse(part.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int anno) && anno > 0)
+                    result.Add(anno);
+            }
+
+            return result;
+        }
+
+        private static bool IsFlagOne(string? value)
+        {
+            string normalized = NormalizeUpper(value);
+            return normalized == "1" || normalized == "TRUE" || normalized == "S" || normalized == "SI";
         }
 
         private void BuildEsitoBorsaGeneralFactsFromCarrieraPregressa(VerificaPipelineContext context)
@@ -846,7 +1068,7 @@ WHERE ANNO_ACCADEMICO = @AA
                         }
 
                         int? tipologiaAtScan = null;
-                        if (TryParseCareerTitleType(item.TipologiaCorso, out int tipoAtScan))
+                        if (TryParseCareerTitleType(item, out int tipoAtScan))
                             tipologiaAtScan = tipoAtScan;
 
                         if (IsTitoloAttesoIncompatibilePerMagistraleBiennale(tipologiaAtScan, item.DurataLegTitoloConseguito)
@@ -929,7 +1151,7 @@ WHERE ANNO_ACCADEMICO = @AA
 
                 if (hasCd)
                 {
-                    if (TryParseCareerTitleType(bestCd!.TipologiaCorso, out int tipoCd))
+                    if (TryParseCareerTitleType(bestCd, out int tipoCd))
                         tipologiaTitoloAccesso = tipoCd;
 
                     durataTitoloAccesso = bestCd.DurataLegTitoloConseguito;
@@ -940,7 +1162,7 @@ WHERE ANNO_ACCADEMICO = @AA
 
                 if (hasAt)
                 {
-                    if (TryParseCareerTitleType(bestAt!.TipologiaCorso, out int tipoAt))
+                    if (TryParseCareerTitleType(bestAt, out int tipoAt))
                         tipologiaTitoloAtteso = tipoAt;
 
                     durataTitoloAtteso = bestAt.DurataLegTitoloConseguito;
@@ -957,7 +1179,7 @@ WHERE ANNO_ACCADEMICO = @AA
 
                 if (bestAtCicloUnico != null)
                 {
-                    if (TryParseCareerTitleType(bestAtCicloUnico.TipologiaCorso, out int tipoAtCicloUnico))
+                    if (TryParseCareerTitleType(bestAtCicloUnico, out int tipoAtCicloUnico))
                         tipologiaTitoloAttesoCicloUnico = tipoAtCicloUnico;
 
                     durataTitoloAttesoCicloUnico = bestAtCicloUnico.DurataLegTitoloConseguito;
@@ -970,7 +1192,7 @@ WHERE ANNO_ACCADEMICO = @AA
                 if (!facts.TitoloAccessoTriennaleConseguito.HasValue)
                     facts.TitoloAccessoTriennaleConseguito = titoloAccessoTriennaleConseguito;
 
-                // Nome mantenuto per compatibilità: da questa versione include AT su ciclo unico
+                // Nome mantenuto per compatibilitï¿½: da questa versione include AT su ciclo unico
                 // e AT su magistrale biennale (tipologia 5).
                 if (!facts.AttesaTitoloCicloUnicoPresente.HasValue)
                     facts.AttesaTitoloCicloUnicoPresente = attesaTitoloIncompatibile;
@@ -981,7 +1203,7 @@ WHERE ANNO_ACCADEMICO = @AA
                 if (best == null)
                     continue;
 
-                if (!facts.TipologiaStudiTitoloConseguito.HasValue && TryParseCareerTitleType(best.TipologiaCorso, out int tipologiaTitolo))
+                if (!facts.TipologiaStudiTitoloConseguito.HasValue && TryParseCareerTitleType(best, out int tipologiaTitolo))
                     facts.TipologiaStudiTitoloConseguito = tipologiaTitolo;
 
                 if (!facts.DurataLegTitoloConseguito.HasValue && best.DurataLegTitoloConseguito.HasValue)
@@ -1023,8 +1245,8 @@ WHERE ANNO_ACCADEMICO = @AA
 
             // Per l'iscrizione a magistrale biennale, dopo un CD triennale valido,
             // un ulteriore AT su ciclo unico o su altra magistrale biennale indica
-            // titolo ulteriore già in corso/atteso e rende non ammissibile la richiesta.
-            // AT normalmente non valorizza la durata legale: la tipologia corso è decisiva.
+            // titolo ulteriore giï¿½ in corso/atteso e rende non ammissibile la richiesta.
+            // AT normalmente non valorizza la durata legale: la tipologia corso ï¿½ decisiva.
             return tipo == 4 || tipo == 5 || durata >= 5;
         }
 
@@ -1037,7 +1259,7 @@ WHERE ANNO_ACCADEMICO = @AA
 
             // AT = attesa conseguimento titolo.
             // Nel tracciato AT normalmente non valorizza DurataLegTitoloConseguito,
-            // quindi la durata legale non può essere usata come requisito per riconoscere il record titolo.
+            // quindi la durata legale non puï¿½ essere usata come requisito per riconoscere il record titolo.
             if (code == "AT" || code == "CD")
                 return true;
 
@@ -1053,10 +1275,35 @@ WHERE ANNO_ACCADEMICO = @AA
             return false;
         }
 
-        private static bool TryParseCareerTitleType(string? value, out int tipologia)
+        private static bool TryParseCareerTitleType(InformazioniCarrieraPregressa? item, out int tipologia)
+        {
+            tipologia = 0;
+            if (item == null)
+                return false;
+
+            if (!TryParseCareerTitleTypeRaw(item.TipologiaCorso, out tipologia))
+                return false;
+
+            tipologia = NormalizeTipologiaTitoloCarrieraPregressa(item.CodAvvenimento, tipologia);
+            return true;
+        }
+
+        private static bool TryParseCareerTitleTypeRaw(string? value, out int tipologia)
         {
             tipologia = 0;
             return int.TryParse((value ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out tipologia);
+        }
+
+        private static int NormalizeTipologiaTitoloCarrieraPregressa(string? codAvvenimento, int tipologia)
+        {
+            string code = NormalizeUpper(codAvvenimento);
+
+            // Regola carriera pregressa: per titoli conseguiti o in attesa (CD/AT),
+            // la tipologia 1 deve essere valutata come triennale (tipologia 3).
+            if ((code == "CD" || code == "AT") && tipologia == 1)
+                return 3;
+
+            return tipologia;
         }
 
         private static bool IsRinunciaBorsa(string codAvvenimento, string benefici)
@@ -1088,7 +1335,7 @@ WHERE ANNO_ACCADEMICO = @AA
                 bool hasBenefit = HasBenefitMarker(benefici, beneficio);
                 bool hasRestituzione = HasMeaningfulRestitution(restituzioni);
 
-                if (hasBenefit && !hasRestituzione)
+                if (hasBenefit && !hasRestituzione && !(beneficio == "BS" && codAvvenimento == "RI"))
                     facts.BeneficiPregressiNonRestituiti.Add(beneficio);
 
                 if (IsRinunciaBenefit(codAvvenimento, benefici, beneficio))

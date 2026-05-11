@@ -1,4 +1,4 @@
-using ProcedureNet7.Verifica;
+﻿using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -171,6 +171,9 @@ IF OBJECT_ID('tempdb..#VerificaEconomiciSemestreFlags') IS NOT NULL
         private static string GetSqlPredicateAttestazioneUniversitaria(string alias)
             => $"(UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%UNIV%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%RID%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%CORRENTE%')";
 
+        private static string GetSqlPredicateAttestazioneOrdinaria(string alias)
+            => $"(UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%ORD%')";
+
         private static void AddFirmataIlMaxParameter(SqlCommand command, string aa)
         {
             if (command == null)
@@ -186,6 +189,7 @@ IF OBJECT_ID('tempdb..#VerificaEconomiciSemestreFlags') IS NOT NULL
 
             string attestazioneBasePredicate = GetSqlPredicateAttestazioneIseeBase("cte");
             string attestazioneUniversitariaPredicate = GetSqlPredicateAttestazioneUniversitaria("cte");
+            string attestazioneOrdinariaPredicate = GetSqlPredicateAttestazioneOrdinaria("cte");
 
             string sql = $@"
 ;WITH Targets AS
@@ -199,13 +203,76 @@ IF OBJECT_ID('tempdb..#VerificaEconomiciSemestreFlags') IS NOT NULL
         ON sf.CodFiscale = t.CodFiscale
        AND sf.NumDomanda = t.NumDomanda
 ),
+TipologieRanked AS
+(
+    SELECT
+        tr.Num_domanda,
+        tr.Tipo_redd_nucleo_fam_integr,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY tr.Num_domanda
+            ORDER BY tr.data_validita DESC
+        ) AS rn
+    FROM Tipologie_redditi tr
+    INNER JOIN Targets t
+        ON t.NumDomanda = tr.Num_domanda
+    WHERE tr.Anno_accademico = @AA
+),
+UltimeTipologie AS
+(
+    SELECT
+        Num_domanda,
+        Tipo_redd_nucleo_fam_integr
+    FROM TipologieRanked
+    WHERE rn = 1
+),
+NucleiRanked AS
+(
+    SELECT
+        nf.Num_domanda,
+        nf.Cod_tipologia_nucleo,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY nf.Num_domanda
+            ORDER BY nf.data_validita DESC
+        ) AS rn
+    FROM Nucleo_familiare nf
+    INNER JOIN Targets t
+        ON t.NumDomanda = nf.Num_domanda
+    WHERE nf.Anno_accademico = @AA
+),
+UltimoNucleo AS
+(
+    SELECT
+        Num_domanda,
+        Cod_tipologia_nucleo
+    FROM NucleiRanked
+    WHERE rn = 1
+),
+TargetEconomicFlags AS
+(
+    SELECT
+        t.CodFiscale,
+        t.NumDomanda,
+        t.ConfermaSemestreFiltro,
+        CASE
+            WHEN UPPER(REPLACE(LTRIM(RTRIM(ISNULL(nf.Cod_tipologia_nucleo, ''))), ' ', '')) = 'I'
+             AND UPPER(REPLACE(LTRIM(RTRIM(ISNULL(tr.Tipo_redd_nucleo_fam_integr, ''))), ' ', '')) = 'EE'
+            THEN 1 ELSE 0
+        END AS HasIntegrazioneRedditiEsteri
+    FROM Targets t
+    LEFT JOIN UltimeTipologie tr
+        ON tr.Num_domanda = t.NumDomanda
+    LEFT JOIN UltimoNucleo nf
+        ON nf.Num_domanda = t.NumDomanda
+),
 BaseIsee AS
 (
     SELECT
         cte.Num_domanda,
         COUNT_BIG(*) AS NumeroIseeBaseEntroScadenza
     FROM Certificaz_ISEE cte
-    INNER JOIN Targets t
+    INNER JOIN TargetEconomicFlags t
         ON t.NumDomanda = cte.Num_domanda
     WHERE cte.Anno_accademico = @AA
       AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) IN ('CO','DO')
@@ -226,21 +293,26 @@ CertUniversitarieRanked AS
         (
             PARTITION BY cte.Num_domanda, x.TipoCert
             ORDER BY
+                CASE WHEN {attestazioneUniversitariaPredicate} THEN 0 ELSE 1 END,
                 cte.firmata_il DESC,
                 cte.data_validita DESC
         ) AS rn
     FROM Certificaz_ISEE cte
-    INNER JOIN Targets t
+    INNER JOIN TargetEconomicFlags t
         ON t.NumDomanda = cte.Num_domanda
     CROSS APPLY
     (
         SELECT UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) AS TipoCert
     ) x
     WHERE cte.Anno_accademico = @AA
-      AND x.TipoCert IN ('CO','CI')
       AND cte.firmata_il IS NOT NULL
       AND cte.firmata_il <= @FirmataIlMax
-      AND {attestazioneUniversitariaPredicate}
+      AND
+      (
+          (x.TipoCert = 'CI' AND {attestazioneUniversitariaPredicate})
+          OR
+          (x.TipoCert = 'CO' AND ({attestazioneUniversitariaPredicate} OR ((t.HasIntegrazioneRedditiEsteri = 1 OR ISNULL(t.ConfermaSemestreFiltro, 0) = 1) AND {attestazioneOrdinariaPredicate})))
+      )
 ),
 LatestCert AS
 (
@@ -266,7 +338,7 @@ StatusRanked AS
             ORDER BY si.data_validita DESC
         ) AS rn
     FROM LatestCert c
-    INNER JOIN Targets t
+    INNER JOIN TargetEconomicFlags t
         ON t.NumDomanda = c.Num_domanda
     INNER JOIN Status_INPS si
         ON si.anno_accademico = @AA
@@ -298,7 +370,7 @@ SELECT
         ELSE 0
     END AS StatusInpsIntegrazione,
     CASE WHEN base.Num_domanda IS NOT NULL AND coCert.Num_domanda IS NOT NULL THEN 1 ELSE 0 END AS CoAttestazioneOk
-FROM Targets t
+FROM TargetEconomicFlags t
 LEFT JOIN BaseIsee base
     ON base.Num_domanda = t.NumDomanda
 LEFT JOIN LatestCert coCert
@@ -665,6 +737,9 @@ SELECT
     ISNULL(cte.patr_imm_50_frat_sor,0) AS patr_imm_50_frat_sor
 FROM {sourceTableName} t
 INNER JOIN Domanda d ON d.Anno_accademico = @AA AND d.Num_domanda = t.NumDomanda
+LEFT JOIN #VerificaEconomiciSemestreFlags sf
+    ON sf.CodFiscale = t.CodFiscale
+   AND sf.NumDomanda = t.NumDomanda
 OUTER APPLY
 (
     SELECT TOP 1 *
@@ -674,8 +749,9 @@ OUTER APPLY
       AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
       AND cte.firmata_il IS NOT NULL
       AND cte.firmata_il <= @FirmataIlMax
-      AND {GetSqlPredicateAttestazioneUniversitaria("cte")}
+      AND ({GetSqlPredicateAttestazioneUniversitaria("cte")} OR ((t.IsIntDI = 1 OR ISNULL(sf.ConfermaSemestreFiltro, 0) = 1) AND {GetSqlPredicateAttestazioneOrdinaria("cte")}))
     ORDER BY
+        CASE WHEN {GetSqlPredicateAttestazioneUniversitaria("cte")} THEN 0 ELSE 1 END,
         cte.firmata_il DESC,
         cte.data_validita DESC
 ) cte
@@ -1052,6 +1128,16 @@ WHERE t.IsIntDI = 1;";
             public List<Target> IntDI { get; } = new();
         }
 
+        private EsitoBorsaFacts GetOrCreateEsitoBorsaFacts(StudentKey key)
+        {
+            if (CurrentContext.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts) && facts != null)
+                return facts;
+
+            facts = new EsitoBorsaFacts();
+            CurrentContext.EsitoBorsaFactsByStudent[key] = facts;
+            return facts;
+        }
+
         private SplitResult LoadTipologieRedditiAndSplit(string aa, string sourceTableName)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadTipologieRedditiAndSplit", $"AA={aa}");
@@ -1062,6 +1148,7 @@ WHERE t.IsIntDI = 1;";
 
             string attestazioneBasePredicate = GetSqlPredicateAttestazioneIseeBase("cte");
             string attestazioneUniversitariaPredicate = GetSqlPredicateAttestazioneUniversitaria("cte");
+            string attestazioneOrdinariaPredicate = GetSqlPredicateAttestazioneOrdinaria("cte");
 
             string sql = $@"
 ;WITH Targets AS
@@ -1102,6 +1189,29 @@ UltimeTipologie AS
     FROM TipologieRanked
     WHERE rn = 1
 ),
+NucleiRanked AS
+(
+    SELECT
+        nf.Num_domanda,
+        nf.Cod_tipologia_nucleo,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY nf.Num_domanda
+            ORDER BY nf.data_validita DESC
+        ) AS rn
+    FROM Nucleo_familiare nf
+    INNER JOIN Targets t
+        ON t.NumDomanda = nf.Num_domanda
+    WHERE nf.Anno_accademico = @AA
+),
+UltimoNucleo AS
+(
+    SELECT
+        Num_domanda,
+        Cod_tipologia_nucleo
+    FROM NucleiRanked
+    WHERE rn = 1
+),
 CertFlags AS
 (
     SELECT
@@ -1119,6 +1229,21 @@ CertFlags AS
                  AND {attestazioneUniversitariaPredicate}
                 THEN 1 ELSE 0 END) AS HasCOUniversitarioEntroScadenza,
         MAX(CASE
+                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
+                 AND cte.firmata_il IS NOT NULL
+                 AND cte.firmata_il <= @FirmataIlMax
+                 AND {attestazioneOrdinariaPredicate}
+                 AND UPPER(REPLACE(LTRIM(RTRIM(ISNULL(nf.Cod_tipologia_nucleo, ''))), ' ', '')) = 'I'
+                 AND UPPER(REPLACE(LTRIM(RTRIM(ISNULL(tr.Tipo_redd_nucleo_fam_integr, ''))), ' ', '')) = 'EE'
+                THEN 1 ELSE 0 END) AS HasCOOrdinarioConIntegrazioneEsteriEntroScadenza,
+        MAX(CASE
+                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
+                 AND cte.firmata_il IS NOT NULL
+                 AND cte.firmata_il <= @FirmataIlMax
+                 AND {attestazioneOrdinariaPredicate}
+                 AND ISNULL(t.ConfermaSemestreFiltro, 0) = 1
+                THEN 1 ELSE 0 END) AS HasCOOrdinarioSemestreFiltroEntroScadenza,
+        MAX(CASE
                 WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CI'
                  AND cte.firmata_il IS NOT NULL
                  AND cte.firmata_il <= @FirmataIlMax
@@ -1129,6 +1254,10 @@ CertFlags AS
     FROM Certificaz_ISEE cte
     INNER JOIN Targets t
         ON t.NumDomanda = cte.Num_domanda
+    LEFT JOIN UltimeTipologie tr
+        ON tr.Num_domanda = t.NumDomanda
+    LEFT JOIN UltimoNucleo nf
+        ON nf.Num_domanda = t.NumDomanda
     WHERE cte.Anno_accademico = @AA
       AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) IN ('CO','DO','CI','DI')
     GROUP BY cte.Num_domanda
@@ -1141,6 +1270,8 @@ SELECT
     ISNULL(tr.altri_mezzi, 0) AS altri_mezzi,
     ISNULL(cf.HasIseeBaseEntroScadenza, 0) AS HasIseeBaseEntroScadenza,
     ISNULL(cf.HasCOUniversitarioEntroScadenza, 0) AS CoAttestazioneOk,
+    ISNULL(cf.HasCOOrdinarioConIntegrazioneEsteriEntroScadenza, 0) AS CoOrdinarioConIntegrazioneEsteriOk,
+    ISNULL(cf.HasCOOrdinarioSemestreFiltroEntroScadenza, 0) AS CoOrdinarioSemestreFiltroOk,
     ISNULL(cf.HasCIUniversitarioEntroScadenza, 0) AS CiAttestazioneOk,
     ISNULL(cf.NumeroCertificazioniImportate, 0) AS NumeroCertificazioniImportate,
     ISNULL(cf.NumeroModificheDopoScadenzaBase, 0) AS NumeroModificheDopoScadenzaBase
@@ -1161,6 +1292,8 @@ LEFT JOIN CertFlags cf
             int readCount = 0;
             int origineItBaseMancanteCount = 0;
             int origineItUniversitariaMancanteCount = 0;
+            int origineItOrdinariaConIntegrazioneEsteriCount = 0;
+            int origineItOrdinariaSemestreFiltroCount = 0;
             int integrazioneItUniversitariaMancanteCount = 0;
             int studentiConModificheMultipleCount = 0;
             using var reader = command.ExecuteReader();
@@ -1189,14 +1322,39 @@ LEFT JOIN CertFlags cf
                 if (tipoOrigine.Equals("it", StringComparison.OrdinalIgnoreCase))
                 {
                     bool baseOk = reader.SafeGetInt("HasIseeBaseEntroScadenza") != 0;
-                    bool coOk = reader.SafeGetInt("CoAttestazioneOk") != 0;
-                    raw.CoAttestazioneOk = baseOk && coOk;
+                    bool coUniversitarioOk = reader.SafeGetInt("CoAttestazioneOk") != 0;
+                    bool coOrdinarioConIntegrazioneEsteriOk = reader.SafeGetInt("CoOrdinarioConIntegrazioneEsteriOk") != 0;
+                    bool coOrdinarioSemestreFiltroOk = reader.SafeGetInt("CoOrdinarioSemestreFiltroOk") != 0;
+                    bool coOk = EsitoBorsaSupport.IsCoAdeguataOrigine(coUniversitarioOk, coOrdinarioConIntegrazioneEsteriOk, coOrdinarioSemestreFiltroOk);
+                    bool origineEconomicaAdeguata = baseOk && coOk;
+                    raw.CoAttestazioneOk = origineEconomicaAdeguata;
 
-                    // Regola 20252026+: non si usa pi� il fallback DO per rendere idoneo lo studente.
-                    // Prima deve esistere un ISEE base firmato entro il 22/07; per ConfermaSemestreFiltro=1 entro il 31/12. Poi l'ultima attestazione UNIVERSITARIA/RIDOTTA/CORRENTE entro il 31/12.
-                    // Se manca una delle due condizioni non viene caricata una fonte economica italiana: EsitoBorsaIncomeRules produrr� RED086.
-                    if (baseOk && coOk)
+                    var key = CreateStudentKey(codFiscale, numDomanda);
+                    var facts = GetOrCreateEsitoBorsaFacts(key);
+                    facts.HasIseeBaseEntroScadenza = baseOk;
+                    facts.HasCoUniversitarioEntroScadenza = coUniversitarioOk;
+                    facts.HasCoOrdinarioConIntegrazioneEsteriEntroScadenza = coOrdinarioConIntegrazioneEsteriOk;
+                    facts.HasCoOrdinarioSemestreFiltroEntroScadenza = coOrdinarioSemestreFiltroOk;
+                    facts.OrigineEconomicaAdeguata = origineEconomicaAdeguata;
+                    facts.MotivoAdeguatezzaOrigine = EsitoBorsaSupport.GetMotivoAdeguatezzaOrigine(
+                        baseOk,
+                        coUniversitarioOk,
+                        coOrdinarioConIntegrazioneEsteriOk,
+                        coOrdinarioSemestreFiltroOk);
+
+                    // Regola 20252026+: non si usa più il fallback DO per rendere idoneo lo studente.
+                    // Prima deve esistere un ISEE base firmato entro il 22/07; per ConfermaSemestreFiltro=1 entro il 31/12.
+                    // Poi serve una CO UNIVERSITARIA/RIDOTTA/CORRENTE entro il 31/12.
+                    // Eccezioni: CO ORDINARIA adeguata se il nucleo indipendente ha integrazione di redditi esteri oppure se lo studente è semestre filtro.
+                    // Se manca una delle condizioni non viene caricata una fonte economica italiana: EsitoBorsaIncomeRules produrrà RED031.
+                    if (origineEconomicaAdeguata)
                     {
+                        if (!coUniversitarioOk && coOrdinarioConIntegrazioneEsteriOk)
+                            origineItOrdinariaConIntegrazioneEsteriCount++;
+
+                        if (!coUniversitarioOk && !coOrdinarioConIntegrazioneEsteriOk && coOrdinarioSemestreFiltroOk)
+                            origineItOrdinariaSemestreFiltroCount++;
+
                         result.OrigIT_CO.Add(target);
                     }
                     else
@@ -1222,6 +1380,10 @@ LEFT JOIN CertFlags cf
                 if (tipoIntegrazione.Equals("it", StringComparison.OrdinalIgnoreCase))
                 {
                     bool ciOk = reader.SafeGetInt("CiAttestazioneOk") != 0;
+                    var key = CreateStudentKey(codFiscale, numDomanda);
+                    var facts = GetOrCreateEsitoBorsaFacts(key);
+                    facts.HasCiUniversitarioEntroScadenza = ciOk;
+
                     if (ciOk)
                     {
                         result.IntIT_CI.Add(target);
@@ -1238,7 +1400,7 @@ LEFT JOIN CertFlags cf
                 }
             }
 
-            Logger.LogInfo(33, $"Tipologie reddito lette: {readCount} | OrigIT_CO={result.OrigIT_CO.Count} | OrigIT_DO={result.OrigIT_DO.Count} | OrigEE={result.OrigEE.Count} | IntIT_CI={result.IntIT_CI.Count} | IntDI={result.IntDI.Count} | OrigIT senza ISEE base entro scadenza effettiva={origineItBaseMancanteCount} | OrigIT senza UNIVERSITARIO entro 31/12={origineItUniversitariaMancanteCount} | IntIT senza UNIVERSITARIO entro 31/12={integrazioneItUniversitariaMancanteCount} | Certificazioni modificate dopo scadenza base effettiva={studentiConModificheMultipleCount}");
+            Logger.LogInfo(33, $"Tipologie reddito lette: {readCount} | OrigIT_CO={result.OrigIT_CO.Count} | OrigIT_DO={result.OrigIT_DO.Count} | OrigEE={result.OrigEE.Count} | IntIT_CI={result.IntIT_CI.Count} | IntDI={result.IntDI.Count} | OrigIT senza ISEE base entro scadenza effettiva={origineItBaseMancanteCount} | OrigIT senza CO adeguata entro 31/12={origineItUniversitariaMancanteCount} | OrigIT ordinario accettato per integrazione redditi esteri={origineItOrdinariaConIntegrazioneEsteriCount} | OrigIT ordinario accettato per semestre filtro={origineItOrdinariaSemestreFiltroCount} | IntIT senza UNIVERSITARIO entro 31/12={integrazioneItUniversitariaMancanteCount} | Certificazioni modificate dopo scadenza base effettiva={studentiConModificheMultipleCount}");
             return result;
         }
 

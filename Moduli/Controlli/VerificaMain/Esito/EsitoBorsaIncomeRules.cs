@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 
 namespace ProcedureNet7
 {
@@ -39,11 +39,11 @@ namespace ProcedureNet7
 
             if (context.AaNumero >= 20252026)
             {
-                // La raccolta economica imposta OrigineFonte = CO solo quando sono rispettate entrambe le condizioni:
-                // 1) ISEE base, anche ordinario/corrente, firmato entro il 22/07; se ConfermaSemestreFiltro=1 entro il 31/12;
-                // 2) CO UNIVERSITARIA/RIDOTTA/CORRENTE firmata entro il 31/12.
-                // Se OrigineFonte non è CO, il requisito economico italiano 20252026+ non è soddisfatto.
-                if (tipoOrigine == "IT" && origineFonte != "CO")
+                bool origineAdeguata = context.Facts.OrigineEconomicaAdeguata || origineFonte == "CO";
+
+                // Origine IT valida solo se esiste ISEE base entro scadenza effettiva e CO adeguata:
+                // CO universitaria/ridotta/corrente oppure CO ordinaria con integrazione redditi esteri.
+                if (tipoOrigine == "IT" && !origineAdeguata)
                     evaluation.Add("RED031");
             }
             else if (tipoOrigine == "IT" && origineFonte != "CO" && origineFonte != "DO")
@@ -62,7 +62,7 @@ namespace ProcedureNet7
             if (context.AaNumero >= 20252026)
             {
                 // Per l'integrazione italiana 20252026+ serve una CI UNIVERSITARIA/RIDOTTA/CORRENTE entro il 31/12.
-                // Il fallback DI non rende idoneo lo studente quando l'integrazione richiesta è italiana.
+                // Il fallback DI non rende idoneo lo studente quando l'integrazione richiesta ï¿½ italiana.
                 if (tipoIntegrazione == "IT" && integrazioneFonte != "CI")
                     evaluation.Add("RED033");
             }
