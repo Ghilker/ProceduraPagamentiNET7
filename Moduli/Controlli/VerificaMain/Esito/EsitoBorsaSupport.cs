@@ -579,7 +579,7 @@ namespace ProcedureNet7
             }
 
             if (pipeline != null
-                && pipeline.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var rawByBenefit)
+                && pipeline.TryGetEsitiConcorsoByBenefit(key, out var rawByBenefit)
                 && rawByBenefit != null)
             {
                 foreach (var beneficio in rawByBenefit.Keys)
@@ -590,7 +590,7 @@ namespace ProcedureNet7
             }
 
             if (pipeline != null
-                && pipeline.EsitiCalcolatiByStudentBenefit.TryGetValue(key, out var calcolatiByBenefit)
+                && pipeline.TryGetEsitiCalcolatiByBenefit(key, out var calcolatiByBenefit)
                 && calcolatiByBenefit != null)
             {
                 foreach (var beneficio in calcolatiByBenefit.Keys)

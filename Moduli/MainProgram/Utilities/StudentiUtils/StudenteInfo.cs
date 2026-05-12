@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ProcedureNet7.Verifica;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,6 +22,13 @@ namespace ProcedureNet7
         public InformazioniSede InformazioniSede { get; set; } = new InformazioniSede();
         public InformazioniEconomiche InformazioniEconomiche { get; set; } = new InformazioniEconomiche();
         public InformazioniImportoBorsa InformazioniImportoBorsa { get; set; } = new InformazioniImportoBorsa();
+
+        public EsitoBorsaFacts EsitoBorsaFacts => InformazioniBeneficio.EsitoBorsaFacts;
+        public IscrizioneEsitoFactsRaw IscrizioneEsitoFacts => InformazioniIscrizione.EsitoFacts;
+        public List<CarrieraPregressaBeneficiRiRaw> CarrieraPregressaBeneficiRi => InformazioniIscrizione.CarrieraPregressaBeneficiRi;
+        public Dictionary<string, EsitoConcorsoBenefitRaw> EsitiConcorsoByBenefit => InformazioniBeneficio.EsitiConcorsoByBenefit;
+        public Dictionary<string, EsitoBeneficioCalcolato> EsitiCalcolatiByBenefit => InformazioniBeneficio.EsitiCalcolatiByBenefit;
+
         public Dictionary<string, string> MessaggiErrore { get; set; } = new Dictionary<string, string>();
         public void SetLuogoNascita(string codComune, string nomeComune, string provincia)
         {

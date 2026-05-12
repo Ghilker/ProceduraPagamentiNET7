@@ -61,12 +61,12 @@ ISCR AS
         CAST(CASE WHEN ISNULL(ss.TELEMATICA,0) = 1 OR ISNULL(cl.CORSO_IN_PRESENZA,1) = 0 THEN 1 ELSE 0 END AS BIT) AS AlwaysA,
         CONVERT(NVARCHAR(50), ss.COD_ENTE) AS Cod_ente,
         CASE
-            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL THEN '00000'
+            WHEN NULLIF(ISNULL(cl.COD_SEDE_DISTACCATA,''), '') IS NULL THEN '00000'
             ELSE cl.COD_SEDE_DISTACCATA
         END AS Cod_sede_distaccata,
         CASE
-            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL
-                 OR LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))) = '00000'
+            WHEN NULLIF(ISNULL(cl.COD_SEDE_DISTACCATA,''), '') IS NULL
+                 OR ISNULL(cl.COD_SEDE_DISTACCATA,'') = '00000'
                 THEN CASE
                         WHEN ISNULL(cl.COMUNE_SEDE_STUDI,'') IN ('00000','0000') THEN 'H501'
                         ELSE ISNULL(cl.COMUNE_SEDE_STUDI,'')
@@ -237,7 +237,7 @@ OUTER APPLY
                       AND b.Anno_accademico = @AA
                       AND ISNULL(b.Riga_valida, 0) = 1
                       AND TRY_CONVERT(INT, b.Anno_carriera) IS NOT NULL
-                      AND UPPER(LTRIM(RTRIM(ISNULL(cp.COD_AVVENIMENTO, '')))) = 'RI'
+                      AND UPPER(ISNULL(cp.COD_AVVENIMENTO, '')) = 'RI'
                       AND ISNULL(TRY_CONVERT(INT, cp.BENEFICI_USUFRUITI), 0) = 1
                 ) x
                 ORDER BY x.AnnoCarriera
@@ -263,7 +263,7 @@ OUTER APPLY
                       AND r.Anno_accademico = @AA
                       AND ISNULL(r.Riga_valida, 0) = 1
                       AND TRY_CONVERT(INT, r.Anno_carriera) IS NOT NULL
-                      AND UPPER(LTRIM(RTRIM(ISNULL(cp.COD_AVVENIMENTO, '')))) = 'RI'
+                      AND UPPER(ISNULL(cp.COD_AVVENIMENTO, '')) = 'RI'
                       AND ISNULL(TRY_CONVERT(INT, cp.IMPORTI_RESTITUITI), 0) = 1
                 ) x
                 ORDER BY x.AnnoCarriera
@@ -280,15 +280,7 @@ OUTER APPLY
         private const string MeritoCodTipoOrdinamentoCorsoColumn = "Cod_tipo_ordinamento";
 
         private static IscrizioneEsitoFactsRaw GetOrCreateIscrizioneEsitoFacts(VerificaPipelineContext context, StudentKey key)
-        {
-            if (!context.IscrizioneEsitoFactsByStudent.TryGetValue(key, out var facts) || facts == null)
-            {
-                facts = new IscrizioneEsitoFactsRaw();
-                context.IscrizioneEsitoFactsByStudent[key] = facts;
-            }
-
-            return facts;
-        }
+            => context.GetOrCreateIscrizioneEsitoFacts(key);
 
         private void LoadBaseIscrizione(VerificaPipelineContext context)
         {
@@ -390,11 +382,7 @@ OUTER APPLY
                 if (string.Equals((codAvvenimento ?? string.Empty).Trim(), "RI", StringComparison.OrdinalIgnoreCase))
                 {
                     var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
-                    if (!context.CarrieraPregressaBeneficiRiByStudent.TryGetValue(key, out var items))
-                    {
-                        items = new List<CarrieraPregressaBeneficiRiRaw>();
-                        context.CarrieraPregressaBeneficiRiByStudent[key] = items;
-                    }
+                    var items = context.GetOrCreateCarrieraPregressaBeneficiRi(key);
 
                     items.Add(new CarrieraPregressaBeneficiRiRaw
                     {
@@ -403,8 +391,10 @@ OUTER APPLY
                         ImportiRestituiti = importiRestituiti,
                         AnniBeneficiUsufruitiLz = reader.SafeGetString("Anni_benefici_usufruiti_LZ"),
                         AnniImportiRestituitiLz = reader.SafeGetString("Anni_importi_restituiti_LZ"),
+                        SedeIstituzioneUniversitaria = reader.SafeGetString("Sede_istituzione_universitaria"),
                         TipologiaCorso = reader.SafeGetString("Tipologia_corso"),
-                        DurataLegTitoloConseguito = reader.SafeGetInt("Durata_leg_titolo_conseguito")
+                        DurataLegTitoloConseguito = reader.SafeGetInt("Durata_leg_titolo_conseguito"),
+                        AnnoAvvenimento = reader.SafeGetInt("Anno_avvenimento")
                     });
                 }
             });

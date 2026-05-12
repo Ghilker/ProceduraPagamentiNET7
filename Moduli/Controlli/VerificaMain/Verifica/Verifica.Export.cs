@@ -130,6 +130,7 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("AnniBorsaPregressaUsufruitiNormalizzati", typeof(string));
             dt.Columns.Add("AnniBorsaPregressaRestituitiNormalizzati", typeof(string));
             dt.Columns.Add("AnniBorsaPregressaNonRestituitaConfliggenti", typeof(string));
+            dt.Columns.Add("BorsaPregressaEsteraNonRichiedeRestituzione", typeof(bool));
             dt.Columns.Add("DiagnosticaBorsaPregressaRestituzioni", typeof(string));
 
             dt.Columns.Add("StatusSedeRiferimentoImportoBorsa", typeof(string));
@@ -183,7 +184,7 @@ namespace ProcedureNet7.Verifica
             row["TipoRedditoOrigine"] = eco.Raw.TipoRedditoOrigine ?? "";
             row["TipoRedditoIntegrazione"] = eco.Raw.TipoRedditoIntegrazione ?? "";
 
-            context.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts);
+            context.TryGetEsitoBorsaFacts(key, out var facts);
             row["HasIseeBaseEntroScadenza"] = facts?.HasIseeBaseEntroScadenza == true;
             row["HasCOUniversitarioEntroScadenza"] = facts?.HasCoUniversitarioEntroScadenza == true;
             row["HasCOOrdinarioConIntegrazioneEsteriEntroScadenza"] = facts?.HasCoOrdinarioConIntegrazioneEsteriEntroScadenza == true;
@@ -296,6 +297,7 @@ namespace ProcedureNet7.Verifica
             row["AnniBorsaPregressaUsufruitiNormalizzati"] = facts?.AnniBorsaPregressaUsufruitiNormalizzati ?? "";
             row["AnniBorsaPregressaRestituitiNormalizzati"] = facts?.AnniBorsaPregressaRestituitiNormalizzati ?? "";
             row["AnniBorsaPregressaNonRestituitaConfliggenti"] = facts?.AnniBorsaPregressaNonRestituitaConfliggenti ?? "";
+            row["BorsaPregressaEsteraNonRichiedeRestituzione"] = facts?.BorsaPregressaEsteraNonRichiedeRestituzione == true;
             row["DiagnosticaBorsaPregressaRestituzioni"] = facts?.DiagnosticaBorsaPregressaRestituzioni ?? "";
 
             row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
@@ -307,9 +309,9 @@ namespace ProcedureNet7.Verifica
 
         private static void FillBenefitOutcomeColumns(DataRow row, VerificaPipelineContext context, StudentKey key)
         {
-            context.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts);
-            context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var rawByBenefit);
-            context.EsitiCalcolatiByStudentBenefit.TryGetValue(key, out var calcolatiByBenefit);
+            context.TryGetEsitoBorsaFacts(key, out var facts);
+            context.TryGetEsitiConcorsoByBenefit(key, out var rawByBenefit);
+            context.TryGetEsitiCalcolatiByBenefit(key, out var calcolatiByBenefit);
 
             row["CodiciEsclusioneCalcolata_BS"] = string.Empty;
             row["DescrizioneEsclusioneCalcolata_BS"] = string.Empty;
@@ -354,7 +356,7 @@ namespace ProcedureNet7.Verifica
 
         private static decimal? GetImportoAssegnato(VerificaPipelineContext context, StudentKey key, string codBeneficio)
         {
-            if (context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var rawByBenefit) &&
+            if (context.TryGetEsitiConcorsoByBenefit(key, out var rawByBenefit) &&
                 rawByBenefit != null &&
                 rawByBenefit.TryGetValue(codBeneficio, out var raw) &&
                 raw != null)

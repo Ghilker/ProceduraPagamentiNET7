@@ -30,7 +30,7 @@ namespace ProcedureNet7
             {
                 var info = pair.Value;
 
-                context.EsitoBorsaFactsByStudent.TryGetValue(pair.Key, out var facts);
+                context.TryGetEsitoBorsaFacts(pair.Key, out var facts);
                 var benefitCodes = EsitoBorsaSupport.GetRequestedBenefitCodes(facts);
                 var results = new System.Collections.Generic.Dictionary<string, EsitoBeneficioCalcolato>(StringComparer.OrdinalIgnoreCase);
 
@@ -49,7 +49,10 @@ namespace ProcedureNet7
                     benefitRows++;
                 }
 
-                context.EsitiCalcolatiByStudentBenefit[pair.Key] = results;
+                var targetResults = context.GetOrCreateEsitiCalcolatiByBenefit(pair.Key);
+                targetResults.Clear();
+                foreach (var resultPair in results)
+                    targetResults[resultPair.Key] = resultPair.Value;
                 ApplyLegacyBsEvaluation(info, results);
                 info.CalcoloEsitoBorsaEseguito = results.Count > 0;
             }

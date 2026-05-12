@@ -22,10 +22,10 @@ ESITI_LAST AS
     SELECT
         D.NumDomanda,
         D.CodFiscale,
-        UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio,'')))) AS CodBeneficio,
+        UPPER(ISNULL(ec.Cod_beneficio,'')) AS CodBeneficio,
         CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsito,
         TRY_CONVERT(DECIMAL(18,2), ec.Imp_beneficio) AS ImportoAssegnato,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda, UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio,'')))) ORDER BY ec.Data_validita DESC) AS rn
+        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda, UPPER(ISNULL(ec.Cod_beneficio,'')) ORDER BY ec.Data_validita DESC) AS rn
     FROM D
     JOIN ESITI_CONCORSI ec
       ON ec.Num_domanda = D.NumDomanda
@@ -312,11 +312,7 @@ WHERE rn = 1;";
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
                 var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
-                if (!context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var byBenefit) || byBenefit == null)
-                {
-                    byBenefit = new System.Collections.Generic.Dictionary<string, EsitoConcorsoBenefitRaw>(StringComparer.OrdinalIgnoreCase);
-                    context.EsitiConcorsoByStudentBenefit[key] = byBenefit;
-                }
+                var byBenefit = context.GetOrCreateEsitiConcorsoByBenefit(key);
 
                 string codBeneficio = EsitoBorsaSupport.NormalizeUpper(reader.SafeGetString("CodBeneficio"));
                 var raw = new EsitoConcorsoBenefitRaw
@@ -547,10 +543,11 @@ FROM #StatusSedeClassBase b;";
 
             foreach (var pair in context.Students)
             {
-                bool beneficioPaRichiesto = context.EsitoBorsaFactsByStudent.TryGetValue(pair.Key, out var facts)
+                bool beneficioPaRichiesto = context.TryGetEsitoBorsaFacts(pair.Key, out var facts)
+                                           && facts != null
                                            && facts.BeneficiRichiesti.Contains("PA");
 
-                bool paAssegnato = context.EsitiConcorsoByStudentBenefit.TryGetValue(pair.Key, out var byBenefit)
+                bool paAssegnato = context.TryGetEsitiConcorsoByBenefit(pair.Key, out var byBenefit)
                                    && byBenefit != null
                                    && byBenefit.TryGetValue("PA", out var pa)
                                    && ((pa.CodTipoEsito ?? 0) == 1 || (pa.CodTipoEsito ?? 0) == 2);

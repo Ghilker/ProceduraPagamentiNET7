@@ -58,7 +58,7 @@ SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
     TRY_CONVERT(INT, v.COD_TIPO_VARIAZ) AS CodTipoVariaz,
-    UPPER(LTRIM(RTRIM(ISNULL(v.COD_BENEFICIO,'')))) AS CodBeneficio
+    UPPER(ISNULL(v.COD_BENEFICIO,'')) AS CodBeneficio
 FROM {TEMP_TABLE} t
 JOIN VARIAZIONI v
   ON v.ANNO_ACCADEMICO = @AA
@@ -81,7 +81,7 @@ SELECT
     CAST(v.Num_Domanda AS INT) AS NumDomanda,
     t.CodFiscale,
     TRY_CONVERT(INT, v.Riga_valida) AS RigaValida,
-    UPPER(LTRIM(RTRIM(ISNULL(v.COD_BENEFICIO,'')))) AS CodBeneficio
+    UPPER(ISNULL(v.COD_BENEFICIO,'')) AS CodBeneficio
 FROM {TEMP_TABLE} t
 JOIN RINUNCE v
   ON v.ANNO_ACCADEMICO = @AA
@@ -103,8 +103,8 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    UPPER(LTRIM(RTRIM(ISNULL(vb.Cod_beneficio,'')))) AS CodBeneficio,
-    CONVERT(NVARCHAR(MAX), dbo.SlashMotiviEsclusioneTest(CAST(t.NumDomanda AS INT), @AA, UPPER(LTRIM(RTRIM(ISNULL(vb.Cod_beneficio,'')))))) AS SlashMotiviEsclusione
+    UPPER(ISNULL(vb.Cod_beneficio,'')) AS CodBeneficio,
+    CONVERT(NVARCHAR(MAX), dbo.SlashMotiviEsclusioneTest(CAST(t.NumDomanda AS INT), @AA, UPPER(ISNULL(vb.Cod_beneficio,'')))) AS SlashMotiviEsclusione
 FROM {TEMP_TABLE} t
 JOIN vBenefici_richiesti vb
   ON vb.Anno_accademico = @AA
@@ -117,7 +117,7 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    UPPER(LTRIM(RTRIM(ISNULL(mbp.Cod_tipologia_blocco,'')))) AS CodTipologiaBlocco,
+    UPPER(ISNULL(mbp.Cod_tipologia_blocco,'')) AS CodTipologiaBlocco,
     CASE WHEN ISNULL(TRY_CONVERT(INT, mbp.blocco_pagamento_attivo), 0) = 1 THEN 1 ELSE 0 END AS BloccoPagamentoAttivo
 FROM {TEMP_TABLE} t
 JOIN Motivazioni_blocco_pagamenti mbp
@@ -131,10 +131,10 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    UPPER(LTRIM(RTRIM(ISNULL(i.Cod_incongruenza,'')))) AS CodIncongruenza,
+    UPPER(ISNULL(i.Cod_incongruenza,'')) AS CodIncongruenza,
     CASE WHEN i.Data_fine_validita IS NULL THEN 1 ELSE 0 END AS IncongruenzaAttiva,
-    UPPER(LTRIM(RTRIM(ISNULL(i.Cod_forzatura,'')))) AS CodForzatura,
-    UPPER(LTRIM(RTRIM(ISNULL(i.EliminataDa,'')))) AS EliminataDa
+    UPPER(ISNULL(i.Cod_forzatura,'')) AS CodForzatura,
+    UPPER(ISNULL(i.EliminataDa,'')) AS EliminataDa
 FROM {TEMP_TABLE} t
 JOIN Incongruenze i
   ON i.Anno_accademico = @AA
@@ -151,10 +151,7 @@ JOIN Incongruenze i
                 throw new ArgumentNullException(nameof(context));
 
             foreach (var key in context.Students.Keys)
-            {
-                if (!context.EsitoBorsaFactsByStudent.ContainsKey(key))
-                    context.EsitoBorsaFactsByStudent[key] = new EsitoBorsaFacts();
-            }
+                context.GetOrCreateEsitoBorsaFacts(key);
 
             LoadEsitoBorsaForzature(context);
             LoadEsitoBorsaForzatureRinuncia(context);
@@ -372,7 +369,7 @@ JOIN Incongruenze i
             {
                 var facts = GetOrCreateEsitoBorsaFacts(context, pair.Key);
 
-                if (!context.IscrizioneEsitoFactsByStudent.TryGetValue(pair.Key, out var raw) || raw == null)
+                if (!context.TryGetIscrizioneEsitoFacts(pair.Key, out var raw) || raw == null)
                     continue;
 
                 facts.CarrieraInterrotta = raw.CarrieraInterrotta;
@@ -500,7 +497,7 @@ RES AS
         CAST
         (
             CASE
-                WHEN NULLIF(LTRIM(RTRIM(ISNULL(r.COD_COMUNE, ''))), '') IS NULL THEN 0
+                WHEN NULLIF(ISNULL(r.COD_COMUNE, ''), '') IS NULL THEN 0
                 WHEN LEFT(ISNULL(r.COD_COMUNE, ''), 1) = 'Z' THEN
                     CASE
                         WHEN EXISTS
@@ -584,7 +581,7 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
-    UPPER(LTRIM(RTRIM(ISNULL(vb.Cod_beneficio,'')))) AS CodBeneficio
+    UPPER(ISNULL(vb.Cod_beneficio,'')) AS CodBeneficio
 FROM {TEMP_TABLE} t
 JOIN vBenefici_richiesti vb
   ON vb.Anno_accademico = @AA
@@ -715,8 +712,8 @@ SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 SELECT
-    UPPER(LTRIM(RTRIM(ISNULL(COD_ENTE,'')))) AS CodEnte,
-    UPPER(LTRIM(RTRIM(ISNULL(COD_CORSO_LAUREA,'')))) AS CodCorsoLaurea
+    UPPER(ISNULL(COD_ENTE,'')) AS CodEnte,
+    UPPER(ISNULL(COD_CORSO_LAUREA,'')) AS CodCorsoLaurea
 FROM CONTROLLO_SPECIALISTICA
 WHERE ANNO_ACCADEMICO = @AA
   AND DATA_FINE_VALIDITA IS NULL;";
@@ -776,6 +773,7 @@ WHERE ANNO_ACCADEMICO = @AA
                 facts.AnniBorsaPregressaUsufruitiNormalizzati = string.Empty;
                 facts.AnniBorsaPregressaRestituitiNormalizzati = string.Empty;
                 facts.AnniBorsaPregressaNonRestituitaConfliggenti = string.Empty;
+                facts.BorsaPregressaEsteraNonRichiedeRestituzione = false;
                 facts.DiagnosticaBorsaPregressaRestituzioni = string.Empty;
 
                 var items = info.InformazioniIscrizione?.CarrierePregresse;
@@ -787,19 +785,25 @@ WHERE ANNO_ACCADEMICO = @AA
                     string benefici = NormalizeUpper(item?.BeneficiUsufruiti);
                     string restituzioni = NormalizeUpper(item?.ImportiRestituiti);
                     string codAvvenimento = NormalizeUpper(item?.CodAvvenimento);
+                    bool isCarrieraPregressaEstera = IsCarrieraPregressaEstera(item?.SedeIstituzioneUniversitaria);
 
                     bool hasBorsa = HasBorsaMarker(benefici);
                     bool hasRestituzione = HasMeaningfulRestitution(restituzioni);
 
+                    // Se la carriera pregressa è stata effettuata all'estero (Sede_istituzione_universitaria = 2),
+                    // il beneficio non restituito non blocca la borsa.
+                    if (isCarrieraPregressaEstera && hasBorsa && !hasRestituzione)
+                        facts.BorsaPregressaEsteraNonRichiedeRestituzione = true;
+
                     // La rinuncia (RI) con Benefici_usufruiti_LZ/Importi_restituiti_LZ viene gestita sotto con mappatura 3+2/ciclo unico.
                     // Evita il vecchio confronto secco 1° anno con 1° anno, non valido per studenti che richiedono una magistrale.
-                    if (codAvvenimento != "RI" && hasBorsa && !hasRestituzione)
+                    if (!isCarrieraPregressaEstera && codAvvenimento != "RI" && hasBorsa && !hasRestituzione)
                         facts.UsufruitoBeneficioBorsaNonRestituito = true;
 
                     if (IsRinunciaBorsa(codAvvenimento, benefici))
                         facts.RinunciaBorsa = true;
 
-                    AddPregressaBenefitFacts(facts, benefici, restituzioni, codAvvenimento);
+                    AddPregressaBenefitFacts(facts, benefici, restituzioni, codAvvenimento, isCarrieraPregressaEstera);
                 }
 
                 if (HasBeneficiRiUsufruitiNonRestituiti(context, pair.Key, facts))
@@ -812,7 +816,7 @@ WHERE ANNO_ACCADEMICO = @AA
 
         private static bool HasBeneficiRiUsufruitiNonRestituiti(VerificaPipelineContext context, StudentKey key, EsitoBorsaFacts facts)
         {
-            if (context == null || facts == null || !context.CarrieraPregressaBeneficiRiByStudent.TryGetValue(key, out var rows) || rows == null || rows.Count == 0)
+            if (context == null || facts == null || !context.TryGetCarrieraPregressaBeneficiRi(key, out var rows) || rows == null || rows.Count == 0)
                 return false;
 
             if (!context.Students.TryGetValue(key, out var info) || info?.InformazioniIscrizione == null)
@@ -842,6 +846,13 @@ WHERE ANNO_ACCADEMICO = @AA
                 if (!IsFlagOne(row.BeneficiUsufruiti))
                     continue;
 
+                if (IsCarrieraPregressaEstera(row.SedeIstituzioneUniversitaria))
+                {
+                    facts.BorsaPregressaEsteraNonRichiedeRestituzione = true;
+                    diagnostica.Add(BuildDiagnosticaBeneficiRiEstera(row));
+                    continue;
+                }
+
                 var anniUsufruiti = ParseAnnoCarrieraSet(row.AnniBeneficiUsufruitiLz);
                 if (anniUsufruiti.Count == 0)
                     continue;
@@ -850,7 +861,7 @@ WHERE ANNO_ACCADEMICO = @AA
                     ? ParseAnnoCarrieraSet(row.AnniImportiRestituitiLz)
                     : new HashSet<int>();
 
-                string tipoPregresso = ResolvePercorsoBeneficiPregressi(row.TipologiaCorso, row.DurataLegTitoloConseguito);
+                string tipoPregresso = ResolvePercorsoBeneficiPregressi(row.TipologiaCorso, row.DurataLegTitoloConseguito, row.AnnoAvvenimento);
                 bool fallbackOrdinale = tipoPregresso == "UNKNOWN";
 
                 foreach (int annoUsufruito in anniUsufruiti)
@@ -898,11 +909,26 @@ WHERE ANNO_ACCADEMICO = @AA
             string tipo = fallbackOrdinale ? "UNKNOWN_FALLBACK_ORDINALE" : tipoPregresso;
             return string.Concat(
                 "RI;TipoPregresso=", tipo,
+                ";SedeIstituzioneUniversitaria=", NormalizeUpper(row.SedeIstituzioneUniversitaria),
+                ";CarrieraEstera=0",
                 ";TipologiaCorso=", NormalizeUpper(row.TipologiaCorso),
                 ";Durata=", row.DurataLegTitoloConseguito?.ToString(CultureInfo.InvariantCulture) ?? "",
+                ";AnnoAvvenimento=", row.AnnoAvvenimento?.ToString(CultureInfo.InvariantCulture) ?? "",
                 ";AnniUsufruitiRaw=", row.AnniBeneficiUsufruitiLz ?? string.Empty,
                 ";AnniRestituitiRaw=", row.AnniImportiRestituitiLz ?? string.Empty);
         }
+
+        private static string BuildDiagnosticaBeneficiRiEstera(CarrieraPregressaBeneficiRiRaw row)
+            => string.Concat(
+                "RI;TipoPregresso=ESTERO_NON_RICHIEDE_RESTITUZIONE",
+                ";SedeIstituzioneUniversitaria=", NormalizeUpper(row.SedeIstituzioneUniversitaria),
+                ";CarrieraEstera=1",
+                ";Regola=beneficio_pregresso_estero_non_bloccante",
+                ";TipologiaCorso=", NormalizeUpper(row.TipologiaCorso),
+                ";Durata=", row.DurataLegTitoloConseguito?.ToString(CultureInfo.InvariantCulture) ?? "",
+                ";AnnoAvvenimento=", row.AnnoAvvenimento?.ToString(CultureInfo.InvariantCulture) ?? "",
+                ";AnniUsufruitiRaw=", row.AnniBeneficiUsufruitiLz ?? string.Empty,
+                ";AnniRestituitiRaw=", row.AnniImportiRestituitiLz ?? string.Empty);
 
         private static int NormalizeAnnoBeneficioCorrente(InformazioniIscrizione iscr, int annoCarrieraDomanda)
         {
@@ -951,19 +977,24 @@ WHERE ANNO_ACCADEMICO = @AA
             return "UNKNOWN";
         }
 
-        private static string ResolvePercorsoBeneficiPregressi(string? tipologiaCorso, int? durataLegale)
+        private static string ResolvePercorsoBeneficiPregressi(string? tipologiaCorso, int? durataLegale, int? annoAccademicoConseguimento)
         {
             int tipologia = 0;
             int.TryParse((tipologiaCorso ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out tipologia);
-            int durata = durataLegale ?? 0;
 
-            if (tipologia == 5 || durata == 2)
+            tipologia = NormalizeTipologiaTitoloCarrieraPregressa(
+                codAvvenimento: null,
+                tipologia: tipologia,
+                durataLegale: durataLegale,
+                annoAccademicoConseguimento: annoAccademicoConseguimento);
+
+            if (tipologia == 5)
                 return "MAGISTRALE";
 
-            if (tipologia == 4 || durata >= 5)
+            if (tipologia == 4)
                 return "CICLO_UNICO";
 
-            if (tipologia == 3 || tipologia == 6 || durata == 3)
+            if (tipologia == 3 || tipologia == 6)
                 return "TRIENNALE";
 
             return "UNKNOWN";
@@ -1284,7 +1315,11 @@ WHERE ANNO_ACCADEMICO = @AA
             if (!TryParseCareerTitleTypeRaw(item.TipologiaCorso, out tipologia))
                 return false;
 
-            tipologia = NormalizeTipologiaTitoloCarrieraPregressa(item.CodAvvenimento, tipologia);
+            tipologia = NormalizeTipologiaTitoloCarrieraPregressa(
+                item.CodAvvenimento,
+                tipologia,
+                item.DurataLegTitoloConseguito,
+                item.AnnoAvvenimento);
             return true;
         }
 
@@ -1294,16 +1329,60 @@ WHERE ANNO_ACCADEMICO = @AA
             return int.TryParse((value ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out tipologia);
         }
 
-        private static int NormalizeTipologiaTitoloCarrieraPregressa(string? codAvvenimento, int tipologia)
+        private static int NormalizeTipologiaTitoloCarrieraPregressa(string? codAvvenimento, int tipologia, int? durataLegale, int? annoAccademicoConseguimento)
         {
-            string code = NormalizeUpper(codAvvenimento);
+            int durata = durataLegale ?? 0;
+            bool titoloAnte20092010 = IsAnnoAccademicoTitoloPrecedente20092010(annoAccademicoConseguimento);
 
-            // Regola carriera pregressa: per titoli conseguiti o in attesa (CD/AT),
-            // la tipologia 1 deve essere valutata come triennale (tipologia 3).
-            if ((code == "CD" || code == "AT") && tipologia == 1)
+            if (titoloAnte20092010)
+            {
+                // Regola storica per titoli conseguiti prima del 2009/2010:
+                // - tipologia 1 viene valutata sempre come ciclo unico;
+                // - tipologia 2 dipende dalla durata legale: 3 anni = triennale, 4/5/6 anni = ciclo unico.
+                if (tipologia == 1)
+                    return 4;
+
+                if (tipologia == 2)
+                {
+                    if (durata == 3)
+                        return 3;
+
+                    if (durata >= 4)
+                        return 4;
+                }
+
+                return tipologia;
+            }
+
+            // Dal 2009/2010 in poi la tipologia pregressa viene normalizzata solo sulla durata legale.
+            if (durata == 3)
                 return 3;
 
+            if (durata >= 4)
+                return 4;
+
+            if (durata == 2)
+                return 5;
+
             return tipologia;
+        }
+
+        private static bool IsAnnoAccademicoTitoloPrecedente20092010(int? annoAccademicoConseguimento)
+        {
+            if (!annoAccademicoConseguimento.HasValue || annoAccademicoConseguimento.Value <= 0)
+                return false;
+
+            int anno = annoAccademicoConseguimento.Value;
+
+            // Formato AA compatto, es. 20082009, 20092010.
+            if (anno >= 1000000)
+                return anno < 20092010;
+
+            // Formato anno iniziale, es. 2008 = 2008/2009, 2009 = 2009/2010.
+            if (anno >= 1900 && anno <= 9999)
+                return anno < 2009;
+
+            return false;
         }
 
         private static bool IsRinunciaBorsa(string codAvvenimento, string benefici)
@@ -1328,20 +1407,23 @@ WHERE ANNO_ACCADEMICO = @AA
             return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
 
-        private static void AddPregressaBenefitFacts(EsitoBorsaFacts facts, string benefici, string restituzioni, string codAvvenimento)
+        private static void AddPregressaBenefitFacts(EsitoBorsaFacts facts, string benefici, string restituzioni, string codAvvenimento, bool isCarrieraPregressaEstera)
         {
             foreach (string beneficio in KnownBenefitCodes)
             {
                 bool hasBenefit = HasBenefitMarker(benefici, beneficio);
                 bool hasRestituzione = HasMeaningfulRestitution(restituzioni);
 
-                if (hasBenefit && !hasRestituzione && !(beneficio == "BS" && codAvvenimento == "RI"))
+                if (!isCarrieraPregressaEstera && hasBenefit && !hasRestituzione && !(beneficio == "BS" && codAvvenimento == "RI"))
                     facts.BeneficiPregressiNonRestituiti.Add(beneficio);
 
                 if (IsRinunciaBenefit(codAvvenimento, benefici, beneficio))
                     facts.BeneficiRinunciaPregressa.Add(beneficio);
             }
         }
+
+        private static bool IsCarrieraPregressaEstera(string? sedeIstituzioneUniversitaria)
+            => NormalizeUpper(sedeIstituzioneUniversitaria) == "2";
 
         private static bool IsRinunciaBenefit(string codAvvenimento, string benefici, string beneficio)
         {
@@ -1377,15 +1459,7 @@ WHERE ANNO_ACCADEMICO = @AA
             => (value ?? string.Empty).Trim().ToUpperInvariant();
 
         private static EsitoBorsaFacts GetOrCreateEsitoBorsaFacts(VerificaPipelineContext context, StudentKey key)
-        {
-            if (!context.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts) || facts == null)
-            {
-                facts = new EsitoBorsaFacts();
-                context.EsitoBorsaFactsByStudent[key] = facts;
-            }
-
-            return facts;
-        }
+            => context.GetOrCreateEsitoBorsaFacts(key);
 
         private static HashSet<string> GetObjectColumns(SqlConnection connection, string objectName)
         {
@@ -1444,9 +1518,9 @@ WHERE name = @ObjectName
             return $@"CAST(
 CASE
     WHEN TRY_CONVERT(INT, {alias}.[{column}]) = 1 THEN 1
-    WHEN UPPER(LTRIM(RTRIM(CONVERT(NVARCHAR(50), {alias}.[{column}] )))) IN ('1','TRUE','T','S','SI','Y','YES') THEN 1
+    WHEN UPPER(CONVERT(NVARCHAR(50), {alias}.[{column}] )) IN ('1','TRUE','T','S','SI','Y','YES') THEN 1
     WHEN TRY_CONVERT(INT, {alias}.[{column}]) = 0 THEN 0
-    WHEN UPPER(LTRIM(RTRIM(CONVERT(NVARCHAR(50), {alias}.[{column}] )))) IN ('0','FALSE','F','N','NO') THEN 0
+    WHEN UPPER(CONVERT(NVARCHAR(50), {alias}.[{column}] )) IN ('0','FALSE','F','N','NO') THEN 0
     ELSE NULL
 END
 AS BIT)";
@@ -1467,7 +1541,7 @@ AS BIT)";
             if (string.IsNullOrWhiteSpace(column))
                 return "CAST(NULL AS NVARCHAR(100))";
 
-            return $"NULLIF(LTRIM(RTRIM(CONVERT(NVARCHAR(100), {alias}.[{column}] ))), '')";
+            return $"NULLIF(CONVERT(NVARCHAR(100), {alias}.[{column}] ), '')";
         }
 
         private static string BuildNullableDecimalExpression(string alias, HashSet<string> columns, params string[] candidates)

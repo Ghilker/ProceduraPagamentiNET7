@@ -166,13 +166,13 @@ IF OBJECT_ID('tempdb..#VerificaEconomiciSemestreFlags') IS NOT NULL
         }
 
         private static string GetSqlPredicateAttestazioneIseeBase(string alias)
-            => $"(UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%ORD%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%UNIV%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%RID%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%CORRENTE%')";
+            => $"(UPPER(ISNULL({alias}.Cod_tipo_attestazione,'')) LIKE '%ORD%' OR UPPER(ISNULL({alias}.Cod_tipo_attestazione,'')) LIKE '%UNIV%' OR UPPER(ISNULL({alias}.Cod_tipo_attestazione,'')) LIKE '%RID%' OR UPPER(ISNULL({alias}.Cod_tipo_attestazione,'')) LIKE '%CORRENTE%')";
 
         private static string GetSqlPredicateAttestazioneUniversitaria(string alias)
-            => $"(UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%UNIV%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%RID%' OR UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%CORRENTE%')";
+            => $"(UPPER(ISNULL({alias}.Cod_tipo_attestazione,'')) LIKE '%UNIV%' OR UPPER(ISNULL({alias}.Cod_tipo_attestazione,'')) LIKE '%RID%' OR UPPER(ISNULL({alias}.Cod_tipo_attestazione,'')) LIKE '%CORRENTE%')";
 
         private static string GetSqlPredicateAttestazioneOrdinaria(string alias)
-            => $"(UPPER(LTRIM(RTRIM(ISNULL({alias}.Cod_tipo_attestazione,'')))) LIKE '%ORD%')";
+            => $"(UPPER(ISNULL({alias}.Cod_tipo_attestazione,'')) LIKE '%ORD%')";
 
         private static void AddFirmataIlMaxParameter(SqlCommand command, string aa)
         {
@@ -256,8 +256,8 @@ TargetEconomicFlags AS
         t.NumDomanda,
         t.ConfermaSemestreFiltro,
         CASE
-            WHEN UPPER(REPLACE(LTRIM(RTRIM(ISNULL(nf.Cod_tipologia_nucleo, ''))), ' ', '')) = 'I'
-             AND UPPER(REPLACE(LTRIM(RTRIM(ISNULL(tr.Tipo_redd_nucleo_fam_integr, ''))), ' ', '')) = 'EE'
+            WHEN UPPER(REPLACE(ISNULL(nf.Cod_tipologia_nucleo, ''), ' ', '')) = 'I'
+             AND UPPER(REPLACE(ISNULL(tr.Tipo_redd_nucleo_fam_integr, ''), ' ', '')) = 'EE'
             THEN 1 ELSE 0
         END AS HasIntegrazioneRedditiEsteri
     FROM Targets t
@@ -275,7 +275,7 @@ BaseIsee AS
     INNER JOIN TargetEconomicFlags t
         ON t.NumDomanda = cte.Num_domanda
     WHERE cte.Anno_accademico = @AA
-      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) IN ('CO','DO')
+      AND UPPER(ISNULL(cte.tipologia_certificazione,'')) IN ('CO','DO')
       AND cte.firmata_il IS NOT NULL
       AND cte.firmata_il <= CASE WHEN ISNULL(t.ConfermaSemestreFiltro, 0) = 1 THEN @FirmataIlMax ELSE @ScadenzaIseeBase END
       AND {attestazioneBasePredicate}
@@ -302,7 +302,7 @@ CertUniversitarieRanked AS
         ON t.NumDomanda = cte.Num_domanda
     CROSS APPLY
     (
-        SELECT UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) AS TipoCert
+        SELECT UPPER(ISNULL(cte.tipologia_certificazione,'')) AS TipoCert
     ) x
     WHERE cte.Anno_accademico = @AA
       AND cte.firmata_il IS NOT NULL
@@ -325,38 +325,30 @@ LatestCert AS
     FROM CertUniversitarieRanked
     WHERE rn = 1
 ),
-StatusRanked AS
+LatestStatus AS
 (
     SELECT
         t.CodFiscale,
         t.NumDomanda,
         c.TipoCert,
-        TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(si.status_inps)), '')) AS StatusInps,
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY t.CodFiscale, t.NumDomanda, c.TipoCert
-            ORDER BY si.data_validita DESC
-        ) AS rn
+        TRY_CONVERT(INT, NULLIF(si.status_inps, '')) AS StatusInps
     FROM LatestCert c
     INNER JOIN TargetEconomicFlags t
         ON t.NumDomanda = c.Num_domanda
-    INNER JOIN Status_INPS si
-        ON si.anno_accademico = @AA
-       AND si.cod_fiscale = t.CodFiscale
-       AND si.num_domanda = t.NumDomanda
-       AND si.data_fine_validita IS NULL
-       AND UPPER(LTRIM(RTRIM(ISNULL(si.tipo_certificaz,'')))) = c.TipoCert
-       AND ISNULL(NULLIF(LTRIM(RTRIM(si.Utente)), ''), '#NULL#') = ISNULL(NULLIF(LTRIM(RTRIM(c.Utente)), ''), '#NULL#')
-),
-LatestStatus AS
-(
-    SELECT
-        CodFiscale,
-        NumDomanda,
-        TipoCert,
-        StatusInps
-    FROM StatusRanked
-    WHERE rn = 1
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            si1.status_inps,
+            si1.data_validita
+        FROM Status_INPS si1
+        WHERE si1.anno_accademico = @AA
+          AND si1.cod_fiscale = t.CodFiscale
+          AND si1.num_domanda = t.NumDomanda
+          AND si1.data_fine_validita IS NULL
+          AND UPPER(ISNULL(si1.tipo_certificaz,'')) = c.TipoCert
+          AND ISNULL(NULLIF(si1.Utente, ''), '#NULL#') = ISNULL(NULLIF(c.Utente, ''), '#NULL#')
+        ORDER BY si1.data_validita DESC
+    ) si
 )
 SELECT
     t.CodFiscale AS Cod_fiscale,
@@ -746,7 +738,7 @@ OUTER APPLY
     FROM Certificaz_ISEE cte
     WHERE cte.Anno_accademico = @AA
       AND cte.Num_domanda = t.NumDomanda
-      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
+      AND UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'CO'
       AND cte.firmata_il IS NOT NULL
       AND cte.firmata_il <= @FirmataIlMax
       AND ({GetSqlPredicateAttestazioneUniversitaria("cte")} OR ((t.IsIntDI = 1 OR ISNULL(sf.ConfermaSemestreFiltro, 0) = 1) AND {GetSqlPredicateAttestazioneOrdinaria("cte")}))
@@ -961,7 +953,7 @@ OUTER APPLY
     FROM Certificaz_ISEE cte
     WHERE cte.Anno_accademico = @AA
       AND cte.Num_domanda = t.NumDomanda
-      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'DO'
+      AND UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'DO'
       AND (cte.firmata_il IS NULL OR cte.firmata_il <= @FirmataIlMax)
     ORDER BY
         cte.firmata_il DESC,
@@ -1026,7 +1018,7 @@ OUTER APPLY
     FROM Certificaz_ISEE cte
     WHERE cte.Anno_accademico = @AA
       AND cte.Num_domanda = t.NumDomanda
-      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CI'
+      AND UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'CI'
       AND cte.firmata_il IS NOT NULL
       AND cte.firmata_il <= @FirmataIlMax
       AND {GetSqlPredicateAttestazioneUniversitaria("cte")}
@@ -1129,14 +1121,7 @@ WHERE t.IsIntDI = 1;";
         }
 
         private EsitoBorsaFacts GetOrCreateEsitoBorsaFacts(StudentKey key)
-        {
-            if (CurrentContext.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts) && facts != null)
-                return facts;
-
-            facts = new EsitoBorsaFacts();
-            CurrentContext.EsitoBorsaFactsByStudent[key] = facts;
-            return facts;
-        }
+            => CurrentContext.GetOrCreateEsitoBorsaFacts(key);
 
         private SplitResult LoadTipologieRedditiAndSplit(string aa, string sourceTableName)
         {
@@ -1217,34 +1202,34 @@ CertFlags AS
     SELECT
         cte.Num_domanda,
         MAX(CASE
-                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) IN ('CO','DO')
+                WHEN UPPER(ISNULL(cte.tipologia_certificazione,'')) IN ('CO','DO')
                  AND cte.firmata_il IS NOT NULL
                  AND cte.firmata_il <= CASE WHEN ISNULL(t.ConfermaSemestreFiltro, 0) = 1 THEN @FirmataIlMax ELSE @ScadenzaIseeBase END
                  AND {attestazioneBasePredicate}
                 THEN 1 ELSE 0 END) AS HasIseeBaseEntroScadenza,
         MAX(CASE
-                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
+                WHEN UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'CO'
                  AND cte.firmata_il IS NOT NULL
                  AND cte.firmata_il <= @FirmataIlMax
                  AND {attestazioneUniversitariaPredicate}
                 THEN 1 ELSE 0 END) AS HasCOUniversitarioEntroScadenza,
         MAX(CASE
-                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
+                WHEN UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'CO'
                  AND cte.firmata_il IS NOT NULL
                  AND cte.firmata_il <= @FirmataIlMax
                  AND {attestazioneOrdinariaPredicate}
-                 AND UPPER(REPLACE(LTRIM(RTRIM(ISNULL(nf.Cod_tipologia_nucleo, ''))), ' ', '')) = 'I'
-                 AND UPPER(REPLACE(LTRIM(RTRIM(ISNULL(tr.Tipo_redd_nucleo_fam_integr, ''))), ' ', '')) = 'EE'
+                 AND UPPER(REPLACE(ISNULL(nf.Cod_tipologia_nucleo, ''), ' ', '')) = 'I'
+                 AND UPPER(REPLACE(ISNULL(tr.Tipo_redd_nucleo_fam_integr, ''), ' ', '')) = 'EE'
                 THEN 1 ELSE 0 END) AS HasCOOrdinarioConIntegrazioneEsteriEntroScadenza,
         MAX(CASE
-                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CO'
+                WHEN UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'CO'
                  AND cte.firmata_il IS NOT NULL
                  AND cte.firmata_il <= @FirmataIlMax
                  AND {attestazioneOrdinariaPredicate}
                  AND ISNULL(t.ConfermaSemestreFiltro, 0) = 1
                 THEN 1 ELSE 0 END) AS HasCOOrdinarioSemestreFiltroEntroScadenza,
         MAX(CASE
-                WHEN UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) = 'CI'
+                WHEN UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'CI'
                  AND cte.firmata_il IS NOT NULL
                  AND cte.firmata_il <= @FirmataIlMax
                  AND {attestazioneUniversitariaPredicate}
@@ -1259,7 +1244,7 @@ CertFlags AS
     LEFT JOIN UltimoNucleo nf
         ON nf.Num_domanda = t.NumDomanda
     WHERE cte.Anno_accademico = @AA
-      AND UPPER(LTRIM(RTRIM(ISNULL(cte.tipologia_certificazione,'')))) IN ('CO','DO','CI','DI')
+      AND UPPER(ISNULL(cte.tipologia_certificazione,'')) IN ('CO','DO','CI','DI')
     GROUP BY cte.Num_domanda
 )
 SELECT
