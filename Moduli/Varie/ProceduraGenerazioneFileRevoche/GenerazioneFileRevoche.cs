@@ -326,7 +326,7 @@ JOIN vSpecifiche_impegni si
 JOIN vEsiti_concorsiBS bs
     ON bs.Anno_accademico = d.Anno_accademico
    AND bs.Num_domanda = d.Num_domanda
-   AND bs.Cod_tipo_esito <> 0
+   AND bs.cod_tipo_esito <> 0
 LEFT JOIN vEsiti_concorsiPA pa
     ON pa.Anno_accademico = d.Anno_accademico
    AND pa.Num_domanda = d.Num_domanda

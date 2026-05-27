@@ -13,19 +13,58 @@ namespace ProcedureNet7
         {
             try
             {
-
                 var excelLookup = LeggiExcel(args.FilePath);
-
 
                 if (excelLookup.Count == 0)
                     return;
 
                 var studenti = CaricaStudentiDaDb(excelLookup.Keys.ToList(), excelLookup);
 
-                var flusso = GenerareFlussoDataTable(studenti);
+                // Controllo presenza colonna impegno
+                bool hasImpegno = excelLookup.Values
+                    .First()
+                    .Table
+                    .Columns
+                    .Cast<DataColumn>()
+                    .Any(c => c.ColumnName.Equals("impegno", StringComparison.OrdinalIgnoreCase));
 
-                if (flusso.Rows.Count > 0)
-                    Utilities.WriteDataTableToTextFile(flusso, args.FolderPath, "flusso_generato");
+                // Caso standard: nessun impegno
+                if (!hasImpegno)
+                {
+                    var flusso = GenerareFlussoDataTable(studenti);
+
+                    if (flusso.Rows.Count > 0)
+                    {
+                        Utilities.WriteDataTableToTextFile(
+                            flusso,
+                            args.FolderPath,
+                            "flusso_generato");
+                    }
+
+                    return;
+                }
+
+                // Caso con impegno
+                var gruppiImpegno = studenti
+                    .GroupBy(x => x.InformazioniPagamento.NumeroImpegno)
+                    .ToList();
+
+                foreach (var gruppo in gruppiImpegno)
+                {
+                    string impegno = gruppo.Key;
+
+                    var flusso = GenerareFlussoDataTable(gruppo.ToList());
+
+                    if (flusso.Rows.Count == 0)
+                        continue;
+
+                    string nomeFile = $"flusso_generato_imp_{impegno}";
+
+                    Utilities.WriteDataTableToTextFile(
+                        flusso,
+                        args.FolderPath,
+                        nomeFile);
+                }
             }
             catch (Exception ex)
             {
@@ -136,7 +175,6 @@ namespace ProcedureNet7
         // MAPPING OGGETTO
         // ===============================
         private StudentePagamenti CreaStudente(SqlDataReader reader, DataRow excelRow)
-
         {
             var culturaIt = new CultureInfo("it-IT");
 
@@ -146,29 +184,45 @@ namespace ProcedureNet7
 
             long.TryParse(Utilities.SafeGetString(reader, "telefono_cellulare"), out long telefono);
 
+            string impegno = string.Empty;
+
+            // Lettura opzionale colonna impegno
+            if (excelRow.Table.Columns
+                .Cast<DataColumn>()
+                .Any(c => c.ColumnName.Equals("impegno", StringComparison.OrdinalIgnoreCase)))
+            {
+                impegno = excelRow["impegno"]?.ToString()?.Trim() ?? string.Empty;
+            }
+
             return new StudentePagamenti
             {
+
                 InformazioniPersonali = new InformazioniPersonali
                 {
                     CodFiscale = Utilities.SafeGetString(reader, "cod_fiscale"),
                     Cognome = Utilities.SafeGetString(reader, "cognome"),
                     Nome = Utilities.SafeGetString(reader, "nome"),
-                    DataNascita = Utilities.SafeGetDateTime(reader, "data_nascita").ToString("dd/MM/yyyy") ?? string.Empty,
+                    DataNascita = Utilities.SafeGetDateTime(reader, "data_nascita")
+                        .ToString("dd/MM/yyyy") ?? string.Empty,
                     Sesso = Utilities.SafeGetString(reader, "sesso"),
                     IndirizzoEmail = Utilities.SafeGetString(reader, "indirizzo_e_mail"),
                     Telefono = telefono
                 },
+
                 InformazioniPagamento = new InformazioniPagamento
                 {
+                    NumeroImpegno = impegno,
                     ImportoDaPagareLordo = lordo,
                     ImportoReversale = reversali,
                     ImportoDaPagare = netto
                 },
+
                 InformazioniConto = new InformazioniConto
                 {
                     IBAN = Utilities.SafeGetString(reader, "IBAN"),
                     Swift = Utilities.SafeGetString(reader, "Swift")
                 },
+
                 InformazioniSede = new InformazioniSede
                 {
                     Residenza = new Residenza
