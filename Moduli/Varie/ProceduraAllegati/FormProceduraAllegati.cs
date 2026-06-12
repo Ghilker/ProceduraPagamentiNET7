@@ -1,32 +1,26 @@
-﻿using ProcedureNet7.ProceduraAllegatiSpace;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+using ClosedXML.Excel;
+using ProcedureNet7.ProceduraAllegatiSpace;
 
 namespace ProcedureNet7
 {
     public partial class FormProceduraAllegati : Form
     {
-        MasterForm? _masterForm;
-        string selectedFilePath = string.Empty;
-        string selectedFolderPath = string.Empty;
-        ContextMenuStrip selectedBeneficiStrip;
+        private readonly MasterForm _masterForm;
+
+        private string selectedFilePath = string.Empty;
+        private string selectedFolderPath = string.Empty;
+
+        private ContextMenuStrip selectedBeneficiStrip = new();
 
         private readonly Dictionary<string, string> proceduraAllegatiBeneficiItems = new()
         {
+            { "00", "Tutti i benefici" },
             { "BS", "Borsa di studio" },
             { "PA", "Posto alloggio" },
-            { "CI", "Contributo integrativo" },
-            { "PL", "Premio di laurea" },
-            { "BL", "Buono libro" }
+            { "CI", "Contributo integrativo" }
         };
 
         private readonly Dictionary<string, string> allegatiProvvItems = new()
@@ -35,45 +29,85 @@ namespace ProcedureNet7
             { "02", "Riammissione come idoneo" },
             { "03", "Revoca senza recupero somme" },
             { "04", "Decadenza" },
-            { "05", "Modifica importo - NON IMPLEMENTATO" },
+            { "05", "Modifica importo" },
             { "06", "Revoca con recupero somme" },
             { "09", "Da idoneo a vincitore" },
             { "10", "Rinuncia con recupero somme" },
             { "11", "Rinuncia senza recupero somme" },
             { "13", "Cambio status sede" }
         };
+
         public FormProceduraAllegati(MasterForm masterForm)
         {
             _masterForm = masterForm;
+
             InitializeComponent();
+
             Initialize();
         }
 
         private void Initialize()
         {
+            LoadTipoAllegatoCombo();
+
+            Utilities.CreateDropDownMenu(
+                ref proceduraAllegatiBeneficiBtn,
+                ref selectedBeneficiStrip,
+                proceduraAllegatiBeneficiItems, clean:true);
+
+            btnScaricaModello.Click += btnScaricaModello_Click;
+        }
+
+        private void LoadTipoAllegatoCombo()
+        {
             proceduraAllegatiTipoCombo.Items.Clear();
-            foreach (KeyValuePair<string, string> item in allegatiProvvItems)
+
+            foreach (var item in allegatiProvvItems)
             {
-                if (item.Key == "00")
+                proceduraAllegatiTipoCombo.Items.Add(new ComboBoxItem
                 {
-                    continue;
-                }
-                _ = proceduraAllegatiTipoCombo.Items.Add(new { Text = item.Value, Value = item.Key });
+                    Text = item.Value,
+                    Value = item.Key
+                });
             }
 
-            proceduraAllegatiTipoCombo.DisplayMember = "Text";
-            proceduraAllegatiTipoCombo.ValueMember = "Value";
+            proceduraAllegatiTipoCombo.DisplayMember = nameof(ComboBoxItem.Text);
+            proceduraAllegatiTipoCombo.ValueMember = nameof(ComboBoxItem.Value);
 
-            //Utilities.CreateDropDownMenu(ref filtroBeneficioBTN, ref selectedBeneficiStrip, proceduraAllegatiBeneficiItems);
+            if (proceduraAllegatiTipoCombo.Items.Count > 0)
+            {
+                proceduraAllegatiTipoCombo.SelectedIndex = 0;
+            }
+        }
+
+        private string GetSelectedTipoAllegato()
+        {
+            if (proceduraAllegatiTipoCombo.SelectedItem is ComboBoxItem item)
+            {
+                return item.Value;
+            }
+
+            return string.Empty;
+        }
+
+        private string GetSelectedTipoAllegatoName()
+        {
+            if (proceduraAllegatiTipoCombo.SelectedItem is ComboBoxItem item)
+            {
+                return item.Text;
+            }
+
+            return string.Empty;
+        }
+
+        private string GetSelectedBenefici()
+        {
+            return Utilities.GetCheckBoxSelectedCodes(
+                selectedBeneficiStrip.Items);
         }
 
         private void RunProcedureBtnClick(object sender, EventArgs e)
         {
-            if (_masterForm == null)
-            {
-                return;
-            }
-
             _masterForm.RunBackgroundWorker(RunAllegatiProcedure);
         }
 
@@ -81,47 +115,37 @@ namespace ProcedureNet7
         {
             try
             {
-                if (_masterForm == null)
+                string selectedTipoAllegatoValue = string.Empty;
+                string selectedTipoAllegatoName = string.Empty;
+                string selectedBenefici = string.Empty;
+
+                Invoke(new MethodInvoker(() =>
                 {
-                    throw new Exception("Master form non può essere nullo a questo punto!");
-                }
-                ArgsValidation argsValidation = new();
-                string selectedTipoAllegatoValue = "";
-                _ = Invoke(new MethodInvoker(() =>
-                {
-                    dynamic selectedItem = proceduraAllegatiTipoCombo.SelectedItem;
-                    selectedTipoAllegatoValue = selectedItem?.Value ?? "";
+                    selectedTipoAllegatoValue = GetSelectedTipoAllegato();
+                    selectedTipoAllegatoName = GetSelectedTipoAllegatoName();
+                    selectedBenefici = GetSelectedBenefici();
                 }));
 
-                string selectedTipoAllegatoName = "";
-                _ = Invoke(new MethodInvoker(() =>
-                {
-                    dynamic selectedItem = proceduraAllegatiTipoCombo.SelectedItem;
-                    selectedTipoAllegatoName = selectedItem?.Text ?? "";
-                }));
-
-                string selectedTipoBeneficioValue = "";
-                _ = Invoke(new MethodInvoker(() =>
-                {
-                    dynamic selectedItem = Utilities.GetCheckBoxSelectedCodes(selectedBeneficiStrip?.Items);
-                    selectedTipoBeneficioValue = selectedItem ?? "";
-                }));
-                ArgsProceduraAllegati argsProceduraAllegati = new()
+                ArgsProceduraAllegati args = new()
                 {
                     _selectedAA = proceduraAllegatiAA.Text,
                     _selectedFileExcel = selectedFilePath,
                     _selectedSaveFolder = selectedFolderPath,
                     _selectedTipoAllegato = selectedTipoAllegatoValue,
                     _selectedTipoAllegatoName = selectedTipoAllegatoName,
-                    _selectedTipoBeneficio = selectedTipoBeneficioValue
+                    _selectedTipoBeneficio = selectedBenefici
                 };
-                // argsValidation.Validate(argsProceduraAllegati);
-                ProceduraAllegati proceduraAllegati = new(_masterForm, mainConnection);
-                proceduraAllegati.RunProcedure(argsProceduraAllegati);
+
+                ProceduraAllegati procedura =
+                    new(_masterForm, mainConnection);
+
+                procedura.RunProcedure(args);
             }
             catch (ValidationException ex)
             {
-                Logger.LogWarning(100, "Errore compilazione procedura: " + ex.Message);
+                Logger.LogWarning(
+                    100,
+                    $"Errore compilazione procedura: {ex.Message}");
             }
             catch
             {
@@ -131,12 +155,104 @@ namespace ProcedureNet7
 
         private void ProceduraAllegatiCFbtn_Click(object sender, EventArgs e)
         {
-            Utilities.ChooseFileAndSetPath(proceduraAllegatiCFlbl, excelFileDialog, ref selectedFilePath);
+            Utilities.ChooseFileAndSetPath(
+                proceduraAllegatiCFlbl,
+                excelFileDialog,
+                ref selectedFilePath);
         }
 
+        private void btnScaricaModello_Click(object? sender, EventArgs e)
+        {
+            string tipoAllegato = GetSelectedTipoAllegato();
+
+            if (string.IsNullOrWhiteSpace(tipoAllegato))
+            {
+                MessageBox.Show(
+                    "Selezionare un tipo allegato.",
+                    "Attenzione",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+
+                return;
+            }
+
+            GeneraTemplate(
+                    tipoAllegato,
+                    proceduraAllegatiAA.Text);
+        }
+
+        public void GeneraTemplate(string tipoAllegato, string annoAccademico)
+        {
+            switch (tipoAllegato)
+            {
+                case "04":
+                    GeneraTemplateDecadenza(annoAccademico);
+                    break; 
+
+                default:
+                    MessageBox.Show(
+                        "Template non ancora implementato");
+                    break;
+            }
+        }
+        private void GeneraTemplateDecadenza(string annoAccademico)
+        {
+            string? filePath = null;
+
+            _masterForm.Invoke(() =>
+            {
+                using SaveFileDialog saveDialog = new();
+
+                saveDialog.Filter =
+                    "Excel (*.xlsx)|*.xlsx";
+
+                saveDialog.FileName =
+                    $"Template_Decadenza_{annoAccademico}.xlsx";
+
+                if (saveDialog.ShowDialog() == DialogResult.OK)
+                {
+                    filePath = saveDialog.FileName;
+                }
+            });
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                Logger.LogInfo(null, "Salvataggio annullato.");
+                return;
+            }
+
+            DataTable dt = new();
+
+            dt.Columns.Add("CodiceFiscale");
+            dt.Columns.Add("Motivazione");
+
+            using XLWorkbook wb = new();
+            wb.Worksheets.Add(dt, "Decadenza");
+            wb.SaveAs(filePath);
+
+            Logger.LogInfo(
+                null,
+                $"Creato template: {filePath}");
+        }
         private void ProceduraAllegatiSavebtn_Click(object sender, EventArgs e)
         {
-            Utilities.ChooseFolder(proceduraAllegatiSavelbl, saveFolderDialog, ref selectedFolderPath);
+            Utilities.ChooseFolder(
+                proceduraAllegatiSavelbl,
+                saveFolderDialog,
+                ref selectedFolderPath);
         }
     }
+
+    public class ComboBoxItem
+    {
+        public string Text { get; set; } = string.Empty;
+
+        public string Value { get; set; } = string.Empty;
+
+        public override string ToString()
+        {
+            return Text;
+        }
+    }
+
 }

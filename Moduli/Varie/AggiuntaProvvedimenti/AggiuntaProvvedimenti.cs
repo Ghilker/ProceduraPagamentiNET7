@@ -591,31 +591,31 @@ namespace ProcedureNet7
             }
 
             string createTempFiscalTable = @"
-IF OBJECT_ID('tempdb..#TempFiscalCodes') IS NOT NULL
-    DROP TABLE #TempFiscalCodes;
+                IF OBJECT_ID('tempdb..#TempFiscalCodes') IS NOT NULL
+                    DROP TABLE #TempFiscalCodes;
 
-CREATE TABLE #TempFiscalCodes
-(
-    FiscalCode VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
-);";
+                CREATE TABLE #TempFiscalCodes
+                (
+                    FiscalCode VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
+                );";
 
             string createTempNumDomandaTable = @"
-IF OBJECT_ID('tempdb..#TempNumDom') IS NOT NULL
-    DROP TABLE #TempNumDom;
+                IF OBJECT_ID('tempdb..#TempNumDom') IS NOT NULL
+                    DROP TABLE #TempNumDom;
 
-CREATE TABLE #TempNumDom
-(
-    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
-);";
+                CREATE TABLE #TempNumDom
+                (
+                    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
+                );";
 
             string createTempCommonTable = @"
-IF OBJECT_ID('tempdb..#TempCommonCodes') IS NOT NULL
-    DROP TABLE #TempCommonCodes;
+                IF OBJECT_ID('tempdb..#TempCommonCodes') IS NOT NULL
+                    DROP TABLE #TempCommonCodes;
 
-CREATE TABLE #TempCommonCodes
-(
-    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
-);";
+                CREATE TABLE #TempCommonCodes
+                (
+                    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
+                );";
 
             using (var cmd = new SqlCommand(createTempFiscalTable, CONNECTION, sqlTransaction))
             {
@@ -650,13 +650,13 @@ CREATE TABLE #TempCommonCodes
             if (beneficioProvvedimento != "BS" && beneficioProvvedimento != "CI")
             {
                 string fillTempNumDomanda = @"
-INSERT INTO #TempNumDom (NumDomanda)
-SELECT DISTINCT d.num_domanda
-FROM Domanda d
-INNER JOIN #TempFiscalCodes t
-    ON d.Cod_fiscale = t.FiscalCode
-WHERE d.Anno_accademico = @aaProvvedimento
-  AND d.Tipo_bando = 'LZ';";
+                INSERT INTO #TempNumDom (NumDomanda)
+                SELECT DISTINCT d.num_domanda
+                FROM Domanda d
+                INNER JOIN #TempFiscalCodes t
+                    ON d.Cod_fiscale = t.FiscalCode
+                WHERE d.Anno_accademico = @aaProvvedimento
+                  AND d.Tipo_bando = 'LZ';";
 
                 using var cmd = new SqlCommand(fillTempNumDomanda, CONNECTION, sqlTransaction);
                 cmd.Parameters.Add("@aaProvvedimento", SqlDbType.VarChar, 8).Value = aaProvvedimento;
@@ -679,18 +679,18 @@ WHERE d.Anno_accademico = @aaProvvedimento
             }
 
             string fillTempCommonCodes = @"
-INSERT INTO #TempCommonCodes (NumDomanda)
-SELECT DISTINCT d.Num_domanda
-FROM Domanda d
-INNER JOIN PROVVEDIMENTI p
-    ON d.Num_domanda = p.Num_domanda
-   AND d.Anno_accademico = p.Anno_accademico
-INNER JOIN #TempNumDom t
-    ON d.Num_domanda = t.NumDomanda
-WHERE d.Anno_accademico = @aaProvvedimento
-  AND p.Anno_accademico = @aaProvvedimento
-  AND p.num_provvedimento = @numProvvedimento
-  AND d.Tipo_bando = 'LZ';";
+                INSERT INTO #TempCommonCodes (NumDomanda)
+                SELECT DISTINCT d.Num_domanda
+                FROM Domanda d
+                INNER JOIN PROVVEDIMENTI p
+                    ON d.Num_domanda = p.Num_domanda
+                   AND d.Anno_accademico = p.Anno_accademico
+                INNER JOIN #TempNumDom t
+                    ON d.Num_domanda = t.NumDomanda
+                WHERE d.Anno_accademico = @aaProvvedimento
+                  AND p.Anno_accademico = @aaProvvedimento
+                  AND p.num_provvedimento = @numProvvedimento
+                  AND d.Tipo_bando = 'LZ';";
 
             using (var cmd = new SqlCommand(fillTempCommonCodes, CONNECTION, sqlTransaction))
             {
@@ -722,37 +722,37 @@ WHERE d.Anno_accademico = @aaProvvedimento
             }
 
             string insertNewProvvedimenti = @"
-INSERT INTO [dbo].[PROVVEDIMENTI]
-(
-    [Num_domanda],
-    [tipo_provvedimento],
-    [data_provvedimento],
-    [Anno_accademico],
-    [note],
-    [num_provvedimento],
-    [riga_valida],
-    [data_validita]
-)
-SELECT DISTINCT
-       d.num_domanda,
-       @provvedimentoSelezionato,
-       @dataProvvedimento,
-       @aaProvvedimento,
-       @notaProvvedimento,
-       @numProvvedimento,
-       1,
-       CURRENT_TIMESTAMP
-FROM Domanda d
-INNER JOIN #TempNumDom t
-    ON d.Num_domanda = t.NumDomanda
-WHERE d.Anno_accademico = @aaProvvedimento
-  AND d.Tipo_bando = 'LZ'
-  AND NOT EXISTS
-  (
-      SELECT 1
-      FROM #TempCommonCodes c
-      WHERE c.NumDomanda = d.Num_domanda
-  );";
+                INSERT INTO [dbo].[PROVVEDIMENTI]
+                (
+                    [Num_domanda],
+                    [tipo_provvedimento],
+                    [data_provvedimento],
+                    [Anno_accademico],
+                    [note],
+                    [num_provvedimento],
+                    [riga_valida],
+                    [data_validita]
+                )
+                SELECT DISTINCT
+                       d.num_domanda,
+                       @provvedimentoSelezionato,
+                       @dataProvvedimento,
+                       @aaProvvedimento,
+                       @notaProvvedimento,
+                       @numProvvedimento,
+                       1,
+                       CURRENT_TIMESTAMP
+                FROM Domanda d
+                INNER JOIN #TempNumDom t
+                    ON d.Num_domanda = t.NumDomanda
+                WHERE d.Anno_accademico = @aaProvvedimento
+                  AND d.Tipo_bando = 'LZ'
+                  AND NOT EXISTS
+                  (
+                      SELECT 1
+                      FROM #TempCommonCodes c
+                      WHERE c.NumDomanda = d.Num_domanda
+                  );";
 
             int affectedRows;
             using (var cmd = new SqlCommand(insertNewProvvedimenti, CONNECTION, sqlTransaction))
@@ -777,14 +777,14 @@ WHERE d.Anno_accademico = @aaProvvedimento
 
             List<string> newCodes = new();
             string selectNewlyInserted = @"
-            SELECT DISTINCT t.NumDomanda
-            FROM #TempNumDom t
-            WHERE NOT EXISTS
-            (
-                SELECT 1
-                FROM #TempCommonCodes c
-                WHERE c.NumDomanda = t.NumDomanda
-            );";
+                SELECT DISTINCT t.NumDomanda
+                FROM #TempNumDom t
+                WHERE NOT EXISTS
+                (
+                    SELECT 1
+                    FROM #TempCommonCodes c
+                    WHERE c.NumDomanda = t.NumDomanda
+                );";
 
             using (var cmd = new SqlCommand(selectNewlyInserted, CONNECTION, sqlTransaction))
             using (var reader = cmd.ExecuteReader())
@@ -797,23 +797,23 @@ WHERE d.Anno_accademico = @aaProvvedimento
                 }
             }
 
-            //InsertMessaggiStudente(newCodes,provvedimentoSelezionato);
+            InsertMessaggiStudente(newCodes,provvedimentoSelezionato);
 
             string updateDecadenzeSql = @"
-            UPDATE dt
-            SET data_fine_validita = CURRENT_TIMESTAMP
-            FROM Decadenze_tracciabilita_bs dt
-            INNER JOIN Domanda d
-                ON dt.Anno_accademico = d.Anno_accademico
-               AND dt.Cod_fiscale = d.Cod_fiscale
-            INNER JOIN #TempNumDom t
-                ON d.Num_domanda = t.NumDomanda
-            LEFT JOIN #TempCommonCodes c
-                ON c.NumDomanda = d.Num_domanda
-            WHERE d.Anno_accademico = @aaProvvedimento
-              AND dt.Cod_beneficio = @beneficioProvvedimento
-              AND c.NumDomanda IS NULL
-              AND dt.data_fine_validita IS NULL;";
+                UPDATE dt
+                SET data_fine_validita = CURRENT_TIMESTAMP
+                FROM Decadenze_tracciabilita_bs dt
+                INNER JOIN Domanda d
+                    ON dt.Anno_accademico = d.Anno_accademico
+                   AND dt.Cod_fiscale = d.Cod_fiscale
+                INNER JOIN #TempNumDom t
+                    ON d.Num_domanda = t.NumDomanda
+                LEFT JOIN #TempCommonCodes c
+                    ON c.NumDomanda = d.Num_domanda
+                WHERE d.Anno_accademico = @aaProvvedimento
+                  AND dt.Cod_beneficio = @beneficioProvvedimento
+                  AND c.NumDomanda IS NULL
+                  AND dt.data_fine_validita IS NULL;";
 
             using (var cmd = new SqlCommand(updateDecadenzeSql, CONNECTION, sqlTransaction))
             {
@@ -1016,17 +1016,17 @@ WHERE d.Anno_accademico = @aaProvvedimento
             BulkInsertSpecificheNumDomande(numDomande);
 
             string sqlUpdate = @"
-UPDATE si
-SET si.data_fine_validita = @dataProvvedimento,
-    si.Num_determina = @numDetermina,
-    si.data_determina = @dataProvvedimento,
-    si.descrizione_determina = @descrDetermina
-FROM Specifiche_impegni si
-INNER JOIN #TempSpecNumDomande t
-    ON si.num_domanda = t.NumDomanda
-WHERE si.anno_accademico = @selectedAA
-  AND si.cod_beneficio = @selectedCodBeneficio
-  AND si.data_fine_validita IS NULL;";
+                UPDATE si
+                SET si.data_fine_validita = @dataProvvedimento,
+                    si.Num_determina = @numDetermina,
+                    si.data_determina = @dataProvvedimento,
+                    si.descrizione_determina = @descrDetermina
+                FROM Specifiche_impegni si
+                INNER JOIN #TempSpecNumDomande t
+                    ON si.num_domanda = t.NumDomanda
+                WHERE si.anno_accademico = @selectedAA
+                  AND si.cod_beneficio = @selectedCodBeneficio
+                  AND si.data_fine_validita IS NULL;";
 
             using SqlCommand updateCommand = new(sqlUpdate, CONNECTION, sqlTransaction);
             updateCommand.Parameters.Add("@dataProvvedimento", SqlDbType.DateTime).Value = dataProvvedimentoDate;
@@ -1052,60 +1052,60 @@ WHERE si.anno_accademico = @selectedAA
                 : $"{numProvvedimento} del {dataProvvedimentoDate:dd/MM/yyyy}";
 
             string sqlInsert = @"
-INSERT INTO [specifiche_impegni]
-(
-    [Anno_accademico],
-    [Num_domanda],
-    [Cod_fiscale],
-    [Cod_beneficio],
-    [Data_validita],
-    [Utente],
-    [Codice_Studente],
-    [Tipo_fondo],
-    [Capitolo],
-    [Importo_assegnato],
-    [Determina_conferimento],
-    [num_impegno_primaRata],
-    [num_impegno_saldo],
-    [esercizio_saldo],
-    [Esercizio_prima_rata],
-    [data_fine_validita],
-    [Num_determina],
-    [data_determina],
-    [descrizione_determina],
-    monetizzazione_concessa,
-    importo_servizio_mensa,
-    impegno_monetizzazione
-)
-SELECT
-    @selectedAA,
-    t.NumDomanda,
-    d.Cod_fiscale,
-    @selectedCodBeneficio,
-    CURRENT_TIMESTAMP,
-    'Area4',
-    s.Codice_Studente,
-    @tipoFondo,
-    @capitolo,
-    t.Importo,
-    @determinaConferimento,
-    @impegnoPR,
-    @impegnoSA,
-    @eseSA,
-    @esePR,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0,
-    NULL,
-    NULL
-FROM #TempSpecImporti t
-INNER JOIN Domanda d
-    ON d.Anno_accademico = @selectedAA
-   AND d.Num_domanda = t.NumDomanda
-INNER JOIN Studente s
-    ON s.Cod_fiscale = d.Cod_fiscale;";
+                INSERT INTO [specifiche_impegni]
+                (
+                    [Anno_accademico],
+                    [Num_domanda],
+                    [Cod_fiscale],
+                    [Cod_beneficio],
+                    [Data_validita],
+                    [Utente],
+                    [Codice_Studente],
+                    [Tipo_fondo],
+                    [Capitolo],
+                    [Importo_assegnato],
+                    [Determina_conferimento],
+                    [num_impegno_primaRata],
+                    [num_impegno_saldo],
+                    [esercizio_saldo],
+                    [Esercizio_prima_rata],
+                    [data_fine_validita],
+                    [Num_determina],
+                    [data_determina],
+                    [descrizione_determina],
+                    monetizzazione_concessa,
+                    importo_servizio_mensa,
+                    impegno_monetizzazione
+                )
+                SELECT
+                    @selectedAA,
+                    t.NumDomanda,
+                    d.Cod_fiscale,
+                    @selectedCodBeneficio,
+                    CURRENT_TIMESTAMP,
+                    'Area4',
+                    s.Codice_Studente,
+                    @tipoFondo,
+                    @capitolo,
+                    t.Importo,
+                    @determinaConferimento,
+                    @impegnoPR,
+                    @impegnoSA,
+                    @eseSA,
+                    @esePR,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    0,
+                    NULL,
+                    NULL
+                FROM #TempSpecImporti t
+                INNER JOIN Domanda d
+                    ON d.Anno_accademico = @selectedAA
+                   AND d.Num_domanda = t.NumDomanda
+                INNER JOIN Studente s
+                    ON s.Cod_fiscale = d.Cod_fiscale;";
 
             using SqlCommand insertCommand = new(sqlInsert, CONNECTION, sqlTransaction);
             insertCommand.Parameters.Add("@selectedAA", SqlDbType.VarChar, 8).Value = aaProvvedimento;
@@ -1127,13 +1127,13 @@ INNER JOIN Studente s
                 throw new InvalidOperationException("Connessione o transazione non disponibile.");
 
             string sql = @"
-IF OBJECT_ID('tempdb..#TempSpecNumDomande') IS NOT NULL
-    DROP TABLE #TempSpecNumDomande;
+                IF OBJECT_ID('tempdb..#TempSpecNumDomande') IS NOT NULL
+                    DROP TABLE #TempSpecNumDomande;
 
-CREATE TABLE #TempSpecNumDomande
-(
-    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL PRIMARY KEY
-);";
+                CREATE TABLE #TempSpecNumDomande
+                (
+                    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL PRIMARY KEY
+                );";
 
             using SqlCommand cmd = new(sql, CONNECTION, sqlTransaction);
             cmd.ExecuteNonQuery();
@@ -1165,14 +1165,14 @@ CREATE TABLE #TempSpecNumDomande
                 throw new InvalidOperationException("Connessione o transazione non disponibile.");
 
             string sql = @"
-IF OBJECT_ID('tempdb..#TempSpecImporti') IS NOT NULL
-    DROP TABLE #TempSpecImporti;
+                IF OBJECT_ID('tempdb..#TempSpecImporti') IS NOT NULL
+                    DROP TABLE #TempSpecImporti;
 
-CREATE TABLE #TempSpecImporti
-(
-    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL PRIMARY KEY,
-    Importo DECIMAL(18,2) NOT NULL
-);";
+                CREATE TABLE #TempSpecImporti
+                (
+                    NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL PRIMARY KEY,
+                    Importo DECIMAL(18,2) NOT NULL
+                );";
 
             using SqlCommand cmd = new(sql, CONNECTION, sqlTransaction);
             cmd.ExecuteNonQuery();
@@ -1232,20 +1232,17 @@ CREATE TABLE #TempSpecImporti
 
         private readonly Dictionary<string, string> tipoProvvedimentoDescriptions = new()
             {
-                { "00", "Varie" },
                 { "01", "Riammissione come vincitore" },
                 { "02", "Riammissione come idoneo" },
-                { "03", "Revoca senza recupero somme" },
-                { "04", "Decadenza" },
-                { "05", "Modifica importo" },
-                { "06", "Revoca con recupero somme" },
-                { "07", "Pagamento" },
-                { "08", "Rinuncia" },
-                { "09", "Da idoneo a vincitore" },
-                { "10", "Rinuncia con recupero somme" },
-                { "11", "Rinuncia senza recupero somme" },
-                { "12", "Rimborso tassa regionale indebitamente pagata" },
-                { "13", "Cambio status sede" },
+                { "03", "Revoca della borsa di studio senza recupero somme" },
+                { "04", "Decadenza dalla borsa di studio" },
+                { "05", "Modifica importo borsa di studio" },
+                { "06", "Revoca della borsa di studio con recupero somme" },
+                { "08", "Rinuncia al/ai benefici" },
+                { "09", "Scorrimento da idoneo a vincitore" },
+                { "10", "Rinuncia alla borsa di studio con recupero somme" },
+                { "11", "Rinuncia alla borsa di studio senza recupero somme" },
+                { "13", "Cambio status sede per la borsa di studio" },
             };
         private string BuildMessaggioStudente(string tipoProvvedimento)
             {
@@ -1256,7 +1253,7 @@ CREATE TABLE #TempSpecImporti
                     : "provvedimento amministrativo";
 
                 return
-                    $"Gentile studente, le comunichiamo che con il seguente messaggio si conclude il procedimento amministrativo riguardo all'atto di {descrizione}.";
+                    $"Gentile studente, le comunichiamo che con il seguente messaggio si conclude il procedimento amministrativo riguardo all'atto prodotto nei suoi confronti con motivazione: {descrizione}.";
             }
 
         private void InsertMessaggiStudente(List<string> numDomande,string tipoProvvedimento)
