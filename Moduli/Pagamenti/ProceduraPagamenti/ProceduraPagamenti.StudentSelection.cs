@@ -325,9 +325,10 @@ namespace ProcedureNet7
                                                     OR cod_tipo_pagam = '{codTipoPagamento}'
                                                     )");
             }
-
-                //queryBuilder.AppendLine($"      AND StatisticheTotali.Cod_fiscale = 'DFLLSS05R69D883F'");
-            
+            if (!string.IsNullOrWhiteSpace(debugStudente))
+            {
+                queryBuilder.AppendLine($"      AND StatisticheTotali.Cod_fiscale = 'GCCRNN95E55H501P'");
+            }
   
             
 

@@ -73,7 +73,7 @@ namespace ProcedureNet7.Verifica
                 FaseElaborativa = ResolveFaseElaborativa(args, _folderPath)
             };
 
-            var cfFilter = GetStringListArg(args, "_codiciFiscali", "CodiciFiscali", "CodiciFiscale", "CF");
+            var cfFilter = new List<string>() { }; //GetStringListArg(args, "_codiciFiscali", "CodiciFiscali", "CodiciFiscale", "CF");
             if (cfFilter != null && cfFilter.Count > 0)
             {
                 foreach (var cf in cfFilter.Select(NormalizeCf).Where(cf => !string.IsNullOrWhiteSpace(cf)).Distinct(StringComparer.OrdinalIgnoreCase))

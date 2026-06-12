@@ -59,7 +59,7 @@ WITH base AS (
        AND ve.Cod_tipo_esito <> 0
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
-	--where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
+	where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
 )
 SELECT DISTINCT Cod_fiscale
 FROM base
@@ -92,12 +92,13 @@ WITH base AS (
        AND ve.Cod_tipo_esito <> 0
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
+where cod_status = '11'
 	--where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
 )
 SELECT DISTINCT Cod_fiscale
 FROM base
 WHERE rn = 1
-  AND cod_status = '01'
+  AND cod_status = '11'
 ");
                 Logger.LogInfo(41, $"[PA] Retrieved {dtPa.Rows.Count} rows.");
 
@@ -228,8 +229,7 @@ WHERE rn = 1
 <p>Buongiorno,</p>
 <p>su richiesta di Rita che legge in copia,</p>
 <p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono
-essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno), questo file dovrà essere lavorato a seguito del completamento della lavorazione del file precedente.
-In questo file potranno essere presenti studenti già lavorati per sovrapposizione con i posti alloggio</p>
+essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno)</p>
 <p>Grazie e buon lavoro!</p>
 <p>Giacomo Pavone</p>";
 

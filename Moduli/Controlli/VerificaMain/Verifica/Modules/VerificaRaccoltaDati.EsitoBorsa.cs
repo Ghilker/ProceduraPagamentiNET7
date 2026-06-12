@@ -861,7 +861,11 @@ WHERE ANNO_ACCADEMICO = @AA
                     ? ParseAnnoCarrieraSet(row.AnniImportiRestituitiLz)
                     : new HashSet<int>();
 
-                string tipoPregresso = ResolvePercorsoBeneficiPregressi(row.TipologiaCorso, row.DurataLegTitoloConseguito, row.AnnoAvvenimento);
+                string tipoPregresso = ResolvePercorsoBeneficiPregressi(
+                    row.TipologiaCorso,
+                    row.DurataLegTitoloConseguito,
+                    row.AnnoAvvenimento,
+                    row.SedeIstituzioneUniversitaria);
                 bool fallbackOrdinale = tipoPregresso == "UNKNOWN";
 
                 foreach (int annoUsufruito in anniUsufruiti)
@@ -977,7 +981,11 @@ WHERE ANNO_ACCADEMICO = @AA
             return "UNKNOWN";
         }
 
-        private static string ResolvePercorsoBeneficiPregressi(string? tipologiaCorso, int? durataLegale, int? annoAccademicoConseguimento)
+        private static string ResolvePercorsoBeneficiPregressi(
+            string? tipologiaCorso,
+            int? durataLegale,
+            int? annoAccademicoConseguimento,
+            string? sedeIstituzioneUniversitaria)
         {
             int tipologia = 0;
             int.TryParse((tipologiaCorso ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out tipologia);
@@ -986,7 +994,8 @@ WHERE ANNO_ACCADEMICO = @AA
                 codAvvenimento: null,
                 tipologia: tipologia,
                 durataLegale: durataLegale,
-                annoAccademicoConseguimento: annoAccademicoConseguimento);
+                annoAccademicoConseguimento: annoAccademicoConseguimento,
+                sedeIstituzioneUniversitaria: sedeIstituzioneUniversitaria);
 
             if (tipologia == 5)
                 return "MAGISTRALE";
@@ -1312,15 +1321,18 @@ WHERE ANNO_ACCADEMICO = @AA
             if (item == null)
                 return false;
 
-            if (!TryParseCareerTitleTypeRaw(item.TipologiaCorso, out tipologia))
+            bool carrieraPregressaEstera = IsCarrieraPregressaEstera(item.SedeIstituzioneUniversitaria);
+            if (!TryParseCareerTitleTypeRaw(item.TipologiaCorso, out tipologia) && !carrieraPregressaEstera)
                 return false;
 
             tipologia = NormalizeTipologiaTitoloCarrieraPregressa(
                 item.CodAvvenimento,
                 tipologia,
                 item.DurataLegTitoloConseguito,
-                item.AnnoAvvenimento);
-            return true;
+                item.AnnoAvvenimento,
+                item.SedeIstituzioneUniversitaria);
+
+            return tipologia > 0;
         }
 
         private static bool TryParseCareerTitleTypeRaw(string? value, out int tipologia)
@@ -1329,8 +1341,19 @@ WHERE ANNO_ACCADEMICO = @AA
             return int.TryParse((value ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out tipologia);
         }
 
-        private static int NormalizeTipologiaTitoloCarrieraPregressa(string? codAvvenimento, int tipologia, int? durataLegale, int? annoAccademicoConseguimento)
+        private static int NormalizeTipologiaTitoloCarrieraPregressa(
+            string? codAvvenimento,
+            int tipologia,
+            int? durataLegale,
+            int? annoAccademicoConseguimento,
+            string? sedeIstituzioneUniversitaria = null)
         {
+            // I titoli/carriere pregresse estere vengono valutati come triennale per default.
+            // Non si usa la durata 4/5 per dedurre ciclo unico, perché non c'è certezza di equivalenza
+            // con la tipologia italiana e possono intervenire sistemi secondari di controllo.
+            if (IsCarrieraPregressaEstera(sedeIstituzioneUniversitaria))
+                return 3;
+
             int durata = durataLegale ?? 0;
             bool titoloAnte20092010 = IsAnnoAccademicoTitoloPrecedente20092010(annoAccademicoConseguimento);
 
@@ -1355,6 +1378,16 @@ WHERE ANNO_ACCADEMICO = @AA
             }
 
             // Dal 2009/2010 in poi la tipologia pregressa viene normalizzata solo sulla durata legale.
+            if (tipologia == 3 && !(durata == 3))
+                return 3;
+
+            if (tipologia == 4 && !(durata >= 4))
+                return 4;
+
+            if (tipologia == 5 && !(durata == 2))
+                return 5;
+
+            // Fallback
             if (durata == 3)
                 return 3;
 

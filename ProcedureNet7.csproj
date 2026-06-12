@@ -7,7 +7,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Configurations>Debug;Release;PAGAMENTI;VARIE;VERIFICHE</Configurations>
-    <SignAssembly>False</SignAssembly>
+    <SignAssembly>True</SignAssembly>
     <UseWPF>False</UseWPF>
 	  <InternalsVisibleTo>ProcedurePagamentiNET7.Tests</InternalsVisibleTo>
   </PropertyGroup>
