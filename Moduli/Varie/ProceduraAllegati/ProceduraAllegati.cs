@@ -1,9 +1,6 @@
 ﻿using ClosedXML.Excel;
-using DocumentFormat.OpenXml.Drawing;
-using DocumentFormat.OpenXml.Spreadsheet;
 using System.Data;
 using System.Data.SqlClient;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace ProcedureNet7.ProceduraAllegatiSpace
@@ -20,6 +17,8 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
         string selectedNomeAllegato = string.Empty;
         string selectedBeneficio = "BS";
         string AAsplit = string.Empty;
+
+        
 
         SqlTransaction sqlTransaction;
 

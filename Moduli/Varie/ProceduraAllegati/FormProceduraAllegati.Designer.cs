@@ -40,43 +40,44 @@
             label1 = new Label();
             excelFileDialog = new OpenFileDialog();
             saveFolderDialog = new FolderBrowserDialog();
+            proceduraAllegatiBeneficiBtn = new Button();
+            label2 = new Label();
+            btnScaricaModello = new Button();
             SuspendLayout();
             // 
             // label24
             // 
             label24.AutoSize = true;
-            label24.Location = new Point(317, 135);
+            label24.Location = new Point(317, 137);
             label24.Name = "label24";
-            label24.Size = new Size(257, 15);
-            label24.TabIndex = 7;
-            label24.Text = "Indicare l'anno accademico (formato xxxxyyyy)";
+            label24.Size = new Size(179, 15);
+            label24.TabIndex = 8;
+            label24.Text = "Anno accademico (es. 20242025)";
             // 
             // proceduraAllegatiAA
             // 
-            proceduraAllegatiAA.Location = new Point(44, 127);
+            proceduraAllegatiAA.Location = new Point(45, 133);
             proceduraAllegatiAA.Name = "proceduraAllegatiAA";
-            proceduraAllegatiAA.Size = new Size(267, 23);
-            proceduraAllegatiAA.TabIndex = 6;
+            proceduraAllegatiAA.Size = new Size(266, 23);
+            proceduraAllegatiAA.TabIndex = 7;
             // 
             // label23
             // 
             label23.AutoSize = true;
-            label23.Location = new Point(317, 106);
+            label23.Location = new Point(317, 108);
             label23.Name = "label23";
-            label23.Size = new Size(157, 15);
-            label23.TabIndex = 5;
-            label23.Text = "Selezionare il tipo di allegato";
+            label23.Size = new Size(144, 15);
+            label23.TabIndex = 6;
+            label23.Text = "Selezionare il tipo allegato";
             // 
             // proceduraAllegatiTipoCombo
             // 
-            proceduraAllegatiTipoCombo.BackColor = SystemColors.Window;
             proceduraAllegatiTipoCombo.DropDownStyle = ComboBoxStyle.DropDownList;
-            proceduraAllegatiTipoCombo.ForeColor = SystemColors.WindowText;
             proceduraAllegatiTipoCombo.FormattingEnabled = true;
-            proceduraAllegatiTipoCombo.Location = new Point(45, 98);
+            proceduraAllegatiTipoCombo.Location = new Point(45, 104);
             proceduraAllegatiTipoCombo.Name = "proceduraAllegatiTipoCombo";
             proceduraAllegatiTipoCombo.Size = new Size(266, 23);
-            proceduraAllegatiTipoCombo.TabIndex = 4;
+            proceduraAllegatiTipoCombo.TabIndex = 5;
             // 
             // proceduraAllegatiSavelbl
             // 
@@ -84,26 +85,26 @@
             proceduraAllegatiSavelbl.Location = new Point(317, 79);
             proceduraAllegatiSavelbl.Name = "proceduraAllegatiSavelbl";
             proceduraAllegatiSavelbl.Size = new Size(32, 15);
-            proceduraAllegatiSavelbl.TabIndex = 3;
+            proceduraAllegatiSavelbl.TabIndex = 4;
             proceduraAllegatiSavelbl.Text = "_____";
             // 
             // proceduraAllegatiSavebtn
             // 
-            proceduraAllegatiSavebtn.Location = new Point(44, 71);
+            proceduraAllegatiSavebtn.Location = new Point(44, 75);
             proceduraAllegatiSavebtn.Name = "proceduraAllegatiSavebtn";
             proceduraAllegatiSavebtn.Size = new Size(267, 23);
-            proceduraAllegatiSavebtn.TabIndex = 2;
-            proceduraAllegatiSavebtn.Text = "Seleziona Cartella salvataggio";
+            proceduraAllegatiSavebtn.TabIndex = 3;
+            proceduraAllegatiSavebtn.Text = "Seleziona Cartella Salvataggio";
             proceduraAllegatiSavebtn.UseVisualStyleBackColor = true;
             proceduraAllegatiSavebtn.Click += ProceduraAllegatiSavebtn_Click;
             // 
             // proceduraAllegatiCFlbl
             // 
             proceduraAllegatiCFlbl.AutoSize = true;
-            proceduraAllegatiCFlbl.Location = new Point(317, 54);
+            proceduraAllegatiCFlbl.Location = new Point(317, 50);
             proceduraAllegatiCFlbl.Name = "proceduraAllegatiCFlbl";
             proceduraAllegatiCFlbl.Size = new Size(32, 15);
-            proceduraAllegatiCFlbl.TabIndex = 1;
+            proceduraAllegatiCFlbl.TabIndex = 2;
             proceduraAllegatiCFlbl.Text = "_____";
             // 
             // proceduraAllegatiCFbtn
@@ -111,18 +112,18 @@
             proceduraAllegatiCFbtn.Location = new Point(44, 46);
             proceduraAllegatiCFbtn.Name = "proceduraAllegatiCFbtn";
             proceduraAllegatiCFbtn.Size = new Size(267, 23);
-            proceduraAllegatiCFbtn.TabIndex = 0;
-            proceduraAllegatiCFbtn.Text = "Seleziona File excel con CF";
+            proceduraAllegatiCFbtn.TabIndex = 1;
+            proceduraAllegatiCFbtn.Text = "Seleziona File Excel";
             proceduraAllegatiCFbtn.UseVisualStyleBackColor = true;
             proceduraAllegatiCFbtn.Click += ProceduraAllegatiCFbtn_Click;
             // 
             // button1
             // 
-            button1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
+            button1.Font = new Font("Segoe UI", 15F);
             button1.Location = new Point(476, 289);
             button1.Name = "button1";
             button1.Size = new Size(312, 49);
-            button1.TabIndex = 26;
+            button1.TabIndex = 12;
             button1.Text = "AVVIA LA PROCEDURA";
             button1.UseVisualStyleBackColor = true;
             button1.Click += RunProcedureBtnClick;
@@ -130,16 +131,39 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
+            label1.Font = new Font("Segoe UI", 15F);
             label1.Location = new Point(45, 9);
             label1.Name = "label1";
             label1.Size = new Size(321, 28);
-            label1.TabIndex = 27;
+            label1.TabIndex = 0;
             label1.Text = "PROCEDURA CREAZIONE ALLEGATI";
             // 
-            // excelFileDialog
+            // proceduraAllegatiBeneficiBtn
             // 
-            excelFileDialog.FileName = "Excel con CF";
+            proceduraAllegatiBeneficiBtn.Location = new Point(45, 162);
+            proceduraAllegatiBeneficiBtn.Name = "proceduraAllegatiBeneficiBtn";
+            proceduraAllegatiBeneficiBtn.Size = new Size(266, 23);
+            proceduraAllegatiBeneficiBtn.TabIndex = 9;
+            proceduraAllegatiBeneficiBtn.Text = "Seleziona benefici";
+            proceduraAllegatiBeneficiBtn.UseVisualStyleBackColor = true;
+            // 
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Location = new Point(317, 166);
+            label2.Name = "label2";
+            label2.Size = new Size(155, 15);
+            label2.TabIndex = 10;
+            label2.Text = "Seleziona uno o più benefici";
+            // 
+            // btnScaricaModello
+            // 
+            btnScaricaModello.Location = new Point(476, 104);
+            btnScaricaModello.Name = "btnScaricaModello";
+            btnScaricaModello.Size = new Size(266, 23);
+            btnScaricaModello.TabIndex = 11;
+            btnScaricaModello.Text = "SCARICA MODELLO PER ALLEGATO";
+            btnScaricaModello.UseVisualStyleBackColor = true;
             // 
             // FormProceduraAllegati
             // 
@@ -148,15 +172,18 @@
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             Controls.Add(label1);
-            Controls.Add(button1);
-            Controls.Add(label24);
             Controls.Add(proceduraAllegatiCFbtn);
-            Controls.Add(proceduraAllegatiAA);
             Controls.Add(proceduraAllegatiCFlbl);
-            Controls.Add(label23);
             Controls.Add(proceduraAllegatiSavebtn);
-            Controls.Add(proceduraAllegatiTipoCombo);
             Controls.Add(proceduraAllegatiSavelbl);
+            Controls.Add(proceduraAllegatiTipoCombo);
+            Controls.Add(label23);
+            Controls.Add(proceduraAllegatiAA);
+            Controls.Add(label24);
+            Controls.Add(proceduraAllegatiBeneficiBtn);
+            Controls.Add(label2);
+            Controls.Add(btnScaricaModello);
+            Controls.Add(button1);
             FormBorderStyle = FormBorderStyle.None;
             Name = "FormProceduraAllegati";
             Text = "FormProceduraAllegati";
@@ -177,5 +204,8 @@
         private Label label1;
         private OpenFileDialog excelFileDialog;
         private FolderBrowserDialog saveFolderDialog;
+        private Button proceduraAllegatiBeneficiBtn;
+        private Label label2;
+        private Button btnScaricaModello;
     }
 }
