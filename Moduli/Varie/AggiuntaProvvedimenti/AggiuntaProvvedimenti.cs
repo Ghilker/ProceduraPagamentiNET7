@@ -784,6 +784,30 @@ WHERE d.Anno_accademico = @aaProvvedimento
 
             Logger.Log(60, $"Modificati: {affectedRows} studenti", LogLevel.INFO);
 
+            List<string> newCodes = new();
+            string selectNewlyInserted = @"
+            SELECT DISTINCT t.NumDomanda
+            FROM #TempNumDom t
+            WHERE NOT EXISTS
+            (
+                SELECT 1
+                FROM #TempCommonCodes c
+                WHERE c.NumDomanda = t.NumDomanda
+            );";
+
+            using (var cmd = new SqlCommand(selectNewlyInserted, CONNECTION, sqlTransaction))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string code = Convert.ToString(reader["NumDomanda"]) ?? string.Empty;
+                    if (!string.IsNullOrWhiteSpace(code))
+                        newCodes.Add(code);
+                }
+            }
+
+            //InsertMessaggiStudente(newCodes,provvedimentoSelezionato);
+
             string updateDecadenzeSql = @"
 UPDATE dt
 SET data_fine_validita = @dataValidita
@@ -810,27 +834,7 @@ WHERE d.Anno_accademico = @aaProvvedimento
                 Logger.Log(70, $"Aggiornate data_fine_validita in Decadenze_tracciabilita_bs: {updated} righe.", LogLevel.INFO);
             }
 
-            List<string> newCodes = new();
-            string selectNewlyInserted = @"
-SELECT DISTINCT t.NumDomanda
-FROM #TempNumDom t
-WHERE NOT EXISTS
-(
-    SELECT 1
-    FROM #TempCommonCodes c
-    WHERE c.NumDomanda = t.NumDomanda
-);";
-
-            using (var cmd = new SqlCommand(selectNewlyInserted, CONNECTION, sqlTransaction))
-            using (var reader = cmd.ExecuteReader())
-            {
-                while (reader.Read())
-                {
-                    string code = Convert.ToString(reader["NumDomanda"]) ?? string.Empty;
-                    if (!string.IsNullOrWhiteSpace(code))
-                        newCodes.Add(code);
-                }
-            }
+           
 
             foreach (string code in newCodes)
             {
@@ -1234,5 +1238,113 @@ CREATE TABLE #TempSpecImporti
             {
             }
         }
+
+        //Sezione caricamento messaggio di notifica allo studente
+
+        private readonly Dictionary<string, string> tipoProvvedimentoDescriptions = new()
+            {
+                { "00", "Varie" },
+                { "01", "Riammissione come vincitore" },
+                { "02", "Riammissione come idoneo" },
+                { "03", "Revoca senza recupero somme" },
+                { "04", "Decadenza" },
+                { "05", "Modifica importo" },
+                { "06", "Revoca con recupero somme" },
+                { "07", "Pagamento" },
+                { "08", "Rinuncia" },
+                { "09", "Da idoneo a vincitore" },
+                { "10", "Rinuncia con recupero somme" },
+                { "11", "Rinuncia senza recupero somme" },
+                { "12", "Rimborso tassa regionale indebitamente pagata" },
+                { "13", "Cambio status sede" },
+            };
+        private string BuildMessaggioStudente(string tipoProvvedimento)
+            {
+                string descrizione = tipoProvvedimentoDescriptions.TryGetValue(
+                    tipoProvvedimento,
+                    out string? value)
+                    ? value
+                    : "provvedimento amministrativo";
+
+                return
+                    $"Gentile studente, le comunichiamo che con il seguente messaggio si conclude il procedimento amministrativo riguardo all'atto di {descrizione}.";
+            }
+
+        private void InsertMessaggiStudente(List<string> numDomande,string tipoProvvedimento)
+            {
+                if (CONNECTION == null)
+                    throw new InvalidOperationException("Connessione non disponibile.");
+
+                if (sqlTransaction == null)
+                    throw new InvalidOperationException("Transazione non disponibile.");
+
+                if (numDomande == null || numDomande.Count == 0)
+                    return;
+
+                string messaggio = BuildMessaggioStudente(tipoProvvedimento);
+
+                string createTempTable = @"
+                    IF OBJECT_ID('tempdb..#TempMsgNumDom') IS NOT NULL
+                        DROP TABLE #TempMsgNumDom;
+
+                    CREATE TABLE #TempMsgNumDom
+                    (
+                        NumDomanda VARCHAR(50) COLLATE Latin1_General_CI_AS NOT NULL
+                    );";
+
+                using (SqlCommand cmd = new SqlCommand(createTempTable, CONNECTION, sqlTransaction))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
+                DataTable dt = new();
+                dt.Columns.Add("NumDomanda", typeof(string));
+
+                foreach (string numDomanda in numDomande.Distinct())
+                {
+                    dt.Rows.Add(numDomanda);
+                }
+
+                using (SqlBulkCopy bulk = new SqlBulkCopy(CONNECTION, SqlBulkCopyOptions.Default, sqlTransaction))
+                {
+                    bulk.DestinationTableName = "#TempMsgNumDom";
+                    bulk.WriteToServer(dt);
+                }
+
+                string insertSql = @"
+                    INSERT INTO MESSAGGI_STUDENTE
+                    (
+                        COD_FISCALE,
+                        DATA_INSERIMENTO_MESSAGGIO,
+                        MESSAGGIO,
+                        LETTO,
+                        DATA_LETTURA,
+                        UTENTE
+                    )
+                    SELECT DISTINCT
+                            d.Cod_fiscale,
+                            CURRENT_TIMESTAMP,
+                            @messaggio,
+                            'N',
+                            NULL,
+                            'Area4'
+                    FROM Domanda d
+                    INNER JOIN #TempMsgNumDom t
+                        ON d.Num_domanda = t.NumDomanda
+                    WHERE d.Anno_accademico = @aa
+                        AND d.Tipo_bando = 'LZ';";
+
+                using SqlCommand insertCommand = new(insertSql, CONNECTION, sqlTransaction);
+
+                insertCommand.Parameters.Add("@messaggio", SqlDbType.VarChar, 4000).Value = messaggio;
+                insertCommand.Parameters.Add("@aa", SqlDbType.VarChar, 8).Value = aaProvvedimento;
+
+                int inserted = insertCommand.ExecuteNonQuery();
+
+                Logger.Log(
+                    85,
+                    $"Inseriti {inserted} messaggi in MESSAGGI_STUDENTE",
+                    LogLevel.INFO);
+            }
     }
 }
