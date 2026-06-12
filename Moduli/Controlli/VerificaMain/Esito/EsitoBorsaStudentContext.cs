@@ -36,13 +36,6 @@ namespace ProcedureNet7
         public bool Invalido => Info?.InformazioniPersonali?.Disabile == true;
 
         private static EsitoBorsaFacts GetFacts(VerificaPipelineContext pipeline, StudentKey key)
-        {
-            if (pipeline.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts) && facts != null)
-                return facts;
-
-            facts = new EsitoBorsaFacts();
-            pipeline.EsitoBorsaFactsByStudent[key] = facts;
-            return facts;
-        }
+            => pipeline.GetOrCreateEsitoBorsaFacts(key);
     }
 }

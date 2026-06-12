@@ -37,27 +37,41 @@ namespace ProcedureNet7.PagamentiProcessor
             return listaStudentiDaMantenere;
         }
 
-        public void AdjustPendolarePayment(StudentePagamenti studente, ref double importoDaPagare, ref double importoMassimo, ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari, double sogliaISEE, double importoPendolare)
+        public void AdjustPendolarePayment(
+            StudentePagamenti studente,
+            ref double importoDaPagare,
+            ref double importoMassimo,
+            ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari,
+            double sogliaISEE,
+            double importoPendolare,
+            string? categoriaPagamento = null,
+            string? annoAccademico = null,
+            HashSet<(string ComuneA, string ComuneB)>? comuniEquiparatiStatusSede = null,
+            DateTime? referenceDate = null)
         {
-            bool hasDomicilio = studente.InformazioniSede.DomicilioCheck;
-            bool isMoreThanHalfAbroad = studente.InformazioniPersonali.NumeroComponentiNucleoFamiliareEstero >= (studente.InformazioniPersonali.NumeroComponentiNucleoFamiliare / 2.0);
+            bool pagaComePendolare;
+            ProcedureNet7.ControlloStatusSede.StatusSedeResult statusSede;
 
-            // Guard clause: if status is not 'B' or there's a forced 'B', exit early
-            if (studente.InformazioniSede.StatusSede != "B" || studente.InformazioniSede.ForzaturaStatusSede == "B")
-                return;
+            if (!string.IsNullOrWhiteSpace(annoAccademico))
+            {
+                pagaComePendolare = ProcedureNet7.ControlloStatusSede.DevePagareComePendolarePerPagamento(
+                    studente,
+                    annoAccademico,
+                    categoriaPagamento,
+                    comuniEquiparatiStatusSede,
+                    (referenceDate ?? DateTime.Today).Date,
+                    out statusSede);
+            }
+            else
+            {
+                pagaComePendolare = ProcedureNet7.ControlloStatusSede.DevePagareComePendolareDaStatusCalcolato(
+                    studente,
+                    out statusSede);
+            }
 
-            // Guard clause: if any of these conditions is true, exit early
-            if (studente.InformazioniPersonali.Rifugiato ||
-                studente.InformazioniBeneficio.EsitoPA != 0 ||
-                isMoreThanHalfAbroad ||
-                studente.InformazioniIscrizione.TipoCorso == 6)
-                return;
+            studente.SetDomicilioCheck(statusSede.DomicilioValido);
 
-            // Guard clause: if the student DOES have domicile and everything is valid, exit early
-            // (Because that means we do NOT need to apply pendolare logic)
-            bool isDomicilioValidOrNotNeeded = hasDomicilio && studente.InformazioniSede.ContrattoValido && !(studente.InformazioniSede.Domicilio?.prorogatoLocazione == true && !studente.InformazioniSede.ProrogaValido);
-
-            if (isDomicilioValidOrNotNeeded)
+            if (!pagaComePendolare)
                 return;
 
             double iseeStudente = studente.InformazioniPagamento.ValoreISEE;
@@ -69,79 +83,52 @@ namespace ProcedureNet7.PagamentiProcessor
 
             if (iseeStudente <= halfThreshold)
             {
-                // fascia 1: ISEE <= metà soglia → +15% sull’importo da pendolare
                 nuovoImportoMassimoPendolare = importoPendolare * 1.15;
             }
             else if (iseeStudente < twoThirdsThreshold)
             {
-                // fascia 2: ISEE < 2/3 soglia → importo pendolare pieno
                 nuovoImportoMassimoPendolare = importoPendolare;
             }
             else
             {
-                // fascia 3: ISEE >= 2/3 soglia
-                // importo massimo decresce gradualmente da 100% (a 2/3 soglia)
-                // fino al 50% (a soglia ISEE).
-                // Se l’ISEE supera la soglia, lo clampiamo alla soglia.
                 double iseeClamped = Math.Min(iseeStudente, sogliaISEE);
 
-                // se per qualche motivo twoThirdsThreshold == sogliaISEE, evito divisione per zero
                 if (twoThirdsThreshold >= sogliaISEE)
                 {
-                    // caso limite: prendo direttamente metà borsa pendolare
                     nuovoImportoMassimoPendolare = importoPendolare * 0.5;
                 }
                 else
                 {
-                    double t = (iseeClamped - twoThirdsThreshold) / (sogliaISEE - twoThirdsThreshold); // 0→1
-                    double fattore = 1.0 - 0.5 * t; // 1.0 → 0.5
+                    double t = (iseeClamped - twoThirdsThreshold) / (sogliaISEE - twoThirdsThreshold);
+                    double fattore = 1.0 - 0.5 * t;
                     nuovoImportoMassimoPendolare = importoPendolare * fattore;
                 }
             }
 
-            bool studenteFuoriCorso = (studente.InformazioniIscrizione.AnnoCorso == -1 && !studente.InformazioniPersonali.Disabile);
-            bool studenteDisabileFuoriCorso = (studente.InformazioniIscrizione.AnnoCorso == -2 && studente.InformazioniPersonali.Disabile);
+            bool studenteFuoriCorso = studente.InformazioniIscrizione.AnnoCorso == -1 && !studente.InformazioniPersonali.Disabile;
+            bool studenteDisabileFuoriCorso = studente.InformazioniIscrizione.AnnoCorso == -2 && studente.InformazioniPersonali.Disabile;
 
             double importoMensa = 600;
-            if(studenteFuoriCorso || studenteDisabileFuoriCorso)
-            {
+            if (studenteFuoriCorso || studenteDisabileFuoriCorso)
                 importoMensa = 300;
-            }
-            bool haMensa = studente.InformazioniPagamento.ConcessaMonetizzazioneMensa;
-            if (!haMensa) {
+
+            if (!studente.InformazioniPagamento.ConcessaMonetizzazioneMensa)
                 importoMensa = 0;
-            }
+
             nuovoImportoMassimoPendolare += importoMensa;
 
             importoMassimo = nuovoImportoMassimoPendolare;
             importoDaPagare = nuovoImportoMassimoPendolare;
 
-            // Build the message for reasons why they were paid as pendolari
-            string messaggio = string.Empty;
+            string codPag = (categoriaPagamento ?? "").Trim().ToUpperInvariant();
+            string saldoInfo = codPag == "SA"
+                ? $"; saldo SA: requisito fuori sede certo={statusSede.FuoriSedeCertoPerSaldo}"
+                : string.Empty;
 
-            if (studente.InformazioniSede.Domicilio == null)
-            {
-                messaggio += "#Nessun domicilio trovato";
-            }
-            if (!hasDomicilio)
-            {
-                messaggio += "#Durata contratto minore dieci mesi";
-            }
-            if (!studente.InformazioniSede.ContrattoValido && studente.InformazioniSede.Domicilio != null)
-            {
-                messaggio += $"#Serie contratto non valida: {studente.InformazioniSede.Domicilio.codiceSerieLocazione}";
-            }
-            if (studente.InformazioniSede.Domicilio?.prorogatoLocazione == true && !studente.InformazioniSede.ProrogaValido)
-            {
-                messaggio +=
-                    $"#Serie proroga non valida: Contratto {studente.InformazioniSede.Domicilio.codiceSerieLocazione} " +
-                    $"- Proroga {studente.InformazioniSede.Domicilio.codiceSerieProrogaLocazione}";
-            }
+            string messaggio = $"CodTipoPagamento={codPag}; StatusSede attuale={studente.InformazioniSede.StatusSede}; StatusSede calcolato={statusSede.SuggestedStatus}; {statusSede.Reason}{saldoInfo}";
 
-            // Record the reason and mark the student as 'paid as pendolare'
             studentiPagatiComePendolari.Add((studente.InformazioniPersonali.CodFiscale, messaggio));
             studente.SetPagatoPendolare(true);
         }
-
     }
 }

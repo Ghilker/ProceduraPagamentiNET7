@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace ProcedureNet7
 {
@@ -15,6 +15,7 @@ namespace ProcedureNet7
             if (facts.IsConferma == true)
                 return;
 
+            ApplyAttestazioneEconomicaObbligatoriaRules(context, evaluation);
             ApplyStatusIseeRules(context, evaluation);
 
             decimal isee = EsitoBorsaSupport.GetIseeRiferimento(info);
@@ -27,9 +28,57 @@ namespace ProcedureNet7
                 evaluation.Add("RED013");
         }
 
+        private static void ApplyAttestazioneEconomicaObbligatoriaRules(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
+        {
+            var raw = context.Info?.InformazioniEconomiche?.Raw;
+            if (raw == null)
+                return;
+
+            string tipoOrigine = Normalize(raw.TipoRedditoOrigine);
+            string origineFonte = Normalize(raw.OrigineFonte);
+
+            if (context.AaNumero >= 20252026)
+            {
+                bool origineAdeguata = context.Facts.OrigineEconomicaAdeguata || origineFonte == "CO";
+
+                // Origine IT valida solo se esiste ISEE base entro scadenza effettiva e CO adeguata:
+                // CO universitaria/ridotta/corrente oppure CO ordinaria con integrazione redditi esteri.
+                if (tipoOrigine == "IT" && !origineAdeguata)
+                    evaluation.Add("RED031");
+            }
+            else if (tipoOrigine == "IT" && origineFonte != "CO" && origineFonte != "DO")
+            {
+                evaluation.Add("RED086");
+            }
+
+            string tipoNucleo = Normalize(raw.TipoNucleo);
+            string tipoIntegrazione = Normalize(raw.TipoRedditoIntegrazione);
+            string integrazioneFonte = Normalize(raw.IntegrazioneFonte);
+
+            bool richiedeIntegrazione = tipoNucleo == "I" && !string.IsNullOrWhiteSpace(tipoIntegrazione);
+            if (!richiedeIntegrazione)
+                return;
+
+            if (context.AaNumero >= 20252026)
+            {
+                // Per l'integrazione italiana 20252026+ serve una CI UNIVERSITARIA/RIDOTTA/CORRENTE entro il 31/12.
+                // Il fallback DI non rende idoneo lo studente quando l'integrazione richiesta � italiana.
+                if (tipoIntegrazione == "IT" && integrazioneFonte != "CI")
+                    evaluation.Add("RED033");
+            }
+            else if (tipoIntegrazione == "IT" && integrazioneFonte != "CI" && integrazioneFonte != "DI")
+            {
+                evaluation.Add("RED086");
+            }
+        }
+
         private static void ApplyStatusIseeRules(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
-            int? statusIsee = context.Facts.StatusIsee;
+            var info = context.Info;
+            if (info == null)
+                return;
+
+            int? statusIsee = EsitoBorsaSupport.GetStatusIseeDaEconomici(info, context.AaNumero);
             if (!statusIsee.HasValue || statusIsee.Value == 0)
                 return;
 
@@ -39,21 +88,14 @@ namespace ProcedureNet7
                 return;
             }
 
-            string tipoCertificazione = EsitoBorsaSupport.NormalizeUpper(context.Facts.TipoCertificazione);
-            bool redditoEstero = string.Equals((context.Info?.InformazioniEconomiche?.Raw?.TipoRedditoOrigine ?? string.Empty).Trim(), "EE", StringComparison.OrdinalIgnoreCase);
-
-            if (redditoEstero && statusIsee.Value == 2)
+            if (statusIsee.Value == 11)
                 return;
 
-            bool certificazioneValida = tipoCertificazione == "UNIV"
-                                        || tipoCertificazione == "RID"
-                                        || tipoCertificazione == "ORD";
-
-            if ((statusIsee.Value != 2 && statusIsee.Value != 11)
-                || (statusIsee.Value == 2 && !certificazioneValida))
-            {
+            if (!EsitoBorsaSupport.IsSituazioneEconomicaValidaPerEsito(info, context.AaNumero))
                 evaluation.Add("RED086");
-            }
         }
+
+        private static string Normalize(string? value)
+            => (value ?? string.Empty).Trim().ToUpperInvariant();
     }
 }

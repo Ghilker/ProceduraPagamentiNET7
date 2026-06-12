@@ -17,8 +17,11 @@ namespace ProcedureNet7.PagamentiProcessor
             ref double importoDaPagare,
             ref double importoMassimo,
             ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari,
-            double limiteISEE,
-            double importoPendolare
-        );
+            double sogliaISEE,
+            double importoPendolare,
+            string? categoriaPagamento = null,
+            string? annoAccademico = null,
+            HashSet<(string ComuneA, string ComuneB)>? comuniEquiparatiStatusSede = null,
+            DateTime? referenceDate = null);
     }
 }

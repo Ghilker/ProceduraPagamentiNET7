@@ -30,6 +30,13 @@ namespace ProcedureNet7.Verifica
 
             dt.Columns.Add("TipoRedditoOrigine", typeof(string));
             dt.Columns.Add("TipoRedditoIntegrazione", typeof(string));
+            dt.Columns.Add("HasIseeBaseEntroScadenza", typeof(bool));
+            dt.Columns.Add("HasCOUniversitarioEntroScadenza", typeof(bool));
+            dt.Columns.Add("HasCOOrdinarioConIntegrazioneEsteriEntroScadenza", typeof(bool));
+            dt.Columns.Add("HasCOOrdinarioSemestreFiltroEntroScadenza", typeof(bool));
+            dt.Columns.Add("HasCIUniversitarioEntroScadenza", typeof(bool));
+            dt.Columns.Add("OrigineEconomicaAdeguata", typeof(bool));
+            dt.Columns.Add("MotivoAdeguatezzaOrigine", typeof(string));
             dt.Columns.Add("ISR", typeof(decimal));
             dt.Columns.Add("ISP", typeof(decimal));
             dt.Columns.Add("Detrazioni", typeof(decimal));
@@ -118,6 +125,13 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("HaPassaggioCorsoEsteroCarrieraPregressa", typeof(bool));
             dt.Columns.Add("HaRipetenzaCarrieraPregressa", typeof(bool));
             dt.Columns.Add("CodiciAvvenimentoCarrieraPregressa", typeof(string));
+            dt.Columns.Add("BorsaPregressaNonRestituitaConfliggente", typeof(bool));
+            dt.Columns.Add("AnnoBorsaRichiestoNormalizzato", typeof(int));
+            dt.Columns.Add("AnniBorsaPregressaUsufruitiNormalizzati", typeof(string));
+            dt.Columns.Add("AnniBorsaPregressaRestituitiNormalizzati", typeof(string));
+            dt.Columns.Add("AnniBorsaPregressaNonRestituitaConfliggenti", typeof(string));
+            dt.Columns.Add("BorsaPregressaEsteraNonRichiedeRestituzione", typeof(bool));
+            dt.Columns.Add("DiagnosticaBorsaPregressaRestituzioni", typeof(string));
 
             dt.Columns.Add("StatusSedeRiferimentoImportoBorsa", typeof(string));
             dt.Columns.Add("ImportoBaseBorsa", typeof(decimal));
@@ -169,6 +183,16 @@ namespace ProcedureNet7.Verifica
 
             row["TipoRedditoOrigine"] = eco.Raw.TipoRedditoOrigine ?? "";
             row["TipoRedditoIntegrazione"] = eco.Raw.TipoRedditoIntegrazione ?? "";
+
+            context.TryGetEsitoBorsaFacts(key, out var facts);
+            row["HasIseeBaseEntroScadenza"] = facts?.HasIseeBaseEntroScadenza == true;
+            row["HasCOUniversitarioEntroScadenza"] = facts?.HasCoUniversitarioEntroScadenza == true;
+            row["HasCOOrdinarioConIntegrazioneEsteriEntroScadenza"] = facts?.HasCoOrdinarioConIntegrazioneEsteriEntroScadenza == true;
+            row["HasCOOrdinarioSemestreFiltroEntroScadenza"] = facts?.HasCoOrdinarioSemestreFiltroEntroScadenza == true;
+            row["HasCIUniversitarioEntroScadenza"] = facts?.HasCiUniversitarioEntroScadenza == true;
+            row["OrigineEconomicaAdeguata"] = facts?.OrigineEconomicaAdeguata == true;
+            row["MotivoAdeguatezzaOrigine"] = facts?.MotivoAdeguatezzaOrigine ?? "";
+
             row["ImportoAssegnatoBS"] = GetImportoAssegnato(context, key, "BS") ?? ToDecimalOrZero(eco.Raw.ImportoAssegnato);
             row["ISR"] = eco.Calcolate.ISRDSU;
             row["ISP"] = eco.Calcolate.ISPDSU;
@@ -233,7 +257,6 @@ namespace ProcedureNet7.Verifica
 
             int aaInizio = EsitoBorsaSupport.ParseAnnoAccademicoInizio(context.AnnoAccademico);
             int aaNumero = EsitoBorsaSupport.ParseAnnoAccademicoAsNumber(context.AnnoAccademico);
-            context.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts);
             int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(iscr, facts, aaInizio, aaNumero);
             bool ripetenteDaPassaggio = aaNumero >= 20252026
                                         && ((facts?.RipetenteDaPassaggio).HasValue == true
@@ -269,6 +292,13 @@ namespace ProcedureNet7.Verifica
             row["HaPassaggioCorsoEsteroCarrieraPregressa"] = iscr.HaPassaggioCorsoEsteroCarrieraPregressa != 0;
             row["HaRipetenzaCarrieraPregressa"] = iscr.HaRipetenzaCarrieraPregressa != 0;
             row["CodiciAvvenimentoCarrieraPregressa"] = iscr.CodiciAvvenimentoCarrieraPregressa ?? "";
+            row["BorsaPregressaNonRestituitaConfliggente"] = facts?.BorsaPregressaNonRestituitaConfliggente == true;
+            SetIfHasValue(row, "AnnoBorsaRichiestoNormalizzato", facts?.AnnoBorsaRichiestoNormalizzato);
+            row["AnniBorsaPregressaUsufruitiNormalizzati"] = facts?.AnniBorsaPregressaUsufruitiNormalizzati ?? "";
+            row["AnniBorsaPregressaRestituitiNormalizzati"] = facts?.AnniBorsaPregressaRestituitiNormalizzati ?? "";
+            row["AnniBorsaPregressaNonRestituitaConfliggenti"] = facts?.AnniBorsaPregressaNonRestituitaConfliggenti ?? "";
+            row["BorsaPregressaEsteraNonRichiedeRestituzione"] = facts?.BorsaPregressaEsteraNonRichiedeRestituzione == true;
+            row["DiagnosticaBorsaPregressaRestituzioni"] = facts?.DiagnosticaBorsaPregressaRestituzioni ?? "";
 
             row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
             row["ImportoBaseBorsa"] = impBorsa.ImportoBase;
@@ -279,9 +309,9 @@ namespace ProcedureNet7.Verifica
 
         private static void FillBenefitOutcomeColumns(DataRow row, VerificaPipelineContext context, StudentKey key)
         {
-            context.EsitoBorsaFactsByStudent.TryGetValue(key, out var facts);
-            context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var rawByBenefit);
-            context.EsitiCalcolatiByStudentBenefit.TryGetValue(key, out var calcolatiByBenefit);
+            context.TryGetEsitoBorsaFacts(key, out var facts);
+            context.TryGetEsitiConcorsoByBenefit(key, out var rawByBenefit);
+            context.TryGetEsitiCalcolatiByBenefit(key, out var calcolatiByBenefit);
 
             row["CodiciEsclusioneCalcolata_BS"] = string.Empty;
             row["DescrizioneEsclusioneCalcolata_BS"] = string.Empty;
@@ -326,7 +356,7 @@ namespace ProcedureNet7.Verifica
 
         private static decimal? GetImportoAssegnato(VerificaPipelineContext context, StudentKey key, string codBeneficio)
         {
-            if (context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var rawByBenefit) &&
+            if (context.TryGetEsitiConcorsoByBenefit(key, out var rawByBenefit) &&
                 rawByBenefit != null &&
                 rawByBenefit.TryGetValue(codBeneficio, out var raw) &&
                 raw != null)

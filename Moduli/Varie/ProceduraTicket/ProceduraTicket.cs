@@ -210,7 +210,7 @@ namespace ProcedureNet7
 
                     string messageBody = @"
                         <p>Buongiorno,</p>
-                        <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/01/2025 
+                        <p>vi invio l'estrazione dei ticket aperti e nuovi dal 01/01/2026 
                         con gli esiti di borsa e i blocchi presenti, integrato con le università
                         di appartenenza dello studente.</p>";
 

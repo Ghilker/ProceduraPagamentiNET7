@@ -73,7 +73,7 @@ namespace ProcedureNet7
 
         List<string> GenerateImpegnoComboBox(ref ComboBox comboBox, SqlConnection conn)
         {
-            SqlCommand readData = new($"SELECT * FROM impegni WHERE Cod_beneficio = '{selectedBeneficio}' and anno_accademico = '{selectedAA}' and categoria_pagamento = '{catPagamento}'", conn, sqlTransaction);
+            SqlCommand readData = new($"SELECT distinct * FROM impegni WHERE Cod_beneficio = '{selectedBeneficio}' and anno_accademico = '{selectedAA}' and categoria_pagamento = '{catPagamento}'", conn, sqlTransaction);
 
             Dictionary<string, string> impegni = new Dictionary<string, string>
             {

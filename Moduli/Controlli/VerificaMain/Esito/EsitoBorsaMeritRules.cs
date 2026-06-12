@@ -23,8 +23,9 @@ namespace ProcedureNet7
             iscr.EsamiMinimiRichiestiPassaggio = null;
             iscr.CreditiMinimiRichiestiPassaggio = null;
 
-            if (!PassaRequisitiSpecImmatricolati(context))
-                evaluation.Add("MER089");
+            string? motivoSpecImmatricolati = GetMotivoEsclusioneSpecImmatricolati(context);
+            if (!string.IsNullOrWhiteSpace(motivoSpecImmatricolati))
+                evaluation.Add(motivoSpecImmatricolati);
 
             if (!PassaRegolaCreditiSpecialisticaPrimoAnno(context))
                 evaluation.Add("MER074");
@@ -75,21 +76,46 @@ namespace ProcedureNet7
             return false;
         }
 
-        private static bool PassaRequisitiSpecImmatricolati(EsitoBorsaStudentContext context)
+        private static string? GetMotivoEsclusioneSpecImmatricolati(EsitoBorsaStudentContext context)
         {
             var iscr = context.Iscrizione;
             if (iscr == null || iscr.TipoCorso != 5 || iscr.AnnoCorso != 1)
-                return true;
+                return null;
+
+
+            if (context.Key.CodFiscale == "BNCDSR01L59H501Y")
+            {
+                string test = "";
+            }
+
+            if (context.Facts.TitoloGiaConseguitoConAttesaCicloUnico == true)
+                return "MER093";
+
+            if (context.Facts.AttesaTitoloValidataDaBloccoPagamentoRimosso == true
+                && context.Facts.TitoloAccademicoConseguito != true)
+                return null;
+
+            if (context.Facts.AttesaTitoloValidataDaIncongruenza27 == true
+                && context.Facts.TitoloAccademicoConseguito != true)
+                return null;
+
+            if (context.Facts.AttesaTitoloScaduta == true && context.Facts.TitoloAccademicoConseguito != true)
+                return "MER090";
+
+            if (!EsitoBorsaSupport.HasTitoloAccessoValido(context))
+                return "MER091";
 
             if (!context.Facts.TipologiaStudiTitoloConseguito.HasValue)
-                return true;
+                return "MER091";
 
             int tipologiaTitolo = context.Facts.TipologiaStudiTitoloConseguito.Value;
             int durataTitolo = context.Facts.DurataLegTitoloConseguito ?? 0;
 
-            return (tipologiaTitolo == 2 && durataTitolo == 3)
-                   || tipologiaTitolo == 3
-                   || tipologiaTitolo == 9;
+            bool titoloAmmesso = (tipologiaTitolo == 2 && durataTitolo == 3)
+                                || tipologiaTitolo == 3
+                                || tipologiaTitolo == 9;
+
+            return titoloAmmesso ? null : "MER089";
         }
 
         private static bool PassaRegolaCreditiSpecialisticaPrimoAnno(EsitoBorsaStudentContext context)
@@ -116,12 +142,26 @@ namespace ProcedureNet7
             if (creditiRichiesti <= 0m)
                 return true;
 
+            if(context.Key.CodFiscale == "MNZLNE00L67D662Q")
+            {
+                string test = "";
+            }
+
             decimal creditiStudente = iscr.NumeroCrediti ?? 0m;
             if (creditiStudente >= creditiRichiesti)
                 return true;
 
-            if (HasBloccoBonusTitolo(context, iscr))
-                evaluation.Add("MER085");
+            if (IsBonusRichiesto(iscr))
+            {
+                if (HasBloccoBonusTitolo(context, iscr))
+                    evaluation.Add("MER085");
+
+                if (HasBloccoBonusCreditiRiconosciuti(context, iscr))
+                    evaluation.Add("MER086");
+
+                if (HasBloccoBonusCarrieraPregressaCdAt(context))
+                    evaluation.Add("MER087");
+            }
 
             decimal bonusUsabile = GetBonusUsabile(context, iscr, iscr.AnnoCorso);
             if (creditiStudente + bonusUsabile >= creditiRichiesti)
@@ -136,14 +176,19 @@ namespace ProcedureNet7
 
         private static decimal GetBonusUsabile(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, int annoCorsoDichiarato)
         {
-            bool bonusRichiesto = iscr.UtilizzoBonus != 0 || (iscr.CreditiUtilizzati ?? 0m) > 0m;
-            if (!bonusRichiesto)
+            if (!IsBonusRichiesto(iscr))
                 return 0m;
 
             if (!CanUseBonus(context, iscr))
                 return 0m;
 
             if (HasBloccoBonusTitolo(context, iscr))
+                return 0m;
+
+            if (HasBloccoBonusCreditiRiconosciuti(context, iscr))
+                return 0m;
+
+            if (HasBloccoBonusCarrieraPregressaCdAt(context))
                 return 0m;
 
             decimal? creditiRimanenti = iscr.CreditiRimanenti;
@@ -175,6 +220,12 @@ namespace ProcedureNet7
             if (EsitoBorsaSupport.HasRipetenzaDaPassaggio(context))
                 return false;
 
+            if (HasBloccoBonusCreditiRiconosciuti(context, iscr))
+                return false;
+
+            if (HasBloccoBonusCarrieraPregressaCdAt(context))
+                return false;
+
             int annoInizioImmatricolazione = EsitoBorsaSupport.GetAnnoInizioDaAnnoAccademico(iscr.AnnoImmatricolazione ?? 0);
             if (annoInizioImmatricolazione <= 0 || annoInizioImmatricolazione < 2000)
                 return false;
@@ -192,25 +243,157 @@ namespace ProcedureNet7
 
         private static bool HasBloccoBonusTitolo(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
         {
-            bool bonusRichiesto = iscr.UtilizzoBonus != 0 || (iscr.CreditiUtilizzati ?? 0m) > 0m;
-            if (!bonusRichiesto)
+            if (!IsBonusRichiesto(iscr))
                 return false;
 
-            string sedeIstituzione = (context.Facts.SedeIstituzioneUniversitariaTitolo ?? string.Empty).Trim();
-            bool sedeCompatibile = string.IsNullOrEmpty(sedeIstituzione) || sedeIstituzione == "0";
-            if (!sedeCompatibile)
+            if (!EsitoBorsaSupport.HasTitoloAccessoValido(context))
                 return false;
 
             int tipologiaTitolo = context.Facts.TipologiaStudiTitoloConseguito ?? 0;
             bool isImmatricolato = iscr.AnnoCorso == 1;
+            string sedeIstituzioneTitolo = (context.Facts.SedeIstituzioneUniversitariaTitolo ?? string.Empty).Trim();
 
             if (iscr.TipoCorso == 5 && !isImmatricolato && tipologiaTitolo == 9)
                 return true;
 
-            if (tipologiaTitolo == 9 && context.Facts.RiconoscimentoTitoloEstero == true)
+            if (tipologiaTitolo == 9 && sedeIstituzioneTitolo == "2")
                 return true;
 
             return tipologiaTitolo == 1 || tipologiaTitolo == 2;
+        }
+
+        private static bool IsBonusRichiesto(InformazioniIscrizione iscr)
+        {
+            return iscr != null && (iscr.UtilizzoBonus != 0 || (iscr.CreditiUtilizzati ?? 0m) > 0m);
+        }
+
+        private static bool HasBloccoBonusCreditiRiconosciuti(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
+        {
+            if (iscr == null)
+                return false;
+
+            decimal creditiRiconosciuti = Math.Max(iscr.CreditiRiconosciuti ?? 0m, iscr.CreditiRiconosciutiDaRinuncia ?? 0m);
+            if (creditiRiconosciuti <= 0m)
+                return false;
+
+            return !HasCreditiRiconosciutiAttribuibiliATrasferimentoBonusAmmessi(context, iscr);
+        }
+
+        private static bool HasCreditiRiconosciutiAttribuibiliATrasferimentoBonusAmmessi(EsitoBorsaStudentContext context, InformazioniIscrizione iscr)
+        {
+            if (context == null || iscr == null)
+                return false;
+
+            if (context.Facts.RipetenteDaPassaggio == true || context.Facts.IscrittoRipetente == true)
+                return false;
+
+            var items = context.Info?.InformazioniIscrizione?.CarrierePregresse;
+            if (items == null || items.Count == 0)
+                return false;
+
+            bool hasTrasferimento = false;
+            bool hasRinuncia = false;
+            bool riconoscimentoMatchTrasferimento = false;
+            bool riconoscimentoMatchRinuncia = false;
+            int aaRiconoscimento = EsitoBorsaSupport.ParseAnnoAccademicoStartFromString(iscr.AACreditiRiconosciuti);
+
+            foreach (var item in items)
+            {
+                if (item == null)
+                    continue;
+
+                string codAvvenimento = NormalizeCodAvvenimentoCarrieraPregressa(item.CodAvvenimento);
+                bool isTrasferimento = codAvvenimento == "TS";
+                bool isRinuncia = IsRinunciaCarrieraPregressa(item, codAvvenimento);
+
+                if (!isTrasferimento && !isRinuncia)
+                    continue;
+
+                int aaAvvenimento = NormalizeAnnoAvvenimentoCarrieraPregressa(item.AnnoAvvenimento);
+
+                if (isTrasferimento)
+                {
+                    hasTrasferimento = true;
+                    if (aaRiconoscimento > 0 && aaAvvenimento == aaRiconoscimento)
+                        riconoscimentoMatchTrasferimento = true;
+                }
+
+                if (isRinuncia)
+                {
+                    hasRinuncia = true;
+                    if (aaRiconoscimento > 0 && aaAvvenimento == aaRiconoscimento)
+                        riconoscimentoMatchRinuncia = true;
+                }
+            }
+
+            if (!hasTrasferimento)
+                return false;
+
+            if (!hasRinuncia)
+                return true;
+
+            if (aaRiconoscimento <= 0)
+                return false;
+
+            return riconoscimentoMatchTrasferimento && !riconoscimentoMatchRinuncia;
+        }
+
+        private static string NormalizeCodAvvenimentoCarrieraPregressa(string? value)
+            => (value ?? string.Empty).Trim().ToUpperInvariant();
+
+        private static bool IsRinunciaCarrieraPregressa(InformazioniCarrieraPregressa item, string codAvvenimento)
+        {
+            if (codAvvenimento == "RI" || codAvvenimento == "RN")
+                return true;
+
+            if (codAvvenimento.Contains("RIN", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            string benefici = (item.BeneficiUsufruiti ?? string.Empty).Trim();
+            return benefici.Contains("RINUNC", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int NormalizeAnnoAvvenimentoCarrieraPregressa(int? annoAvvenimento)
+        {
+            if (!annoAvvenimento.HasValue || annoAvvenimento.Value <= 0)
+                return 0;
+
+            return EsitoBorsaSupport.GetAnnoInizioDaAnnoAccademico(annoAvvenimento.Value);
+        }
+
+        private static bool HasBloccoBonusCarrieraPregressaCdAt(EsitoBorsaStudentContext context)
+        {
+            var items = context?.Info?.InformazioniIscrizione?.CarrierePregresse;
+            if (items == null || items.Count == 0)
+                return false;
+
+            foreach (var item in items)
+            {
+                if (item == null)
+                    continue;
+
+                string codAvvenimento = (item.CodAvvenimento ?? string.Empty).Trim().ToUpperInvariant();
+                if (codAvvenimento != "CD" && codAvvenimento != "AT")
+                    continue;
+
+                if (TryParseInt(item.TipologiaCorso, out int tipologiaCorso) && tipologiaCorso == 9)
+                    return true;
+
+                string sedeIstituzione = (item.SedeIstituzioneUniversitaria ?? string.Empty).Trim();
+                if (TryParseInt(sedeIstituzione, out int sedeIstituzioneCode) && sedeIstituzioneCode == 2)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryParseInt(string? value, out int result)
+        {
+            return int.TryParse(
+                (value ?? string.Empty).Trim(),
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out result);
         }
 
         private static decimal GetCreditiMinimiRichiesti(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, bool invalido, int annoCorsoRiferimento)
@@ -268,7 +451,7 @@ namespace ProcedureNet7
 
         private static bool HasCreditiDichiaratiIncongruenti(InformazioniIscrizione iscr)
         {
-            decimal crediti = iscr.NumeroCrediti ?? 0m;
+            decimal crediti = iscr.NumeroCreditiRaw ?? 0m;
             if (crediti <= 0m)
                 return false;
 
@@ -276,7 +459,7 @@ namespace ProcedureNet7
 
             return iscr.TipoCorso switch
             {
-                5 => crediti > 120m,
+                5 => crediti >= 120m,
                 3 => crediti >= 180m,
                 4 when durataLegale == 5 => crediti >= 300m,
                 4 when durataLegale == 6 => crediti >= 360m,

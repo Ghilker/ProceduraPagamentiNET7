@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Globalization;
 using System.Linq;
 using ProcedureNet7.Verifica;
@@ -16,18 +17,216 @@ namespace ProcedureNet7
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-            var evaluator = new StatusSedeEvaluator(context.ComuniEquiparati, context.ReferenceDate.Date);
-            var (aaStart, aaEnd) = GetAaDateRange(context.AnnoAccademico);
-
             foreach (var info in context.Students.Values)
             {
-                var decision = evaluator.Evaluate(info, aaStart, aaEnd);
-
-                info.InformazioniSede.StatusSedeSuggerito = decision.SuggestedStatus;
-                info.InformazioniSede.MotivoStatusSede = decision.Reason;
-                info.InformazioniSede.DomicilioPresente = decision.DomicilioPresente;
-                info.InformazioniSede.DomicilioValido = decision.DomicilioValido;
+                ApplicaStatusSede(
+                    info,
+                    context.AnnoAccademico,
+                    context.ComuniEquiparati,
+                    context.ReferenceDate.Date);
             }
+        }
+
+        internal static StatusSedeResult ValutaStatusSede(
+            StudenteInfo info,
+            string annoAccademico,
+            HashSet<(string ComuneA, string ComuneB)>? comuniEquiparati = null,
+            DateTime? referenceDate = null)
+        {
+            if (info == null)
+                throw new ArgumentNullException(nameof(info));
+
+            var evaluator = new StatusSedeEvaluator(
+                comuniEquiparati ?? new HashSet<(string ComuneA, string ComuneB)>(),
+                (referenceDate ?? DateTime.Today).Date);
+
+            var (aaStart, aaEnd) = GetAaDateRange(annoAccademico);
+            var decision = evaluator.Evaluate(info, aaStart, aaEnd);
+
+            return new StatusSedeResult(
+                decision.SuggestedStatus,
+                decision.Reason,
+                decision.DomicilioPresente,
+                decision.DomicilioValido,
+                decision.FuoriSedeCertoPerSaldo);
+        }
+
+        internal static StatusSedeResult ApplicaStatusSede(
+            StudenteInfo info,
+            string annoAccademico,
+            HashSet<(string ComuneA, string ComuneB)>? comuniEquiparati = null,
+            DateTime? referenceDate = null)
+        {
+            var result = ValutaStatusSede(info, annoAccademico, comuniEquiparati, referenceDate);
+
+            info.InformazioniSede.StatusSedeSuggerito = result.SuggestedStatus;
+            info.InformazioniSede.MotivoStatusSede = result.Reason;
+            info.InformazioniSede.DomicilioPresente = result.DomicilioPresente;
+            info.InformazioniSede.DomicilioValido = result.DomicilioValido;
+
+            return result;
+        }
+
+        internal static bool DevePagareComePendolare(
+            StudenteInfo info,
+            string annoAccademico,
+            HashSet<(string ComuneA, string ComuneB)>? comuniEquiparati,
+            DateTime referenceDate,
+            out StatusSedeResult statusSede)
+        {
+            return DevePagareComePendolarePerPagamento(
+                info,
+                annoAccademico,
+                codTipoPagamento: string.Empty,
+                comuniEquiparati,
+                referenceDate,
+                out statusSede);
+        }
+
+        internal static bool DevePagareComePendolarePerPagamento(
+            StudenteInfo info,
+            string annoAccademico,
+            string? codTipoPagamento,
+            HashSet<(string ComuneA, string ComuneB)>? comuniEquiparati,
+            DateTime referenceDate,
+            out StatusSedeResult statusSede)
+        {
+            statusSede = ApplicaStatusSede(info, annoAccademico, comuniEquiparati, referenceDate);
+
+            return DevePagareComePendolarePerPagamentoDaResult(
+                info,
+                codTipoPagamento,
+                statusSede);
+        }
+
+        internal static bool DevePagareComePendolarePerPagamentoDaResult(
+            StudenteInfo info,
+            string? codTipoPagamento,
+            StatusSedeResult statusSede)
+        {
+            if (info == null)
+                throw new ArgumentNullException(nameof(info));
+
+            string statusAttuale = (info.InformazioniSede.StatusSede ?? "").Trim().ToUpperInvariant();
+            string statusCalcolato = (statusSede.SuggestedStatus ?? "").Trim().ToUpperInvariant();
+            string codPag = (codTipoPagamento ?? "").Trim().ToUpperInvariant();
+
+            if (statusAttuale != "B")
+                return false;
+
+            // Saldo SA: il fuori sede deve essere certo.
+            // Istanze future, domicilio sotto i mesi minimi o validità solo in finestra proroga
+            // non bastano per pagare il saldo come fuori sede.
+            if (codPag == "SA")
+                return statusCalcolato != "B" || !statusSede.FuoriSedeCertoPerSaldo;
+
+            return statusCalcolato == "C" || statusCalcolato == "D";
+        }
+
+        internal readonly record struct StatusSedeResult(
+            string SuggestedStatus,
+            string Reason,
+            bool DomicilioPresente,
+            bool DomicilioValido,
+            bool FuoriSedeCertoPerSaldo)
+        {
+            public StatusSedeResult(
+                string SuggestedStatus,
+                string Reason,
+                bool DomicilioPresente,
+                bool DomicilioValido)
+                : this(
+                    SuggestedStatus,
+                    Reason,
+                    DomicilioPresente,
+                    DomicilioValido,
+                    string.Equals((SuggestedStatus ?? "").Trim(), "B", StringComparison.OrdinalIgnoreCase) && DomicilioValido)
+            {
+            }
+        }
+
+        private static readonly object ComuniEquiparatiCacheLock = new();
+        private static HashSet<(string ComuneA, string ComuneB)>? _comuniEquiparatiCache;
+        private static DateTime _comuniEquiparatiCacheLoadedAtUtc;
+        private static readonly TimeSpan ComuniEquiparatiCacheTtl = TimeSpan.FromMinutes(30);
+
+        internal static HashSet<(string ComuneA, string ComuneB)> LoadComuniEquiparatiFromDb(
+            SqlConnection connection,
+            SqlTransaction? transaction = null,
+            bool forceRefresh = false)
+        {
+            if (connection == null)
+                throw new ArgumentNullException(nameof(connection));
+
+            lock (ComuniEquiparatiCacheLock)
+            {
+                if (!forceRefresh
+                    && _comuniEquiparatiCache != null
+                    && (DateTime.UtcNow - _comuniEquiparatiCacheLoadedAtUtc) <= ComuniEquiparatiCacheTtl)
+                {
+                    return new HashSet<(string ComuneA, string ComuneB)>(_comuniEquiparatiCache);
+                }
+            }
+
+            const string sql = @"
+SELECT
+    UPPER(LTRIM(RTRIM(Cod_Comune_A))) AS Cod_Comune_A,
+    UPPER(LTRIM(RTRIM(Cod_Comune_B))) AS Cod_Comune_B
+FROM dbo.STATUS_SEDE_COMUNI_EQUIVALENTI
+WHERE Data_Fine_Validita IS NULL;";
+
+            var result = new HashSet<(string ComuneA, string ComuneB)>();
+
+            using var cmd = transaction == null
+                ? new SqlCommand(sql, connection)
+                : new SqlCommand(sql, connection, transaction);
+
+            cmd.CommandType = CommandType.Text;
+            cmd.CommandTimeout = 9000000;
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                string comuneA = Utilities.SafeGetString(reader, "Cod_Comune_A").Trim().ToUpperInvariant();
+                string comuneB = Utilities.SafeGetString(reader, "Cod_Comune_B").Trim().ToUpperInvariant();
+
+                if (comuneA.Length == 0 || comuneB.Length == 0)
+                    continue;
+
+                result.Add(NormalizeComunePair(comuneA, comuneB));
+            }
+
+            lock (ComuniEquiparatiCacheLock)
+            {
+                _comuniEquiparatiCache = new HashSet<(string ComuneA, string ComuneB)>(result);
+                _comuniEquiparatiCacheLoadedAtUtc = DateTime.UtcNow;
+            }
+
+            Logger.LogInfo(null, $"[ControlloStatusSede] Comuni equiparati caricati: {result.Count}");
+            return result;
+        }
+
+        internal static bool DevePagareComePendolareDaStatusCalcolato(
+            StudenteInfo info,
+            out StatusSedeResult statusSede)
+        {
+            if (info == null)
+                throw new ArgumentNullException(nameof(info));
+
+            string statusAttuale = (info.InformazioniSede.StatusSede ?? "").Trim().ToUpperInvariant();
+            string statusCalcolato = (info.InformazioniSede.StatusSedeSuggerito ?? "").Trim().ToUpperInvariant();
+            string motivo = info.InformazioniSede.MotivoStatusSede ?? "Status sede calcolato non valorizzato";
+
+            statusSede = new StatusSedeResult(
+                statusCalcolato,
+                motivo,
+                info.InformazioniSede.DomicilioPresente,
+                info.InformazioniSede.DomicilioValido);
+
+            return DevePagareComePendolarePerPagamentoDaResult(
+                info,
+                codTipoPagamento: string.Empty,
+                statusSede);
         }
 
         private sealed class StatusSedeEvaluator
@@ -158,7 +357,7 @@ namespace ProcedureNet7
                 => string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
-        private static class DomicilioValidator
+        internal static class DomicilioValidator
         {
             public static DomResult Validate(StudenteInfo info, DateTime aaStart, DateTime aaEnd, DateTime referenceDate)
             {
@@ -190,7 +389,14 @@ namespace ProcedureNet7
                     $"ISTANZA APERTA {info.InformazioniSede.NumIstanzaDomicilio}");
 
                 if (!corrente.Presente && istanza.Presente)
-                    return istanza;
+                {
+                    return istanza with
+                    {
+                        ValidoCertoPerSaldo = false,
+                        Reason = "Solo istanza aperta: valida per valutazione ordinaria, non sufficiente per saldo SA" +
+                                 $" | Istanza: {istanza.Reason}"
+                    };
+                }
 
                 if (corrente.Presente && !istanza.Presente)
                     return corrente;
@@ -220,7 +426,8 @@ namespace ProcedureNet7
                                 $" | Istanza: {istanza.Reason}",
                             ComuneDomicilio: comuneValutato,
                             TipoEnte: tipoEnteValutato,
-                            Source: "ISTANZA FUTURA + DOMICILIO CORRENTE");
+                            Source: "ISTANZA FUTURA + DOMICILIO CORRENTE",
+                            ValidoCertoPerSaldo: corrente.ValidoCertoPerSaldo);
                     }
 
                     return new DomResult(
@@ -233,7 +440,8 @@ namespace ProcedureNet7
                             $" | Istanza: {istanza.Reason}",
                         ComuneDomicilio: comuneValutato,
                         TipoEnte: tipoEnteValutato,
-                        Source: "ISTANZA FUTURA");
+                        Source: "ISTANZA FUTURA",
+                        ValidoCertoPerSaldo: false);
                 }
 
                 if (corrente.Valido)
@@ -248,7 +456,8 @@ namespace ProcedureNet7
                             $" | Istanza: {istanza.Reason}",
                         ComuneDomicilio: corrente.ComuneDomicilio,
                         TipoEnte: corrente.TipoEnte,
-                        Source: "DOMICILIO CORRENTE + ISTANZA FUTURA");
+                        Source: "DOMICILIO CORRENTE + ISTANZA FUTURA",
+                        ValidoCertoPerSaldo: corrente.ValidoCertoPerSaldo);
                 }
 
                 return new DomResult(
@@ -264,7 +473,8 @@ namespace ProcedureNet7
                     TipoEnte: !string.IsNullOrWhiteSpace(corrente.TipoEnte)
                         ? corrente.TipoEnte
                         : istanza.TipoEnte,
-                    Source: "DOMICILIO CORRENTE + ISTANZA");
+                    Source: "DOMICILIO CORRENTE + ISTANZA",
+                    ValidoCertoPerSaldo: false);
             }
 
             private static DomResult ValidateSnapshot(
@@ -360,10 +570,11 @@ namespace ProcedureNet7
                         return new DomResult(
                             true,
                             true,
-                            $"Valido in finestra proroga 30 giorni (mesi coperti={mesi}, minimo={min}, scadenza={dom.DataScadenza:dd/MM/yyyy})",
+                            $"Valido in finestra proroga 30 giorni (mesi coperti={mesi}, minimo={min}, scadenza={dom.DataScadenza:dd/MM/yyyy}) - non sufficiente per saldo SA",
                             comuneDom,
                             tipoEnte,
-                            source);
+                            source,
+                            ValidoCertoPerSaldo: false);
                     }
 
                     if (haBuchiInizialiRilevanti && dom.DataScadenza.Date >= aaEnd.Date)
@@ -437,13 +648,26 @@ namespace ProcedureNet7
             }
         }
 
-        private readonly record struct DomResult(
+        internal readonly record struct DomResult(
             bool Presente,
             bool Valido,
             string Reason,
             string ComuneDomicilio,
             string TipoEnte,
-            string Source);
+            string Source,
+            bool ValidoCertoPerSaldo)
+        {
+            public DomResult(
+                bool Presente,
+                bool Valido,
+                string Reason,
+                string ComuneDomicilio,
+                string TipoEnte,
+                string Source)
+                : this(Presente, Valido, Reason, ComuneDomicilio, TipoEnte, Source, Valido)
+            {
+            }
+        }
 
         private sealed class StatusSedeDecision
         {
@@ -451,20 +675,37 @@ namespace ProcedureNet7
             public string Reason { get; }
             public bool DomicilioPresente { get; }
             public bool DomicilioValido { get; }
+            public bool FuoriSedeCertoPerSaldo { get; }
 
-            private StatusSedeDecision(string suggested, string reason, bool domPres, bool domVal)
+            private StatusSedeDecision(
+                string suggested,
+                string reason,
+                bool domPres,
+                bool domVal,
+                bool fuoriSedeCertoPerSaldo)
             {
                 SuggestedStatus = suggested;
                 Reason = reason;
                 DomicilioPresente = domPres;
                 DomicilioValido = domVal;
+                FuoriSedeCertoPerSaldo = fuoriSedeCertoPerSaldo;
             }
 
             public static StatusSedeDecision Fixed(string suggested, string reason)
-                => new StatusSedeDecision(suggested, reason, domPres: false, domVal: false);
+                => new StatusSedeDecision(
+                    suggested,
+                    reason,
+                    domPres: false,
+                    domVal: false,
+                    fuoriSedeCertoPerSaldo: string.Equals((suggested ?? "").Trim(), "B", StringComparison.OrdinalIgnoreCase));
 
             public static StatusSedeDecision WithDom(string suggested, string reason, DomResult dom)
-                => new StatusSedeDecision(suggested, reason, dom.Presente, dom.Valido);
+                => new StatusSedeDecision(
+                    suggested,
+                    reason,
+                    dom.Presente,
+                    dom.Valido,
+                    string.Equals((suggested ?? "").Trim(), "B", StringComparison.OrdinalIgnoreCase) && dom.ValidoCertoPerSaldo);
         }
 
         private static (string ComuneA, string ComuneB) NormalizeComunePair(string? comuneA, string? comuneB)

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ProcedureNet7.Verifica;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,6 +18,10 @@ namespace ProcedureNet7
         public bool RichiestaPA { get; set; }
         public bool RinunciaPA { get; set; }
         public bool HaServizioSanitario { get; set; }
-        public bool ConcessaMonetizzazioneMensa {  get; set; }
+        public bool ConcessaMonetizzazioneMensa { get; set; }
+
+        public EsitoBorsaFacts EsitoBorsaFacts { get; } = new();
+        public Dictionary<string, EsitoConcorsoBenefitRaw> EsitiConcorsoByBenefit { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, EsitoBeneficioCalcolato> EsitiCalcolatiByBenefit { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

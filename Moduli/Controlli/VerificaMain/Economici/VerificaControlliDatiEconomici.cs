@@ -17,103 +17,127 @@ namespace ProcedureNet7
             foreach (var info in context.Students.Values)
             {
                 var eco = info.InformazioniEconomiche;
-                ResetCalcolate(eco.Calcolate);
-                ApplyDbDerivedValues(eco, calc);
+                var cal = eco.Calcolate;
 
-                eco.Calcolate.SEQ = ComputeSeqFinal(eco);
-                eco.Calcolate.ISRDSU = Math.Max(eco.Calcolate.ISRDSU - eco.Calcolate.Detrazioni, 0m);
+                decimal seqOrigine;
+                decimal seqIntegrazione;
+                decimal isrDsu;
+                decimal ispDsu;
+                decimal sommaRedditiStud;
+                int numeroComponentiIntegrazione;
 
-                decimal isedsu = eco.Calcolate.ISRDSU + 0.2m * eco.Calcolate.ISPDSU;
-                decimal iseed = eco.Calcolate.SEQ > 0m ? isedsu / eco.Calcolate.SEQ : isedsu;
-                decimal ispe = (eco.Calcolate.ISPDSU > 0m && eco.Calcolate.SEQ > 0m) ? eco.Calcolate.ISPDSU / eco.Calcolate.SEQ : 0m;
+                ComputeDbDerivedValues(eco, calc, out seqOrigine, out seqIntegrazione, out isrDsu, out ispDsu, out sommaRedditiStud, out numeroComponentiIntegrazione);
 
-                eco.Calcolate.ISEDSU = EconomiciFormulaSupport.RoundSql(isedsu, 2);
-                eco.Calcolate.ISEEDSU = EconomiciFormulaSupport.RoundSql(iseed, 2);
-                eco.Calcolate.ISPEDSU = EconomiciFormulaSupport.RoundSql(ispe, 2);
+                cal.SEQ_Origine = seqOrigine;
+                cal.SEQ_Integrazione = seqIntegrazione;
+                cal.ISRDSU = isrDsu;
+                cal.ISPDSU = ispDsu;
+                cal.Detrazioni = eco.Raw.DetrazioniAdisu + eco.Raw.DetrazioniAltreBorse;
+                cal.SommaRedditiStud = sommaRedditiStud;
+
+                cal.SEQ = ComputeSeqFinal(eco, numeroComponentiIntegrazione);
+                cal.ISRDSU = Math.Max(cal.ISRDSU - cal.Detrazioni, 0m);
+
+                decimal isedsu = cal.ISRDSU + 0.2m * cal.ISPDSU;
+                decimal iseed = cal.SEQ > 0m ? isedsu / cal.SEQ : isedsu;
+                decimal ispe = (cal.ISPDSU > 0m && cal.SEQ > 0m) ? cal.ISPDSU / cal.SEQ : 0m;
+
+                cal.ISEDSU = EconomiciFormulaSupport.RoundSql(isedsu, 2);
+                cal.ISEEDSU = EconomiciFormulaSupport.RoundSql(iseed, 2);
+                cal.ISPEDSU = EconomiciFormulaSupport.RoundSql(ispe, 2);
             }
         }
 
-        private static void ResetCalcolate(InformazioniEconomiche.InformazioniEconomicheCalcolate calcolate)
+        private static void ComputeDbDerivedValues(
+            InformazioniEconomiche eco,
+            CalcParams calc,
+            out decimal seqOrigine,
+            out decimal seqIntegrazione,
+            out decimal isrDsu,
+            out decimal ispDsu,
+            out decimal sommaRedditiStud,
+            out int numeroComponentiIntegrazione)
         {
-            calcolate.SEQ_Origine = 0m;
-            calcolate.SEQ_Integrazione = 0m;
-            calcolate.ISRDSU = 0m;
-            calcolate.ISPDSU = 0m;
-            calcolate.Detrazioni = 0m;
-            calcolate.SommaRedditiStud = 0m;
-            calcolate.ISEDSU = 0m;
-            calcolate.ISEEDSU = 0m;
-            calcolate.ISPEDSU = 0m;
-            calcolate.SEQ = 0m;
+            ComputeOrigine(eco, calc, out seqOrigine, out isrDsu, out ispDsu, out sommaRedditiStud);
+            ComputeIntegrazione(eco, calc, out seqIntegrazione, out numeroComponentiIntegrazione, ref isrDsu, ref ispDsu);
         }
 
-        private static void ApplyDbDerivedValues(InformazioniEconomiche eco, CalcParams calc)
-        {
-            eco.Calcolate.Detrazioni = eco.Raw.DetrazioniAdisu + eco.Raw.DetrazioniAltreBorse;
-            ApplyOrigine(eco, calc);
-            ApplyIntegrazione(eco, calc);
-        }
-
-        private static void ApplyOrigine(InformazioniEconomiche eco, CalcParams calc)
+        private static void ComputeOrigine(
+            InformazioniEconomiche eco,
+            CalcParams calc,
+            out decimal seqOrigine,
+            out decimal isrDsu,
+            out decimal ispDsu,
+            out decimal sommaRedditiStud)
         {
             var raw = eco.Raw;
-            var cal = eco.Calcolate;
+            seqOrigine = 0m;
+            isrDsu = 0m;
+            ispDsu = 0m;
+            sommaRedditiStud = 0m;
 
             switch ((raw.OrigineFonte ?? string.Empty).Trim().ToUpperInvariant())
             {
                 case "CO":
                 case "DO":
-                    cal.SEQ_Origine = raw.OrigineScalaEquivalenza;
-                    cal.SommaRedditiStud = raw.OrigineSommaRedditi;
-                    cal.ISRDSU = raw.OrigineISR
+                    seqOrigine = raw.OrigineScalaEquivalenza;
+                    sommaRedditiStud = raw.OrigineSommaRedditi;
+                    isrDsu = raw.OrigineISR
                                 - raw.OrigineReddFratelli50
                                 + raw.OrigineReddFrat50Est
                                 + raw.OrigineReddFam50Est
                                 + raw.AltriMezzi
                                 + (raw.OriginePatrFrat50Est - raw.OriginePatrFratelli50 + raw.OriginePatrFam50Est) * calc.RendPatr;
-                    cal.ISPDSU = raw.OrigineISP - raw.OriginePatrImm50FratSor + raw.OrigineMetriQuadri * 500m;
+                    ispDsu = raw.OrigineISP - raw.OriginePatrImm50FratSor + raw.OrigineMetriQuadri * 500m;
                     break;
 
                 case "EE":
-                    cal.SEQ_Origine = EconomiciFormulaSupport.ScalaMin(raw.OrigineNumeroComponenti);
+                    seqOrigine = EconomiciFormulaSupport.ScalaMin(raw.OrigineNumeroComponenti);
                     var patrAdj = Math.Max(raw.OriginePatrMobiliare + raw.OriginePatrMobFratell * 0.5m - calc.FranchigiaPatMob, 0m);
-                    cal.ISRDSU = raw.OrigineRedditoComplessivo + raw.OrigineReddLordoFratell * 0.5m + patrAdj * calc.RendPatr + raw.AltriMezzi;
+                    isrDsu = raw.OrigineRedditoComplessivo + raw.OrigineReddLordoFratell * 0.5m + patrAdj * calc.RendPatr + raw.AltriMezzi;
                     var isp = Math.Max((raw.OrigineSuperfAbitazMq + raw.OrigineSupComplAltreMq + raw.OrigineSupComplMq * 0.5m) * 500m - calc.Franchigia, 0m);
-                    cal.ISPDSU = isp + patrAdj;
+                    ispDsu = isp + patrAdj;
                     break;
             }
         }
 
-        private static void ApplyIntegrazione(InformazioniEconomiche eco, CalcParams calc)
+        private static void ComputeIntegrazione(
+            InformazioniEconomiche eco,
+            CalcParams calc,
+            out decimal seqIntegrazione,
+            out int numeroComponentiIntegrazione,
+            ref decimal isrDsu,
+            ref decimal ispDsu)
         {
             var raw = eco.Raw;
-            var cal = eco.Calcolate;
+            seqIntegrazione = 0m;
+            numeroComponentiIntegrazione = 0;
 
             switch ((raw.IntegrazioneFonte ?? string.Empty).Trim().ToUpperInvariant())
             {
                 case "CI":
-                    cal.SEQ_Integrazione = raw.IntegrazioneScalaEquivalenza;
-                    raw.NumeroComponentiIntegrazione = raw.IntegrazioneNumeroComponenti;
-                    cal.ISRDSU += raw.IntegrazioneISR
+                    seqIntegrazione = raw.IntegrazioneScalaEquivalenza;
+                    numeroComponentiIntegrazione = raw.IntegrazioneNumeroComponenti;
+                    isrDsu += raw.IntegrazioneISR
                                 - raw.IntegrazioneReddFratelli50
                                 + raw.IntegrazioneReddFrat50Est
                                 + raw.IntegrazioneReddFam50Est
                                 - (raw.IntegrazionePatrFrat50Est - raw.IntegrazionePatrFratelli50 + raw.IntegrazionePatrFam50Est) * calc.RendPatr;
-                    cal.ISPDSU += raw.IntegrazioneISP + raw.IntegrazioneMetriQuadri * 500m;
+                    ispDsu += raw.IntegrazioneISP + raw.IntegrazioneMetriQuadri * 500m;
                     break;
 
                 case "DI":
-                    raw.NumeroComponentiIntegrazione = raw.IntegrazioneNumeroComponenti;
-                    cal.SEQ_Integrazione = EconomiciFormulaSupport.ScalaMin(raw.IntegrazioneNumeroComponenti);
+                    numeroComponentiIntegrazione = raw.IntegrazioneNumeroComponenti;
+                    seqIntegrazione = EconomiciFormulaSupport.ScalaMin(raw.IntegrazioneNumeroComponenti);
                     var patrAdj = Math.Max(raw.IntegrazionePatrMobiliare + raw.IntegrazionePatrMobFratell * 0.5m - calc.FranchigiaPatMob, 0m);
-                    cal.ISRDSU += raw.IntegrazioneRedditoComplessivo + raw.IntegrazioneReddLordoFratell * 0.5m + patrAdj * calc.RendPatr;
+                    isrDsu += raw.IntegrazioneRedditoComplessivo + raw.IntegrazioneReddLordoFratell * 0.5m + patrAdj * calc.RendPatr;
                     var ispAdd = Math.Max((raw.IntegrazioneSuperfAbitazMq + raw.IntegrazioneSupComplAltreMq + raw.IntegrazioneSupComplMq * 0.5m) * 500m - calc.Franchigia, 0m) + patrAdj;
-                    cal.ISPDSU += ispAdd;
+                    ispDsu += ispAdd;
                     break;
             }
         }
 
-        private static decimal ComputeSeqFinal(InformazioniEconomiche eco)
+        private static decimal ComputeSeqFinal(InformazioniEconomiche eco, int numeroComponentiIntegrazione)
         {
             var raw = eco.Raw;
             var cal = eco.Calcolate;
@@ -131,7 +155,7 @@ namespace ProcedureNet7
                 componentiStudente = baseComponenti + conviventiEstero;
             }
 
-            int componentiIntegrazione = Math.Max(raw.NumeroComponentiIntegrazione, 0);
+            int componentiIntegrazione = Math.Max(numeroComponentiIntegrazione, 0);
             if (componentiIntegrazione <= 0)
             {
                 decimal seqSoloStudente = EconomiciFormulaSupport.ScalaMin(componentiStudente) + maggiorazioneStudente;
@@ -152,7 +176,7 @@ namespace ProcedureNet7
 
     internal static class EconomiciFormulaSupport
     {
-        internal static decimal RoundSql(decimal value, int decimals) => Math.Round(value, decimals);
+        internal static decimal RoundSql(decimal value, int decimals) => Math.Round(value, decimals, MidpointRounding.AwayFromZero);
 
         internal static decimal ScalaMin(int componentCount)
         {

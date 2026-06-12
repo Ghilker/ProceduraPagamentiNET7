@@ -22,10 +22,10 @@ ESITI_LAST AS
     SELECT
         D.NumDomanda,
         D.CodFiscale,
-        UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio,'')))) AS CodBeneficio,
+        UPPER(ISNULL(ec.Cod_beneficio,'')) AS CodBeneficio,
         CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsito,
         TRY_CONVERT(DECIMAL(18,2), ec.Imp_beneficio) AS ImportoAssegnato,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda, UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio,'')))) ORDER BY ec.Data_validita DESC) AS rn
+        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda, UPPER(ISNULL(ec.Cod_beneficio,'')) ORDER BY ec.Data_validita DESC) AS rn
     FROM D
     JOIN ESITI_CONCORSI ec
       ON ec.Num_domanda = D.NumDomanda
@@ -93,20 +93,6 @@ FROM {TEMP_TABLE} t
 JOIN vMonetizzazione_Mensa mm
   ON mm.Num_domanda = t.NumDomanda;";
 
-        private const string NucleoFamiliarePopulationSql = @"
-SET NOCOUNT ON;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
-
-SELECT
-    CAST(t.NumDomanda AS INT) AS NumDomanda,
-    t.CodFiscale,
-    CAST(ISNULL(n.Num_componenti,0) AS INT) AS NumComponenti,
-    CAST(ISNULL(n.Numero_conviventi_estero,0) AS INT) AS NumConvEstero
-FROM {TEMP_TABLE} t
-JOIN VNUCLEO_FAMILIARE n
-  ON n.Num_domanda = t.NumDomanda
-WHERE n.Anno_accademico = @AA;";
-
         private const string ResidenzaPopulationSql = @"
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
@@ -120,7 +106,7 @@ FROM {TEMP_TABLE} t
 JOIN vRESIDENZA r
   ON UPPER(r.COD_FISCALE) = UPPER(t.CodFiscale)
 WHERE r.ANNO_ACCADEMICO = @AA
-  AND r.TIPO_BANDO = 'LZ';";
+  AND (r.TIPO_BANDO = 'LZ' OR r.TIPO_BANDO IS NULL);";
 
         private const string StatusSedeAttualePopulationSql = @"
 SET NOCOUNT ON;
@@ -156,146 +142,6 @@ JOIN Forzature_StatusSede f
 WHERE f.Anno_Accademico = @AA
   AND f.Data_fine_validita IS NULL
   AND f.Status_sede IN ('A','B','C','D');";
-
-        private const string StatusSedeClassificationFlagsSql = @"
-SET NOCOUNT ON;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
-
-;WITH D AS
-(
-    SELECT
-        CAST(t.NumDomanda AS INT) AS NumDomanda,
-        t.CodFiscale,
-        COALESCE(t.TipoBando,'') AS TipoBando
-    FROM {TEMP_TABLE} t
-),
-RES AS
-(
-    SELECT
-        D.NumDomanda,
-        D.CodFiscale,
-        ISNULL(r.Cod_comune,'') AS ComuneResidenza
-    FROM D
-    JOIN vRESIDENZA r
-      ON UPPER(r.COD_FISCALE) = UPPER(D.CodFiscale)
-    WHERE r.ANNO_ACCADEMICO = @AA
-      AND r.TIPO_BANDO = 'LZ'
-),
-ISCR AS
-(
-    SELECT
-        D.NumDomanda,
-        D.CodFiscale,
-        i.COD_SEDE_STUDI AS CodSedeStudi,
-        CASE
-            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL THEN '00000'
-            ELSE cl.COD_SEDE_DISTACCATA
-        END AS CodSedeDistaccata,
-        CAST(
-            CASE
-                WHEN ISNULL(ss.TELEMATICA,0) = 1 OR ISNULL(cl.CORSO_IN_PRESENZA,1) = 0 THEN 1
-                ELSE 0
-            END
-        AS BIT) AS AlwaysA
-    FROM D
-    JOIN ISCRIZIONI i
-      ON i.ANNO_ACCADEMICO = @AA
-     AND i.COD_FISCALE = D.CodFiscale
-     AND i.DATA_VALIDITA =
-     (
-        SELECT MAX(i2.DATA_VALIDITA)
-        FROM ISCRIZIONI i2
-        WHERE i2.COD_FISCALE = i.COD_FISCALE
-          AND i2.ANNO_ACCADEMICO = i.ANNO_ACCADEMICO
-          AND (i2.TIPO_BANDO IS NULL OR i2.TIPO_BANDO LIKE 'L%')
-     )
-    JOIN CORSI_LAUREA cl
-      ON i.Cod_corso_laurea     = cl.Cod_corso_laurea
-     AND i.Anno_accad_inizio    = cl.Anno_accad_inizio
-     AND i.Cod_tipo_ordinamento = cl.Cod_tipo_ordinamento
-     AND i.Cod_facolta          = cl.Cod_facolta
-     AND i.Cod_sede_studi       = cl.Cod_sede_studi
-     AND i.Cod_tipologia_studi  = cl.Cod_tipologia_studi
-    LEFT JOIN SEDE_STUDI ss
-      ON ss.COD_SEDE_STUDI = i.COD_SEDE_STUDI
-)
-SELECT
-    D.NumDomanda,
-    D.CodFiscale,
-    ISNULL(I.AlwaysA, CAST(0 AS BIT)) AS AlwaysA,
-    CAST(
-        CASE WHEN EXISTS
-        (
-            SELECT 1
-            FROM COMUNI_INSEDE ci
-            WHERE ci.riga_valida = 1
-              AND ci.cod_comune = R.ComuneResidenza
-              AND ci.cod_sede_studi = I.CodSedeStudi
-              AND ISNULL(ci.cod_sede_distaccata,'00000') = ISNULL(I.CodSedeDistaccata,'00000')
-        )
-        THEN 1 ELSE 0 END
-    AS BIT) AS InSedeList,
-    CAST(
-        CASE WHEN EXISTS
-        (
-            SELECT 1
-            FROM COMUNI_PENDOLARI cp
-            WHERE cp.cod_comune = R.ComuneResidenza
-              AND cp.cod_sede_studi = I.CodSedeStudi
-              AND ISNULL(cp.cod_sede_distaccata,'00000') = ISNULL(I.CodSedeDistaccata,'00000')
-        )
-        THEN 1 ELSE 0 END
-    AS BIT) AS PendolareList,
-    CAST(
-        CASE WHEN EXISTS
-        (
-            SELECT 1
-            FROM COMUNI_FUORISEDE cf
-            WHERE cf.cod_comune = R.ComuneResidenza
-              AND cf.cod_sede_studi = I.CodSedeStudi
-              AND ISNULL(cf.cod_sede_distaccata,'00000') = ISNULL(I.CodSedeDistaccata,'00000')
-        )
-        THEN 1 ELSE 0 END
-    AS BIT) AS FuoriSedeList,
-    CAST(10 AS INT) AS MinMesiDomicilioFuoriSede
-FROM D
-LEFT JOIN RES R
-  ON R.NumDomanda = D.NumDomanda
-LEFT JOIN ISCR I
-  ON I.NumDomanda = D.NumDomanda;";
-
-        private const string EsitoPaPerAlloggioSql = @"
-SET NOCOUNT ON;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
-
-;WITH D AS
-(
-    SELECT CAST(t.NumDomanda AS INT) AS NumDomanda, t.CodFiscale
-    FROM {TEMP_TABLE} t
-),
-PA_LAST AS
-(
-    SELECT
-        D.NumDomanda,
-        D.CodFiscale,
-        CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsito,
-        ROW_NUMBER() OVER (PARTITION BY D.NumDomanda ORDER BY ec.Data_validita DESC) AS rn
-    FROM D
-    JOIN ESITI_CONCORSI ec
-      ON ec.Num_domanda = D.NumDomanda
-    JOIN vBenefici_richiesti vb
-      ON vb.Num_domanda = D.NumDomanda
-     AND vb.Anno_accademico = ec.Anno_accademico
-     AND vb.Cod_beneficio = ec.Cod_beneficio
-    WHERE ec.Anno_accademico = @AA
-      AND UPPER(ec.Cod_beneficio) = 'PA'
-)
-SELECT
-    NumDomanda,
-    CodFiscale,
-    CAST(CASE WHEN CodTipoEsito IN (1,2) THEN 1 ELSE 0 END AS BIT) AS HasAlloggio12
-FROM PA_LAST
-WHERE rn = 1;";
 
         private const string DomicilioCorrentePopulationSql = @"
 SET NOCOUNT ON;
@@ -461,17 +307,12 @@ WHERE rn = 1;";
 
         private void LoadEsitoBs(VerificaPipelineContext context)
         {
-            context.EsitiConcorsoByStudentBenefit.Clear();
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadEsitiConcorso", $"AA={context.AnnoAccademico}");
             using var cmd = CreatePopulationCommand(EsitoBsPopulationSql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
                 var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
-                if (!context.EsitiConcorsoByStudentBenefit.TryGetValue(key, out var byBenefit) || byBenefit == null)
-                {
-                    byBenefit = new System.Collections.Generic.Dictionary<string, EsitoConcorsoBenefitRaw>(StringComparer.OrdinalIgnoreCase);
-                    context.EsitiConcorsoByStudentBenefit[key] = byBenefit;
-                }
+                var byBenefit = context.GetOrCreateEsitiConcorsoByBenefit(key);
 
                 string codBeneficio = EsitoBorsaSupport.NormalizeUpper(reader.SafeGetString("CodBeneficio"));
                 var raw = new EsitoConcorsoBenefitRaw
@@ -525,8 +366,12 @@ WHERE rn = 1;";
         private void LoadNucleoFamiliarePerStatusSede(VerificaPipelineContext context)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadNucleoFamiliareStatusSede", $"AA={context.AnnoAccademico}");
-            using var cmd = CreatePopulationCommand(NucleoFamiliarePopulationSql, context);
-            ReadAndMergeByStudentKey(cmd, (reader, info) => info.SetNucleoFamiliare(reader.SafeGetInt("NumComponenti"), reader.SafeGetInt("NumConvEstero")));
+
+            foreach (var info in context.Students.Values)
+            {
+                var raw = info.InformazioniEconomiche.Raw;
+                info.SetNucleoFamiliare(raw.NumeroComponenti, raw.NumeroConviventiEstero);
+            }
         }
 
         private void LoadResidenza(VerificaPipelineContext context)
@@ -558,7 +403,81 @@ WHERE rn = 1;";
         private void LoadStatusSedeClassificationFlags(VerificaPipelineContext context)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadStatusSedeClassificationFlags", $"AA={context.AnnoAccademico}");
-            using var cmd = CreatePopulationCommand(StatusSedeClassificationFlagsSql, context);
+
+            const string createSql = @"
+IF OBJECT_ID('tempdb..#StatusSedeClassBase') IS NOT NULL
+    DROP TABLE #StatusSedeClassBase;
+
+CREATE TABLE #StatusSedeClassBase
+(
+    CodFiscale NVARCHAR(32) NOT NULL,
+    NumDomanda NUMERIC(18,0) NOT NULL,
+    ComuneResidenza NVARCHAR(20) NOT NULL,
+    CodSedeStudi NVARCHAR(50) NOT NULL,
+    CodSedeDistaccata NVARCHAR(50) NOT NULL,
+    AlwaysA BIT NOT NULL,
+    CONSTRAINT PK_StatusSedeClassBase PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
+);";
+
+            using (var createCommand = new SqlCommand(createSql, context.Connection) { CommandTimeout = 9999999 })
+                createCommand.ExecuteNonQuery();
+
+            var table = BuildStatusSedeClassBaseTable(context);
+            if (table.Rows.Count > 0)
+            {
+                using var bulk = new SqlBulkCopy(context.Connection, SqlBulkCopyOptions.TableLock, null)
+                {
+                    DestinationTableName = "#StatusSedeClassBase",
+                    BulkCopyTimeout = 9999999,
+                    BatchSize = 10000
+                };
+
+                bulk.ColumnMappings.Add("CodFiscale", "CodFiscale");
+                bulk.ColumnMappings.Add("NumDomanda", "NumDomanda");
+                bulk.ColumnMappings.Add("ComuneResidenza", "ComuneResidenza");
+                bulk.ColumnMappings.Add("CodSedeStudi", "CodSedeStudi");
+                bulk.ColumnMappings.Add("CodSedeDistaccata", "CodSedeDistaccata");
+                bulk.ColumnMappings.Add("AlwaysA", "AlwaysA");
+                bulk.WriteToServer(table);
+            }
+
+            const string sql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CAST(b.NumDomanda AS INT) AS NumDomanda,
+    b.CodFiscale,
+    b.AlwaysA,
+    CAST(CASE WHEN EXISTS
+    (
+        SELECT 1
+        FROM COMUNI_INSEDE ci
+        WHERE ci.riga_valida = 1
+          AND ci.cod_comune = b.ComuneResidenza
+          AND ci.cod_sede_studi = b.CodSedeStudi
+          AND ISNULL(ci.cod_sede_distaccata,'00000') = ISNULL(b.CodSedeDistaccata,'00000')
+    ) THEN 1 ELSE 0 END AS BIT) AS InSedeList,
+    CAST(CASE WHEN EXISTS
+    (
+        SELECT 1
+        FROM COMUNI_PENDOLARI cp
+        WHERE cp.cod_comune = b.ComuneResidenza
+          AND cp.cod_sede_studi = b.CodSedeStudi
+          AND ISNULL(cp.cod_sede_distaccata,'00000') = ISNULL(b.CodSedeDistaccata,'00000')
+    ) THEN 1 ELSE 0 END AS BIT) AS PendolareList,
+    CAST(CASE WHEN EXISTS
+    (
+        SELECT 1
+        FROM COMUNI_FUORISEDE cf
+        WHERE cf.cod_comune = b.ComuneResidenza
+          AND cf.cod_sede_studi = b.CodSedeStudi
+          AND ISNULL(cf.cod_sede_distaccata,'00000') = ISNULL(b.CodSedeDistaccata,'00000')
+    ) THEN 1 ELSE 0 END AS BIT) AS FuoriSedeList,
+    CAST(10 AS INT) AS MinMesiDomicilioFuoriSede
+FROM #StatusSedeClassBase b;";
+
+            using var cmd = new SqlCommand(sql, context.Connection) { CommandTimeout = 9999999 };
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
                 info.InformazioniSede.AlwaysA = reader.SafeGetBool("AlwaysA");
@@ -569,11 +488,72 @@ WHERE rn = 1;";
             });
         }
 
+        private static DataTable BuildStatusSedeClassBaseTable(VerificaPipelineContext context)
+        {
+            var table = new DataTable();
+            table.Columns.Add("CodFiscale", typeof(string));
+            table.Columns.Add("NumDomanda", typeof(decimal));
+            table.Columns.Add("ComuneResidenza", typeof(string));
+            table.Columns.Add("CodSedeStudi", typeof(string));
+            table.Columns.Add("CodSedeDistaccata", typeof(string));
+            table.Columns.Add("AlwaysA", typeof(bool));
+
+            foreach (var info in context.Students.Values)
+            {
+                string codFiscale = (info.InformazioniPersonali.CodFiscale ?? string.Empty).Trim().ToUpperInvariant();
+                string numDomandaText = (info.InformazioniPersonali.NumDomanda ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(codFiscale) ||
+                    (!decimal.TryParse(numDomandaText, NumberStyles.Number, CultureInfo.InvariantCulture, out var numDomanda) &&
+                     !decimal.TryParse(numDomandaText, NumberStyles.Number, CultureInfo.GetCultureInfo("it-IT"), out numDomanda)))
+                    continue;
+
+                string comuneResidenza = GetComuneResidenzaFromContext(info);
+                string codSedeStudi = (info.InformazioniIscrizione.CodSedeStudi ?? string.Empty).Trim();
+                string codSedeDistaccata = (info.InformazioniIscrizione.CodSedeDistaccata ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(codSedeDistaccata))
+                    codSedeDistaccata = "00000";
+
+                table.Rows.Add(
+                    codFiscale,
+                    numDomanda,
+                    comuneResidenza,
+                    codSedeStudi,
+                    codSedeDistaccata,
+                    info.InformazioniSede.AlwaysA);
+            }
+
+            return table;
+        }
+
+        private static string GetComuneResidenzaFromContext(StudenteInfo info)
+        {
+            if (info?.InformazioniSede?.Residenza == null)
+                return string.Empty;
+
+            var codComune = (info.InformazioniSede.Residenza.codComune ?? string.Empty).Trim();
+            if (codComune.Length > 0)
+                return codComune;
+
+            return (info.InformazioniSede.Residenza.nomeComune ?? string.Empty).Trim();
+        }
+
         private void LoadEsitoPaPerAlloggio(VerificaPipelineContext context)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadEsitoPaPerAlloggio", $"AA={context.AnnoAccademico}");
-            using var cmd = CreatePopulationCommand(EsitoPaPerAlloggioSql, context);
-            ReadAndMergeByStudentKey(cmd, (reader, info) => info.InformazioniSede.HasAlloggio12 = reader.SafeGetBool("HasAlloggio12"));
+
+            foreach (var pair in context.Students)
+            {
+                bool beneficioPaRichiesto = context.TryGetEsitoBorsaFacts(pair.Key, out var facts)
+                                           && facts != null
+                                           && facts.BeneficiRichiesti.Contains("PA");
+
+                bool paAssegnato = context.TryGetEsitiConcorsoByBenefit(pair.Key, out var byBenefit)
+                                   && byBenefit != null
+                                   && byBenefit.TryGetValue("PA", out var pa)
+                                   && ((pa.CodTipoEsito ?? 0) == 1 || (pa.CodTipoEsito ?? 0) == 2);
+
+                pair.Value.InformazioniSede.HasAlloggio12 = beneficioPaRichiesto && paAssegnato;
+            }
         }
 
         private void LoadDomicilioCorrente(VerificaPipelineContext context)

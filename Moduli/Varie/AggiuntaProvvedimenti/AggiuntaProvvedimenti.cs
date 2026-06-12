@@ -13,6 +13,8 @@ namespace ProcedureNet7
 {
     internal class AggiuntaProvvedimenti : BaseProcedure<ArgsAggiuntaProvvedimenti>
     {
+        private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
+
         private readonly Dictionary<string, string> variazCodVariazioneItems = new()
         {
             { "01", "Variazione generica" },
@@ -78,7 +80,10 @@ namespace ProcedureNet7
         private string numProvvedimento = string.Empty;
         private string aaProvvedimento = string.Empty;
         private string dataProvvedimento = string.Empty;
+        private string dataProvvedimentoText = string.Empty;
         private DateTime dataProvvedimentoDate;
+        private DateTime dataOperazioneDate;
+
         private string provvedimentoSelezionato = string.Empty;
         private string notaProvvedimento = string.Empty;
         private string beneficioProvvedimento = string.Empty;
@@ -91,7 +96,6 @@ namespace ProcedureNet7
         private string impegnoPR = string.Empty;
         private string impegnoSA = string.Empty;
 
-        // Stato interno per la lavorazione specifiche impegni
         private List<string> _specificheNumDomandas = new();
         private int _specificheNumDomandaColumn = -1;
         private int _specificheFirstSelectedRowIndex = -1;
@@ -119,8 +123,12 @@ namespace ProcedureNet7
                 selectedFolderPath = args._selectedFolderPath;
                 numProvvedimento = (args._numProvvedimento ?? string.Empty).Trim();
                 aaProvvedimento = (args._aaProvvedimento ?? string.Empty).Trim();
+
                 dataProvvedimento = (args._dataProvvedimento ?? string.Empty).Trim();
-                dataProvvedimentoDate = ParseProvvedimentoDate(dataProvvedimento);
+                dataProvvedimentoDate = ParseProvvedimentoDate(dataProvvedimento).Date;
+                dataProvvedimentoText = dataProvvedimentoDate.ToString("dd/MM/yyyy", ItalianCulture);
+                dataOperazioneDate = DateTime.Today;
+
                 provvedimentoSelezionato = (args._provvedimentoSelezionato ?? string.Empty).Trim();
                 notaProvvedimento = (args._notaProvvedimento ?? string.Empty).Trim();
                 beneficioProvvedimento = (args._beneficioProvvedimento ?? string.Empty).Trim();
@@ -285,20 +293,20 @@ namespace ProcedureNet7
             if (DateTime.TryParseExact(
                 input,
                 formats,
-                CultureInfo.GetCultureInfo("it-IT"),
+                ItalianCulture,
                 DateTimeStyles.None,
                 out DateTime exact))
             {
-                return exact;
+                return exact.Date;
             }
 
             if (DateTime.TryParse(
                 input,
-                CultureInfo.GetCultureInfo("it-IT"),
+                ItalianCulture,
                 DateTimeStyles.None,
                 out DateTime generic))
             {
-                return generic;
+                return generic.Date;
             }
 
             throw new FormatException($"Data provvedimento non valida: '{input}'");
@@ -722,46 +730,47 @@ namespace ProcedureNet7
             }
 
             string insertNewProvvedimenti = @"
-                INSERT INTO [dbo].[PROVVEDIMENTI]
-                (
-                    [Num_domanda],
-                    [tipo_provvedimento],
-                    [data_provvedimento],
-                    [Anno_accademico],
-                    [note],
-                    [num_provvedimento],
-                    [riga_valida],
-                    [data_validita]
-                )
-                SELECT DISTINCT
-                       d.num_domanda,
-                       @provvedimentoSelezionato,
-                       @dataProvvedimento,
-                       @aaProvvedimento,
-                       @notaProvvedimento,
-                       @numProvvedimento,
-                       1,
-                       CURRENT_TIMESTAMP
-                FROM Domanda d
-                INNER JOIN #TempNumDom t
-                    ON d.Num_domanda = t.NumDomanda
-                WHERE d.Anno_accademico = @aaProvvedimento
-                  AND d.Tipo_bando = 'LZ'
-                  AND NOT EXISTS
-                  (
-                      SELECT 1
-                      FROM #TempCommonCodes c
-                      WHERE c.NumDomanda = d.Num_domanda
-                  );";
+INSERT INTO [dbo].[PROVVEDIMENTI]
+(
+    [Num_domanda],
+    [tipo_provvedimento],
+    [data_provvedimento],
+    [Anno_accademico],
+    [note],
+    [num_provvedimento],
+    [riga_valida],
+    [data_validita]
+)
+SELECT DISTINCT
+       d.num_domanda,
+       @provvedimentoSelezionato,
+       @dataProvvedimento,
+       @aaProvvedimento,
+       @notaProvvedimento,
+       @numProvvedimento,
+       1,
+       @dataValidita
+FROM Domanda d
+INNER JOIN #TempNumDom t
+    ON d.Num_domanda = t.NumDomanda
+WHERE d.Anno_accademico = @aaProvvedimento
+  AND d.Tipo_bando = 'LZ'
+  AND NOT EXISTS
+  (
+      SELECT 1
+      FROM #TempCommonCodes c
+      WHERE c.NumDomanda = d.Num_domanda
+  );";
 
             int affectedRows;
             using (var cmd = new SqlCommand(insertNewProvvedimenti, CONNECTION, sqlTransaction))
             {
                 cmd.Parameters.Add("@provvedimentoSelezionato", SqlDbType.VarChar, 10).Value = provvedimentoSelezionato;
-                cmd.Parameters.Add("@dataProvvedimento", SqlDbType.DateTime).Value = dataProvvedimentoDate;
+                cmd.Parameters.Add("@dataProvvedimento", SqlDbType.VarChar, 50).Value = dataProvvedimentoText;
                 cmd.Parameters.Add("@aaProvvedimento", SqlDbType.VarChar, 8).Value = aaProvvedimento;
                 cmd.Parameters.Add("@notaProvvedimento", SqlDbType.VarChar, -1).Value = notaProvvedimento;
                 cmd.Parameters.Add("@numProvvedimento", SqlDbType.VarChar, 50).Value = numProvvedimento;
+                cmd.Parameters.Add("@dataValidita", SqlDbType.Date).Value = dataOperazioneDate;
 
                 affectedRows = cmd.ExecuteNonQuery();
             }
@@ -800,25 +809,26 @@ namespace ProcedureNet7
             InsertMessaggiStudente(newCodes,provvedimentoSelezionato);
 
             string updateDecadenzeSql = @"
-                UPDATE dt
-                SET data_fine_validita = CURRENT_TIMESTAMP
-                FROM Decadenze_tracciabilita_bs dt
-                INNER JOIN Domanda d
-                    ON dt.Anno_accademico = d.Anno_accademico
-                   AND dt.Cod_fiscale = d.Cod_fiscale
-                INNER JOIN #TempNumDom t
-                    ON d.Num_domanda = t.NumDomanda
-                LEFT JOIN #TempCommonCodes c
-                    ON c.NumDomanda = d.Num_domanda
-                WHERE d.Anno_accademico = @aaProvvedimento
-                  AND dt.Cod_beneficio = @beneficioProvvedimento
-                  AND c.NumDomanda IS NULL
-                  AND dt.data_fine_validita IS NULL;";
+UPDATE dt
+SET data_fine_validita = @dataValidita
+FROM Decadenze_tracciabilita_bs dt
+INNER JOIN Domanda d
+    ON dt.Anno_accademico = d.Anno_accademico
+   AND dt.Cod_fiscale = d.Cod_fiscale
+INNER JOIN #TempNumDom t
+    ON d.Num_domanda = t.NumDomanda
+LEFT JOIN #TempCommonCodes c
+    ON c.NumDomanda = d.Num_domanda
+WHERE d.Anno_accademico = @aaProvvedimento
+  AND dt.Cod_beneficio = @beneficioProvvedimento
+  AND c.NumDomanda IS NULL
+  AND dt.data_fine_validita IS NULL;";
 
             using (var cmd = new SqlCommand(updateDecadenzeSql, CONNECTION, sqlTransaction))
             {
                 cmd.Parameters.Add("@aaProvvedimento", SqlDbType.VarChar, 8).Value = aaProvvedimento;
                 cmd.Parameters.Add("@beneficioProvvedimento", SqlDbType.VarChar, 2).Value = beneficioProvvedimento;
+                cmd.Parameters.Add("@dataValidita", SqlDbType.Date).Value = dataOperazioneDate;
 
                 int updated = cmd.ExecuteNonQuery();
                 Logger.Log(70, $"Aggiornate data_fine_validita in Decadenze_tracciabilita_bs: {updated} righe.", LogLevel.INFO);
@@ -1029,7 +1039,7 @@ namespace ProcedureNet7
                   AND si.data_fine_validita IS NULL;";
 
             using SqlCommand updateCommand = new(sqlUpdate, CONNECTION, sqlTransaction);
-            updateCommand.Parameters.Add("@dataProvvedimento", SqlDbType.DateTime).Value = dataProvvedimentoDate;
+            updateCommand.Parameters.Add("@dataProvvedimento", SqlDbType.Date).Value = dataProvvedimentoDate;
             updateCommand.Parameters.Add("@numDetermina", SqlDbType.VarChar, 100).Value = numProvvedimento;
             updateCommand.Parameters.Add("@descrDetermina", SqlDbType.VarChar, -1).Value = notaProvvedimento;
             updateCommand.Parameters.Add("@selectedAA", SqlDbType.VarChar, 8).Value = aaProvvedimento;
@@ -1049,67 +1059,68 @@ namespace ProcedureNet7
 
             string determinaConferimento = string.IsNullOrWhiteSpace(numProvvedimento)
                 ? string.Empty
-                : $"{numProvvedimento} del {dataProvvedimentoDate:dd/MM/yyyy}";
+                : $"{numProvvedimento} del {dataProvvedimentoText}";
 
             string sqlInsert = @"
-                INSERT INTO [specifiche_impegni]
-                (
-                    [Anno_accademico],
-                    [Num_domanda],
-                    [Cod_fiscale],
-                    [Cod_beneficio],
-                    [Data_validita],
-                    [Utente],
-                    [Codice_Studente],
-                    [Tipo_fondo],
-                    [Capitolo],
-                    [Importo_assegnato],
-                    [Determina_conferimento],
-                    [num_impegno_primaRata],
-                    [num_impegno_saldo],
-                    [esercizio_saldo],
-                    [Esercizio_prima_rata],
-                    [data_fine_validita],
-                    [Num_determina],
-                    [data_determina],
-                    [descrizione_determina],
-                    monetizzazione_concessa,
-                    importo_servizio_mensa,
-                    impegno_monetizzazione
-                )
-                SELECT
-                    @selectedAA,
-                    t.NumDomanda,
-                    d.Cod_fiscale,
-                    @selectedCodBeneficio,
-                    CURRENT_TIMESTAMP,
-                    'Area4',
-                    s.Codice_Studente,
-                    @tipoFondo,
-                    @capitolo,
-                    t.Importo,
-                    @determinaConferimento,
-                    @impegnoPR,
-                    @impegnoSA,
-                    @eseSA,
-                    @esePR,
-                    NULL,
-                    NULL,
-                    NULL,
-                    NULL,
-                    0,
-                    NULL,
-                    NULL
-                FROM #TempSpecImporti t
-                INNER JOIN Domanda d
-                    ON d.Anno_accademico = @selectedAA
-                   AND d.Num_domanda = t.NumDomanda
-                INNER JOIN Studente s
-                    ON s.Cod_fiscale = d.Cod_fiscale;";
+INSERT INTO [specifiche_impegni]
+(
+    [Anno_accademico],
+    [Num_domanda],
+    [Cod_fiscale],
+    [Cod_beneficio],
+    [Data_validita],
+    [Utente],
+    [Codice_Studente],
+    [Tipo_fondo],
+    [Capitolo],
+    [Importo_assegnato],
+    [Determina_conferimento],
+    [num_impegno_primaRata],
+    [num_impegno_saldo],
+    [esercizio_saldo],
+    [Esercizio_prima_rata],
+    [data_fine_validita],
+    [Num_determina],
+    [data_determina],
+    [descrizione_determina],
+    monetizzazione_concessa,
+    importo_servizio_mensa,
+    impegno_monetizzazione
+)
+SELECT
+    @selectedAA,
+    t.NumDomanda,
+    d.Cod_fiscale,
+    @selectedCodBeneficio,
+    @dataValidita,
+    'Area4',
+    s.Codice_Studente,
+    @tipoFondo,
+    @capitolo,
+    t.Importo,
+    @determinaConferimento,
+    @impegnoPR,
+    @impegnoSA,
+    @eseSA,
+    @esePR,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0,
+    NULL,
+    NULL
+FROM #TempSpecImporti t
+INNER JOIN Domanda d
+    ON d.Anno_accademico = @selectedAA
+   AND d.Num_domanda = t.NumDomanda
+INNER JOIN Studente s
+    ON s.Cod_fiscale = d.Cod_fiscale;";
 
             using SqlCommand insertCommand = new(sqlInsert, CONNECTION, sqlTransaction);
             insertCommand.Parameters.Add("@selectedAA", SqlDbType.VarChar, 8).Value = aaProvvedimento;
             insertCommand.Parameters.Add("@selectedCodBeneficio", SqlDbType.VarChar, 2).Value = beneficioProvvedimento;
+            insertCommand.Parameters.Add("@dataValidita", SqlDbType.Date).Value = dataOperazioneDate;
             insertCommand.Parameters.Add("@tipoFondo", SqlDbType.VarChar, 50).Value = tipoFondo;
             insertCommand.Parameters.Add("@capitolo", SqlDbType.VarChar, 50).Value = capitolo;
             insertCommand.Parameters.Add("@determinaConferimento", SqlDbType.VarChar, 200).Value = determinaConferimento;
@@ -1209,7 +1220,7 @@ namespace ProcedureNet7
 
             string normalized = input.Trim();
 
-            return decimal.TryParse(normalized, NumberStyles.Any, CultureInfo.GetCultureInfo("it-IT"), out value)
+            return decimal.TryParse(normalized, NumberStyles.Any, ItalianCulture, out value)
                    || decimal.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
         }
 

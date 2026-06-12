@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ProcedureNet7.Verifica;
+using System;
 using System.Collections.Generic;
 
 namespace ProcedureNet7
@@ -8,7 +9,7 @@ namespace ProcedureNet7
         public int AnnoCorso { get; set; }
         public int TipoCorso { get; set; }
         public string CodCorsoLaurea { get; set; } = string.Empty;
-        public bool CorsoStem {  get; set; }
+        public bool CorsoStem { get; set; }
         public string CodSedeStudi { get; set; } = string.Empty;
         public string CodFacolta { get; set; } = string.Empty;
         public string AnnoAccadInizioCorso { get; set; } = string.Empty;
@@ -24,6 +25,7 @@ namespace ProcedureNet7
         public int? AnnoImmatricolazione { get; set; }
         public int? NumeroEsami { get; set; }
         public decimal? NumeroCrediti { get; set; }
+        public decimal? NumeroCreditiRaw { get; set; }
         public decimal? SommaVoti { get; set; }
         public int UtilizzoBonus { get; set; }
         public decimal? CreditiUtilizzati { get; set; }
@@ -48,6 +50,8 @@ namespace ProcedureNet7
         public string CodiciAvvenimentoCarrieraPregressa { get; set; } = string.Empty;
 
         public List<InformazioniCarrieraPregressa> CarrierePregresse { get; } = new();
+        public IscrizioneEsitoFactsRaw EsitoFacts { get; } = new();
+        public List<CarrieraPregressaBeneficiRiRaw> CarrieraPregressaBeneficiRi { get; } = new();
     }
 
     public class InformazioniCarrieraPregressa

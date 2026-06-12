@@ -58,14 +58,15 @@ ISCR AS
         TRY_CONVERT(INT, i.SEMESTRE) AS Semestre,
         TRY_CONVERT(INT, i.RIPETENTE) AS Ripetente,
         CAST(ISNULL(cl.CORSO_STEM,0) AS BIT) AS Stem,
+        CAST(CASE WHEN ISNULL(ss.TELEMATICA,0) = 1 OR ISNULL(cl.CORSO_IN_PRESENZA,1) = 0 THEN 1 ELSE 0 END AS BIT) AS AlwaysA,
         CONVERT(NVARCHAR(50), ss.COD_ENTE) AS Cod_ente,
         CASE
-            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL THEN '00000'
+            WHEN NULLIF(ISNULL(cl.COD_SEDE_DISTACCATA,''), '') IS NULL THEN '00000'
             ELSE cl.COD_SEDE_DISTACCATA
         END AS Cod_sede_distaccata,
         CASE
-            WHEN NULLIF(LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))), '') IS NULL
-                 OR LTRIM(RTRIM(ISNULL(cl.COD_SEDE_DISTACCATA,''))) = '00000'
+            WHEN NULLIF(ISNULL(cl.COD_SEDE_DISTACCATA,''), '') IS NULL
+                 OR ISNULL(cl.COD_SEDE_DISTACCATA,'') = '00000'
                 THEN CASE
                         WHEN ISNULL(cl.COMUNE_SEDE_STUDI,'') IN ('00000','0000') THEN 'H501'
                         ELSE ISNULL(cl.COMUNE_SEDE_STUDI,'')
@@ -115,6 +116,7 @@ SELECT
     ISNULL(I.Semestre, 0) AS Semestre,
     ISNULL(I.Ripetente, 0) AS Ripetente,
     I.Stem,
+    I.AlwaysA,
     ISNULL(I.Cod_ente,'') AS Cod_ente,
     ISNULL(I.Cod_sede_distaccata,'00000') AS Cod_sede_distaccata,
     ISNULL(I.ComuneSedeStudi,'') AS ComuneSedeStudi,
@@ -201,6 +203,8 @@ SELECT
     CONVERT(NVARCHAR(250), cp.SEDE_ISTITUZIONE_UNIVERSITARIA) AS Sede_istituzione_universitaria,
     CONVERT(NVARCHAR(250), cp.BENEFICI_USUFRUITI) AS benefici_usufruiti,
     CONVERT(NVARCHAR(250), cp.IMPORTI_RESTITUITI) AS importi_restituiti,
+    ISNULL(bu.AnniBeneficiUsufruitiLz, '') AS Anni_benefici_usufruiti_LZ,
+    ISNULL(ir.AnniImportiRestituitiLz, '') AS Anni_importi_restituiti_LZ,
     TRY_CONVERT(DECIMAL(18,2), cp.NUMERO_CREDITI) AS numero_crediti,
     TRY_CONVERT(INT, cp.ANNO_CORSO) AS anno_corso,
     TRY_CONVERT(INT, cp.RIPETENTE) AS ripetente,
@@ -209,6 +213,7 @@ FROM D
 JOIN CARRIERA_PREGRESSA cp
   ON cp.ANNO_ACCADEMICO = @AA
  AND cp.COD_FISCALE = D.CodFiscale
+ AND cp.riga_valida = 0
  AND cp.DATA_VALIDITA =
  (
     SELECT MAX(cp2.DATA_VALIDITA)
@@ -216,57 +221,66 @@ JOIN CARRIERA_PREGRESSA cp
     WHERE cp2.COD_FISCALE = cp.COD_FISCALE
       AND cp2.ANNO_ACCADEMICO = cp.ANNO_ACCADEMICO
       AND cp2.COD_AVVENIMENTO = cp.COD_AVVENIMENTO
- );
+ )
+OUTER APPLY
+(
+    SELECT
+        STUFF
+        (
+            (
+                SELECT '|' + CONVERT(NVARCHAR(10), x.AnnoCarriera)
+                FROM
+                (
+                    SELECT DISTINCT TRY_CONVERT(INT, b.Anno_carriera) AS AnnoCarriera
+                    FROM Benefici_usufruiti_LZ b
+                    WHERE b.Cod_fiscale = D.CodFiscale
+                      AND b.Anno_accademico = @AA
+                      AND ISNULL(b.Riga_valida, 0) = 1
+                      AND TRY_CONVERT(INT, b.Anno_carriera) IS NOT NULL
+                      AND UPPER(ISNULL(cp.COD_AVVENIMENTO, '')) = 'RI'
+                      AND ISNULL(TRY_CONVERT(INT, cp.BENEFICI_USUFRUITI), 0) = 1
+                ) x
+                ORDER BY x.AnnoCarriera
+                FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)'),
+            1,
+            1,
+            ''
+        ) AS AnniBeneficiUsufruitiLz
+) bu
+OUTER APPLY
+(
+    SELECT
+        STUFF
+        (
+            (
+                SELECT '|' + CONVERT(NVARCHAR(10), x.AnnoCarriera)
+                FROM
+                (
+                    SELECT DISTINCT TRY_CONVERT(INT, r.Anno_carriera) AS AnnoCarriera
+                    FROM Importi_restituiti_LZ r
+                    WHERE r.Cod_fiscale = D.CodFiscale
+                      AND r.Anno_accademico = @AA
+                      AND ISNULL(r.Riga_valida, 0) = 1
+                      AND TRY_CONVERT(INT, r.Anno_carriera) IS NOT NULL
+                      AND UPPER(ISNULL(cp.COD_AVVENIMENTO, '')) = 'RI'
+                      AND ISNULL(TRY_CONVERT(INT, cp.IMPORTI_RESTITUITI), 0) = 1
+                ) x
+                ORDER BY x.AnnoCarriera
+                FOR XML PATH(''), TYPE
+            ).value('.', 'NVARCHAR(MAX)'),
+            1,
+            1,
+            ''
+        ) AS AnniImportiRestituitiLz
+) ir;
 ";
 
         private const string MeritoDurataLegaleCorsoColumn = "Durata_legale";
         private const string MeritoCodTipoOrdinamentoCorsoColumn = "Cod_tipo_ordinamento";
 
-        private static void ResetIscrizioneState(VerificaPipelineContext context)
-        {
-            foreach (var info in context.Students.Values)
-            {
-                var iscr = info.InformazioniIscrizione;
-                iscr.TipoBando = string.Empty;
-                iscr.AnnoCorso = 0;
-                iscr.TipoCorso = 0;
-                iscr.CodCorsoLaurea = string.Empty;
-                iscr.CodSedeStudi = string.Empty;
-                iscr.CodFacolta = string.Empty;
-                iscr.AnnoAccadInizioCorso = string.Empty;
-                iscr.CodEnte = string.Empty;
-                iscr.CodSedeDistaccata = string.Empty;
-                iscr.ComuneSedeStudi = string.Empty;
-                iscr.ProvinciaSedeStudi = string.Empty;
-                iscr.CorsoStem = false;
-                iscr.CreditiTirocinio = null;
-                iscr.CreditiRiconosciuti = null;
-                iscr.ConfermaSemestreFiltro = 0;
-                iscr.AnnoImmatricolazione = null;
-                iscr.NumeroEsami = null;
-                iscr.NumeroCrediti = null;
-                iscr.SommaVoti = null;
-                iscr.UtilizzoBonus = 0;
-                iscr.CreditiUtilizzati = null;
-                iscr.CreditiRimanenti = null;
-                iscr.CreditiRiconosciutiDaRinuncia = null;
-                iscr.AACreditiRiconosciuti = string.Empty;
-                iscr.DurataLegaleCorso = null;
-                iscr.CodTipoOrdinamentoCorso = string.Empty;
-                iscr.EsamiMinimiRichiestiMerito = null;
-                iscr.CreditiMinimiRichiestiMerito = null;
-                iscr.EsamiMinimiRichiestiPassaggio = null;
-                iscr.CreditiMinimiRichiestiPassaggio = null;
-                iscr.RegolaMeritoApplicata = string.Empty;
-                iscr.NumeroEventiCarrieraPregressa = 0;
-                iscr.UltimoAnnoAvvenimentoCarrieraPregressa = null;
-                iscr.TotaleCreditiCarrieraPregressa = 0m;
-                iscr.HaPassaggioCorsoEsteroCarrieraPregressa = 0;
-                iscr.HaRipetenzaCarrieraPregressa = 0;
-                iscr.CodiciAvvenimentoCarrieraPregressa = string.Empty;
-                iscr.CarrierePregresse.Clear();
-            }
-        }
+        private static IscrizioneEsitoFactsRaw GetOrCreateIscrizioneEsitoFacts(VerificaPipelineContext context, StudentKey key)
+            => context.GetOrCreateIscrizioneEsitoFacts(key);
 
         private void LoadBaseIscrizione(VerificaPipelineContext context)
         {
@@ -295,9 +309,15 @@ JOIN CARRIERA_PREGRESSA cp
                 iscr.ComuneSedeStudi = reader.SafeGetString("ComuneSedeStudi").Trim();
                 iscr.ProvinciaSedeStudi = reader.SafeGetString("ProvinciaSede").Trim().ToUpperInvariant();
                 iscr.CorsoStem = reader.SafeGetBool("Stem");
+                info.InformazioniSede.AlwaysA = reader.SafeGetBool("AlwaysA");
                 iscr.CreditiTirocinio = reader.SafeGetDecimal("Crediti_tirocinio");
                 iscr.CreditiRiconosciuti = reader.SafeGetDecimal("Crediti_riconosciuti");
                 iscr.ConfermaSemestreFiltro = reader.SafeGetInt("Conferma_semestre_filtro");
+
+                var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                var facts = GetOrCreateIscrizioneEsitoFacts(context, key);
+                facts.Semestre = reader.SafeGetInt("Semestre");
+                facts.IscrittoRipetente = reader.SafeGetInt("Ripetente") != 0;
 
                 if (TryParseInt(reader.SafeGetString("Cod_tipologia_studi"), out var tipoCorso))
                     iscr.TipoCorso = tipoCorso;
@@ -319,6 +339,13 @@ JOIN CARRIERA_PREGRESSA cp
                 iscr.CreditiRimanenti = reader.SafeGetDecimal("Crediti_rimanenti");
                 iscr.CreditiRiconosciutiDaRinuncia = reader.SafeGetDecimal("Crediti_riconosciuti_da_rinuncia");
                 iscr.AACreditiRiconosciuti = reader.SafeGetString("AACreditiRiconosciuti");
+
+                var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                var facts = GetOrCreateIscrizioneEsitoFacts(context, key);
+                facts.CarrieraInterrotta = reader.SafeGetInt("Carriera_interr") != 0;
+                facts.NumAnniInterruzione = reader.SafeGetInt("Num_anni_interr");
+                facts.MeseImmatricolazione = reader.SafeGetInt("Mese_immatricolaz");
+                facts.CreditiExtraCurriculari = reader.SafeGetDecimal("Crediti_extra_curriculari");
             });
         }
 
@@ -329,9 +356,13 @@ JOIN CARRIERA_PREGRESSA cp
             using var cmd = CreatePopulationCommand(CarrieraPregressaSql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) =>
             {
+                string codAvvenimento = reader.SafeGetString("Cod_avvenimento");
+                string beneficiUsufruiti = reader.SafeGetString("benefici_usufruiti");
+                string importiRestituiti = reader.SafeGetString("importi_restituiti");
+
                 info.InformazioniIscrizione.CarrierePregresse.Add(new InformazioniCarrieraPregressa
                 {
-                    CodAvvenimento = reader.SafeGetString("Cod_avvenimento"),
+                    CodAvvenimento = codAvvenimento,
                     AnnoAvvenimento = reader.SafeGetInt("Anno_avvenimento"),
                     UnivDiConseguim = reader.SafeGetString("Univ_di_conseguim"),
                     UnivProvenienza = reader.SafeGetString("Univ_provenienza"),
@@ -340,13 +371,32 @@ JOIN CARRIERA_PREGRESSA cp
                     DurataLegTitoloConseguito = reader.SafeGetInt("Durata_leg_titolo_conseguito"),
                     PassaggioCorsoEstero = reader.SafeGetInt("Passaggio_corso_estero"),
                     SedeIstituzioneUniversitaria = reader.SafeGetString("Sede_istituzione_universitaria"),
-                    BeneficiUsufruiti = reader.SafeGetString("benefici_usufruiti"),
-                    ImportiRestituiti = reader.SafeGetString("importi_restituiti"),
+                    BeneficiUsufruiti = beneficiUsufruiti,
+                    ImportiRestituiti = importiRestituiti,
                     NumeroCrediti = reader.SafeGetDecimal("numero_crediti"),
                     AnnoCorso = reader.SafeGetInt("anno_corso"),
                     Ripetente = reader.SafeGetInt("ripetente"),
                     ConfermaSemestreFiltroDi = reader.SafeGetInt("Iscritto_semestre_filtroDI")
                 });
+
+                if (string.Equals((codAvvenimento ?? string.Empty).Trim(), "RI", StringComparison.OrdinalIgnoreCase))
+                {
+                    var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                    var items = context.GetOrCreateCarrieraPregressaBeneficiRi(key);
+
+                    items.Add(new CarrieraPregressaBeneficiRiRaw
+                    {
+                        CodAvvenimento = codAvvenimento,
+                        BeneficiUsufruiti = beneficiUsufruiti,
+                        ImportiRestituiti = importiRestituiti,
+                        AnniBeneficiUsufruitiLz = reader.SafeGetString("Anni_benefici_usufruiti_LZ"),
+                        AnniImportiRestituitiLz = reader.SafeGetString("Anni_importi_restituiti_LZ"),
+                        SedeIstituzioneUniversitaria = reader.SafeGetString("Sede_istituzione_universitaria"),
+                        TipologiaCorso = reader.SafeGetString("Tipologia_corso"),
+                        DurataLegTitoloConseguito = reader.SafeGetInt("Durata_leg_titolo_conseguito"),
+                        AnnoAvvenimento = reader.SafeGetInt("Anno_avvenimento")
+                    });
+                }
             });
         }
 
@@ -389,6 +439,62 @@ JOIN CARRIERA_PREGRESSA cp
                 iscr.HaPassaggioCorsoEsteroCarrieraPregressa = hasPassaggioEstero;
                 iscr.HaRipetenzaCarrieraPregressa = hasRipetenza;
                 iscr.CodiciAvvenimentoCarrieraPregressa = string.Join("|", codici);
+
+                var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
+                var facts = GetOrCreateIscrizioneEsitoFacts(context, key);
+                InformazioniCarrieraPregressa? bestTs = null;
+                int bestTsYear = int.MinValue;
+
+                foreach (var item in items)
+                {
+                    if (!string.Equals((item.CodAvvenimento ?? string.Empty).Trim(), "TS", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    int year = item.AnnoAvvenimento ?? int.MinValue;
+                    if (bestTs == null || year > bestTsYear)
+                    {
+                        bestTs = item;
+                        bestTsYear = year;
+                    }
+                }
+
+                facts.PassaggioTrasferimento = bestTs != null;
+                facts.RipetenteDaPassaggio = bestTs != null && bestTs.Ripetente != 0;
+                facts.PrimaImmatricolazTs = bestTs?.PrimaImmatricolaz;
+                facts.AaTrasferimento = bestTs?.AnnoAvvenimento;
+            }
+        }
+
+
+        private static void ApplyCreditiMeritoDerivati(VerificaPipelineContext context)
+        {
+            foreach (var pair in context.Students)
+            {
+                var info = pair.Value;
+                var iscr = info.InformazioniIscrizione;
+                var facts = GetOrCreateIscrizioneEsitoFacts(context, pair.Key);
+
+                if (facts.CreditiMeritoNormalizzati)
+                    continue;
+
+                decimal rawCrediti = iscr.NumeroCrediti ?? 0m;
+                iscr.NumeroCreditiRaw = rawCrediti;
+                if (rawCrediti == 0m)
+                {
+                    facts.CreditiMeritoNormalizzati = true;
+                    continue;
+                }
+
+                bool passaggio = facts.PassaggioTrasferimento == true;
+                bool ripetenteDaPassaggio = facts.RipetenteDaPassaggio == true;
+                if (!passaggio || ripetenteDaPassaggio)
+                {
+                    decimal creditiDaRinuncia = iscr.CreditiRiconosciutiDaRinuncia ?? 0m;
+                    decimal creditiExtra = facts.CreditiExtraCurriculari ?? 0m;
+                    iscr.NumeroCrediti = rawCrediti - creditiDaRinuncia - creditiExtra;
+                }
+
+                facts.CreditiMeritoNormalizzati = true;
             }
         }
 
