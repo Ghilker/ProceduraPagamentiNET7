@@ -18,6 +18,13 @@ namespace ProcedureNet7
             {
                 var eco = info.InformazioniEconomiche;
                 var cal = eco.Calcolate;
+                string origineFonte = (eco.Raw.OrigineFonte ?? string.Empty).Trim().ToUpperInvariant();
+
+                if (origineFonte != "CO" && origineFonte != "EE")
+                {
+                    ResetCalculatedValues(cal);
+                    continue;
+                }
 
                 decimal seqOrigine;
                 decimal seqIntegrazione;
@@ -35,17 +42,34 @@ namespace ProcedureNet7
                 cal.Detrazioni = eco.Raw.DetrazioniAdisu + eco.Raw.DetrazioniAltreBorse;
                 cal.SommaRedditiStud = sommaRedditiStud;
 
-                cal.SEQ = ComputeSeqFinal(eco, numeroComponentiIntegrazione);
-                cal.ISRDSU = Math.Max(cal.ISRDSU - cal.Detrazioni, 0m);
+                decimal seq = ComputeSeqFinal(eco, seqOrigine, seqIntegrazione, numeroComponentiIntegrazione);
+                decimal detrazioni = cal.Detrazioni.GetValueOrDefault();
+                decimal isrNetto = Math.Max(isrDsu - detrazioni, 0m);
 
-                decimal isedsu = cal.ISRDSU + 0.2m * cal.ISPDSU;
-                decimal iseed = cal.SEQ > 0m ? isedsu / cal.SEQ : isedsu;
-                decimal ispe = (cal.ISPDSU > 0m && cal.SEQ > 0m) ? cal.ISPDSU / cal.SEQ : 0m;
+                decimal isedsu = isrNetto + 0.2m * ispDsu;
+                decimal iseed = isedsu / seq;
+                decimal ispe = ispDsu / seq;
 
+                cal.ISRDSU = isrNetto;
+                cal.SEQ = seq;
                 cal.ISEDSU = EconomiciFormulaSupport.RoundSql(isedsu, 2);
                 cal.ISEEDSU = EconomiciFormulaSupport.RoundSql(iseed, 2);
                 cal.ISPEDSU = EconomiciFormulaSupport.RoundSql(ispe, 2);
             }
+        }
+
+        private static void ResetCalculatedValues(InformazioniEconomiche.InformazioniEconomicheCalcolate cal)
+        {
+            cal.SEQ_Origine = null;
+            cal.SEQ_Integrazione = null;
+            cal.ISRDSU = null;
+            cal.ISPDSU = null;
+            cal.Detrazioni = null;
+            cal.SommaRedditiStud = null;
+            cal.ISEDSU = null;
+            cal.ISEEDSU = null;
+            cal.ISPEDSU = null;
+            cal.SEQ = null;
         }
 
         private static void ComputeDbDerivedValues(
@@ -79,7 +103,6 @@ namespace ProcedureNet7
             switch ((raw.OrigineFonte ?? string.Empty).Trim().ToUpperInvariant())
             {
                 case "CO":
-                case "DO":
                     seqOrigine = raw.OrigineScalaEquivalenza;
                     sommaRedditiStud = raw.OrigineSommaRedditi;
                     isrDsu = raw.OrigineISR
@@ -137,10 +160,13 @@ namespace ProcedureNet7
             }
         }
 
-        private static decimal ComputeSeqFinal(InformazioniEconomiche eco, int numeroComponentiIntegrazione)
+        private static decimal ComputeSeqFinal(
+            InformazioniEconomiche eco,
+            decimal seqOrigine,
+            decimal seqIntegrazione,
+            int numeroComponentiIntegrazione)
         {
             var raw = eco.Raw;
-            var cal = eco.Calcolate;
 
             int componentiTotali = raw.NumeroComponenti > 0 ? raw.NumeroComponenti : 1;
             int conviventiEstero = Math.Max(raw.NumeroConviventiEstero, 0);
@@ -151,7 +177,7 @@ namespace ProcedureNet7
             if (string.Equals(raw.TipoRedditoOrigine, "it", StringComparison.OrdinalIgnoreCase))
             {
                 int baseComponenti = Math.Max(componentiTotali - conviventiEstero, 1);
-                maggiorazioneStudente = (cal.SEQ_Origine > 0 ? cal.SEQ_Origine : 0m) - EconomiciFormulaSupport.ScalaMin(baseComponenti);
+                maggiorazioneStudente = Math.Max(seqOrigine, 0m) - EconomiciFormulaSupport.ScalaMin(baseComponenti);
                 componentiStudente = baseComponenti + conviventiEstero;
             }
 
@@ -164,7 +190,7 @@ namespace ProcedureNet7
 
             decimal maggiorazioneIntegrazione = 0m;
             if (string.Equals(raw.TipoRedditoIntegrazione, "it", StringComparison.OrdinalIgnoreCase))
-                maggiorazioneIntegrazione = (cal.SEQ_Integrazione > 0 ? cal.SEQ_Integrazione : 0m) - EconomiciFormulaSupport.ScalaMin(componentiIntegrazione);
+                maggiorazioneIntegrazione = Math.Max(seqIntegrazione, 0m) - EconomiciFormulaSupport.ScalaMin(componentiIntegrazione);
 
             int componentiTot = componentiStudente + componentiIntegrazione;
             decimal seq = EconomiciFormulaSupport.ScalaMin(componentiTot) + maggiorazioneStudente +

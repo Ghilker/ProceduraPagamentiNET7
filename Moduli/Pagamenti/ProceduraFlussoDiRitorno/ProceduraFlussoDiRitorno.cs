@@ -74,9 +74,14 @@ namespace ProcedureNet7
                 Logger.LogInfo(88, "Inserimento messaggi ai soli studenti effettivamente pagati");
                 InsertMessaggio(CONNECTION, sqlTransaction);
 
+                string riepilogoConferma = BuildRiepilogoConferma();
+                MessageBoxIcon confermaIcon = HasErroriConferma()
+                    ? MessageBoxIcon.Warning
+                    : MessageBoxIcon.Question;
+
                 _ = _masterForm.Invoke((MethodInvoker)delegate
                 {
-                    var result = MessageBox.Show(_masterForm, "continuare?", "cont", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    var result = MessageBox.Show(_masterForm, riepilogoConferma, "Conferma flusso di ritorno", MessageBoxButtons.YesNo, confermaIcon);
                     if (result == DialogResult.No)
                     {
                         sqlTransaction.Rollback();
@@ -273,6 +278,118 @@ namespace ProcedureNet7
 
             // export excel nella cartella del flusso
             ExportFlussoLogExcel();
+        }
+
+        private bool HasErroriConferma()
+        {
+            int righeScartateDalFile = CountFlussoRows("SKIP");
+            int senzaMovimento = studenteRitornoList.Count(s => string.IsNullOrWhiteSpace(s.codMovimentoGenerale));
+            return righeScartateDalFile > 0 || senzaMovimento > 0;
+        }
+
+        private string BuildRiepilogoConferma()
+        {
+            int righeTotali = _flussoLog.Rows.Count;
+            int righeValide = CountFlussoRows("OK");
+            int righeScartateDalFile = CountFlussoRows("SKIP");
+            int studentiConMovimento = studenteRitornoList.Count(s => !string.IsNullOrWhiteSpace(s.codMovimentoGenerale));
+            int studentiSenzaMovimento = studenteRitornoList.Count - studentiConMovimento;
+            int pagamentiScartati = studentiScartati.Count;
+            int pagamentiEffettivi = studenteRitornoList.Count(s => !s.pagamentoScartato && !string.IsNullOrWhiteSpace(s.codMovimentoGenerale));
+            bool hasErrori = righeScartateDalFile > 0 || studentiSenzaMovimento > 0;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Riepilogo flusso di ritorno");
+            sb.AppendLine();
+            sb.AppendLine($"File: {Path.GetFileName(selectedFileFlusso)}");
+            sb.AppendLine($"Mandato provvisorio: {selectedOldMandato}");
+            sb.AppendLine($"Righe lette: {righeTotali}");
+            sb.AppendLine($"Righe valide: {righeValide}");
+            sb.AppendLine($"Studenti con movimento associato: {studentiConMovimento}");
+            sb.AppendLine($"Pagamenti effettivi da confermare: {pagamentiEffettivi}");
+            sb.AppendLine($"Pagamenti scartati nel flusso: {pagamentiScartati}");
+
+            if (ignoraFlussi1 && pagamentiScartati > 0)
+                sb.AppendLine("Nota: gli scartati del flusso non verranno annullati perche' e' attiva l'opzione 'Ignora flussi a 1'.");
+
+            sb.AppendLine();
+
+            if (hasErrori)
+            {
+                sb.AppendLine("ATTENZIONE - ERRORI / ANOMALIE DA VERIFICARE");
+                AppendErroriParsing(sb, righeScartateDalFile);
+                AppendStudentiSenzaMovimento(sb, studentiSenzaMovimento);
+                AppendLogPath(sb);
+            }
+            else
+            {
+                sb.AppendLine("Nessun errore rilevato nel file o nell'associazione ai movimenti.");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("Confermare la procedura?");
+            sb.AppendLine("Si = conferma e salva le modifiche. No = annulla tutto.");
+
+            return sb.ToString();
+        }
+
+        private int CountFlussoRows(string esito)
+        {
+            if (_flussoLog.Rows.Count == 0)
+                return 0;
+
+            return _flussoLog.Rows
+                .Cast<DataRow>()
+                .Count(row => string.Equals(Convert.ToString(row["Esito"]), esito, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void AppendErroriParsing(StringBuilder sb, int righeScartateDalFile)
+        {
+            if (righeScartateDalFile == 0)
+                return;
+
+            sb.AppendLine($"- Righe scartate dal file: {righeScartateDalFile}");
+
+            var gruppiErrore = _flussoLog.Rows
+                .Cast<DataRow>()
+                .Where(row => string.Equals(Convert.ToString(row["Esito"]), "SKIP", StringComparison.OrdinalIgnoreCase))
+                .GroupBy(row => Convert.ToString(row["ErroreCodice"]) ?? "ERRORE")
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key)
+                .Take(4);
+
+            foreach (var gruppo in gruppiErrore)
+            {
+                DataRow esempio = gruppo.First();
+                string codice = string.IsNullOrWhiteSpace(gruppo.Key) ? "ERRORE" : gruppo.Key;
+                string dettaglio = Convert.ToString(esempio["ErroreDettaglio"]) ?? "";
+                string lineNo = Convert.ToString(esempio["LineNo"]) ?? "";
+
+                sb.AppendLine($"  * {codice}: {gruppo.Count()} (es. riga {lineNo}: {dettaglio})");
+            }
+        }
+
+        private void AppendStudentiSenzaMovimento(StringBuilder sb, int studentiSenzaMovimento)
+        {
+            if (studentiSenzaMovimento == 0)
+                return;
+
+            sb.AppendLine($"- Studenti senza movimento contabile associato: {studentiSenzaMovimento}");
+
+            var esempi = studenteRitornoList
+                .Where(s => string.IsNullOrWhiteSpace(s.codMovimentoGenerale))
+                .Take(5)
+                .Select(s => $"{s.codFiscale} (mandato {s.numMandatoFlusso})")
+                .ToList();
+
+            if (esempi.Count > 0)
+                sb.AppendLine($"  * Esempi: {string.Join(", ", esempi)}");
+        }
+
+        private void AppendLogPath(StringBuilder sb)
+        {
+            if (!string.IsNullOrWhiteSpace(_flussoLogExcelPath))
+                sb.AppendLine($"Log dettagliato: {_flussoLogExcelPath}");
         }
 
         // ─────────────────────────────────────────────────────────────────────────────

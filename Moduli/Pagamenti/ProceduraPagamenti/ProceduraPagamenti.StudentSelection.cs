@@ -231,6 +231,7 @@ namespace ProcedureNet7
                                         cod_beneficio CHAR(2) COLLATE Latin1_General_CI_AS,
                                         esitoPA CHAR(1) COLLATE Latin1_General_CI_AS,
                                         anno_corso CHAR(2) COLLATE Latin1_General_CI_AS,
+                                        anno_corso_calcolato CHAR(2) COLLATE Latin1_General_CI_AS,
                                         disabile CHAR(1) COLLATE Latin1_General_CI_AS,
                                         esonero_tassa_regionale CHAR(1) COLLATE Latin1_General_CI_AS,
                                         imp_beneficio DECIMAL(8,2),
@@ -327,7 +328,7 @@ namespace ProcedureNet7
             }
             if (!string.IsNullOrWhiteSpace(debugStudente))
             {
-                queryBuilder.AppendLine($"      AND StatisticheTotali.Cod_fiscale = 'GCCRNN95E55H501P'");
+                queryBuilder.AppendLine($"      AND StatisticheTotali.Cod_fiscale = {debugStudente}");
             }
   
             
@@ -616,6 +617,7 @@ namespace ProcedureNet7
                     _ = int.TryParse(Utilities.SafeGetString(reader, "Superamento_esami"), out int superamentoEsami);
                     _ = int.TryParse(Utilities.SafeGetString(reader, "Superamento_esami_tassa_reg"), out int superamentoEsamiTassaRegionale);
                     _ = int.TryParse(Utilities.SafeGetString(reader, "anno_corso"), out int annoCorso);
+                    _ = int.TryParse(Utilities.SafeGetString(reader, "anno_corso_calcolato"), out int annoCorsoCalcolato);
                     int esitoPA = Utilities.SafeGetInt(reader, "EsitoPA");
                     string studenteCodEnte = Utilities.SafeGetString(reader, "cod_ente");
 
@@ -630,10 +632,10 @@ namespace ProcedureNet7
                     switch (tipoStudente)
                     {
                         case "0":
-                            skipTipoStudente = annoCorso != 1;
+                            skipTipoStudente = (annoCorso != 1);
                             break;
                         case "1":
-                            skipTipoStudente = annoCorso == 1;
+                            skipTipoStudente = (annoCorso == 1);
                             break;
                         case "2":
                             skipTipoStudente = false;
@@ -664,6 +666,7 @@ namespace ProcedureNet7
                             esoneroTassaRegionale == 1,
                             double.TryParse(Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "imp_beneficio")), out double importoBeneficio) ? importoBeneficio : 0,
                             annoCorso,
+                            annoCorsoCalcolato,
                             int.TryParse(Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "cod_corso")), out int codCorso) ? codCorso : 0,
                             esitoPA,
                             superamentoEsami == 1,

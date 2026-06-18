@@ -260,7 +260,8 @@ WHERE Data_Fine_Validita IS NULL;";
                 if (eco != null
                     && string.Equals((eco.Raw.TipoRedditoOrigine ?? "").Trim(), "EE", StringComparison.OrdinalIgnoreCase)
                     && IsSeqOne(eco.Calcolate.SEQ)
-                    && eco.Calcolate.ISRDSU >= 9000m)
+                    && eco.Calcolate.ISRDSU is decimal isrDsu
+                    && isrDsu >= 9000m)
                 {
                     return StatusSedeDecision.Fixed(
                         "B",
@@ -352,7 +353,8 @@ WHERE Data_Fine_Validita IS NULL;";
             }
 
             private static bool IsValidStatus(string? s) => s is "A" or "B" or "C" or "D";
-            private static bool IsSeqOne(decimal seq) => Math.Abs(seq - 1m) < 0.0001m;
+            private static bool IsSeqOne(decimal? seq)
+                => seq.HasValue && Math.Abs(seq.Value - 1m) < 0.0001m;
             private static bool Eq(string? a, string? b)
                 => string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
         }

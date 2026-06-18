@@ -20,33 +20,35 @@ namespace ProcedureNet7
                 var imp = info.InformazioniImportoBorsa;
                 string status = GetStatusSedeRiferimento(info.InformazioniSede);
 
-                decimal importoBase = GetImportoBaseByStatus(status, calc);
-                decimal importoFinale = importoBase;
-                decimal isee = GetIseeRiferimento(info);
+                decimal? importoBase = GetImportoBaseByStatus(status, calc);
+                decimal? isee = GetIseeRiferimento(info);
+                decimal? importoFinale = null;
 
-                if (importoFinale > 0m)
+                if (importoBase.HasValue && importoBase.Value > 0m && isee.HasValue)
                 {
-                    importoFinale = ApplyIseeRule(importoFinale, isee, calc.SogliaIsee);
+                    decimal valoreFinale = ApplyIseeRule(importoBase.Value, isee.Value, calc.SogliaIsee);
 
                     if (IsDonnaStem(info))
-                        importoFinale += RoundMoney(importoBase * 0.20m);
+                        valoreFinale += RoundMoney(importoBase.Value * 0.20m);
 
                     bool riduzioneMeta = DeveRidurreAMetaPerFuoriCorso(info);
                     if (riduzioneMeta)
-                        importoFinale = RoundMoney(importoFinale / 2m);
+                        valoreFinale = RoundMoney(valoreFinale / 2m);
 
                     if (HaMonetizzazioneMensa(info))
-                        importoFinale += riduzioneMeta ? 300m : 600m;
+                        valoreFinale += riduzioneMeta ? 300m : 600m;
+
+                    importoFinale = RoundMoney(valoreFinale);
                 }
 
                 imp.StatusSedeRiferimento = status;
-                imp.ImportoBase = RoundMoney(importoBase);
-                imp.ImportoFinale = RoundMoney(importoFinale);
-                imp.CalcoloEseguito = true;
+                imp.ImportoBase = importoBase.HasValue ? RoundMoney(importoBase.Value) : null;
+                imp.ImportoFinale = importoFinale;
+                imp.CalcoloEseguito = importoFinale.HasValue;
             }
         }
 
-        private static decimal GetImportoBaseByStatus(string status, CalcParams calc)
+        private static decimal? GetImportoBaseByStatus(string status, CalcParams calc)
         {
             switch ((status ?? string.Empty).Trim().ToUpperInvariant())
             {
@@ -54,7 +56,7 @@ namespace ProcedureNet7
                 case "B": return calc.ImportoBorsaB;
                 case "C":
                 case "D": return calc.ImportoBorsaC;
-                default: return 0m;
+                default: return null;
             }
         }
 
@@ -86,17 +88,17 @@ namespace ProcedureNet7
             return RoundMoney(importoBase);
         }
 
-        private static decimal GetIseeRiferimento(StudenteInfo info)
+        private static decimal? GetIseeRiferimento(StudenteInfo info)
         {
             var eco = info.InformazioniEconomiche;
 
-            if (TryReadDecimal(eco?.Calcolate?.ISEEDSU, out var ordinario) && ordinario > 0m)
+            if (eco?.Calcolate?.ISEEDSU is decimal ordinario)
                 return ordinario;
 
-            if (TryReadDecimal(eco?.Attuali?.ISEEDSU, out var attuale) && attuale > 0m)
-                return attuale;
+            if (eco?.Attuali?.ISEEDSU is double attuale)
+                return Convert.ToDecimal(attuale, CultureInfo.InvariantCulture);
 
-            return 0m;
+            return null;
         }
 
         private static bool IsDonnaStem(StudenteInfo info)
@@ -120,18 +122,6 @@ namespace ProcedureNet7
             if (!string.IsNullOrWhiteSpace(sede.StatusSedeSuggerito))
                 return sede.StatusSedeSuggerito;
             return sede.StatusSede ?? string.Empty;
-        }
-
-        private static bool TryReadDecimal(object? value, out decimal result)
-        {
-            result = 0m;
-            if (value == null || value == DBNull.Value) return false;
-            try
-            {
-                result = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
-                return true;
-            }
-            catch { return false; }
         }
 
         private static decimal RoundMoney(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);

@@ -650,6 +650,10 @@ namespace ProcedureNet7
 
         private void CheckLiquefazione()
         {
+            bool ignoraBloccoBppPrimaRataBorsa =
+                string.Equals(categoriaPagam, "PR", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(tipoBeneficio, TipoBeneficio.BorsaDiStudio.ToCode(), StringComparison.OrdinalIgnoreCase);
+
             // Check for payment blocks
             string sqlKiller = $@"
                     SELECT DISTINCT
@@ -668,6 +672,10 @@ namespace ProcedureNet7
             if (tipoBeneficio == TipoBeneficio.BuonoLibro.ToCode())
             {
                 sqlKiller += " AND cod_tipologia_blocco in ('BPD', 'BSS', 'BS1')";
+            }
+            if (ignoraBloccoBppPrimaRataBorsa)
+            {
+                sqlKiller += " AND cod_tipologia_blocco <> 'BPP'";
             }
             sqlKiller += " )";
 
@@ -759,7 +767,7 @@ namespace ProcedureNet7
 
                         bool ibanValido = IbanValidatorUtil.ValidateIban(IBAN);
 
-                        if (!ibanValido && !listaStudentiDaBloccareIBAN.Contains(studente.InformazioniPersonali.CodFiscale))
+                        if (IBAN != string.Empty && !ibanValido && !listaStudentiDaBloccareIBAN.Contains(studente.InformazioniPersonali.CodFiscale))
                         {
                             listaStudentiDaBloccareIBAN.Add(studente.InformazioniPersonali.CodFiscale);
                         }
@@ -783,7 +791,7 @@ namespace ProcedureNet7
                 ibanUpdate.ExecuteNonQuery();
             }
 
-            string listaCFIBANNonValido = string.Join(", ", listaStudentiDaEliminareIBAN.Select(cf => $"'{cf}'"));
+            string listaCFIBANNonValido = string.Join(", ", listaStudentiDaBloccareIBAN.Select(cf => $"'{cf}'"));
             if (!string.IsNullOrWhiteSpace(listaCFIBANNonValido))
             {
                 string sqlUpdateIban = $@"
@@ -798,7 +806,7 @@ namespace ProcedureNet7
                     CommandTimeout = 9000000
                 };
                 ibanUpdate.ExecuteNonQuery();
-                BlocksUtil.AddBlock(CONNECTION, sqlTransaction, listaStudentiDaEliminareIBAN.ToList<string>(), "BSS", selectedAA, "IBAN_Check", true);
+                BlocksUtil.AddBlock(CONNECTION, sqlTransaction, listaStudentiDaBloccareIBAN.ToList<string>(), "BSS", selectedAA, "IBAN_Check", true);
             }
 
             // Check for non-winners
@@ -2251,7 +2259,7 @@ namespace ProcedureNet7
                     else if ((tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() || tipoBeneficio == TipoBeneficio.ContributoStraordinario.ToCode()) && !isTR)
                     {
                         importoDaPagare = importoMassimo;
-                        if (studente.InformazioniIscrizione.AnnoCorso == 1)
+                        if (studente.InformazioniIscrizione.AnnoCorso == 1 || studente.InformazioniIscrizione.AnnoCorsoCalcolato == 1)
                         {
                             if (!studente.InformazioniBeneficio.SuperamentoEsami && studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale && !(studente.InformazioniIscrizione.TipoCorso == 6 || studente.InformazioniIscrizione.TipoCorso == 7))
                             {
@@ -2276,7 +2284,7 @@ namespace ProcedureNet7
                         }
                         if ((!hasSaldo || (hasSaldo && saldoStorno && !riemessaSecondaRata)) && !studenteForzato)
                         {
-                            if (!(studente.InformazioniIscrizione.AnnoCorso == 1 && (studente.InformazioniBeneficio.SuperamentoEsami || studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)))
+                            if (!((studente.InformazioniIscrizione.AnnoCorso == 1 || studente.InformazioniIscrizione.AnnoCorsoCalcolato == 1) && (studente.InformazioniBeneficio.SuperamentoEsami || studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)))
                             {
                                 studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
                                 studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Non ha saldo/saldo non riemesso"));
@@ -2296,7 +2304,7 @@ namespace ProcedureNet7
                             return;
                         }
 
-                        if (studente.InformazioniIscrizione.AnnoCorso == 1 && !(studente.InformazioniBeneficio.SuperamentoEsami || studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale))
+                        if ((studente.InformazioniIscrizione.AnnoCorso == 1 || studente.InformazioniIscrizione.AnnoCorsoCalcolato == 1) && !(studente.InformazioniBeneficio.SuperamentoEsami || studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale))
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
                             return;

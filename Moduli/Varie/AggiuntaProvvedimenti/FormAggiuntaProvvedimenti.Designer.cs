@@ -59,6 +59,7 @@
             label34 = new Label();
             panelInserimentoImpegni = new Panel();
             provvedimentiRequiredSpecificheImpegni = new CheckBox();
+            provvedimentiInsertMsgCheck = new CheckBox();
             panelInserimentoImpegni.SuspendLayout();
             SuspendLayout();
             // 
@@ -126,7 +127,7 @@
             label8.Location = new Point(29, 172);
             label8.Margin = new Padding(4, 0, 4, 0);
             label8.Name = "label8";
-            label8.Size = new Size(218, 15);
+            label8.Size = new Size(214, 15);
             label8.TabIndex = 31;
             label8.Text = "A.A. provvedimento - formato xxxxyyyy";
             // 
@@ -180,7 +181,7 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
+            label1.Font = new Font("Segoe UI", 15F);
             label1.Location = new Point(29, 11);
             label1.Name = "label1";
             label1.Size = new Size(381, 28);
@@ -189,7 +190,7 @@
             // 
             // button1
             // 
-            button1.Font = new Font("Segoe UI", 15F, FontStyle.Regular, GraphicsUnit.Point);
+            button1.Font = new Font("Segoe UI", 15F);
             button1.Location = new Point(460, 291);
             button1.Name = "button1";
             button1.Size = new Size(312, 49);
@@ -295,7 +296,7 @@
             label33.AutoSize = true;
             label33.Location = new Point(3, 65);
             label33.Name = "label33";
-            label33.Size = new Size(65, 15);
+            label33.Size = new Size(66, 15);
             label33.TabIndex = 55;
             label33.Text = "Tipo fondo";
             // 
@@ -348,6 +349,18 @@
             provvedimentiRequiredSpecificheImpegni.UseVisualStyleBackColor = true;
             provvedimentiRequiredSpecificheImpegni.CheckedChanged += ProvvedimentiRequiredSpecificheImpegni_CheckedChanged;
             // 
+            // provvedimentiInsertMsgCheck
+            // 
+            provvedimentiInsertMsgCheck.AutoSize = true;
+            provvedimentiInsertMsgCheck.Checked = true;
+            provvedimentiInsertMsgCheck.CheckState = CheckState.Checked;
+            provvedimentiInsertMsgCheck.Location = new Point(29, 281);
+            provvedimentiInsertMsgCheck.Name = "provvedimentiInsertMsgCheck";
+            provvedimentiInsertMsgCheck.Size = new Size(177, 19);
+            provvedimentiInsertMsgCheck.TabIndex = 64;
+            provvedimentiInsertMsgCheck.Text = "Inserisci Messaggio studente";
+            provvedimentiInsertMsgCheck.UseVisualStyleBackColor = true;
+            // 
             // FormAggiuntaProvvedimenti
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -355,6 +368,7 @@
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
             ControlBox = false;
+            Controls.Add(provvedimentiInsertMsgCheck);
             Controls.Add(provvedimentiRequiredSpecificheImpegni);
             Controls.Add(panelInserimentoImpegni);
             Controls.Add(label2);
@@ -415,5 +429,6 @@
         private Label label34;
         private Panel panelInserimentoImpegni;
         private CheckBox provvedimentiRequiredSpecificheImpegni;
+        private CheckBox provvedimentiInsertMsgCheck;
     }
 }

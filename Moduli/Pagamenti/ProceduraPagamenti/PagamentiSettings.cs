@@ -124,6 +124,7 @@ namespace ProcedureNet7
                                         Valori_calcolati.Anno_accademico
                                         ,Valori_calcolati.Num_domanda
                                         ,Valori_calcolati.Status_sede
+                                        ,Valori_calcolati.anno_corso as anno_corso_calcolato
                                     FROM
                                         Valori_calcolati INNER JOIN MaxValoriCalcolati ON Valori_calcolati.Num_domanda = MaxValoriCalcolati.Num_domanda AND Valori_calcolati.Anno_accademico = MaxValoriCalcolati.Anno_accademico
                                     WHERE Valori_calcolati.Data_validita = MaxValoriCalcolati.MaxDataValidita AND Valori_calcolati.Anno_accademico = @annoAccademico
@@ -165,7 +166,7 @@ namespace ProcedureNet7
                                         ,Rifug_politico
                                     FROM
                                         DatiGenerali_dom INNER JOIN MaxDatiGeneraliDom ON DatiGenerali_dom.Num_domanda = MaxDatiGeneraliDom.Num_domanda AND DatiGenerali_dom.Anno_accademico = MaxDatiGeneraliDom.Anno_accademico
-                                    WHERE DatiGenerali_dom.Data_validita = MaxDatiGeneraliDom.MaxDataValidita AND DatiGenerali_dom.Anno_accademico = @annoAccademico and DatiGenerali_dom.Blocco_pagamento<>1
+                                    WHERE DatiGenerali_dom.Data_validita = MaxDatiGeneraliDom.MaxDataValidita AND DatiGenerali_dom.Anno_accademico = @annoAccademico
                                 )
 
                                 ,MaxIscrizioni
@@ -239,6 +240,7 @@ namespace ProcedureNet7
                                         ,EsitiConcorsiTotali.Cod_beneficio
                                         ,EsitiConcorsiTotali.Imp_beneficio
 	                                    ,ValoriCalcolatiTotali.Status_sede
+	                                    ,ValoriCalcolatiTotali.anno_corso_calcolato
 	                                    ,AppartenenzaTotali.Cod_ente
 	                                    ,DatiGeneraliDomTotali.Tipo_studente
                                         ,DatiGeneraliDomTotali.Invalido
@@ -293,6 +295,7 @@ namespace ProcedureNet7
 		                            ,EsitiTotali.Cod_beneficio
                                     ,COALESCE(EsitiTotali.EsitoPA, 0) as EsitoPA
 		                            ,IscrizioniTotali.Anno_corso
+		                            ,anno_corso_calcolato
 		                            ,invalido AS disabile
 		                            ,esonero_pag_tassa_reg AS esonero_tassa_regionale
 		                            ,imp_beneficio AS imp_beneficio

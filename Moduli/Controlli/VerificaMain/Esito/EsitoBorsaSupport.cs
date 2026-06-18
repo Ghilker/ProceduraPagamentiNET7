@@ -10,6 +10,8 @@ namespace ProcedureNet7
 {
     internal static class EsitoBorsaSupport
     {
+        public static readonly IReadOnlyList<string> SupportedBenefitCodes = new[] { "BS", "PA", "PK", "CI" };
+
         private static readonly Dictionary<string, string> MotiviEsclusione = new(StringComparer.OrdinalIgnoreCase)
         {
             { "GEN000", "Domanda non completa" },
@@ -27,22 +29,13 @@ namespace ProcedureNet7
             { "GEN093", "Iscrizione fuori termine" },
             { "GEN094", "Domanda non trasmessa" },
             { "GENDOC", "Documento di riconoscimento mancante" },
-            { "RED001", "Conferma del reddito mancante" },
             { "RED011", "Valore ISEE assente o non valido" },
             { "RED012", "Valore ISP oltre la soglia ammessa" },
             { "RED013", "Valore ISEE oltre la soglia ammessa" },
             { "RED086", "Stato ISEE non ammesso" },
             { "RED087", "Codice fiscale dello studente indipendente presente nell'attestazione ISEE della famiglia di origine" },
-            { "RED029", "ISEE base assente entro la scadenza effettiva" },
-            { "RED030", "ISEE base presente ma firmato oltre la scadenza effettiva" },
             { "RED031", "Attestazione ISEE origine non adeguata: manca CO universitaria/ridotta/corrente oppure CO ordinaria valida con integrazione redditi esteri" },
-            { "RED032", "Attestazione ISEE universitaria/corrente origine presente ma firmata oltre il 31/12/2025" },
-            { "RED033", "Integrazione ISEE universitaria/corrente nucleo di origine non presente entro il 31/12/2025" },
-            { "RED034", "Integrazione ISEE universitaria/corrente nucleo di origine presente ma firmata oltre il 31/12/2025" },
-            { "RED035", "Status INPS origine mancante per la certificazione ISEE universitaria/corrente selezionata" },
-            { "RED036", "Status INPS integrazione mancante per la certificazione ISEE universitaria/corrente selezionata" },
-            { "RED037", "Status INPS origine non valido per la certificazione ISEE universitaria/corrente selezionata" },
-            { "RED038", "Status INPS integrazione non valido per la certificazione ISEE universitaria/corrente selezionata" },
+            { "RED033", "Integrazione ISEE universitaria/corrente nucleo di origine non presente entro il 31 dicembre dell'anno di avvio" },
             { "MER001", "Dati di merito assenti o non sufficienti per il calcolo" },
             { "MER088", "Studente già in possesso di altra borsa" },
             { "MER005", "Crediti dichiarati incongruenti con il corso di studi" },
@@ -407,23 +400,13 @@ namespace ProcedureNet7
             return false;
         }
 
-        public static decimal GetIseeRiferimento(StudenteInfo info)
-        {
-            if (TryReadDecimal(info?.InformazioniEconomiche?.Calcolate?.ISEEDSU, out var value))
-                return value;
+        public static decimal? GetIseeRiferimento(StudenteInfo info)
+            => info?.InformazioniEconomiche?.Calcolate?.ISEEDSU;
 
-            return 0m;
-        }
+        public static decimal? GetIspRiferimento(StudenteInfo info)
+            => info?.InformazioniEconomiche?.Calcolate?.ISPEDSU;
 
-        public static decimal GetIspRiferimento(StudenteInfo info)
-        {
-            if (TryReadDecimal(info?.InformazioniEconomiche?.Calcolate?.ISPEDSU, out var value))
-                return value;
-
-            return 0m;
-        }
-
-        public static int? GetStatusIseeDaEconomici(StudenteInfo? info, int aaNumero)
+        public static int? GetStatusIseeDaEconomici(StudenteInfo? info)
         {
             var raw = info?.InformazioniEconomiche?.Raw;
             var calcolate = info?.InformazioniEconomiche?.Calcolate;
@@ -444,16 +427,16 @@ namespace ProcedureNet7
                 return 2;
 
             int statusOrigine = raw.StatusInpsOrigine;
-            if (aaNumero > 20092010 && (statusOrigine == 5 || statusOrigine == 6 || statusOrigine == 7 || statusOrigine == 8 || statusOrigine == 9))
+            if (statusOrigine == 5 || statusOrigine == 6 || statusOrigine == 7 || statusOrigine == 8 || statusOrigine == 9)
                 statusOrigine = 2;
 
             if (statusOrigine == 2)
             {
-                decimal isee = 0m;
-                TryReadDecimal(calcolate?.ISEEDSU, out isee);
+                decimal? isee = calcolate?.ISEEDSU;
 
                 if (string.Equals(NormalizeUpper(raw.TipoRedditoOrigine), "IT", StringComparison.OrdinalIgnoreCase)
-                    && isee == 0m
+                    && isee.HasValue
+                    && isee.Value == 0m
                     && raw.OrigineSommaRedditi > 0m)
                 {
                     return 11;
@@ -465,13 +448,13 @@ namespace ProcedureNet7
             return statusOrigine;
         }
 
-        public static bool IsSituazioneEconomicaValidaPerEsito(StudenteInfo? info, int aaNumero)
+        public static bool IsSituazioneEconomicaValidaPerEsito(StudenteInfo? info)
         {
             var raw = info?.InformazioniEconomiche?.Raw;
             if (raw == null)
                 return false;
 
-            int? statusIsee = GetStatusIseeDaEconomici(info, aaNumero);
+            int? statusIsee = GetStatusIseeDaEconomici(info);
             if (!statusIsee.HasValue || statusIsee.Value == 0)
                 return true;
 
@@ -488,8 +471,7 @@ namespace ProcedureNet7
                 return string.Equals(origineFonte, "EE", StringComparison.OrdinalIgnoreCase);
 
             if (statusIsee.Value == 2)
-                return string.Equals(origineFonte, "CO", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(origineFonte, "DO", StringComparison.OrdinalIgnoreCase);
+                return string.Equals(origineFonte, "CO", StringComparison.OrdinalIgnoreCase);
 
             return false;
         }
@@ -549,80 +531,23 @@ namespace ProcedureNet7
             return codice;
         }
 
-        private static readonly string[] PreferredBenefitOrder = { "BS", "PA", "CS", "CM", "CT", "CI" };
-
         public static IReadOnlyList<string> GetRequestedBenefitCodes(EsitoBorsaFacts? facts)
         {
             if (facts == null || facts.BeneficiRichiesti.Count == 0)
                 return Array.Empty<string>();
 
-            return facts.BeneficiRichiesti
-                .Where(beneficio => !string.IsNullOrWhiteSpace(beneficio))
-                .Select(NormalizeUpper)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(GetBenefitSortOrder)
-                .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
+            return SupportedBenefitCodes
+                .Where(facts.BeneficiRichiesti.Contains)
                 .ToArray();
-        }
-
-        public static IReadOnlyList<string> GetBenefitCodes(VerificaPipelineContext pipeline, StudentKey key, EsitoBorsaFacts? facts)
-        {
-            var items = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            if (facts != null)
-            {
-                foreach (var beneficio in facts.BeneficiRichiesti)
-                {
-                    if (!string.IsNullOrWhiteSpace(beneficio))
-                        items.Add(NormalizeUpper(beneficio));
-                }
-            }
-
-            if (pipeline != null
-                && pipeline.TryGetEsitiConcorsoByBenefit(key, out var rawByBenefit)
-                && rawByBenefit != null)
-            {
-                foreach (var beneficio in rawByBenefit.Keys)
-                {
-                    if (!string.IsNullOrWhiteSpace(beneficio))
-                        items.Add(NormalizeUpper(beneficio));
-                }
-            }
-
-            if (pipeline != null
-                && pipeline.TryGetEsitiCalcolatiByBenefit(key, out var calcolatiByBenefit)
-                && calcolatiByBenefit != null)
-            {
-                foreach (var beneficio in calcolatiByBenefit.Keys)
-                {
-                    if (!string.IsNullOrWhiteSpace(beneficio))
-                        items.Add(NormalizeUpper(beneficio));
-                }
-            }
-
-            if (items.Count == 0)
-                items.Add("BS");
-
-            return items
-                .OrderBy(GetBenefitSortOrder)
-                .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
-
-        private static int GetBenefitSortOrder(string? beneficio)
-        {
-            string normalized = NormalizeUpper(beneficio);
-            for (int i = 0; i < PreferredBenefitOrder.Length; i++)
-            {
-                if (string.Equals(PreferredBenefitOrder[i], normalized, StringComparison.OrdinalIgnoreCase))
-                    return i;
-            }
-
-            return PreferredBenefitOrder.Length + 1;
         }
 
         public static bool IsBenefitRequested(EsitoBorsaFacts? facts, string? beneficio)
-            => facts != null && facts.BeneficiRichiesti.Contains(NormalizeUpper(beneficio));
+        {
+            string normalized = NormalizeUpper(beneficio);
+            return facts != null
+                   && SupportedBenefitCodes.Contains(normalized, StringComparer.OrdinalIgnoreCase)
+                   && facts.BeneficiRichiesti.Contains(normalized);
+        }
 
         public static string GetSlashMotiviEsclusione(EsitoBorsaFacts? facts, string? beneficio)
         {
@@ -662,8 +587,7 @@ namespace ProcedureNet7
             {
                 "BS" => facts.RinunciaBS,
                 "PA" => facts.RinunciaPA,
-                "CM" => facts.RinunciaCM,
-                "CT" => facts.RinunciaCT,
+                "PK" => facts.RinunciaPK,
                 "CI" => facts.RinunciaCI,
                 _ => false
             };
@@ -679,8 +603,7 @@ namespace ProcedureNet7
             {
                 "BS" => facts.DecadutoBS,
                 "PA" => facts.DecadutoPA,
-                "CM" => facts.DecadutoCM,
-                "CT" => facts.DecadutoCT,
+                "PK" => facts.DecadutoPK,
                 "CI" => facts.DecadutoCI,
                 _ => false
             };
@@ -696,8 +619,7 @@ namespace ProcedureNet7
             {
                 "BS" => facts.RevocatoBandoBS,
                 "PA" => facts.RevocatoBandoPA,
-                "CM" => facts.RevocatoBandoCM,
-                "CT" => facts.RevocatoBandoCT,
+                "PK" => facts.RevocatoBandoPK,
                 "CI" => facts.RevocatoBandoCI,
                 _ => false
             };

@@ -51,7 +51,6 @@ namespace ProcedureNet7
 
                 log(40, "Estrazione dati economici origine.");
                 AddDatiEconomiciItaliani_CO(aa, pipelineTableName);
-                AddDatiEconomiciItaliani_DOFromCert(aa, pipelineTableName);
                 AddDatiEconomiciStranieri_DO(aa, pipelineTableName);
 
                 log(60, "Estrazione dati economici integrazione.");
@@ -152,7 +151,7 @@ IF OBJECT_ID('tempdb..#VerificaEconomiciSemestreFlags') IS NOT NULL
             if (value.Length < 4 || !int.TryParse(value.Substring(0, 4), out int startYear))
                 throw new ArgumentException($"Anno accademico non valido per la scadenza ISEE base: {aa}", nameof(aa));
 
-            // Regola 20252026+: ISEE base, anche ordinario/corrente, firmato entro il 22 luglio dell'anno di avvio AA.
+            // ISEE base, anche ordinario/corrente, firmato entro il 22 luglio dell'anno di avvio AA.
             // Per ConfermaSemestreFiltro = 1 il limite viene gestito nelle query e diventa il 31 dicembre.
             return new DateTime(startYear, 7, 22);
         }
@@ -591,9 +590,6 @@ INNER JOIN #EconomicSplitFlags f
             foreach (var target in split.OrigIT_CO)
                 SetSplitFlag(flags, target, static f => f.IsOrigIT_CO = true);
 
-            foreach (var target in split.OrigIT_DO)
-                SetSplitFlag(flags, target, static f => f.IsOrigIT_DO = true);
-
             foreach (var target in split.OrigEE)
                 SetSplitFlag(flags, target, static f => f.IsOrigEE = true);
 
@@ -924,72 +920,6 @@ WHERE t.IsOrigEE = 1;";
             }
         }
 
-        private void AddDatiEconomiciItaliani_DOFromCert(string aa, string sourceTableName)
-        {
-            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.AddDatiEconomiciItaliani_DOFromCert", $"AA={aa}");
-            sourceTableName = ResolveTempTableName(sourceTableName);
-
-            string sql = $@"
-SELECT
-    t.CodFiscale AS Cod_fiscale,
-    t.NumDomanda AS Num_domanda,
-    ISNULL(cte.Somma_redditi,0) AS Somma_redditi,
-    ISNULL(cte.ISR,0) AS ISR,
-    ISNULL(cte.ISP,0) AS ISP,
-    ISNULL(cte.Scala_equivalenza,0) AS SEQU,
-
-    ISNULL(cte.Redd_fratelli_50,0) AS Redd_fratelli_50,
-    ISNULL(cte.Patr_fratelli_50,0) AS Patr_fratelli_50,
-    ISNULL(cte.Patr_frat_50_est,0) AS Patr_frat_50_est,
-    ISNULL(cte.Redd_frat_50_est,0) AS Redd_frat_50_est,
-    ISNULL(cte.Patr_fam_50_est,0) AS Patr_fam_50_est,
-    ISNULL(cte.Metri_quadri,0) AS Metri_quadri,
-    ISNULL(cte.Redd_fam_50_est,0) AS Redd_fam_50_est,
-    ISNULL(cte.patr_imm_50_frat_sor,0) AS patr_imm_50_frat_sor
-FROM {sourceTableName} t
-OUTER APPLY
-(
-    SELECT TOP 1 *
-    FROM Certificaz_ISEE cte
-    WHERE cte.Anno_accademico = @AA
-      AND cte.Num_domanda = t.NumDomanda
-      AND UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'DO'
-      AND (cte.firmata_il IS NULL OR cte.firmata_il <= @FirmataIlMax)
-    ORDER BY
-        cte.firmata_il DESC,
-        cte.data_validita DESC
-) cte
-WHERE t.IsOrigIT_DO = 1
-  AND cte.Num_domanda IS NOT NULL;";
-
-            using var command = new SqlCommand(sql, _conn);
-            AddAaParameter(command, aa);
-            AddDataValiditaMaxParameter(command, aa);
-            AddFirmataIlMaxParameter(command, aa);
-
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
-            {
-                if (!TryGetStudentInfo(reader, out var info)) continue;
-                var eco = info.InformazioniEconomiche;
-                var raw = eco.Raw;
-
-                raw.OrigineFonte = "DO";
-                raw.OrigineSommaRedditi = reader.SafeGetDecimal("Somma_redditi");
-                raw.OrigineISR = reader.SafeGetDecimal("ISR");
-                raw.OrigineISP = reader.SafeGetDecimal("ISP");
-                raw.OrigineScalaEquivalenza = reader.SafeGetDecimal("SEQU");
-                raw.OrigineReddFratelli50 = reader.SafeGetDecimal("Redd_fratelli_50");
-                raw.OriginePatrFratelli50 = reader.SafeGetDecimal("Patr_fratelli_50");
-                raw.OriginePatrFrat50Est = reader.SafeGetDecimal("Patr_frat_50_est");
-                raw.OrigineReddFrat50Est = reader.SafeGetDecimal("Redd_frat_50_est");
-                raw.OriginePatrFam50Est = reader.SafeGetDecimal("Patr_fam_50_est");
-                raw.OrigineMetriQuadri = reader.SafeGetDecimal("Metri_quadri");
-                raw.OrigineReddFam50Est = reader.SafeGetDecimal("Redd_fam_50_est");
-                raw.OriginePatrImm50FratSor = reader.SafeGetDecimal("patr_imm_50_frat_sor");
-            }
-        }
-
         private void AddDatiEconomiciItaliani_CI(string aa, string sourceTableName)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.AddDatiEconomiciItaliani_CI", $"AA={aa}");
@@ -1114,7 +1044,6 @@ WHERE t.IsIntDI = 1;";
         private sealed class SplitResult
         {
             public List<Target> OrigIT_CO { get; } = new();
-            public List<Target> OrigIT_DO { get; } = new();
             public List<Target> OrigEE { get; } = new();
             public List<Target> IntIT_CI { get; } = new();
             public List<Target> IntDI { get; } = new();
@@ -1327,7 +1256,6 @@ LEFT JOIN CertFlags cf
                         coOrdinarioConIntegrazioneEsteriOk,
                         coOrdinarioSemestreFiltroOk);
 
-                    // Regola 20252026+: non si usa più il fallback DO per rendere idoneo lo studente.
                     // Prima deve esistere un ISEE base firmato entro il 22/07; per ConfermaSemestreFiltro=1 entro il 31/12.
                     // Poi serve una CO UNIVERSITARIA/RIDOTTA/CORRENTE entro il 31/12.
                     // Eccezioni: CO ORDINARIA adeguata se il nucleo indipendente ha integrazione di redditi esteri oppure se lo studente è semestre filtro.
@@ -1385,7 +1313,7 @@ LEFT JOIN CertFlags cf
                 }
             }
 
-            Logger.LogInfo(33, $"Tipologie reddito lette: {readCount} | OrigIT_CO={result.OrigIT_CO.Count} | OrigIT_DO={result.OrigIT_DO.Count} | OrigEE={result.OrigEE.Count} | IntIT_CI={result.IntIT_CI.Count} | IntDI={result.IntDI.Count} | OrigIT senza ISEE base entro scadenza effettiva={origineItBaseMancanteCount} | OrigIT senza CO adeguata entro 31/12={origineItUniversitariaMancanteCount} | OrigIT ordinario accettato per integrazione redditi esteri={origineItOrdinariaConIntegrazioneEsteriCount} | OrigIT ordinario accettato per semestre filtro={origineItOrdinariaSemestreFiltroCount} | IntIT senza UNIVERSITARIO entro 31/12={integrazioneItUniversitariaMancanteCount} | Certificazioni modificate dopo scadenza base effettiva={studentiConModificheMultipleCount}");
+            Logger.LogInfo(33, $"Tipologie reddito lette: {readCount} | OrigIT_CO={result.OrigIT_CO.Count} | OrigEE={result.OrigEE.Count} | IntIT_CI={result.IntIT_CI.Count} | IntDI={result.IntDI.Count} | OrigIT senza ISEE base entro scadenza effettiva={origineItBaseMancanteCount} | OrigIT senza CO adeguata entro 31/12={origineItUniversitariaMancanteCount} | OrigIT ordinario accettato per integrazione redditi esteri={origineItOrdinariaConIntegrazioneEsteriCount} | OrigIT ordinario accettato per semestre filtro={origineItOrdinariaSemestreFiltroCount} | IntIT senza UNIVERSITARIO entro 31/12={integrazioneItUniversitariaMancanteCount} | Certificazioni modificate dopo scadenza base effettiva={studentiConModificheMultipleCount}");
             return result;
         }
 
@@ -1427,11 +1355,11 @@ LEFT JOIN Valori_calcolati vv
                 var eco = info.InformazioniEconomiche;
                 var attuali = eco.Attuali;
 
-                attuali.ISPEDSU = reader.SafeGetDouble("ISPEDSU");
-                attuali.ISEDSU = reader.SafeGetDouble("ISEDSU");
-                attuali.SEQ = reader.SafeGetDouble("SEQ");
-                attuali.ISPDSU = reader.SafeGetDouble("ISPDSU");
-                attuali.ISEEDSU = reader.SafeGetDouble("ISEEDSU");
+                attuali.ISPEDSU = GetNullableDouble(reader, "ISPEDSU");
+                attuali.ISEDSU = GetNullableDouble(reader, "ISEDSU");
+                attuali.SEQ = GetNullableDouble(reader, "SEQ");
+                attuali.ISPDSU = GetNullableDouble(reader, "ISPDSU");
+                attuali.ISEEDSU = GetNullableDouble(reader, "ISEEDSU");
             }
         }
     }

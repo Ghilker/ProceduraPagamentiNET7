@@ -9,7 +9,7 @@ namespace ProcedureNet7.Verifica
 {
     internal sealed partial class Verifica
     {
-        private static readonly string[] OutputBenefitCodes = { "BS", "PA", "PK", "CI" };
+        private static readonly IReadOnlyList<string> OutputBenefitCodes = EsitoBorsaSupport.SupportedBenefitCodes;
 
         private static DataTable BuildOutputTable()
         {
@@ -103,7 +103,6 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("PassaggioTrasferimentoMerito", typeof(bool));
             dt.Columns.Add("RipetenteDaPassaggioMerito", typeof(bool));
             dt.Columns.Add("PrimaImmatricolazTsMerito", typeof(int));
-            dt.Columns.Add("RichiestaCSMerito", typeof(bool));
             dt.Columns.Add("RegolaMeritoApplicata", typeof(string));
             dt.Columns.Add("FaseElaborativaVerifica", typeof(string));
             dt.Columns.Add("TipoStudenteNormalizzato", typeof(int));
@@ -193,20 +192,23 @@ namespace ProcedureNet7.Verifica
             row["OrigineEconomicaAdeguata"] = facts?.OrigineEconomicaAdeguata == true;
             row["MotivoAdeguatezzaOrigine"] = facts?.MotivoAdeguatezzaOrigine ?? "";
 
-            row["ImportoAssegnatoBS"] = GetImportoAssegnato(context, key, "BS") ?? ToDecimalOrZero(eco.Raw.ImportoAssegnato);
-            row["ISR"] = eco.Calcolate.ISRDSU;
-            row["ISP"] = eco.Calcolate.ISPDSU;
-            row["Detrazioni"] = eco.Calcolate.Detrazioni;
-            row["ISEDSU"] = eco.Calcolate.ISEDSU;
-            row["ISEEDSU"] = eco.Calcolate.ISEEDSU;
-            row["ISPEDSU"] = eco.Calcolate.ISPEDSU;
-            row["ISPDSU"] = eco.Calcolate.ISPDSU;
-            row["SEQ"] = eco.Calcolate.SEQ;
-            row["ISEDSU_Attuale"] = ToDecimalOrZero(eco.Attuali.ISEDSU);
-            row["ISEEDSU_Attuale"] = ToDecimalOrZero(eco.Attuali.ISEEDSU);
-            row["ISPEDSU_Attuale"] = ToDecimalOrZero(eco.Attuali.ISPEDSU);
-            row["ISPDSU_Attuale"] = ToDecimalOrZero(eco.Attuali.ISPDSU);
-            row["SEQ_Attuale"] = ToDecimalOrZero(eco.Attuali.SEQ);
+            SetNullableDecimal(
+                row,
+                "ImportoAssegnatoBS",
+                GetImportoAssegnato(context, key, "BS") ?? ToNullableDecimal(eco.Raw.ImportoAssegnato));
+            SetNullableDecimal(row, "ISR", eco.Calcolate.ISRDSU);
+            SetNullableDecimal(row, "ISP", eco.Calcolate.ISPDSU);
+            SetNullableDecimal(row, "Detrazioni", eco.Calcolate.Detrazioni);
+            SetNullableDecimal(row, "ISEDSU", eco.Calcolate.ISEDSU);
+            SetNullableDecimal(row, "ISEEDSU", eco.Calcolate.ISEEDSU);
+            SetNullableDecimal(row, "ISPEDSU", eco.Calcolate.ISPEDSU);
+            SetNullableDecimal(row, "ISPDSU", eco.Calcolate.ISPDSU);
+            SetNullableDecimal(row, "SEQ", eco.Calcolate.SEQ);
+            SetNullableDecimal(row, "ISEDSU_Attuale", ToNullableDecimal(eco.Attuali.ISEDSU));
+            SetNullableDecimal(row, "ISEEDSU_Attuale", ToNullableDecimal(eco.Attuali.ISEEDSU));
+            SetNullableDecimal(row, "ISPEDSU_Attuale", ToNullableDecimal(eco.Attuali.ISPEDSU));
+            SetNullableDecimal(row, "ISPDSU_Attuale", ToNullableDecimal(eco.Attuali.ISPDSU));
+            SetNullableDecimal(row, "SEQ_Attuale", ToNullableDecimal(eco.Attuali.SEQ));
 
             row["StatusSedeAttuale"] = sede.StatusSede ?? "";
             row["StatusSedeSuggerito"] = sede.StatusSedeSuggerito ?? "";
@@ -270,7 +272,6 @@ namespace ProcedureNet7.Verifica
             row["PassaggioTrasferimentoMerito"] = facts?.PassaggioTrasferimento == true;
             row["RipetenteDaPassaggioMerito"] = ripetenteDaPassaggio;
             row["PrimaImmatricolazTsMerito"] = facts?.PrimaImmatricolazTs ?? (object)DBNull.Value;
-            row["RichiestaCSMerito"] = facts?.RichiestaCS == true;
             row["RegolaMeritoApplicata"] = iscr.RegolaMeritoApplicata ?? "";
             row["FaseElaborativaVerifica"] = context.FaseElaborativa.ToString();
             SetIfHasValue(row, "TipoStudenteNormalizzato", facts?.TipoStudenteNormalizzato);
@@ -301,8 +302,8 @@ namespace ProcedureNet7.Verifica
             row["DiagnosticaBorsaPregressaRestituzioni"] = facts?.DiagnosticaBorsaPregressaRestituzioni ?? "";
 
             row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
-            row["ImportoBaseBorsa"] = impBorsa.ImportoBase;
-            row["ImportoFinaleBorsa"] = impBorsa.ImportoFinale;
+            SetNullableDecimal(row, "ImportoBaseBorsa", impBorsa.ImportoBase);
+            SetNullableDecimal(row, "ImportoFinaleBorsa", impBorsa.ImportoFinale);
 
             dt.Rows.Add(row);
         }
@@ -367,10 +368,10 @@ namespace ProcedureNet7.Verifica
             return null;
         }
 
-        private static decimal ToDecimalOrZero(object? value)
+        private static decimal? ToNullableDecimal(object? value)
         {
             if (value == null || value == DBNull.Value)
-                return 0m;
+                return null;
 
             try
             {
@@ -378,8 +379,13 @@ namespace ProcedureNet7.Verifica
             }
             catch
             {
-                return 0m;
+                return null;
             }
+        }
+
+        private static void SetNullableDecimal(DataRow row, string columnName, decimal? value)
+        {
+            row[columnName] = value.HasValue ? value.Value : DBNull.Value;
         }
 
         private static void SetIfHasValue(DataRow row, string columnName, object? value)

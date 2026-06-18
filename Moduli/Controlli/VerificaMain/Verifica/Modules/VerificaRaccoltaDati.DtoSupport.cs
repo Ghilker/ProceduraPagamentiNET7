@@ -170,6 +170,14 @@ namespace ProcedureNet7
         private static decimal GetDecimalOrZero(SqlDataReader reader, int ordinal)
             => reader.IsDBNull(ordinal) ? 0m : reader.GetDecimal(ordinal);
 
+        private static double? GetNullableDouble(SqlDataReader reader, string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal)
+                ? null
+                : Convert.ToDouble(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+        }
+
         private sealed class LogMeasureScope : IDisposable
         {
             private readonly string _scope;

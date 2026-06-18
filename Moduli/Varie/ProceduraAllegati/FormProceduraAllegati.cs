@@ -17,10 +17,10 @@ namespace ProcedureNet7
 
         private readonly Dictionary<string, string> proceduraAllegatiBeneficiItems = new()
         {
-            { "00", "Tutti i benefici" },
-            { "BS", "Borsa di studio" },
-            { "PA", "Posto alloggio" },
-            { "CI", "Contributo integrativo" }
+            { "00", "00" },
+            { "BS", "BS" },
+            { "PA", "PA" },
+            { "CI", "CI" }
         };
 
         private readonly Dictionary<string, string> allegatiProvvItems = new()
@@ -28,7 +28,8 @@ namespace ProcedureNet7
             { "01", "Riammissione come vincitore" },
             { "02", "Riammissione come idoneo" },
             { "03", "Revoca senza recupero somme" },
-            { "04", "Decadenza" },
+            { "40", "Decadenza senza recupero somme" },
+            { "41", "Decadenza con recupero somme" },
             { "05", "Modifica importo" },
             { "06", "Revoca con recupero somme" },
             { "09", "Da idoneo a vincitore" },
@@ -185,7 +186,8 @@ namespace ProcedureNet7
         {
             switch (tipoAllegato)
             {
-                case "04":
+                case "40":
+                case "41":
                     GeneraTemplateDecadenza(annoAccademico);
                     break; 
 
@@ -223,8 +225,8 @@ namespace ProcedureNet7
 
             DataTable dt = new();
 
-            dt.Columns.Add("CodiceFiscale");
-            dt.Columns.Add("Motivazione");
+            dt.Columns.Add("Codice fiscale");
+            dt.Columns.Add("Motivo decadenza");
 
             using XLWorkbook wb = new();
             wb.Worksheets.Add(dt, "Decadenza");

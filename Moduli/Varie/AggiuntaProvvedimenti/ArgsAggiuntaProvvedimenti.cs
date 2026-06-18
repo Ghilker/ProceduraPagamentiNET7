@@ -34,6 +34,7 @@ namespace ProcedureNet7
         public string _beneficioProvvedimento { get; set; }
 
         public bool _requireNuovaSpecifica { get; set; }
+        public bool _insertMessaggioStudente { get; set; }
 
         public string _impegnoPR { get; set; }
         public string _impegnoSA { get; set; }

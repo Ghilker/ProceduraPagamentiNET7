@@ -17,21 +17,21 @@ namespace ProcedureNet7
         public int NumeroComponentiIntegrazione { get => Raw.NumeroComponentiIntegrazione; set => Raw.NumeroComponentiIntegrazione = value; }
         public string TipoNucleo { get => Raw.TipoNucleo; set => Raw.TipoNucleo = value; }
         public decimal AltriMezzi { get => Raw.AltriMezzi; set => Raw.AltriMezzi = value; }
-        public decimal SEQ_Origine { get => Calcolate.SEQ_Origine; set => Calcolate.SEQ_Origine = value; }
-        public decimal SEQ_Integrazione { get => Calcolate.SEQ_Integrazione; set => Calcolate.SEQ_Integrazione = value; }
-        public decimal ISRDSU { get => Calcolate.ISRDSU; set => Calcolate.ISRDSU = value; }
-        public decimal ISPDSU { get => Calcolate.ISPDSU; set => Calcolate.ISPDSU = value; }
-        public decimal Detrazioni { get => Calcolate.Detrazioni; set => Calcolate.Detrazioni = value; }
-        public decimal SommaRedditiStud { get => Calcolate.SommaRedditiStud; set => Calcolate.SommaRedditiStud = value; }
-        public decimal ISEDSU { get => Calcolate.ISEDSU; set => Calcolate.ISEDSU = value; }
-        public decimal ISEEDSU { get => Calcolate.ISEEDSU; set => Calcolate.ISEEDSU = value; }
-        public decimal ISPEDSU { get => Calcolate.ISPEDSU; set => Calcolate.ISPEDSU = value; }
-        public decimal SEQ { get => Calcolate.SEQ; set => Calcolate.SEQ = value; }
-        public double ISEDSU_Attuale { get => Attuali.ISEDSU; set => Attuali.ISEDSU = value; }
-        public double ISEEDSU_Attuale { get => Attuali.ISEEDSU; set => Attuali.ISEEDSU = value; }
-        public double ISPEDSU_Attuale { get => Attuali.ISPEDSU; set => Attuali.ISPEDSU = value; }
-        public double ISPDSU_Attuale { get => Attuali.ISPDSU; set => Attuali.ISPDSU = value; }
-        public double SEQ_Attuale { get => Attuali.SEQ; set => Attuali.SEQ = value; }
+        public decimal? SEQ_Origine { get => Calcolate.SEQ_Origine; set => Calcolate.SEQ_Origine = value; }
+        public decimal? SEQ_Integrazione { get => Calcolate.SEQ_Integrazione; set => Calcolate.SEQ_Integrazione = value; }
+        public decimal? ISRDSU { get => Calcolate.ISRDSU; set => Calcolate.ISRDSU = value; }
+        public decimal? ISPDSU { get => Calcolate.ISPDSU; set => Calcolate.ISPDSU = value; }
+        public decimal? Detrazioni { get => Calcolate.Detrazioni; set => Calcolate.Detrazioni = value; }
+        public decimal? SommaRedditiStud { get => Calcolate.SommaRedditiStud; set => Calcolate.SommaRedditiStud = value; }
+        public decimal? ISEDSU { get => Calcolate.ISEDSU; set => Calcolate.ISEDSU = value; }
+        public decimal? ISEEDSU { get => Calcolate.ISEEDSU; set => Calcolate.ISEEDSU = value; }
+        public decimal? ISPEDSU { get => Calcolate.ISPEDSU; set => Calcolate.ISPEDSU = value; }
+        public decimal? SEQ { get => Calcolate.SEQ; set => Calcolate.SEQ = value; }
+        public double? ISEDSU_Attuale { get => Attuali.ISEDSU; set => Attuali.ISEDSU = value; }
+        public double? ISEEDSU_Attuale { get => Attuali.ISEEDSU; set => Attuali.ISEEDSU = value; }
+        public double? ISPEDSU_Attuale { get => Attuali.ISPEDSU; set => Attuali.ISPEDSU = value; }
+        public double? ISPDSU_Attuale { get => Attuali.ISPDSU; set => Attuali.ISPDSU = value; }
+        public double? SEQ_Attuale { get => Attuali.SEQ; set => Attuali.SEQ = value; }
         public int StatusInpsOrigine { get => Raw.StatusInpsOrigine; set => Raw.StatusInpsOrigine = value; }
         public int StatusInpsIntegrazione { get => Raw.StatusInpsIntegrazione; set => Raw.StatusInpsIntegrazione = value; }
         public bool CoAttestazioneOk { get => Raw.CoAttestazioneOk; set => Raw.CoAttestazioneOk = value; }
@@ -138,25 +138,25 @@ namespace ProcedureNet7
 
         public sealed class InformazioniEconomicheAttuali
         {
-            public double ISEDSU { get; set; }
-            public double ISEEDSU { get; set; }
-            public double ISPEDSU { get; set; }
-            public double ISPDSU { get; set; }
-            public double SEQ { get; set; }
+            public double? ISEDSU { get; set; }
+            public double? ISEEDSU { get; set; }
+            public double? ISPEDSU { get; set; }
+            public double? ISPDSU { get; set; }
+            public double? SEQ { get; set; }
         }
 
         public sealed class InformazioniEconomicheCalcolate
         {
-            public decimal SEQ_Origine { get; set; }
-            public decimal SEQ_Integrazione { get; set; }
-            public decimal ISRDSU { get; set; }
-            public decimal ISPDSU { get; set; }
-            public decimal Detrazioni { get; set; }
-            public decimal SommaRedditiStud { get; set; }
-            public decimal ISEDSU { get; set; }
-            public decimal ISEEDSU { get; set; }
-            public decimal ISPEDSU { get; set; }
-            public decimal SEQ { get; set; }
+            public decimal? SEQ_Origine { get; set; }
+            public decimal? SEQ_Integrazione { get; set; }
+            public decimal? ISRDSU { get; set; }
+            public decimal? ISPDSU { get; set; }
+            public decimal? Detrazioni { get; set; }
+            public decimal? SommaRedditiStud { get; set; }
+            public decimal? ISEDSU { get; set; }
+            public decimal? ISEEDSU { get; set; }
+            public decimal? ISPEDSU { get; set; }
+            public decimal? SEQ { get; set; }
         }
     }
 }

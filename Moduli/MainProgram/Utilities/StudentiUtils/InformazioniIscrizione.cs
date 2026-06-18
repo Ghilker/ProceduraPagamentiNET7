@@ -7,6 +7,7 @@ namespace ProcedureNet7
     public class InformazioniIscrizione
     {
         public int AnnoCorso { get; set; }
+        public int AnnoCorsoCalcolato { get; set; }
         public int TipoCorso { get; set; }
         public string CodCorsoLaurea { get; set; } = string.Empty;
         public bool CorsoStem { get; set; }

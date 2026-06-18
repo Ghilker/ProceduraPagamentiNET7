@@ -99,7 +99,6 @@ namespace ProcedureNet7
         public bool? IsAnnoClassificabile { get; set; }
         public string DiagnosticaIscrizione { get; set; } = string.Empty;
         public bool? NubileProle { get; set; }
-        public bool? RichiestaCS { get; set; }
         public HashSet<string> BeneficiRichiesti { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> BeneficiPregressiNonRestituiti { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> BeneficiRinunciaPregressa { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -123,15 +122,13 @@ namespace ProcedureNet7
 
         public bool RinunciaBS { get; set; }
         public bool RinunciaPA { get; set; }
-        public bool RinunciaCM { get; set; }
-        public bool RinunciaCT { get; set; }
+        public bool RinunciaPK { get; set; }
         public bool RinunciaCI { get; set; }
 
         public bool Revocato { get; set; }
         public bool RevocatoBandoBS { get; set; }
         public bool RevocatoBandoPA { get; set; }
-        public bool RevocatoBandoCM { get; set; }
-        public bool RevocatoBandoCT { get; set; }
+        public bool RevocatoBandoPK { get; set; }
         public bool RevocatoBandoCI { get; set; }
         public bool RevocatoSedeDistaccata { get; set; }
         public bool RevocatoMancataIscrizione { get; set; }
@@ -149,8 +146,7 @@ namespace ProcedureNet7
 
         public bool DecadutoBS { get; set; }
         public bool DecadutoPA { get; set; }
-        public bool DecadutoCM { get; set; }
-        public bool DecadutoCT { get; set; }
+        public bool DecadutoPK { get; set; }
         public bool DecadutoCI { get; set; }
 
         public string SlashMotiviEsclusioneBS { get; set; } = string.Empty;

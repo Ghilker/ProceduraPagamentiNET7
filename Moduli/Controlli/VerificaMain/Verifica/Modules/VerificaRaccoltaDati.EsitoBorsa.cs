@@ -331,8 +331,7 @@ JOIN Incongruenze i
             {
                 case "BS": facts.RinunciaBS = true; break;
                 case "PA": facts.RinunciaPA = true; break;
-                case "CM": facts.RinunciaCM = true; break;
-                case "CT": facts.RinunciaCT = true; break;
+                case "PK": facts.RinunciaPK = true; break;
                 case "CI": facts.RinunciaCI = true; break;
                 case "00": facts.RinunciaBenefici = true; break;
             }
@@ -344,8 +343,7 @@ JOIN Incongruenze i
             {
                 case "BS": facts.DecadutoBS = true; break;
                 case "PA": facts.DecadutoPA = true; break;
-                case "CM": facts.DecadutoCM = true; break;
-                case "CT": facts.DecadutoCT = true; break;
+                case "PK": facts.DecadutoPK = true; break;
                 case "CI": facts.DecadutoCI = true; break;
             }
         }
@@ -356,8 +354,7 @@ JOIN Incongruenze i
             {
                 case "BS": facts.RevocatoBandoBS = true; break;
                 case "PA": facts.RevocatoBandoPA = true; break;
-                case "CM": facts.RevocatoBandoCM = true; break;
-                case "CT": facts.RevocatoBandoCT = true; break;
+                case "PK": facts.RevocatoBandoPK = true; break;
                 case "CI": facts.RevocatoBandoCI = true; break;
                 case "00": facts.Revocato = true; break;
             }
@@ -593,12 +590,10 @@ JOIN vBenefici_richiesti vb
                 var key = CreateStudentKey(info.InformazioniPersonali.CodFiscale, info.InformazioniPersonali.NumDomanda);
                 var facts = GetOrCreateEsitoBorsaFacts(context, key);
                 string beneficio = NormalizeUpper(reader.SafeGetString("CodBeneficio"));
-                if (beneficio.Length == 0)
+                if (!EsitoBorsaSupport.SupportedBenefitCodes.Contains(beneficio, StringComparer.OrdinalIgnoreCase))
                     return;
 
                 facts.BeneficiRichiesti.Add(beneficio);
-                if (string.Equals(beneficio, "CS", StringComparison.OrdinalIgnoreCase))
-                    facts.RichiestaCS = true;
             });
         }
 
@@ -1425,8 +1420,6 @@ WHERE ANNO_ACCADEMICO = @AA
             return rinuncia && (HasBorsaMarker(benefici) || codAvvenimento.Contains("BS", StringComparison.OrdinalIgnoreCase));
         }
 
-        private static readonly string[] KnownBenefitCodes = { "BS", "PA", "CS", "CM", "CT", "CI" };
-
         private static bool HasBenefitMarker(string value, string beneficio)
         {
             beneficio = NormalizeUpper(beneficio);
@@ -1442,7 +1435,7 @@ WHERE ANNO_ACCADEMICO = @AA
 
         private static void AddPregressaBenefitFacts(EsitoBorsaFacts facts, string benefici, string restituzioni, string codAvvenimento, bool isCarrieraPregressaEstera)
         {
-            foreach (string beneficio in KnownBenefitCodes)
+            foreach (string beneficio in EsitoBorsaSupport.SupportedBenefitCodes)
             {
                 bool hasBenefit = HasBenefitMarker(benefici, beneficio);
                 bool hasRestituzione = HasMeaningfulRestitution(restituzioni);

@@ -23,6 +23,7 @@ namespace ProcedureNet7
             bool esoneroTassaRegionale,
             double importoBeneficio,
             int annoCorso,
+            int annoCorsoCalcolato,
             int tipoCorso,
             int esitoPA,
             bool superamentoEsami,
@@ -43,6 +44,7 @@ namespace ProcedureNet7
             InformazioniPersonali.EsoneroTassaRegionale = esoneroTassaRegionale;
             InformazioniBeneficio.ImportoBeneficio = importoBeneficio;
             InformazioniIscrizione.AnnoCorso = annoCorso;
+            InformazioniIscrizione.AnnoCorsoCalcolato = annoCorsoCalcolato;
             InformazioniIscrizione.TipoCorso = tipoCorso;
             InformazioniBeneficio.EsitoPA = esitoPA;
             InformazioniBeneficio.VincitorePA = esitoPA == 2 ? true : false;

@@ -88,6 +88,7 @@ namespace ProcedureNet7
         private string notaProvvedimento = string.Empty;
         private string beneficioProvvedimento = string.Empty;
         private bool requireNuovaSpecifica;
+        private bool insertMessaggioStudente;
 
         private string tipoFondo = string.Empty;
         private string capitolo = string.Empty;
@@ -133,6 +134,7 @@ namespace ProcedureNet7
                 notaProvvedimento = (args._notaProvvedimento ?? string.Empty).Trim();
                 beneficioProvvedimento = (args._beneficioProvvedimento ?? string.Empty).Trim();
                 requireNuovaSpecifica = args._requireNuovaSpecifica;
+                insertMessaggioStudente = args._insertMessaggioStudente;
 
                 capitolo = (args._capitolo ?? string.Empty).Trim();
                 esePR = (args._esePR ?? string.Empty).Trim();
@@ -806,7 +808,10 @@ WHERE d.Anno_accademico = @aaProvvedimento
                 }
             }
 
-            InsertMessaggiStudente(newCodes,provvedimentoSelezionato);
+            if (insertMessaggioStudente)
+            {
+                InsertMessaggiStudente(newCodes, provvedimentoSelezionato);
+            }
 
             string updateDecadenzeSql = @"
 UPDATE dt
@@ -1241,30 +1246,11 @@ INNER JOIN Studente s
 
         //Sezione caricamento messaggio di notifica allo studente
 
-        private readonly Dictionary<string, string> tipoProvvedimentoDescriptions = new()
-            {
-                { "01", "Riammissione come vincitore" },
-                { "02", "Riammissione come idoneo" },
-                { "03", "Revoca della borsa di studio senza recupero somme" },
-                { "04", "Decadenza dalla borsa di studio" },
-                { "05", "Modifica importo borsa di studio" },
-                { "06", "Revoca della borsa di studio con recupero somme" },
-                { "08", "Rinuncia al/ai benefici" },
-                { "09", "Scorrimento da idoneo a vincitore" },
-                { "10", "Rinuncia alla borsa di studio con recupero somme" },
-                { "11", "Rinuncia alla borsa di studio senza recupero somme" },
-                { "13", "Cambio status sede per la borsa di studio" },
-            };
         private string BuildMessaggioStudente(string tipoProvvedimento)
             {
-                string descrizione = tipoProvvedimentoDescriptions.TryGetValue(
-                    tipoProvvedimento,
-                    out string? value)
-                    ? value
-                    : "provvedimento amministrativo";
+            string annoAccademicoSlash = aaProvvedimento.Substring(0, 4) + "/" + aaProvvedimento.Substring(4, 4);
 
-                return
-                    $"Gentile studente, le comunichiamo che con il seguente messaggio si conclude il procedimento amministrativo riguardo all'atto prodotto nei suoi confronti con motivazione: {descrizione}.";
+                return $"Gentile studente, le comunichiamo che con il seguente messaggio si conclude il procedimento amministrativo con atto N°{numProvvedimento} del {dataProvvedimento}, anno accademico {annoAccademicoSlash}, precedentemente avviato nei suoi confronti con motivazione: {notaProvvedimento}.";
             }
 
         private void InsertMessaggiStudente(List<string> numDomande,string tipoProvvedimento)
@@ -1322,7 +1308,7 @@ INNER JOIN Studente s
                             d.Cod_fiscale,
                             CURRENT_TIMESTAMP,
                             @messaggio,
-                            'N',
+                            '0',
                             NULL,
                             'Area4'
                     FROM Domanda d

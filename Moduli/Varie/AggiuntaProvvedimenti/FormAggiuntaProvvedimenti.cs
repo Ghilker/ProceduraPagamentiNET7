@@ -123,7 +123,8 @@ namespace ProcedureNet7
                     _eseSA = specificheEseSABox.Text,
                     _esePR = specificheEsePRBox.Text,
                     _capitolo = specificheCapitoloBox.Text,
-                    _tipoFondo = specificheTipoFondoBox.Text
+                    _tipoFondo = specificheTipoFondoBox.Text,
+                    _insertMessaggioStudente = provvedimentiInsertMsgCheck.Checked
                 };
                 argsValidation.Validate(provvArgs);
                 using AggiuntaProvvedimenti aggiuntaProvvedimenti = new(_masterForm, mainConnection);
