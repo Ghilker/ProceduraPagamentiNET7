@@ -18,7 +18,7 @@ namespace ProcedureNet7
 {
     public partial class ProceduraPagamenti : BaseProcedure<ArgsPagamenti>
     {
-        string debugStudente = "";
+        string debugStudente = "GNVMTN02H57A509X";
         string selectedSaveFolder = string.Empty;
         string selectedAA = string.Empty;
 
@@ -47,7 +47,7 @@ namespace ProcedureNet7
         bool massivoDefault = false;
         string massivoString = string.Empty;
 
-        bool studenteForzato = false;
+        bool studenteForzato = true;
         string studenteForzatoCF = string.Empty;
 
         Dictionary<string, StudentePagamenti> studentiDaPagare = new();

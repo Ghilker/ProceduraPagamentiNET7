@@ -48,6 +48,292 @@ JOIN vSTATUS_COMPILAZIONE v
   ON v.Num_domanda = CAST(t.NumDomanda AS INT)
 WHERE v.Anno_accademico = @AA;";
 
+        private const string ProvvedimentoEsclusioneBsPopulationSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+;WITH D AS
+(
+    SELECT
+        CAST(t.NumDomanda AS INT) AS NumDomanda,
+        t.CodFiscale
+    FROM {TEMP_TABLE} t
+),
+GRADUATORIA_DEFINITIVA_BS_RANKED AS
+(
+    SELECT
+        D.NumDomanda,
+        TRY_CONVERT(INT, g.Cod_tipo_esito) AS CodTipoEsitoDefinitivaBs,
+        TRY_CONVERT(DATETIME2, g.Data_validita) AS DataValiditaDefinitivaBs,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY D.NumDomanda
+            ORDER BY g.Data_validita DESC
+        ) AS rn
+    FROM D
+    JOIN Graduatorie g
+      ON g.Num_domanda = D.NumDomanda
+    WHERE g.Anno_accademico = @AA
+      AND UPPER(LTRIM(RTRIM(ISNULL(g.Cod_beneficio, '')))) = 'BS'
+      AND TRY_CONVERT(INT, g.Cod_tipo_graduat) = 1
+),
+GRADUATORIA_DEFINITIVA_BS AS
+(
+    SELECT
+        NumDomanda,
+        CodTipoEsitoDefinitivaBs,
+        DataValiditaDefinitivaBs
+    FROM GRADUATORIA_DEFINITIVA_BS_RANKED
+    WHERE rn = 1
+),
+ESITO_BS_RANKED AS
+(
+    SELECT
+        D.NumDomanda,
+        CAST(ec.Cod_tipo_esito AS INT) AS CodTipoEsitoBs,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY D.NumDomanda
+            ORDER BY ec.Data_validita DESC
+        ) AS rn
+    FROM D
+    JOIN GRADUATORIA_DEFINITIVA_BS gd
+      ON gd.NumDomanda = D.NumDomanda
+    JOIN ESITI_CONCORSI ec
+      ON ec.Num_domanda = D.NumDomanda
+     AND TRY_CONVERT(DATETIME2, ec.Data_validita) >= gd.DataValiditaDefinitivaBs
+    WHERE ec.Anno_accademico = @AA
+      AND UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio, '')))) = 'BS'
+),
+ESITO_BS AS
+(
+    SELECT NumDomanda, CodTipoEsitoBs
+    FROM ESITO_BS_RANKED
+    WHERE rn = 1
+),
+ESITO_BS_ATTUALE AS
+(
+    SELECT
+        gd.NumDomanda,
+        COALESCE(e.CodTipoEsitoBs, gd.CodTipoEsitoDefinitivaBs) AS CodTipoEsitoBs
+    FROM GRADUATORIA_DEFINITIVA_BS gd
+    LEFT JOIN ESITO_BS e
+      ON e.NumDomanda = gd.NumDomanda
+),
+ESITO_BS_STORICO AS
+(
+    SELECT
+        D.NumDomanda,
+        MAX(CASE WHEN CAST(ec.Cod_tipo_esito AS INT) IN (1, 2) THEN 1 ELSE 0 END) AS HasEsitoPositivo
+    FROM D
+    JOIN GRADUATORIA_DEFINITIVA_BS gd
+      ON gd.NumDomanda = D.NumDomanda
+    JOIN ESITI_CONCORSI ec
+      ON ec.Num_domanda = D.NumDomanda
+     AND TRY_CONVERT(DATETIME2, ec.Data_validita) > gd.DataValiditaDefinitivaBs
+    WHERE ec.Anno_accademico = @AA
+      AND UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio, '')))) = 'BS'
+    GROUP BY D.NumDomanda
+),
+PROVVEDIMENTI_NORMALIZZATI AS
+(
+    SELECT
+        D.NumDomanda,
+        LTRIM(RTRIM(ISNULL(CONVERT(NVARCHAR(10), p.tipo_provvedimento), ''))) AS TipoProvvedimento,
+        COALESCE
+        (
+            TRY_CONVERT(DATETIME2, p.data_provvedimento, 103),
+            TRY_CONVERT(DATETIME2, p.data_provvedimento)
+        ) AS DataProvvedimento
+    FROM D
+    JOIN PROVVEDIMENTI p
+      ON p.Num_domanda = D.NumDomanda
+    WHERE p.Anno_accademico = @AA
+      AND ISNULL(p.riga_valida, 0) = 1
+      AND NOT
+      (
+          UPPER(ISNULL(CONVERT(NVARCHAR(MAX), p.note), '')) LIKE '%POSTO ALLOGGIO%'
+          AND UPPER(ISNULL(CONVERT(NVARCHAR(MAX), p.note), '')) NOT LIKE '%BORSA%'
+      )
+),
+ULTIMO_PROVVEDIMENTO AS
+(
+    SELECT
+        NumDomanda,
+        TipoProvvedimento,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY NumDomanda
+            ORDER BY DataProvvedimento DESC
+        ) AS rn
+    FROM PROVVEDIMENTI_NORMALIZZATI
+),
+ULTIMO_PROVVEDIMENTO_STATO AS
+(
+    SELECT
+        NumDomanda,
+        TipoProvvedimento,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY NumDomanda
+            ORDER BY DataProvvedimento DESC
+        ) AS rn
+    FROM PROVVEDIMENTI_NORMALIZZATI
+    WHERE TipoProvvedimento IN ('01', '02', '03', '04', '06', '08', '10', '11')
+),
+PROVVEDIMENTI_AGG AS
+(
+    SELECT
+        NumDomanda,
+        MAX(CASE WHEN TipoProvvedimento IN ('03', '04', '06', '08', '10', '11') THEN 1 ELSE 0 END) AS HasEsclusione
+    FROM PROVVEDIMENTI_NORMALIZZATI
+    GROUP BY NumDomanda
+)
+SELECT
+    D.NumDomanda,
+    D.CodFiscale,
+    CASE
+        WHEN gd.NumDomanda IS NULL
+            THEN 'NON VERIFICABILE - graduatoria definitiva BS assente'
+        WHEN gd.DataValiditaDefinitivaBs IS NULL
+            THEN 'NON VERIFICABILE - data validità della graduatoria definitiva BS assente'
+        WHEN e.CodTipoEsitoBs IS NULL
+            THEN CONCAT(
+                'NON VERIFICABILE - esito BS della graduatoria definitiva assente',
+                CASE
+                    WHEN gd.DataValiditaDefinitivaBs IS NOT NULL
+                        THEN CONCAT(' (definitiva del ', CONVERT(VARCHAR(10), gd.DataValiditaDefinitivaBs, 103), ')')
+                    ELSE ''
+                END)
+        WHEN e.CodTipoEsitoBs = 0
+             AND gd.CodTipoEsitoDefinitivaBs = 0
+             AND ISNULL(storico.HasEsitoPositivo, 0) = 0
+            THEN 'COERENTE - escluso già nella graduatoria definitiva (esito 0) e mai positivo successivamente; provvedimento di esclusione non richiesto'
+        WHEN e.CodTipoEsitoBs = 0
+             AND ultimo.TipoProvvedimento IN ('03', '04', '06', '08', '10', '11')
+            THEN CONCAT(
+                'COERENTE - studente attualmente escluso',
+                CASE
+                    WHEN gd.CodTipoEsitoDefinitivaBs IN (1, 2)
+                        THEN CONCAT('; esito graduatoria definitiva ', gd.CodTipoEsitoDefinitivaBs)
+                    WHEN gd.CodTipoEsitoDefinitivaBs = 0 AND ISNULL(storico.HasEsitoPositivo, 0) = 1
+                        THEN '; escluso in definitiva ma con esito positivo successivo'
+                    WHEN gd.CodTipoEsitoDefinitivaBs IS NULL
+                        THEN '; graduatoria definitiva non trovata'
+                    ELSE ''
+                END,
+                '; ultimo provvedimento di esclusione ',
+                ultimo.TipoProvvedimento)
+        WHEN e.CodTipoEsitoBs = 0
+             AND ultimo.TipoProvvedimento IS NULL
+            THEN CONCAT(
+                'ANOMALIA - studente attualmente escluso senza provvedimento di esclusione',
+                CASE
+                    WHEN gd.CodTipoEsitoDefinitivaBs IN (1, 2)
+                        THEN CONCAT('; aveva esito ', gd.CodTipoEsitoDefinitivaBs, ' nella graduatoria definitiva')
+                    WHEN gd.CodTipoEsitoDefinitivaBs = 0 AND ISNULL(storico.HasEsitoPositivo, 0) = 1
+                        THEN '; escluso in definitiva ma ha avuto un esito positivo successivo'
+                    WHEN gd.CodTipoEsitoDefinitivaBs IS NULL
+                        THEN '; graduatoria definitiva non trovata'
+                    ELSE ''
+                END)
+        WHEN e.CodTipoEsitoBs = 0
+            THEN CONCAT(
+                'ANOMALIA - studente attualmente escluso; ultimo provvedimento ',
+                ultimo.TipoProvvedimento,
+                ' non è un provvedimento di esclusione',
+                CASE
+                    WHEN gd.CodTipoEsitoDefinitivaBs IN (1, 2)
+                        THEN CONCAT('; aveva esito ', gd.CodTipoEsitoDefinitivaBs, ' nella graduatoria definitiva')
+                    WHEN gd.CodTipoEsitoDefinitivaBs = 0 AND ISNULL(storico.HasEsitoPositivo, 0) = 1
+                        THEN '; escluso in definitiva ma ha avuto un esito positivo successivo'
+                    WHEN gd.CodTipoEsitoDefinitivaBs IS NULL
+                        THEN '; graduatoria definitiva non trovata'
+                    ELSE ''
+                END)
+        WHEN ISNULL(agg.HasEsclusione, 0) = 0
+            THEN CONCAT(
+                'COERENTE - studente non escluso; nessun provvedimento di esclusione',
+                CASE
+                    WHEN gd.CodTipoEsitoDefinitivaBs IS NOT NULL
+                        THEN CONCAT('; esito graduatoria definitiva ', gd.CodTipoEsitoDefinitivaBs)
+                    ELSE '; graduatoria definitiva non trovata'
+                END)
+        WHEN ultimoStato.TipoProvvedimento IN ('01', '02')
+            THEN CONCAT(
+                'COERENTE - studente non escluso; riammissione successiva con provvedimento ',
+                ultimoStato.TipoProvvedimento)
+        ELSE CONCAT(
+            'ANOMALIA - studente non escluso; manca un provvedimento 01/02 successivo all''esclusione',
+            CASE
+                WHEN ultimoStato.TipoProvvedimento IS NOT NULL
+                    THEN CONCAT(' (ultimo provvedimento rilevante ', ultimoStato.TipoProvvedimento, ')')
+                ELSE ''
+            END)
+    END AS VerificaProvvedimentiEsclusioneBs
+FROM D
+LEFT JOIN ESITO_BS_ATTUALE e
+  ON e.NumDomanda = D.NumDomanda
+LEFT JOIN ESITO_BS_STORICO storico
+  ON storico.NumDomanda = D.NumDomanda
+LEFT JOIN GRADUATORIA_DEFINITIVA_BS gd
+  ON gd.NumDomanda = D.NumDomanda
+LEFT JOIN ULTIMO_PROVVEDIMENTO ultimo
+  ON ultimo.NumDomanda = D.NumDomanda
+ AND ultimo.rn = 1
+LEFT JOIN ULTIMO_PROVVEDIMENTO_STATO ultimoStato
+  ON ultimoStato.NumDomanda = D.NumDomanda
+ AND ultimoStato.rn = 1
+LEFT JOIN PROVVEDIMENTI_AGG agg
+  ON agg.NumDomanda = D.NumDomanda;";
+
+        private const string SpecificheImpegniBsPopulationSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    si.ImportoSpecificheImpegniBs
+FROM {TEMP_TABLE} t
+OUTER APPLY
+(
+    SELECT TOP (1)
+        TRY_CONVERT(DECIMAL(18,2), s.Importo_assegnato) AS ImportoSpecificheImpegniBs
+    FROM Specifiche_impegni s
+    WHERE s.Num_domanda = CAST(t.NumDomanda AS INT)
+      AND s.Anno_accademico = @AA
+      AND UPPER(LTRIM(RTRIM(ISNULL(s.Cod_beneficio, '')))) = 'BS'
+      AND s.data_fine_validita IS NULL
+    ORDER BY s.Data_validita DESC
+) si;";
+
+        private const string CoefficienteCongiuntoPopulationSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+SELECT
+    CAST(t.NumDomanda AS INT) AS NumDomanda,
+    t.CodFiscale,
+    coeff.CFN,
+    coeff.MeritoConseguito,
+    coeff.MeritoMinimoPrevisto,
+    coeff.MeritoMassimoConseguibile,
+    coeff.CoefficienteCongiunto
+FROM {TEMP_TABLE} t
+OUTER APPLY
+(
+    SELECT TOP (1)
+        TRY_CONVERT(DECIMAL(18,8), v.CFN) AS CFN,
+        TRY_CONVERT(DECIMAL(18,8), v.Merito_conseguito) AS MeritoConseguito,
+        TRY_CONVERT(DECIMAL(18,8), v.Merito_minimo_previsto) AS MeritoMinimoPrevisto,
+        TRY_CONVERT(DECIMAL(18,8), v.Merito_massimo_conseguibile) AS MeritoMassimoConseguibile,
+        TRY_CONVERT(DECIMAL(18,8), v.Coefficiente_congiunto) AS CoefficienteCongiunto
+    FROM VCoefficiente_merito_normalizzato v
+    WHERE v.Num_domanda = CAST(t.NumDomanda AS INT)
+      AND v.Anno_accademico = @AA
+) coeff;";
+
         private const string SessoStudentePopulationSql = @"
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
@@ -336,6 +622,47 @@ WHERE rn = 1;";
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadStatusCompilazione", $"AA={context.AnnoAccademico}");
             using var cmd = CreatePopulationCommand(StatusCompilazionePopulationSql, context);
             ReadAndMergeByStudentKey(cmd, (reader, info) => info.StatusCompilazione = reader.SafeGetInt("StatusCompilazione"));
+        }
+
+        private void LoadProvvedimentoEsclusioneBs(VerificaPipelineContext context)
+        {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadProvvedimentoEsclusioneBs", $"AA={context.AnnoAccademico}");
+            using var cmd = CreatePopulationCommand(ProvvedimentoEsclusioneBsPopulationSql, context);
+            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+                info.VerificaProvvedimentiEsclusioneBs = reader.SafeGetString("VerificaProvvedimentiEsclusioneBs"));
+        }
+
+        private void LoadSpecificheImpegniBs(VerificaPipelineContext context)
+        {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadSpecificheImpegniBs", $"AA={context.AnnoAccademico}");
+            using var cmd = CreatePopulationCommand(SpecificheImpegniBsPopulationSql, context);
+            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            {
+                int ordinal = reader.GetOrdinal("ImportoSpecificheImpegniBs");
+                info.InformazioniImportoBorsa.ImportoSpecificheImpegniBs =
+                    reader.IsDBNull(ordinal) ? null : reader.GetDecimal(ordinal);
+            });
+        }
+
+        private void LoadCoefficienteCongiunto(VerificaPipelineContext context)
+        {
+            using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadCoefficienteCongiunto", $"AA={context.AnnoAccademico}");
+            using var cmd = CreatePopulationCommand(CoefficienteCongiuntoPopulationSql, context);
+            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            {
+                var coeff = info.InformazioniIscrizione.CoefficienteCongiunto;
+                coeff.CFN = ReadNullableDecimal(reader, "CFN");
+                coeff.MeritoConseguito = ReadNullableDecimal(reader, "MeritoConseguito");
+                coeff.MeritoMinimoPrevisto = ReadNullableDecimal(reader, "MeritoMinimoPrevisto");
+                coeff.MeritoMassimoConseguibile = ReadNullableDecimal(reader, "MeritoMassimoConseguibile");
+                coeff.CoefficienteCongiunto = ReadNullableDecimal(reader, "CoefficienteCongiunto");
+            });
+        }
+
+        private static decimal? ReadNullableDecimal(IDataRecord reader, string columnName)
+        {
+            int ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : Convert.ToDecimal(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
         }
 
         private void LoadSessoStudente(VerificaPipelineContext context)

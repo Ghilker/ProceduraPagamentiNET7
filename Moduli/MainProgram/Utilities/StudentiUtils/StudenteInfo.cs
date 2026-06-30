@@ -11,6 +11,7 @@ namespace ProcedureNet7
     {
         public string TipoBando { get; set; } = string.Empty;
         public int StatusCompilazione { get; set; }
+        public string VerificaProvvedimentiEsclusioneBs { get; set; } = string.Empty;
         public int EsitoBorsaCalcolato { get; set; } // 0=Escluso, 1=Idoneo, 2=Vincitore
         public string CodiciMotivoEsitoBorsaCalcolato { get; set; } = string.Empty;
         public string MotiviEsitoBorsaCalcolato { get; set; } = string.Empty;

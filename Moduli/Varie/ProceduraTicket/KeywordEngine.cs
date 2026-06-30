@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -30,7 +31,7 @@ namespace ProcedureNet7
         IBAN, CODICE_FISCALE,
 
         // Pagamenti/Tasse
-        TASSE, RIMBORSO_TASSA, DEBITORIA,
+        PAGAMENTI, TASSE, RIMBORSO_TASSA, DEBITORIA,
 
         // Portale/Accesso
         PORTALE,
@@ -85,10 +86,16 @@ namespace ProcedureNet7
         public int TotalScore { get; set; }
         public int PrimaryScore { get; set; }
         public double PrimaryConfidence { get; set; }      // PrimaryScore / TotalScore
+        public int SecondaryScore { get; set; }
+        public double SecondaryConfidence { get; set; }
         public int MarginTop1Top2 { get; set; }            // bestTopicScore - secondBestTopicScore
         public bool IsLowConfidence { get; set; }
         public bool IsGenericInfoRequest { get; set; }
         public bool SecondaryCutoffApplied { get; set; }
+        public int ConfidenceScore { get; set; }            // 0-100, per uso operativo nel workbook
+        public int PlausibleCategoryCount { get; set; }
+        public bool PrimaryHasSpecificEvidence { get; set; }
+        public string VerificationReason { get; set; } = "";
 
         // Optional quick explain
         public string MatchedPrimaryKeywords { get; set; } = "";  // top matched tokens for primary category
@@ -117,26 +124,23 @@ namespace ProcedureNet7
     public static partial class KeywordEngineV6
     {
         // Weights and thresholds
-        private const int PHRASE_WEIGHT = 3;   // frasi più pesanti
+        // Le frasi e gli indicatori specifici pesano più delle parole generiche.
+        // La precedenza non altera il punteggio: viene usata solo a parità di punteggio.
+        private const int PHRASE_WEIGHT = 6;
+        private const int SINGLE_SPECIFIC_WEIGHT = 3;
+        private const int SINGLE_GENERIC_WEIGHT = 1;
         private const int WORD_WEIGHT = 1;
         private const int BOOST_STRONG = 6;
         private const int BOOST_MED = 3;
 
         private const int MIN_PRIMARY_SCORE = 4;
         private const int MIN_SUB_SCORE = 1;
+        private const int MIN_SECONDARY_ABS = 3;
+        private const double SECONDARY_REL_TO_PRIMARY = 0.55;
+        private const double PLAUSIBLE_CATEGORY_REL_TO_PRIMARY = 0.65;
 
         private const int PENALTY_ANTI = 3;
         private const int BOOST_REQUIRE = 2;
-
-        // Reliability gating
-        private const int MIN_TOTAL_SCORE_FOR_CONF = 3;
-        private const double LOW_CONF_PRIMARY = 0.25;
-
-        // Secondary cutoff (2° e 3°)
-        private const int MIN_T2_ABS = 3;
-        private const double T2_REL_TO_T1 = 0.45;
-        private const int MIN_T3_ABS = 2;
-        private const double T3_REL_TO_T2 = 0.80;
 
         private static readonly RegexOptions RXOPT =
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled;
@@ -166,7 +170,7 @@ namespace ProcedureNet7
         private static readonly Topic[] TOPIC_PRECEDENCE =
         {
             Topic.CAF,
-            Topic.TASSE, Topic.DEBITORIA, Topic.RIMBORSO_TASSA,
+            Topic.PAGAMENTI, Topic.TASSE, Topic.DEBITORIA, Topic.RIMBORSO_TASSA,
             Topic.ISCRIZIONE, Topic.CARRIERA, Topic.CREDITI, Topic.TIROCINIO, Topic.PASSAGGIO_TRASF, Topic.DOV_CIMEA,
             Topic.SALDO, Topic.SALDO_IMPORTO_ERRATO, Topic.IMPORTI, Topic.RINUNCIA_REVOCA,
             Topic.CONTRATTO, Topic.ALLOGGIO,
@@ -205,6 +209,7 @@ namespace ProcedureNet7
 
             [Topic.IBAN] = PrimaryTopic.IBAN,
 
+            [Topic.PAGAMENTI] = PrimaryTopic.PAGAMENTI_E_TASSE,
             [Topic.TASSE] = PrimaryTopic.PAGAMENTI_E_TASSE,
             [Topic.RIMBORSO_TASSA] = PrimaryTopic.PAGAMENTI_E_TASSE,
             [Topic.DEBITORIA] = PrimaryTopic.PAGAMENTI_E_TASSE,
@@ -232,6 +237,14 @@ namespace ProcedureNet7
         // Require/Anti keywords
         private static readonly Dictionary<Topic, string[]> RequireAny = new()
         {
+            [Topic.PAGAMENTI] = new[]
+            {
+                "pagamento", "pagamenti",
+                "accredito", "accreditato", "erogazione", "liquidazione",
+                "mandato", "bonifico",
+                "payment", "credited", "transfer", "disbursement"
+            },
+
             [Topic.TASSE] = new[]
             {
                 "pagopa", "iuv", "mav", "bollettino",
@@ -290,6 +303,14 @@ namespace ProcedureNet7
 
         private static readonly Dictionary<Topic, string[]> Anti = new()
         {
+            [Topic.PAGAMENTI] = new[]
+            {
+                "tassa", "tasse", "regionale", "universitaria",
+                "pagopa", "iuv", "mav", "quietanza", "ricevuta",
+                "attestazione", "certificato", "prova", "mezzi",
+                "tax", "tuition", "fee", "receipt", "invoice"
+            },
+
             [Topic.TASSE] = new[]
             {
                 "codice", "fiscale", "taxcode", "fiscalcode", "iban",
@@ -343,6 +364,7 @@ namespace ProcedureNet7
         // Min score per topic
         private static readonly Dictionary<Topic, int> MinTopicScore = new()
         {
+            [Topic.PAGAMENTI] = 2,
             [Topic.IBAN] = 2,
             [Topic.PERMESSO] = 2,
             [Topic.MENSA] = 2,
@@ -373,6 +395,18 @@ namespace ProcedureNet7
             "attesa", "pending", "waiting",
             "verifica", "check",
             "documenti", "documentazione", "allegato", "allegati", "upload", "caric"
+        };
+
+        // Termini che possono contribuire al punteggio, ma non costituiscono da soli
+        // evidenza specifica. Sono memorizzati sia nella forma intera sia in forme stemmate.
+        private static readonly HashSet<string> GenericKeywordTokens = new(StringComparer.Ordinal)
+        {
+            "borsa", "borse", "beneficio", "benefici", "benefic", "contributo", "contributi", "contribut",
+            "problema", "problemi", "problem", "domanda", "domande", "domand", "richiesta", "richieste", "richiest",
+            "pagamento", "pagamenti", "pagament", "payment", "rimborso", "rimborsi", "rimbors", "refund",
+            "accredito", "accrediti", "accredit", "stato", "status", "informazione", "informazioni", "info",
+            "documento", "documenti", "documentazione", "allegato", "allegati", "servizio", "servizi",
+            "errore", "error", "pagina", "area", "personale", "conto", "card", "carta", "posto", "camera", "stanza"
         };
 
         [GeneratedRegex(@"(?i)\b(?:a\.?\s*a\.?\.?)\s*(\d{2,4})\s*[/\-]?\s*(\d{2,4})\b", RegexOptions.CultureInvariant)]
@@ -470,9 +504,6 @@ namespace ProcedureNet7
             var counts = ArrayPool<int>.Shared.Rent(TOPIC_LEN);
             Array.Clear(counts, 0, TOPIC_LEN);
 
-            int bestTopicScore = 0;
-            int secondTopicScore = 0;
-
             for (int ti = 0; ti < TOPIC_LEN; ti++)
             {
                 var topic = (Topic)ti;
@@ -499,8 +530,11 @@ namespace ProcedureNet7
                             continue;
 
                         score += w * WORD_WEIGHT;
-                        if (headSet.Contains(key)) score += w * WORD_WEIGHT;
-                        if (tailSet.Contains(key)) score += w * WORD_WEIGHT;
+                        if (!IsGenericKeyword(key))
+                        {
+                            if (headSet.Contains(key)) score += w * WORD_WEIGHT;
+                            if (tailSet.Contains(key)) score += w * WORD_WEIGHT;
+                        }
                     }
                 }
 
@@ -534,29 +568,13 @@ namespace ProcedureNet7
                     }
                 }
 
-                // 4) precedence boost
-                if (score > 0 && topic != Topic.BLOCCHI)
-                {
-                    int rank = Array.IndexOf(TOPIC_PRECEDENCE, topic);
-                    if (rank >= 0)
-                    {
-                        if (rank <= 4) score += 3;
-                        else if (rank <= 12) score += 2;
-                        else if (rank <= 20) score += 1;
-                    }
-                }
+                // Topic sensibili: una parola generica non basta. La combinazione
+                // obbligatoria evita falsi positivi quali "rimborso" non fiscale,
+                // "borsa" senza importo e generici errori tecnici non legati al portale.
+                if (score > 0 && !PassesMandatoryCombination(topic, tokenSet))
+                    score = 0;
 
                 counts[ti] = score;
-
-                if (score > bestTopicScore)
-                {
-                    secondTopicScore = bestTopicScore;
-                    bestTopicScore = score;
-                }
-                else if (score > secondTopicScore)
-                {
-                    secondTopicScore = score;
-                }
             }
 
             // Heuristics trasversali
@@ -580,7 +598,26 @@ namespace ProcedureNet7
             if (ex.MentionsBlocks)
                 counts[(int)Topic.BLOCCHI] += BOOST_STRONG;
 
-            // Tasse / rimborso / importi
+            // Pagamenti / tasse / rimborso / importi
+            if (HasAny(tokenSet,
+                    "pagamento", "pagamenti", "pagato", "pagata", "pagat",
+                    "accredito", "accreditato", "accredit", "erogazione", "erog",
+                    "liquidazione", "liquid", "mandato", "bonifico",
+                    "payment", "paid", "credited", "transfer", "disbursement") &&
+                HasAny(tokenSet,
+                    "borsa", "scholarship", "beneficio", "benefit",
+                    "rata", "installment", "saldo", "balance",
+                    "contributo", "grant", "importo", "amount"))
+            {
+                counts[(int)Topic.PAGAMENTI] += BOOST_STRONG;
+            }
+
+            if (HasAny(tokenSet, "quando", "tempistiche", "data", "when") &&
+                HasAny(tokenSet, "pagamento", "pagamenti", "accredito", "erogazione", "payment", "paid"))
+            {
+                counts[(int)Topic.PAGAMENTI] += BOOST_MED;
+            }
+
             if (HasAll(tokenSet, "tassa", "regionale") || HasAll(tokenSet, "regional", "tax"))
                 counts[(int)Topic.TASSE] += BOOST_MED;
 
@@ -651,6 +688,10 @@ namespace ProcedureNet7
                 counts[(int)Topic.CAF] += BOOST_STRONG;
             }
 
+            // Le euristiche trasversali possono incrementare i punteggi dopo lo
+            // scoring iniziale. Riapplica quindi i vincoli obbligatori ai topic sensibili.
+            ApplyMandatoryCombinationGates(counts, tokenSet);
+
             // ──────────────────────────────────────────────────────────────────
             // Risoluzione conflitti mirati (riduce falsi positivi)
             // ──────────────────────────────────────────────────────────────────
@@ -659,6 +700,7 @@ namespace ProcedureNet7
             Suppress(counts, Topic.IBAN, Topic.IMPORTI);
             Suppress(counts, Topic.IBAN, Topic.SALDO);
 
+            Suppress(counts, Topic.PAGAMENTI, Topic.IMPORTI);
             Suppress(counts, Topic.CONTRATTO, Topic.ALLOGGIO);
             Suppress(counts, Topic.PERMESSO, Topic.PORTALE);
             Suppress(counts, Topic.PREMIO_LAUREA, Topic.GRADUATORIA);
@@ -674,229 +716,214 @@ namespace ProcedureNet7
             if (counts[(int)Topic.TASSE] >= 3 && counts[(int)Topic.PORTALE] >= 2)
                 counts[(int)Topic.PORTALE] = Math.Min(counts[(int)Topic.PORTALE], counts[(int)Topic.TASSE] - 1);
 
-            // ──────────────────────────────────────────────────────────────────
-            // Total score + margin
-            // ──────────────────────────────────────────────────────────────────
-            int totalScore = 0;
-            int best = 0, second = 0;
-            for (int ti = 0; ti < TOPIC_LEN; ti++)
+            if (counts[(int)Topic.TASSE] >= 4 &&
+                counts[(int)Topic.PAGAMENTI] > 0 &&
+                !HasAny(tokenSet, "borsa", "scholarship", "beneficio", "grant"))
             {
-                if ((Topic)ti == Topic.BLOCCHI) continue; // non “inquina” il totale semantico
-                int sc = counts[ti];
-                totalScore += sc;
-
-                if (sc > best) { second = best; best = sc; }
-                else if (sc > second) { second = sc; }
+                counts[(int)Topic.PAGAMENTI] = Math.Min(
+                    counts[(int)Topic.PAGAMENTI],
+                    Math.Max(0, counts[(int)Topic.TASSE] - 2));
             }
-            ex.TotalScore = totalScore;
-            ex.MarginTop1Top2 = Math.Max(0, best - second);
 
             // ──────────────────────────────────────────────────────────────────
-            // Aggregazione per categoria primaria
+            // Aggregazione per categoria primaria.
+            // Si usa il miglior topic della categoria, non la somma dei topic: topic
+            // correlati (es. TASSE e RIMBORSO_TASSA) non possono più gonfiare la categoria.
             // ──────────────────────────────────────────────────────────────────
             var catScores = new int[Enum.GetValues<PrimaryTopic>().Length];
             for (int ti = 0; ti < TOPIC_LEN; ti++)
             {
-                if ((Topic)ti == Topic.BLOCCHI) continue;
+                if ((Topic)ti == Topic.BLOCCHI)
+                    continue;
+
                 int cat = Topic2CatArray[ti];
-                catScores[cat] += counts[ti];
+                catScores[cat] = Math.Max(catScores[cat], counts[ti]);
             }
 
-            // Ordine categorie per greedy
-            var catOrder = new List<int>();
-            for (int ci = 0; ci < catScores.Length; ci++)
-                if (catScores[ci] > 0) catOrder.Add(ci);
-
-            catOrder.Sort((a, b) =>
-            {
-                int sa = catScores[a];
-                int sb = catScores[b];
-                if (sa != sb) return sb.CompareTo(sa);
-                int pa = CatPrecedenceRank((PrimaryTopic)a);
-                int pb = CatPrecedenceRank((PrimaryTopic)b);
-                return pa.CompareTo(pb);
-            });
-
-            // ──────────────────────────────────────────────────────────────────
-            // Selezione greedy topic secondari (max 3)
-            // ──────────────────────────────────────────────────────────────────
-            var selectedTopics = new List<Topic>(3);
-            var used = new bool[TOPIC_LEN];
-
-            // Pass 1: un topic per categoria
-            foreach (var catIdx in catOrder)
-            {
-                if (selectedTopics.Count >= 3)
-                    break;
-
-                Topic bestTopic = Topic.BLOCCHI;
-                int bestScore = 0;
-                int bestPrec = int.MaxValue;
-
-                for (int ti = 0; ti < TOPIC_LEN; ti++)
-                {
-                    if (used[ti]) continue;
-                    var t = (Topic)ti;
-                    if (t == Topic.BLOCCHI) continue;
-                    if (Topic2CatArray[ti] != catIdx) continue;
-
-                    int sc = counts[ti];
-                    int minScore = MinTopicScore.TryGetValue(t, out var ms) ? ms : MIN_SUB_SCORE;
-                    if (sc < minScore) continue;
-
-                    int prec = Array.IndexOf(TOPIC_PRECEDENCE, t);
-                    if (prec < 0) prec = int.MaxValue;
-
-                    if (sc > bestScore || (sc == bestScore && prec < bestPrec))
-                    {
-                        bestTopic = t;
-                        bestScore = sc;
-                        bestPrec = prec;
-                    }
-                }
-
-                if (bestScore > 0 && bestTopic != Topic.BLOCCHI)
-                {
-                    selectedTopics.Add(bestTopic);
-                    used[(int)bestTopic] = true;
-                }
-            }
-
-            // Pass 2: riempi con migliori rimasti
-            if (selectedTopics.Count < 3)
-            {
-                var remaining = new List<(Topic topic, int sc, int prec)>();
-                for (int ti = 0; ti < TOPIC_LEN; ti++)
-                {
-                    if (used[ti]) continue;
-                    var t = (Topic)ti;
-                    if (t == Topic.BLOCCHI) continue;
-
-                    int sc = counts[ti];
-                    int minScore = MinTopicScore.TryGetValue(t, out var ms) ? ms : MIN_SUB_SCORE;
-                    if (sc < minScore) continue;
-
-                    int prec = Array.IndexOf(TOPIC_PRECEDENCE, t);
-                    if (prec < 0) prec = int.MaxValue;
-
-                    remaining.Add((t, sc, prec));
-                }
-
-                remaining.Sort((a, b) =>
-                {
-                    if (a.sc != b.sc) return b.sc.CompareTo(a.sc);
-                    return a.prec.CompareTo(b.prec);
-                });
-
-                foreach (var item in remaining)
-                {
-                    if (selectedTopics.Count >= 3) break;
-                    selectedTopics.Add(item.topic);
-                    used[(int)item.topic] = true;
-                }
-            }
-
-            // ──────────────────────────────────────────────────────────────────
-            // Cutoff secondari (2° e 3°) per eliminare rumore
-            // ──────────────────────────────────────────────────────────────────
-            ex.SecondaryCutoffApplied = false;
-
-            if (selectedTopics.Count > 1)
-            {
-                int sc1 = counts[(int)selectedTopics[0]];
-                int sc2 = counts[(int)selectedTopics[1]];
-
-                int min2 = Math.Max(MIN_T2_ABS, (int)Math.Ceiling(sc1 * T2_REL_TO_T1));
-                int min2Topic = MinTopicScore.TryGetValue(selectedTopics[1], out var ms2) ? ms2 : MIN_SUB_SCORE;
-                min2 = Math.Max(min2, min2Topic);
-
-                if (sc2 < min2)
-                {
-                    selectedTopics.RemoveRange(1, selectedTopics.Count - 1);
-                    ex.SecondaryCutoffApplied = true;
-                }
-            }
-
-            if (selectedTopics.Count > 2)
-            {
-                int sc2 = counts[(int)selectedTopics[1]];
-                int sc3 = counts[(int)selectedTopics[2]];
-
-                int min3 = Math.Max(MIN_T3_ABS, (int)Math.Ceiling(sc2 * T3_REL_TO_T2));
-                int min3Topic = MinTopicScore.TryGetValue(selectedTopics[2], out var ms3) ? ms3 : MIN_SUB_SCORE;
-                min3 = Math.Max(min3, min3Topic);
-
-                if (sc3 < min3)
-                {
-                    selectedTopics.RemoveAt(2);
-                    ex.SecondaryCutoffApplied = true;
-                }
-            }
-
-            // TopicSecondary: T1 | T2 | T3
-            if (selectedTopics.Count > 0)
-            {
-                var names = new List<string>(selectedTopics.Count);
-                foreach (var t in selectedTopics) names.Add(t.ToString());
-                ex.TopicSecondary = string.Join(" | ", names);
-            }
-            else
-            {
-                ex.TopicSecondary = "";
-            }
-
-            // ──────────────────────────────────────────────────────────────────
-            // Selezione TopicPrimary (categoria migliore) + fallback “generic status”
-            // ──────────────────────────────────────────────────────────────────
             int bestCat = -1;
             int bestCatScore = 0;
-
             for (int ci = 0; ci < catScores.Length; ci++)
             {
-                int sc = catScores[ci];
-                if (sc <= 0) continue;
+                int score = catScores[ci];
+                if (score <= 0)
+                    continue;
 
                 if (bestCat < 0 ||
-                    sc > bestCatScore ||
-                    (sc == bestCatScore &&
+                    score > bestCatScore ||
+                    (score == bestCatScore &&
                      CatPrecedenceRank((PrimaryTopic)ci) < CatPrecedenceRank((PrimaryTopic)bestCat)))
                 {
                     bestCat = ci;
-                    bestCatScore = sc;
+                    bestCatScore = score;
                 }
             }
 
-            // Preferisci la categoria del primo topic selezionato se presente e coerente
+            int secondCatScore = 0;
+            for (int ci = 0; ci < catScores.Length; ci++)
+            {
+                if (ci == bestCat)
+                    continue;
+                secondCatScore = Math.Max(secondCatScore, catScores[ci]);
+            }
+
+            Topic primarySecondaryTopic = bestCat >= 0
+                ? GetBestTopicForCategory(bestCat, counts)
+                : Topic.BLOCCHI;
+            int primaryTopicScore = primarySecondaryTopic == Topic.BLOCCHI
+                ? 0
+                : counts[(int)primarySecondaryTopic];
+
+            int totalScore = catScores.Sum();
+            ex.TotalScore = totalScore;
+            ex.PrimaryScore = bestCatScore;
+            ex.MarginTop1Top2 = Math.Max(0, bestCatScore - secondCatScore);
+            ex.PrimaryHasSpecificEvidence = primarySecondaryTopic != Topic.BLOCCHI &&
+                                            HasSpecificEvidence(primarySecondaryTopic, text, tokenSet);
+            ex.PlausibleCategoryCount = CountPlausibleCategories(
+                catScores,
+                bestCatScore,
+                text,
+                tokenSet);
+
+            // Un solo argomento primario: la precedenza interviene esclusivamente
+            // per ex-aequo. In assenza di evidenza viene assegnato ALTRO e il ticket
+            // viene portato alla revisione manuale.
+            ex.TopicPrimary = bestCat >= 0 && bestCatScore > 0
+                ? ((PrimaryTopic)bestCat).ToString()
+                : PrimaryTopic.ALTRO.ToString();
+
+            // ──────────────────────────────────────────────────────────────────
+            // Argomenti secondari: massimo due.
+            // 1) miglior topic interno alla categoria primaria;
+            // 2) miglior topic di una categoria esterna, solo se vicino al primo,
+            //    sopra soglia assoluta e sostenuto da evidenza specifica.
+            // ──────────────────────────────────────────────────────────────────
+            var selectedTopics = new List<Topic>(2);
+            if (primarySecondaryTopic != Topic.BLOCCHI &&
+                primaryTopicScore > 0 &&
+                ex.PrimaryHasSpecificEvidence)
+            {
+                selectedTopics.Add(primarySecondaryTopic);
+            }
+
             if (selectedTopics.Count > 0)
             {
-                int catFromTopTopic = Topic2CatArray[(int)selectedTopics[0]];
-                int catScore = catScores[catFromTopTopic];
+                Topic externalTopic = Topic.BLOCCHI;
+                int externalScore = 0;
+                int externalPrecedence = int.MaxValue;
 
-                if (catScore >= bestCatScore - 1) // tolleranza minima per “coerenza”
+                for (int ti = 0; ti < TOPIC_LEN; ti++)
                 {
-                    bestCat = catFromTopTopic;
-                    bestCatScore = catScore;
+                    Topic candidate = (Topic)ti;
+                    if (candidate == Topic.BLOCCHI || Topic2CatArray[ti] == bestCat)
+                        continue;
+
+                    int score = counts[ti];
+                    int minScore = MinTopicScore.TryGetValue(candidate, out var min) ? min : MIN_SUB_SCORE;
+                    if (score < minScore || !HasSpecificEvidence(candidate, text, tokenSet))
+                        continue;
+
+                    int precedence = Array.IndexOf(TOPIC_PRECEDENCE, candidate);
+                    if (precedence < 0)
+                        precedence = int.MaxValue;
+
+                    if (externalTopic == Topic.BLOCCHI ||
+                        score > externalScore ||
+                        (score == externalScore && precedence < externalPrecedence))
+                    {
+                        externalTopic = candidate;
+                        externalScore = score;
+                        externalPrecedence = precedence;
+                    }
+                }
+
+                if (externalTopic != Topic.BLOCCHI)
+                {
+                    int requiredScore = Math.Max(
+                        MIN_SECONDARY_ABS,
+                        (int)Math.Ceiling(primaryTopicScore * SECONDARY_REL_TO_PRIMARY));
+
+                    if (externalScore >= requiredScore)
+                    {
+                        selectedTopics.Add(externalTopic);
+                    }
+                    else
+                    {
+                        ex.SecondaryCutoffApplied = true;
+                    }
                 }
             }
 
-            // Fallback: richieste generiche “stato domanda / in attesa / documenti caricati”
-            // Se non si supera MIN_PRIMARY_SCORE e il testo è generico, sposta su PORTALE_E_ACCESSO
-            if (bestCatScore < MIN_PRIMARY_SCORE && ex.IsGenericInfoRequest)
-            {
-                bestCat = (int)PrimaryTopic.PORTALE_E_ACCESSO;
-                bestCatScore = catScores[bestCat];
-            }
+            ex.TopicSecondary = selectedTopics.Count == 0
+                ? string.Empty
+                : string.Join(" | ", selectedTopics.Select(topic => topic.ToString()));
+            ex.SecondaryScore = selectedTopics.Count > 0
+                ? counts[(int)selectedTopics[0]]
+                : 0;
+            ex.SecondaryConfidence = totalScore > 0
+                ? (double)ex.SecondaryScore / totalScore
+                : 0.0;
 
-            ex.TopicPrimary = bestCatScore >= MIN_PRIMARY_SCORE
-                ? ((PrimaryTopic)bestCat).ToString()
-                : "";
+            // ──────────────────────────────────────────────────────────────────
+            // Confidenza e motivi di verifica.
+            // Il flag viene sollevato per assenza di evidenza, più di due categorie
+            // plausibili, oppure combinazioni di segnali deboli/conflittuali.
+            // ──────────────────────────────────────────────────────────────────
+            bool noEvidence = bestCat < 0 || bestCatScore <= 0 || primarySecondaryTopic == Topic.BLOCCHI;
+            bool genericOnly = !noEvidence && !ex.PrimaryHasSpecificEvidence;
+            bool categoriesClose = !noEvidence && secondCatScore > 0 &&
+                                   secondCatScore >= (int)Math.Ceiling(bestCatScore * 0.80);
+            bool conflictingCategories = categoriesClose &&
+                                         bestCatScore >= MIN_PRIMARY_SCORE &&
+                                         secondCatScore >= MIN_PRIMARY_SCORE &&
+                                         HasCategorySpecificEvidence(bestCat, text, tokenSet) &&
+                                         HasAnyCategorySpecificEvidenceAtScore(
+                                             catScores,
+                                             bestCat,
+                                             secondCatScore,
+                                             text,
+                                             tokenSet);
+            bool tooManyPlausibleCategories = ex.PlausibleCategoryCount > 2;
+            bool combinedWeakSignals = (genericOnly && categoriesClose) ||
+                                       (categoriesClose && conflictingCategories);
 
-            ex.PrimaryScore = bestCatScore;
-            ex.PrimaryConfidence = (totalScore > 0) ? (double)bestCatScore / totalScore : 0.0;
+            ex.IsLowConfidence = noEvidence || tooManyPlausibleCategories || combinedWeakSignals;
 
-            ex.IsLowConfidence =
-                totalScore < MIN_TOTAL_SCORE_FOR_CONF ||
-                ex.PrimaryConfidence < LOW_CONF_PRIMARY;
+            var verificationReasons = new List<string>(4);
+            if (noEvidence)
+                verificationReasons.Add("EVIDENZA_INSUFFICIENTE");
+            if (genericOnly)
+                verificationReasons.Add("KEYWORD_GENERICA");
+            if (categoriesClose)
+                verificationReasons.Add("CATEGORIE_VICINE");
+            if (conflictingCategories)
+                verificationReasons.Add("CONFLITTO_CATEGORIE");
+            if (tooManyPlausibleCategories)
+                verificationReasons.Add("TROPPE_CATEGORIE_PLAUSIBILI");
+            ex.VerificationReason = ex.IsLowConfidence
+                ? string.Join(" | ", verificationReasons.Distinct(StringComparer.Ordinal))
+                : string.Empty;
+
+            double strength = Math.Min(1.0, primaryTopicScore / 9.0);
+            double separation = bestCatScore > 0
+                ? Math.Clamp((double)Math.Max(0, bestCatScore - secondCatScore) / bestCatScore, 0.0, 1.0)
+                : 0.0;
+            int confidenceScore = (int)Math.Round((strength * 55.0) +
+                                                   (separation * 30.0) +
+                                                   (ex.PrimaryHasSpecificEvidence ? 15.0 : 0.0));
+            if (genericOnly)
+                confidenceScore = Math.Min(confidenceScore, 45);
+            if (categoriesClose)
+                confidenceScore -= 15;
+            if (conflictingCategories)
+                confidenceScore -= 10;
+            if (tooManyPlausibleCategories)
+                confidenceScore -= 20;
+            if (noEvidence)
+                confidenceScore = 0;
+
+            ex.ConfidenceScore = Math.Clamp(confidenceScore, 0, 100);
+            ex.PrimaryConfidence = ex.ConfidenceScore / 100.0;
 
             // Tertiary: blocchi
             ex.TopicTertiary = counts[(int)Topic.BLOCCHI] > 0 ? "SI" : "";
@@ -905,9 +932,7 @@ namespace ProcedureNet7
             for (int ti = 0; ti < TOPIC_LEN; ti++)
                 ex.Counts[(Topic)ti] = counts[ti];
 
-            // ──────────────────────────────────────────────────────────────────
             // Explain: matched keywords (top)
-            // ──────────────────────────────────────────────────────────────────
             ex.MatchedPrimaryKeywords = BuildMatchedKeywordsForPrimary(bestCat, tokenSet, max: 12);
             ex.MatchedTop1Keywords = selectedTopics.Count > 0
                 ? BuildMatchedKeywordsForTopic(selectedTopics[0], tokenSet, max: 12)
@@ -929,9 +954,198 @@ namespace ProcedureNet7
             return ex;
         }
 
+        public static ExtractionV6 ExtractTicket(
+            string message,
+            string subject,
+            string category,
+            string subcategory,
+            Lang? preferred = null)
+        {
+            var parts = new[] { subject, category, subcategory, message };
+            string contextualText = string.Join(
+                ". ",
+                parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim()));
+
+            var extraction = Extract(contextualText, preferred);
+            extraction.OriginalText = message ?? "";
+            return extraction;
+        }
+
         // ──────────────────────────────────────────────────────────────────────
         // Helpers
         // ──────────────────────────────────────────────────────────────────────
+        private static bool PassesMandatoryCombination(Topic topic, HashSet<string> tokenSet)
+        {
+            return topic switch
+            {
+                Topic.RIMBORSO_TASSA =>
+                    HasAny(tokenSet, "rimborso", "rimbors", "refund") &&
+                    HasAny(tokenSet,
+                        "tassa", "tasse", "pagopa", "iuv", "mav", "bollettino",
+                        "regionale", "universitaria", "tuition", "fee", "tax", "versamento"),
+
+                Topic.IMPORTI =>
+                    HasAny(tokenSet, "borsa", "borse", "scholarship", "beneficio", "benefici", "benefic", "contributo", "contributi", "contribut", "grant") &&
+                    HasAny(tokenSet,
+                        "importo", "importi", "ammontare", "quanto", "assegnato", "assegnata",
+                        "spettante", "rata", "rate", "accredito", "accreditato", "saldo", "amount", "installment"),
+
+                Topic.PORTALE =>
+                    HasAny(tokenSet,
+                        "portale", "portal", "sito", "website", "login", "accesso", "spid",
+                        "area", "riservata", "personale") &&
+                    HasAny(tokenSet,
+                        "errore", "error", "login", "accesso", "acced", "timeout", "upload",
+                        "caricare", "caricamento", "caric", "schermata", "pagina", "500", "502", "504",
+                        "impossibile", "bloccato", "bloccata", "sessione", "scaduta", "expired"),
+
+                _ => true
+            };
+        }
+
+        private static void ApplyMandatoryCombinationGates(int[] counts, HashSet<string> tokenSet)
+        {
+            foreach (Topic topic in new[] { Topic.RIMBORSO_TASSA, Topic.IMPORTI, Topic.PORTALE })
+            {
+                if (counts[(int)topic] > 0 && !PassesMandatoryCombination(topic, tokenSet))
+                    counts[(int)topic] = 0;
+            }
+        }
+
+        private static Topic GetBestTopicForCategory(int category, int[] counts)
+        {
+            Topic bestTopic = Topic.BLOCCHI;
+            int bestScore = 0;
+            int bestPrecedence = int.MaxValue;
+
+            for (int ti = 0; ti < TOPIC_LEN; ti++)
+            {
+                Topic topic = (Topic)ti;
+                if (topic == Topic.BLOCCHI || Topic2CatArray[ti] != category)
+                    continue;
+
+                int score = counts[ti];
+                if (score <= 0)
+                    continue;
+
+                int precedence = Array.IndexOf(TOPIC_PRECEDENCE, topic);
+                if (precedence < 0)
+                    precedence = int.MaxValue;
+
+                if (bestTopic == Topic.BLOCCHI ||
+                    score > bestScore ||
+                    (score == bestScore && precedence < bestPrecedence))
+                {
+                    bestTopic = topic;
+                    bestScore = score;
+                    bestPrecedence = precedence;
+                }
+            }
+
+            return bestTopic;
+        }
+
+        private static int CountPlausibleCategories(
+            int[] categoryScores,
+            int bestCategoryScore,
+            string text,
+            HashSet<string> tokenSet)
+        {
+            if (bestCategoryScore <= 0)
+                return 0;
+
+            int requiredScore = Math.Max(
+                MIN_PRIMARY_SCORE,
+                (int)Math.Ceiling(bestCategoryScore * PLAUSIBLE_CATEGORY_REL_TO_PRIMARY));
+            int count = 0;
+
+            for (int ci = 0; ci < categoryScores.Length; ci++)
+            {
+                if (categoryScores[ci] < requiredScore)
+                    continue;
+                if (HasCategorySpecificEvidence(ci, text, tokenSet))
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static bool HasAnyCategorySpecificEvidenceAtScore(
+            int[] categoryScores,
+            int excludedCategory,
+            int targetScore,
+            string text,
+            HashSet<string> tokenSet)
+        {
+            for (int ci = 0; ci < categoryScores.Length; ci++)
+            {
+                if (ci == excludedCategory || categoryScores[ci] != targetScore)
+                    continue;
+                if (HasCategorySpecificEvidence(ci, text, tokenSet))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasCategorySpecificEvidence(int category, string text, HashSet<string> tokenSet)
+        {
+            for (int ti = 0; ti < TOPIC_LEN; ti++)
+            {
+                if ((Topic)ti == Topic.BLOCCHI || Topic2CatArray[ti] != category)
+                    continue;
+                if (HasSpecificEvidence((Topic)ti, text, tokenSet))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasSpecificEvidence(Topic topic, string text, HashSet<string> tokenSet)
+        {
+            if (!PassesMandatoryCombination(topic, tokenSet))
+                return false;
+
+            if (Dict.TryGetValue(topic, out var definition) && definition.multi != null)
+            {
+                foreach (string phrase in definition.multi)
+                {
+                    string normalizedPhrase = Normalize(phrase);
+                    if (!string.IsNullOrWhiteSpace(normalizedPhrase) &&
+                        text.Contains(normalizedPhrase, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            if (!Dict.TryGetValue(topic, out definition) || definition.single == null)
+                return false;
+
+            foreach (string rawKeyword in definition.single)
+            {
+                string normalizedKeyword = Normalize(rawKeyword);
+                foreach (string token in normalizedKeyword.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string stem = StemTokenCached(token);
+                    if (!IsGenericKeyword(token) && (tokenSet.Contains(token) || tokenSet.Contains(stem)))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsGenericKeyword(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return false;
+
+            string normalized = Normalize(token);
+            string stem = StemTokenCached(normalized);
+            return GenericKeywordTokens.Contains(normalized) || GenericKeywordTokens.Contains(stem);
+        }
+
         private static void Suppress(int[] c, Topic a, Topic b)
         {
             int ia = (int)a, ib = (int)b;
@@ -1233,7 +1447,7 @@ namespace ProcedureNet7
         }
 
         // ──────────────────────────────────────────────────────────────────────
-        // Build patterns: include BOTH raw token and stem forms in singles (fix “iscrizione”/“permesso” gaps)
+        // Build patterns: token stem unico per evitare il doppio conteggio raw/stem
         // ──────────────────────────────────────────────────────────────────────
         private static (Regex phrasesRx, Dictionary<string, int> singleWeights, HashSet<string> tokenUniverse)[] BuildTopicPatterns()
         {
@@ -1275,7 +1489,7 @@ namespace ProcedureNet7
                     phr = appended > 0 ? new Regex(sb.ToString(), RXOPT) : null;
                 }
 
-                // Singles: store raw token AND stem key
+                // Singles: un solo stem pesato; raw e stem restano disponibili solo per diagnostica
                 var singles = new Dictionary<string, int>(StringComparer.Ordinal);
                 var universe = new HashSet<string>(StringComparer.Ordinal);
 
@@ -1294,9 +1508,13 @@ namespace ProcedureNet7
                         if (tok.Length == 0) continue;
 
                         var st = StemTokenCached(tok);
+                        int weight = IsGenericKeyword(tok)
+                            ? SINGLE_GENERIC_WEIGHT
+                            : SINGLE_SPECIFIC_WEIGHT;
 
-                        AddW(tok, 1);
-                        AddW(st, 1);
+                        // Il token viene valutato una sola volta, tramite stem. Il raw token
+                        // resta nel vocabolario diagnostico ma non produce un doppio punteggio.
+                        AddW(st, weight);
 
                         universe.Add(tok);
                         universe.Add(st);
@@ -1339,7 +1557,7 @@ namespace ProcedureNet7
                 {
                     if (string.IsNullOrEmpty(key)) return;
                     if (singles.TryGetValue(key, out var w))
-                        singles[key] = w + inc;
+                        singles[key] = Math.Max(w, inc);
                     else
                         singles[key] = inc;
                 }
@@ -1415,6 +1633,50 @@ namespace ProcedureNet7
             return new()
             {
                 // ───────── PAGAMENTI/TASSE ─────────
+                [Topic.PAGAMENTI] = (
+                    new[]
+                    {
+                        "pagamento borsa di studio",
+                        "accredito borsa di studio",
+                        "erogazione borsa di studio",
+                        "liquidazione borsa di studio",
+                        "mancato pagamento della borsa",
+                        "pagamento non ricevuto",
+                        "accredito non ricevuto",
+                        "quando arriva il pagamento",
+                        "quando viene pagata la borsa",
+                        "mandato di pagamento",
+                        "bonifico della borsa",
+                        "pagamento prima rata",
+                        "pagamento seconda rata",
+                        "prima rata non ricevuta",
+                        "mancato accredito prima rata",
+                        "saldo non ricevuto",
+                        "mancato accredito del saldo",
+                        "pagamento borsa già effettuato",
+                        "pagamento della borsa già effettuato",
+
+                        "scholarship payment",
+                        "scholarship not paid",
+                        "payment not received",
+                        "when will the scholarship be paid",
+                        "scholarship bank transfer",
+                        "first installment payment",
+                        "second installment payment"
+                    },
+                    new[]
+                    {
+                        "pagamento","pagamenti","pagato","pagata","pagat",
+                        "accredito","accreditato","accreditata","accredit",
+                        "erogazione","erogato","erogata","erog",
+                        "liquidazione","liquidato","liquidata","liquid",
+                        "mandato","bonifico","trasferimento",
+
+                        "payment","paid","credited","disbursement",
+                        "transfer"
+                    }
+                ),
+
                 [Topic.TASSE] = (
                     new[]
                     {
@@ -1824,6 +2086,15 @@ namespace ProcedureNet7
                         "permesso di soggiorno",
                         "permesso di soggiorno scaduto",
                         "permesso di soggiorno in rinnovo",
+                        "documenti permesso di soggiorno",
+                        "allegati permesso di soggiorno",
+                        "caricamento permesso di soggiorno",
+                        "documenti del permesso caricati",
+                        "documenti del permesso lavorati",
+                        "documenti permesso inseriti",
+                        "documenti permesso lavorati",
+                        "permesso di soggiorno inserito",
+                        "permesso di soggiorno lavorato",
                         "ricevuta della questura",
                         "impronte digitali",
                         "appuntamento in questura",
@@ -2140,7 +2411,15 @@ namespace ProcedureNet7
                         "blocco pagamenti",
                         "domanda bloccata",
                         "rimuovere il blocco",
+                        "richiesta rimozione blocco",
+                        "blocco ancora presente",
+                        "blocco non rimosso",
                         "sblocco della domanda",
+                        "sblocco domanda",
+                        "sbloccare la domanda",
+                        "sblocco pratica",
+                        "sbloccare la pratica",
+                        "pratica sbloccata",
                         "incongruenza tra documenti",
                         "indipendente irregolare",
                         "posizione debitoria in sospeso",

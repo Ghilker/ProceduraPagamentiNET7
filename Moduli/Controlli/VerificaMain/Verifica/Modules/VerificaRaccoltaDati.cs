@@ -140,6 +140,21 @@ FROM D;";
                     () => $"students={context.Students.Count}");
 
                 VerificaExecutionSupport.ExecuteTimed(
+                    "VerificaRaccoltaDati.ProvvedimentoEsclusioneBs",
+                    () => LoadProvvedimentoEsclusioneBs(context),
+                    () => $"students={context.Students.Count}");
+
+                VerificaExecutionSupport.ExecuteTimed(
+                    "VerificaRaccoltaDati.SpecificheImpegniBs",
+                    () => LoadSpecificheImpegniBs(context),
+                    () => $"students={context.Students.Count}");
+
+                VerificaExecutionSupport.ExecuteTimed(
+                    "VerificaRaccoltaDati.CoefficienteCongiunto",
+                    () => LoadCoefficienteCongiunto(context),
+                    () => $"students={context.Students.Count}");
+
+                VerificaExecutionSupport.ExecuteTimed(
                     "VerificaRaccoltaDati.IscrizioneBase",
                     () =>
                     {

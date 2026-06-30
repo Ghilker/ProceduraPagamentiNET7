@@ -328,7 +328,7 @@ namespace ProcedureNet7
             }
             if (!string.IsNullOrWhiteSpace(debugStudente))
             {
-                queryBuilder.AppendLine($"      AND StatisticheTotali.Cod_fiscale = {debugStudente}");
+                queryBuilder.AppendLine($"      AND StatisticheTotali.Cod_fiscale = '{debugStudente}'");
             }
   
             

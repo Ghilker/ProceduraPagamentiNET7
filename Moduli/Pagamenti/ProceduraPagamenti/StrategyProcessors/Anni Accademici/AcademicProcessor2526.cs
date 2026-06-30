@@ -74,61 +74,109 @@ namespace ProcedureNet7.PagamentiProcessor
             if (!pagaComePendolare)
                 return;
 
-            double iseeStudente = studente.InformazioniPagamento.ValoreISEE;
+            decimal importoBase = Convert.ToDecimal(importoPendolare);
+            decimal isee = Convert.ToDecimal(studente.InformazioniPagamento.ValoreISEE);
+            decimal soglia = Convert.ToDecimal(sogliaISEE);
 
-            double halfThreshold = sogliaISEE / 2.0;
-            double twoThirdsThreshold = sogliaISEE * 2.0 / 3.0;
+            if (importoBase <= 0m)
+                return;
 
-            double nuovoImportoMassimoPendolare;
+            decimal valoreFinale = ApplyIseeRule(importoBase, isee, soglia);
 
-            if (iseeStudente <= halfThreshold)
-            {
-                nuovoImportoMassimoPendolare = importoPendolare * 1.15;
-            }
-            else if (iseeStudente < twoThirdsThreshold)
-            {
-                nuovoImportoMassimoPendolare = importoPendolare;
-            }
-            else
-            {
-                double iseeClamped = Math.Min(iseeStudente, sogliaISEE);
+            if (IsDonnaStem(studente))
+                valoreFinale += RoundMoney(importoBase * 0.20m);
 
-                if (twoThirdsThreshold >= sogliaISEE)
-                {
-                    nuovoImportoMassimoPendolare = importoPendolare * 0.5;
-                }
-                else
-                {
-                    double t = (iseeClamped - twoThirdsThreshold) / (sogliaISEE - twoThirdsThreshold);
-                    double fattore = 1.0 - 0.5 * t;
-                    nuovoImportoMassimoPendolare = importoPendolare * fattore;
-                }
-            }
+            bool riduzioneMeta = DeveRidurreAMetaPerFuoriCorso(studente);
 
-            bool studenteFuoriCorso = studente.InformazioniIscrizione.AnnoCorso == -1 && !studente.InformazioniPersonali.Disabile;
-            bool studenteDisabileFuoriCorso = studente.InformazioniIscrizione.AnnoCorso == -2 && studente.InformazioniPersonali.Disabile;
+            if (riduzioneMeta)
+                valoreFinale = RoundMoney(valoreFinale / 2m);
 
-            double importoMensa = 600;
-            if (studenteFuoriCorso || studenteDisabileFuoriCorso)
-                importoMensa = 300;
+            if (studente.InformazioniPagamento.ConcessaMonetizzazioneMensa)
+                valoreFinale += riduzioneMeta ? 300m : 600m;
 
-            if (!studente.InformazioniPagamento.ConcessaMonetizzazioneMensa)
-                importoMensa = 0;
+            valoreFinale = RoundMoney(valoreFinale);
 
-            nuovoImportoMassimoPendolare += importoMensa;
-
-            importoMassimo = nuovoImportoMassimoPendolare;
-            importoDaPagare = nuovoImportoMassimoPendolare;
+            importoMassimo = (double)valoreFinale;
+            importoDaPagare = (double)valoreFinale;
 
             string codPag = (categoriaPagamento ?? "").Trim().ToUpperInvariant();
             string saldoInfo = codPag == "SA"
                 ? $"; saldo SA: requisito fuori sede certo={statusSede.FuoriSedeCertoPerSaldo}"
                 : string.Empty;
 
-            string messaggio = $"CodTipoPagamento={codPag}; StatusSede attuale={studente.InformazioniSede.StatusSede}; StatusSede calcolato={statusSede.SuggestedStatus}; {statusSede.Reason}{saldoInfo}";
+            string messaggio =
+                $"CodTipoPagamento={codPag}; " +
+                $"StatusSede attuale={studente.InformazioniSede.StatusSede}; " +
+                $"StatusSede calcolato={statusSede.SuggestedStatus}; " +
+                $"{statusSede.Reason}; " +
+                $"Importo base={RoundMoney(importoBase)}; " +
+                $"ISEE={isee}; " +
+                $"Importo finale={valoreFinale}" +
+                saldoInfo;
 
-            studentiPagatiComePendolari.Add((studente.InformazioniPersonali.CodFiscale, messaggio));
+            studentiPagatiComePendolari.Add((
+                studente.InformazioniPersonali.CodFiscale,
+                messaggio));
+
             studente.SetPagatoPendolare(true);
         }
+
+        private static decimal ApplyIseeRule(
+    decimal importoBase,
+    decimal isee,
+    decimal sogliaIsee)
+        {
+            if (importoBase <= 0m || sogliaIsee <= 0m)
+                return RoundMoney(importoBase);
+
+            decimal metaSoglia = sogliaIsee / 2m;
+            decimal dueTerziSoglia = sogliaIsee * 2m / 3m;
+
+            // Deve essere < e non <=.
+            if (isee >= 0m && isee < metaSoglia)
+                return RoundMoney(importoBase * 1.15m);
+
+            if (isee >= sogliaIsee)
+                return RoundMoney(importoBase * 0.50m);
+
+            if (isee > dueTerziSoglia)
+            {
+                decimal ampiezza = sogliaIsee - dueTerziSoglia;
+
+                if (ampiezza <= 0m)
+                    return RoundMoney(importoBase * 0.50m);
+
+                decimal progresso = (isee - dueTerziSoglia) / ampiezza;
+                decimal coefficiente = 1m - (0.50m * progresso);
+
+                return RoundMoney(importoBase * coefficiente);
+            }
+
+            return RoundMoney(importoBase);
+        }
+
+        private static bool IsDonnaStem(StudentePagamenti studente)
+        {
+            bool donna = string.Equals(
+                (studente.InformazioniPersonali?.Sesso ?? string.Empty).Trim(),
+                "F",
+                StringComparison.OrdinalIgnoreCase);
+
+            bool stem = studente.InformazioniIscrizione?.CorsoStem == true;
+
+            return donna && stem;
+        }
+
+        private static bool DeveRidurreAMetaPerFuoriCorso(StudentePagamenti studente)
+        {
+            int annoCorso = studente.InformazioniIscrizione?.AnnoCorso ?? 0;
+            bool disabile = studente.InformazioniPersonali?.Disabile == true;
+
+            return (annoCorso == -1 && !disabile)
+                || (annoCorso == -2 && disabile);
+        }
+
+        private static decimal RoundMoney(decimal value) =>
+            Math.Round(value, 2, MidpointRounding.AwayFromZero);
     }
 }

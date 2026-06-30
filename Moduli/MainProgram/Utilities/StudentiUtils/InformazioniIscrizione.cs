@@ -42,6 +42,7 @@ namespace ProcedureNet7
         public decimal? EsamiMinimiRichiestiPassaggio { get; set; }
         public decimal? CreditiMinimiRichiestiPassaggio { get; set; }
         public string RegolaMeritoApplicata { get; set; } = string.Empty;
+        public CoefficienteCongiuntoAttuale CoefficienteCongiunto { get; } = new();
 
         public int NumeroEventiCarrieraPregressa { get; set; }
         public int? UltimoAnnoAvvenimentoCarrieraPregressa { get; set; }
@@ -53,6 +54,15 @@ namespace ProcedureNet7
         public List<InformazioniCarrieraPregressa> CarrierePregresse { get; } = new();
         public IscrizioneEsitoFactsRaw EsitoFacts { get; } = new();
         public List<CarrieraPregressaBeneficiRiRaw> CarrieraPregressaBeneficiRi { get; } = new();
+    }
+
+    public sealed class CoefficienteCongiuntoAttuale
+    {
+        public decimal? CFN { get; set; }
+        public decimal? MeritoConseguito { get; set; }
+        public decimal? MeritoMinimoPrevisto { get; set; }
+        public decimal? MeritoMassimoConseguibile { get; set; }
+        public decimal? CoefficienteCongiunto { get; set; }
     }
 
     public class InformazioniCarrieraPregressa

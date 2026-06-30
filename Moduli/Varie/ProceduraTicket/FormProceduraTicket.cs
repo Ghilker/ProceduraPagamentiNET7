@@ -1,4 +1,4 @@
-﻿using ProcedureNet7.ProceduraAllegatiSpace;
+using ProcedureNet7.ProceduraAllegatiSpace;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -18,6 +18,7 @@ namespace ProcedureNet7
         MasterForm? _masterForm;
         string selectedTicketFilePath = string.Empty;
         string selectedMailFilePath = string.Empty;
+        bool sendMailRequested;
         public FormProceduraTicket(MasterForm masterForm)
         {
             _masterForm = masterForm;
@@ -41,6 +42,8 @@ namespace ProcedureNet7
                 return;
             }
 
+            // I controlli WinForms non vengono letti dal thread worker.
+            sendMailRequested = ticketSendMailCheck.Checked;
             _masterForm.RunBackgroundWorker(RunTicketProcedure);
         }
 
@@ -53,7 +56,7 @@ namespace ProcedureNet7
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
                 ArgsValidation argsValidation = new();
-                List<bool> ticketCheckList = new() { ticketSendMailCheck.Checked };
+                List<bool> ticketCheckList = new() { sendMailRequested };
                 ArgsProceduraTicket argsProceduraTicket = new()
                 {
                     _mailFilePath = selectedMailFilePath,

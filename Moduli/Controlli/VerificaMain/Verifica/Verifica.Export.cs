@@ -18,6 +18,7 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("CodFiscale", typeof(string));
             dt.Columns.Add("NumDomanda", typeof(string));
             dt.Columns.Add("StatusCompilazione", typeof(int));
+            dt.Columns.Add("Verifica provvedimenti esclusione", typeof(string));
 
             foreach (var codBeneficio in OutputBenefitCodes)
             {
@@ -136,6 +137,28 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("ImportoBaseBorsa", typeof(decimal));
             dt.Columns.Add("ImportoFinaleBorsa", typeof(decimal));
             dt.Columns.Add("ImportoAssegnatoBS", typeof(decimal));
+            dt.Columns.Add("ImportoSpecificheImpegniBS", typeof(decimal));
+            dt.Columns.Add("SpecificheImpegniUgualeImportoAssegnatoBS", typeof(string));
+            dt.Columns.Add("SpecificheImpegniUgualeImportoCalcolatoBS", typeof(string));
+
+            dt.Columns.Add("CFN_Attuale", typeof(decimal));
+            dt.Columns.Add("MeritoConseguito_Attuale", typeof(decimal));
+            dt.Columns.Add("MeritoMinimoPrevisto_Attuale", typeof(decimal));
+            dt.Columns.Add("MeritoMassimoConseguibile_Attuale", typeof(decimal));
+            dt.Columns.Add("CoefficienteCongiunto_Attuale", typeof(decimal));
+            dt.Columns.Add("MeritoConseguito_Calcolato", typeof(decimal));
+            dt.Columns.Add("MeritoMinimoPrevisto_Calcolato", typeof(decimal));
+            dt.Columns.Add("MeritoMassimoConseguibile_Calcolato", typeof(decimal));
+            dt.Columns.Add("CFN_Calcolato", typeof(decimal));
+            dt.Columns.Add("MediaVoti_Calcolata", typeof(decimal));
+            dt.Columns.Add("MediaN_Calcolata", typeof(decimal));
+            dt.Columns.Add("ISEEDSU_Coefficiente", typeof(decimal));
+            dt.Columns.Add("ISEEMax_Coefficiente", typeof(decimal));
+            dt.Columns.Add("ISEEN_Calcolato", typeof(decimal));
+            dt.Columns.Add("CoefficienteCongiunto_Calcolato", typeof(decimal));
+            dt.Columns.Add("DifferenzaCFN", typeof(decimal));
+            dt.Columns.Add("DifferenzaCoefficienteCongiunto", typeof(decimal));
+            dt.Columns.Add("EsitoConfrontoCoefficienteCongiunto", typeof(string));
 
             return dt;
         }
@@ -172,11 +195,15 @@ namespace ProcedureNet7.Verifica
             var dom = info.InformazioniSede.Domicilio;
             var iscr = info.InformazioniIscrizione;
             var impBorsa = info.InformazioniImportoBorsa;
+            decimal? importoAssegnatoBsAttuale = GetImportoAssegnato(context, key, "BS");
+            decimal? importoAssegnatoBsExport = importoAssegnatoBsAttuale
+                                                ?? ToNullableDecimal(eco.Raw.ImportoAssegnato);
 
             var row = dt.NewRow();
             row["CodFiscale"] = info.InformazioniPersonali.CodFiscale ?? "";
             row["NumDomanda"] = info.InformazioniPersonali.NumDomanda ?? "";
             row["StatusCompilazione"] = info.StatusCompilazione;
+            row["Verifica provvedimenti esclusione"] = info.VerificaProvvedimentiEsclusioneBs ?? "";
 
             FillBenefitOutcomeColumns(row, context, key);
 
@@ -195,7 +222,7 @@ namespace ProcedureNet7.Verifica
             SetNullableDecimal(
                 row,
                 "ImportoAssegnatoBS",
-                GetImportoAssegnato(context, key, "BS") ?? ToNullableDecimal(eco.Raw.ImportoAssegnato));
+                importoAssegnatoBsExport);
             SetNullableDecimal(row, "ISR", eco.Calcolate.ISRDSU);
             SetNullableDecimal(row, "ISP", eco.Calcolate.ISPDSU);
             SetNullableDecimal(row, "Detrazioni", eco.Calcolate.Detrazioni);
@@ -304,8 +331,134 @@ namespace ProcedureNet7.Verifica
             row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
             SetNullableDecimal(row, "ImportoBaseBorsa", impBorsa.ImportoBase);
             SetNullableDecimal(row, "ImportoFinaleBorsa", impBorsa.ImportoFinale);
+            SetNullableDecimal(row, "ImportoSpecificheImpegniBS", impBorsa.ImportoSpecificheImpegniBs);
+            row["SpecificheImpegniUgualeImportoAssegnatoBS"] =
+                MoneyEquals(impBorsa.ImportoSpecificheImpegniBs, importoAssegnatoBsAttuale) ? "SI" : "NO";
+            row["SpecificheImpegniUgualeImportoCalcolatoBS"] =
+                MoneyEquals(impBorsa.ImportoSpecificheImpegniBs, impBorsa.ImportoFinale) ? "SI" : "NO";
+
+            FillCoefficienteCongiuntoColumns(row, context, key, info);
 
             dt.Rows.Add(row);
+        }
+
+        private static void FillCoefficienteCongiuntoColumns(
+            DataRow row,
+            VerificaPipelineContext context,
+            StudentKey key,
+            StudenteInfo info)
+        {
+            var iscr = info.InformazioniIscrizione;
+            var attuale = iscr.CoefficienteCongiunto;
+
+            SetNullableDecimal(row, "CFN_Attuale", attuale.CFN);
+            SetNullableDecimal(row, "MeritoConseguito_Attuale", attuale.MeritoConseguito);
+            SetNullableDecimal(row, "MeritoMinimoPrevisto_Attuale", attuale.MeritoMinimoPrevisto);
+            SetNullableDecimal(row, "MeritoMassimoConseguibile_Attuale", attuale.MeritoMassimoConseguibile);
+            SetNullableDecimal(row, "CoefficienteCongiunto_Attuale", attuale.CoefficienteCongiunto);
+
+            int? esitoBsAttuale = GetEsitoAttuale(context, key, "BS");
+            if (esitoBsAttuale != 1 && esitoBsAttuale != 2)
+            {
+                row["EsitoConfrontoCoefficienteCongiunto"] = esitoBsAttuale == 0
+                    ? "NON APPLICABILE - studente escluso"
+                    : "NON APPLICABILE - studente non idoneo/vincitore o esito BS assente";
+                return;
+            }
+
+            decimal? meritoConseguito = iscr.NumeroCrediti.HasValue
+                ? iscr.NumeroCrediti.Value + Math.Max(iscr.CreditiUtilizzati ?? 0m, 0m)
+                : null;
+            decimal? meritoMinimo = iscr.CreditiMinimiRichiestiMerito
+                                    ?? attuale.MeritoMinimoPrevisto;
+            decimal? meritoMassimo = attuale.MeritoMassimoConseguibile;
+            decimal? cfn = CalculateNormalizedValue(meritoConseguito, meritoMinimo, meritoMassimo);
+
+            decimal? media = iscr.NumeroEsami > 0 && iscr.SommaVoti.HasValue
+                ? iscr.SommaVoti.Value / iscr.NumeroEsami.Value
+                : null;
+            decimal? mediaN = media.HasValue
+                ? Clamp01((media.Value - 18m) / 12m)
+                : null;
+
+            decimal? iseeDsu = info.InformazioniEconomiche.Calcolate.ISEEDSU;
+            decimal? iseeMax = context.CalcParams?.SogliaIsee > 0m
+                ? context.CalcParams.SogliaIsee
+                : null;
+            decimal? iseeN = iseeDsu.HasValue && iseeMax.HasValue
+                ? Clamp01(1m - (iseeDsu.Value / iseeMax.Value))
+                : null;
+
+            decimal? coefficiente = cfn.HasValue && mediaN.HasValue && iseeN.HasValue
+                ? RoundCoefficient((0.70m * cfn.Value) + (0.04m * mediaN.Value) + (0.26m * iseeN.Value))
+                : null;
+
+            SetNullableDecimal(row, "MeritoConseguito_Calcolato", meritoConseguito);
+            SetNullableDecimal(row, "MeritoMinimoPrevisto_Calcolato", meritoMinimo);
+            SetNullableDecimal(row, "MeritoMassimoConseguibile_Calcolato", meritoMassimo);
+            SetNullableDecimal(row, "CFN_Calcolato", cfn);
+            SetNullableDecimal(row, "MediaVoti_Calcolata", media.HasValue ? RoundCoefficient(media.Value) : null);
+            SetNullableDecimal(row, "MediaN_Calcolata", mediaN.HasValue ? RoundCoefficient(mediaN.Value) : null);
+            SetNullableDecimal(row, "ISEEDSU_Coefficiente", iseeDsu);
+            SetNullableDecimal(row, "ISEEMax_Coefficiente", iseeMax);
+            SetNullableDecimal(row, "ISEEN_Calcolato", iseeN.HasValue ? RoundCoefficient(iseeN.Value) : null);
+            SetNullableDecimal(row, "CoefficienteCongiunto_Calcolato", coefficiente);
+
+            decimal? differenzaCfn = Difference(cfn, attuale.CFN);
+            decimal? differenzaCoefficiente = Difference(coefficiente, attuale.CoefficienteCongiunto);
+            SetNullableDecimal(row, "DifferenzaCFN", differenzaCfn);
+            SetNullableDecimal(row, "DifferenzaCoefficienteCongiunto", differenzaCoefficiente);
+            row["EsitoConfrontoCoefficienteCongiunto"] =
+                BuildCoefficientComparisonMessage(attuale, cfn, mediaN, iseeN, coefficiente, differenzaCoefficiente);
+        }
+
+        private static decimal? CalculateNormalizedValue(decimal? value, decimal? minimum, decimal? maximum)
+        {
+            if (!value.HasValue || !minimum.HasValue || !maximum.HasValue)
+                return null;
+
+            decimal range = maximum.Value - minimum.Value;
+            if (range <= 0m)
+                return null;
+
+            return RoundCoefficient(Clamp01((value.Value - minimum.Value) / range));
+        }
+
+        private static decimal Clamp01(decimal value)
+            => Math.Min(Math.Max(value, 0m), 1m);
+
+        private static decimal RoundCoefficient(decimal value)
+            => decimal.Round(value, 6, MidpointRounding.AwayFromZero);
+
+        private static decimal? Difference(decimal? calculated, decimal? current)
+            => calculated.HasValue && current.HasValue
+                ? RoundCoefficient(calculated.Value - current.Value)
+                : null;
+
+        private static string BuildCoefficientComparisonMessage(
+            CoefficienteCongiuntoAttuale current,
+            decimal? cfn,
+            decimal? mediaN,
+            decimal? iseeN,
+            decimal? calculated,
+            decimal? difference)
+        {
+            if (!current.MeritoMassimoConseguibile.HasValue)
+                return "NON CALCOLABILE - merito massimo conseguibile assente nella vista";
+            if (!cfn.HasValue)
+                return "NON CALCOLABILE - dati merito insufficienti o intervallo merito non valido";
+            if (!mediaN.HasValue)
+                return "NON CALCOLABILE - numero esami o somma voti assenti";
+            if (!iseeN.HasValue)
+                return "NON CALCOLABILE - ISEEDSU o limite ISEE di bando assente";
+            if (!current.CoefficienteCongiunto.HasValue)
+                return "CALCOLATO - coefficiente attuale assente nella vista";
+            if (!difference.HasValue)
+                return "NON CONFRONTABILE";
+
+            return Math.Abs(difference.Value) <= 0.000001m
+                ? "COERENTE - coefficiente calcolato uguale al valore attuale"
+                : $"DIFFERENTE - scostamento {difference.Value.ToString("0.000000", CultureInfo.InvariantCulture)}";
         }
 
         private static void FillBenefitOutcomeColumns(DataRow row, VerificaPipelineContext context, StudentKey key)
@@ -368,6 +521,19 @@ namespace ProcedureNet7.Verifica
             return null;
         }
 
+        private static int? GetEsitoAttuale(VerificaPipelineContext context, StudentKey key, string codBeneficio)
+        {
+            if (context.TryGetEsitiConcorsoByBenefit(key, out var rawByBenefit) &&
+                rawByBenefit != null &&
+                rawByBenefit.TryGetValue(codBeneficio, out var raw) &&
+                raw != null)
+            {
+                return raw.CodTipoEsito;
+            }
+
+            return null;
+        }
+
         private static decimal? ToNullableDecimal(object? value)
         {
             if (value == null || value == DBNull.Value)
@@ -401,6 +567,15 @@ namespace ProcedureNet7.Verifica
         private static void SetIfPositiveInt(DataRow row, string columnName, int value)
         {
             row[columnName] = value > 0 ? value : DBNull.Value;
+        }
+
+        private static bool MoneyEquals(decimal? left, decimal? right)
+        {
+            if (!left.HasValue || !right.HasValue)
+                return false;
+
+            return decimal.Round(left.Value, 2, MidpointRounding.AwayFromZero) ==
+                   decimal.Round(right.Value, 2, MidpointRounding.AwayFromZero);
         }
 
         private static string FormatDateForExport(DateTime? value)
