@@ -180,7 +180,7 @@ namespace ProcedureNet7
                                         iscrizioni
                                     WHERE 
 		                            data_validita <= @maxDataValidita
-                                        AND Anno_accademico = @annoAccademico
+                                        AND Anno_accademico = @annoAccademico AND tipo_bando = 'lz'
                                     GROUP BY 
 		                            anno_accademico, 
 		                            cod_fiscale

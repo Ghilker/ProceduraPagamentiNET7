@@ -938,6 +938,8 @@ namespace ProcedureNet7
                 ? BuildMatchedKeywordsForTopic(selectedTopics[0], tokenSet, max: 12)
                 : "";
 
+            ApplyOperationalTopicOverride(ex, text, tokenSet);
+
             // ──────────────────────────────────────────────────────────────────
             // Academic year
             // ──────────────────────────────────────────────────────────────────
@@ -1242,6 +1244,255 @@ namespace ProcedureNet7
             var arr = new List<string>(hs);
             arr.Sort(StringComparer.Ordinal);
             return string.Join(", ", arr);
+        }
+
+        private static void ApplyOperationalTopicOverride(
+            ExtractionV6 extraction,
+            string text,
+            HashSet<string> tokenSet)
+        {
+            if (extraction == null || string.IsNullOrWhiteSpace(text))
+                return;
+
+            if (IsPinManagementText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.PORTALE_E_ACCESSO,
+                    Topic.PORTALE,
+                    "PIN_MANAGEMENT",
+                    88);
+                return;
+            }
+
+            if (IsRegionalTaxText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.PAGAMENTI_E_TASSE,
+                    HasAny(tokenSet, "rimborso", "rimbors", "refund", "reimbursement")
+                        ? Topic.RIMBORSO_TASSA
+                        : Topic.TASSE,
+                    "TASSA_REGIONALE",
+                    90);
+                return;
+            }
+
+            if (IsGraduationPrizeText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.GRADUATORIE,
+                    Topic.PREMIO_LAUREA,
+                    "PREMIO_LAUREA",
+                    90);
+                return;
+            }
+
+            if (IsDomicileContractText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.ALLOGGIO,
+                    Topic.CONTRATTO,
+                    "DOMICILIO_CONTRATTO",
+                    86);
+                return;
+            }
+
+            if (IsResidencePermitText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.DOCUMENTI_E_PERMESSI,
+                    Topic.PERMESSO,
+                    "PERMESSO_SOGGIORNO",
+                    88);
+                return;
+            }
+
+            if (IsIseeOrCafText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.DOCUMENTI_E_PERMESSI,
+                    Topic.ISEE_REDDITI,
+                    "ISEE_CAF_REDDITI",
+                    84);
+                return;
+            }
+
+            if (IsCareerChangeText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.ISCRIZIONE_E_CARRIERA,
+                    Topic.PASSAGGIO_TRASF,
+                    "CAMBIO_CORSO_SEDE_PASSAGGIO",
+                    86);
+                return;
+            }
+
+            if (IsCreditsCareerText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.ISCRIZIONE_E_CARRIERA,
+                    Topic.CREDITI,
+                    "CREDITI_CARRIERA",
+                    82);
+                return;
+            }
+
+            if (IsScholarshipPaymentText(text, tokenSet))
+            {
+                ForceTopic(
+                    extraction,
+                    PrimaryTopic.PAGAMENTI_E_TASSE,
+                    Topic.PAGAMENTI,
+                    "PAGAMENTO_BORSA",
+                    84);
+                return;
+            }
+        }
+
+        private static void ForceTopic(
+            ExtractionV6 extraction,
+            PrimaryTopic primary,
+            Topic secondary,
+            string reason,
+            int confidenceScore)
+        {
+            extraction.TopicPrimary = primary.ToString();
+            extraction.TopicSecondary = secondary.ToString();
+            extraction.PrimaryScore = Math.Max(extraction.PrimaryScore, 8);
+            extraction.SecondaryScore = Math.Max(extraction.SecondaryScore, 8);
+            extraction.PrimaryHasSpecificEvidence = true;
+            extraction.PlausibleCategoryCount = Math.Min(
+                Math.Max(1, extraction.PlausibleCategoryCount),
+                2);
+            extraction.MarginTop1Top2 = Math.Max(extraction.MarginTop1Top2, 3);
+            extraction.IsLowConfidence = false;
+            extraction.VerificationReason = string.Empty;
+            extraction.ConfidenceScore = Math.Max(extraction.ConfidenceScore, confidenceScore);
+            extraction.PrimaryConfidence = extraction.ConfidenceScore / 100.0;
+            extraction.SecondaryConfidence = Math.Max(extraction.SecondaryConfidence, 0.65);
+            extraction.MatchedPrimaryKeywords = reason;
+            extraction.MatchedTop1Keywords = reason;
+        }
+
+        private static bool IsPinManagementText(string text, HashSet<string> tokenSet) =>
+            ContainsPhrase(text, "pin management") ||
+            ContainsPhrase(text, "without pin") ||
+            ContainsPhrase(text, "senza pin") ||
+            ContainsPhrase(text, "pin code") ||
+            ContainsPhrase(text, "codice pin");
+
+        private static bool IsRegionalTaxText(string text, HashSet<string> tokenSet) =>
+            HasAll(tokenSet, "tassa", "regionale") ||
+            HasAll(tokenSet, "regional", "tax") ||
+            HasAny(tokenSet, "pagopa", "iuv") &&
+            HasAny(tokenSet, "tassa", "tax", "rimborso", "rimbors", "refund");
+
+        private static bool IsGraduationPrizeText(string text, HashSet<string> tokenSet) =>
+            ContainsPhrase(text, "premio di laurea") ||
+            ContainsPhrase(text, "premio laurea") ||
+            ContainsPhrase(text, "graduation prize") ||
+            ContainsPhrase(text, "graduation award") ||
+            HasAny(tokenSet, "premio", "prize", "award") &&
+            HasAny(tokenSet, "laurea", "graduation", "degree");
+
+        private static bool IsDomicileContractText(string text, HashSet<string> tokenSet)
+        {
+            bool contract = HasAny(
+                tokenSet,
+                "contratto",
+                "locazione",
+                "affitto",
+                "proroga",
+                "lease",
+                "rental",
+                "tenancy");
+            bool domicile = HasAny(
+                tokenSet,
+                "domicilio",
+                "fuorisede",
+                "residenza",
+                "residence",
+                "accommodation") ||
+                HasAll(tokenSet, "fuori", "sede") ||
+                ContainsPhrase(text, "status sede") ||
+                ContainsPhrase(text, "agenzia delle entrate");
+
+            return contract && domicile ||
+                   ContainsPhrase(text, "contratto di locazione") ||
+                   ContainsPhrase(text, "rental contract") ||
+                   ContainsPhrase(text, "lease agreement");
+        }
+
+        private static bool IsResidencePermitText(string text, HashSet<string> tokenSet) =>
+            ContainsPhrase(text, "permesso di soggiorno") ||
+            ContainsPhrase(text, "residence permit") ||
+            ContainsPhrase(text, "titolo di soggiorno") ||
+            ContainsPhrase(text, "ricevuta della questura") ||
+            HasAny(tokenSet, "permesso", "soggiorno", "questura", "impronte") &&
+            HasAny(tokenSet, "documenti", "documentazione", "allegato", "allegati", "caricato", "uploaded", "rinnovo");
+
+        private static bool IsIseeOrCafText(string text, HashSet<string> tokenSet) =>
+            HasAny(tokenSet, "isee", "iseeup", "iseeu", "ispe", "ispeup", "dsu") ||
+            ContainsPhrase(text, "isee parificato") ||
+            ContainsPhrase(text, "redditi esteri") ||
+            HasAny(tokenSet, "caf") &&
+            HasAny(tokenSet, "isee", "redditi", "parificato", "dsu", "documenti", "documentazione");
+
+        private static bool IsCareerChangeText(string text, HashSet<string> tokenSet) =>
+            ContainsPhrase(text, "cambio corso") ||
+            ContainsPhrase(text, "cambio sede") ||
+            ContainsPhrase(text, "cambiare corso") ||
+            ContainsPhrase(text, "cambiare sede") ||
+            ContainsPhrase(text, "aggiornamento corso") ||
+            ContainsPhrase(text, "modifica corso") ||
+            HasAny(tokenSet, "passaggio", "trasferimento", "abbreviazione") &&
+            HasAny(tokenSet, "corso", "sede", "carriera", "universita", "università");
+
+        private static bool IsCreditsCareerText(string text, HashSet<string> tokenSet) =>
+            HasAny(tokenSet, "cfu", "crediti", "credits", "ects", "tirocinio", "transcript") ||
+            ContainsPhrase(text, "riconoscimento crediti") ||
+            ContainsPhrase(text, "convalida crediti") ||
+            ContainsPhrase(text, "carriera pregressa");
+
+        private static bool IsScholarshipPaymentText(string text, HashSet<string> tokenSet)
+        {
+            bool scholarship = HasAny(
+                tokenSet,
+                "borsa",
+                "scholarship",
+                "beneficio",
+                "benefit");
+            bool payment = HasAny(
+                tokenSet,
+                "pagamento",
+                "pagamenti",
+                "accredito",
+                "accredit",
+                "erogazione",
+                "erog",
+                "mandato",
+                "saldo",
+                "rata",
+                "payment",
+                "paid",
+                "balance",
+                "installment");
+
+            return scholarship && payment && !IsRegionalTaxText(text, tokenSet);
+        }
+
+        private static bool ContainsPhrase(string text, string phrase)
+        {
+            string normalized = Normalize(phrase);
+            return !string.IsNullOrWhiteSpace(normalized) &&
+                   text.Contains(normalized, StringComparison.Ordinal);
         }
 
         private static (bool has, string raw, int s, int e, double conf) DetectAcademicYearFast(string text)

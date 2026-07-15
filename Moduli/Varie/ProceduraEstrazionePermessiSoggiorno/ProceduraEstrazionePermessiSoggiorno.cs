@@ -35,7 +35,7 @@ namespace ProcedureNet7
                 Logger.LogInfo(20, "Starting data extraction for Permessi di Soggiorno.");
 
                 // =================== Estrazioni ===================
-                var dtBs = ExecuteQuery(@"
+                var dtOld = ExecuteQuery(@"
 WITH base AS (
     SELECT
         vs.Cod_fiscale,
@@ -59,16 +59,16 @@ WITH base AS (
        AND ve.Cod_tipo_esito <> 0
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
-	where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
+	--where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
 )
 SELECT DISTINCT Cod_fiscale
 FROM base
 WHERE rn = 1
   AND cod_status = '01'
 ");
-                Logger.LogInfo(40, $"[BS] Retrieved {dtBs.Rows.Count} rows.");
+                Logger.LogInfo(40, $"[OLD] Retrieved {dtOld.Rows.Count} rows for AA 20252026, 20242025, 20232024.");
 
-                var dtPa = ExecuteQuery(@"
+                var dtNew = ExecuteQuery(@"
 WITH base AS (
     SELECT
         vs.Cod_fiscale,
@@ -77,56 +77,26 @@ WITH base AS (
             PARTITION BY vs.Cod_fiscale, vs.Tipo_documento, vs.Tipo_permesso
             ORDER BY vs.Id_allegato DESC
         ) AS rn
-    FROM Specifiche_permesso_soggiorno AS vs
-    INNER JOIN STATUS_ALLEGATI AS va
+    FROM vSpecifiche_permesso_soggiorno AS vs
+    INNER JOIN vSTATUS_ALLEGATI AS va
         ON vs.id_allegato = va.id_allegato
     INNER JOIN ALLEGATI AS al
         ON al.id_allegato = vs.id_allegato and al.data_fine_validita is null
     INNER JOIN Domanda AS d
         ON vs.Cod_fiscale = d.Cod_fiscale
-       AND d.Anno_accademico IN (20252026, 20242025, 20232024)
+       AND d.Anno_accademico IN (20262027)
        AND d.Tipo_bando like 'l%'
-    INNER JOIN vEsiti_concorsi AS ve
-        ON d.Num_domanda = ve.Num_domanda
-       AND ve.Cod_beneficio = 'pa'
-       AND ve.Cod_tipo_esito <> 0
+	   inner join vStatus_compilazione vsc on d.Anno_accademico = vsc.anno_accademico and d.Num_domanda = vsc.num_domanda and vsc.status_compilazione >= 90
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
-where cod_status = '11'
 	--where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
 )
 SELECT DISTINCT Cod_fiscale
 FROM base
 WHERE rn = 1
-  AND cod_status = '11'
+  AND cod_status = '01'
 ");
-                Logger.LogInfo(41, $"[PA] Retrieved {dtPa.Rows.Count} rows.");
-
-                // =================== Filtro BS \ PA ===================
-                var paSet = new HashSet<string>(
-                    dtPa.AsEnumerable()
-                        .Select(r => (r.Field<string>("Cod_fiscale") ?? "").Trim())
-                        .Where(cf => !string.IsNullOrEmpty(cf)),
-                    StringComparer.OrdinalIgnoreCase);
-
-                DataTable dtBsFiltered;
-                var bsRows = dtBs.AsEnumerable()
-                    .Where(r =>
-                    {
-                        var cf = (r.Field<string>("Cod_fiscale") ?? "").Trim();
-                        return !string.IsNullOrEmpty(cf) && !paSet.Contains(cf);
-                    });
-
-                if (bsRows.Any())
-                {
-                    dtBsFiltered = bsRows.CopyToDataTable();
-                    Logger.LogInfo(41, $"[BS] Filtrate {dtBs.Rows.Count - dtBsFiltered.Rows.Count} sovrapposizioni con PA. Rimasti {dtBsFiltered.Rows.Count}.");
-                }
-                else
-                {
-                    dtBsFiltered = dtBs.Clone();
-                    Logger.LogInfo(41, $"[BS] Tutti i {dtBs.Rows.Count} record erano in PA. Rimasti 0.");
-                }
+                Logger.LogInfo(41, $"[NEW] Retrieved {dtNew.Rows.Count} rows for AA 20262027.");
 
                 if (_sendMail)
                 {
@@ -136,13 +106,14 @@ WHERE rn = 1
                         return;
                     }
 
-                    var toEmails = new List<string>();
+                    var oldToEmails = new List<string>();
+                    var newToEmails = new List<string>();
                     var ccEmails = new List<string>();
-                    ReadMailConfig(mailFilePath, toEmails, ccEmails, ref senderMail, ref senderPassword);
+                    ReadMailConfig(mailFilePath, oldToEmails, newToEmails, ccEmails, ref senderMail, ref senderPassword);
 
-                    if (toEmails.Count == 0)
+                    if (oldToEmails.Count == 0 && newToEmails.Count == 0)
                     {
-                        Logger.LogInfo(100, "No recipient email addresses found.");
+                        Logger.LogInfo(100, "No recipient email addresses found for #TO#OLD# or #TO#NEW#.");
                         return;
                     }
                     if (string.IsNullOrEmpty(senderMail) || string.IsNullOrEmpty(senderPassword))
@@ -156,35 +127,35 @@ WHERE rn = 1
                     if (!Directory.Exists(currentDateFolder))
                         Directory.CreateDirectory(currentDateFolder);
 
-                    // =================== Invii (PA prima) ===================
-                    if (dtPa.Rows.Count > 0)
+                    // =================== Invii per anno accademico ===================
+                    if (dtOld.Rows.Count > 0)
                     {
                         SendEmailWithAttachment(
-                            toEmails, ccEmails, dtPa, currentDateFolder,
-                            filePrefix: "ps_pa",
-                            subject: $"Estrazione studenti per PS (PA) - {DateTime.Now:dd/MM/yyyy}",
-                            htmlBody: GetMailBodyPa(),
+                            oldToEmails, ccEmails, dtOld, currentDateFolder,
+                            filePrefix: "ps_old",
+                            subject: $"Estrazione studenti per PS (AA 20252026-20232024) - {DateTime.Now:dd/MM/yyyy}",
+                            htmlBody: GetMailBodyOld(),
                             minRowsPerEmail: 10
                         );
                     }
                     else
                     {
-                        Logger.LogInfo(61, "[PA] Nessun record: nessun invio.");
+                        Logger.LogInfo(60, "[OLD] Nessun record: nessun invio.");
                     }
 
-                    if (dtBsFiltered.Rows.Count > 0)
+                    if (dtNew.Rows.Count > 0)
                     {
                         SendEmailWithAttachment(
-                            toEmails, ccEmails, dtBsFiltered, currentDateFolder,
-                            filePrefix: "ps_bs",
-                            subject: $"Estrazione studenti per PS (BS) - {DateTime.Now:dd/MM/yyyy}",
-                            htmlBody: GetMailBodyBs(),
+                            newToEmails, ccEmails, dtNew, currentDateFolder,
+                            filePrefix: "ps_new",
+                            subject: $"Estrazione studenti per PS (AA 20262027) - {DateTime.Now:dd/MM/yyyy}",
+                            htmlBody: GetMailBodyNew(),
                             minRowsPerEmail: 10
                         );
                     }
                     else
                     {
-                        Logger.LogInfo(60, "[BS] Nessun record dopo filtro PA: nessun invio.");
+                        Logger.LogInfo(61, "[NEW] Nessun record: nessun invio.");
                     }
                 }
 
@@ -207,15 +178,17 @@ WHERE rn = 1
             return dt;
         }
 
-        private void ReadMailConfig(string path, List<string> toEmails, List<string> ccEmails, ref string id, ref string pw)
+        private void ReadMailConfig(string path, List<string> oldToEmails, List<string> newToEmails, List<string> ccEmails, ref string id, ref string pw)
         {
             Logger.LogInfo(70, "Reading email configurations from the file.");
             using var sr = new StreamReader(path);
             string? line;
             while ((line = sr.ReadLine()) != null)
             {
-                if (line.StartsWith("TO#SI#"))
-                    toEmails.Add(line.Substring(6));
+                if (TryReadMailValue(line, "#TO#OLD", out var oldTo))
+                    oldToEmails.Add(oldTo);
+                else if (TryReadMailValue(line, "#TO#NEW", out var newTo))
+                    newToEmails.Add(newTo);
                 else if (line.StartsWith("CC#"))
                     ccEmails.Add(line[3..]);
                 else if (line.StartsWith("ID#") && string.IsNullOrEmpty(id))
@@ -225,18 +198,43 @@ WHERE rn = 1
             }
         }
 
-        private string GetMailBodyBs() => @"
+        private static bool TryReadMailValue(string line, string prefix, out string value)
+        {
+            value = string.Empty;
+            if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var valueStart = prefix.Length;
+            if (line.Length > valueStart)
+            {
+                var separator = line[valueStart];
+                if (separator == '#')
+                {
+                    valueStart++;
+                }
+                else if (!char.IsWhiteSpace(separator))
+                {
+                    return false;
+                }
+            }
+
+            value = line[valueStart..].Trim();
+            return !string.IsNullOrEmpty(value);
+        }
+
+        private string GetMailBodyOld() => @"
 <p>Buongiorno,</p>
 <p>su richiesta di Rita che legge in copia,</p>
-<p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono
-essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno)</p>
+<p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri degli anni accademici 20252026, 20242025 e 20232024 per cui devono essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
 <p>Grazie e buon lavoro!</p>
 <p>Giacomo Pavone</p>";
 
-        private string GetMailBodyPa() => @"
+        private string GetMailBodyNew() => @"
 <p>Buongiorno,</p>
 <p>su richiesta di Rita che legge in copia,</p>
-<p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri per cui devono essere validati in maniera urgente i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
+<p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri dell'anno accademico 20262027 per cui devono essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
 <p>Grazie e buon lavoro!</p>
 <p>Giacomo Pavone</p>";
 

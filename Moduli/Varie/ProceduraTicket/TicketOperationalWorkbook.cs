@@ -15,6 +15,7 @@ namespace ProcedureNet7
     {
         private const string CloseResolved = "CHIUDIBILE_SITUAZIONE_GIA_RISOLTA";
         private const string CloseStandard = "CHIUDIBILE_CON_RISPOSTA_STANDARD";
+        private const string CloseDuplicate = "CHIUDIBILE_DUPLICATO_TICKET_GIA_TRATTATO";
         private const string ClosePersonalized = "FUORI_PERIMETRO_RISCONTRO_ASSISTITO";
         private const string ActionRequired = "NON_CHIUDIBILE_AZIONE_OPERATIVA_NECESSARIA";
         private const string DataMissing = "NON_CHIUDIBILE_DOCUMENTO_O_DATO_MANCANTE";
@@ -122,6 +123,7 @@ namespace ProcedureNet7
 
             AddMetric(result, "Generale", "Ticket totali", queue.Rows.Count);
             AddMetric(result, "Chiusura", "Chiudibili - situazione già risolta", CountByPrefix(queue, "DECISIONE_PROPOSTA", CloseResolved));
+            AddMetric(result, "Chiusura", "Duplicati da confermare", CountByPrefix(queue, "DECISIONE_PROPOSTA", CloseDuplicate));
             AddMetric(result, "Decisione", "Chiudibili con risposta standard", CountByPrefix(queue, "DECISIONE_PROPOSTA", CloseStandard));
             AddMetric(result, "Decisione", "Riscontro assistito fuori perimetro", CountByPrefix(queue, "DECISIONE_PROPOSTA", ClosePersonalized));
             AddMetric(result, "Decisione", "Non chiudibili - azione operativa", CountByPrefix(queue, "DECISIONE_PROPOSTA", ActionRequired));
@@ -148,6 +150,7 @@ namespace ProcedureNet7
             AddMetric(result, "Situazioni risolte", "Condizioni multiple tutte risolte", CountExact(queue, "CONDIZIONE_RISOLTA", "TUTTE_LE_CONDIZIONI_RICHIESTE_RISOLTE_STESSO_AA"));
             AddMetric(result, "Qualità", "Contraddizioni rilevate", CountNotEmpty(queue, "CONTRADDIZIONI_RILEVATE"));
             AddMetric(result, "Qualità", "Decisioni a confidenza bassa", CountExact(queue, "CONFIDENZA_DECISIONE", "BASSA"));
+            AddMetric(result, "Qualità", "Decisioni a confidenza media", CountExact(queue, "CONFIDENZA_DECISIONE", "MEDIA"));
             foreach (IGrouping<string, DataRow> group in queue.AsEnumerable()
                 .GroupBy(row => ReadString(row, "GRUPPO_VERIFICA"), StringComparer.OrdinalIgnoreCase)
                 .Where(group => !string.IsNullOrWhiteSpace(group.Key))
@@ -206,8 +209,7 @@ namespace ProcedureNet7
             foreach (DataRow row in queue.Rows)
             {
                 string decision = ReadString(row, "DECISIONE_PROPOSTA");
-                bool closable = string.Equals(ReadString(row, "CHIUDIBILE"), "SI", StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(ReadString(row, "CHIUDIBILE"), "PROBABILE", StringComparison.OrdinalIgnoreCase);
+                bool closable = IsOperationallyClosableLabel(ReadString(row, "CHIUDIBILE"));
                 bool include = decision.StartsWith(Verify, StringComparison.OrdinalIgnoreCase) ||
                                (!closable &&
                                 (!string.IsNullOrWhiteSpace(ReadString(row, "CONTRADDIZIONI_RILEVATE")) ||
@@ -260,8 +262,7 @@ namespace ProcedureNet7
                 row["NUMERO_TICKET"] = tickets.Count;
                 row["TICKET_P1"] = tickets.Count(ticket => string.Equals(ReadString(ticket, "PRIORITA"), "P1", StringComparison.OrdinalIgnoreCase));
                 row["TICKET_CHIUDIBILI"] = tickets.Count(ticket =>
-                    string.Equals(ReadString(ticket, "CHIUDIBILE"), "SI", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(ReadString(ticket, "CHIUDIBILE"), "PROBABILE", StringComparison.OrdinalIgnoreCase));
+                    IsOperationallyClosableLabel(ReadString(ticket, "CHIUDIBILE")));
                 row["TICKET_DA_VERIFICARE"] = tickets.Count(ticket => ReadString(ticket, "DECISIONE_PROPOSTA").StartsWith(Verify, StringComparison.OrdinalIgnoreCase));
                 row["TICKET_AZIONE_OPERATIVA"] = tickets.Count(ticket =>
                     ReadString(ticket, "DECISIONE_PROPOSTA").StartsWith(ActionRequired, StringComparison.OrdinalIgnoreCase) ||
@@ -337,6 +338,9 @@ namespace ProcedureNet7
             AddRule(result, "GEN_08", "Tutte le condizioni multiple risultano risolte", CloseResolved,
                 "Confermare le evidenze dei singoli ambiti e chiudere il ticket.",
                 "Tutti gli ambiti citati nel ticket risultano risolti. Il ticket può essere chiuso.");
+            AddRule(result, "DUP_01", "Ticket collegato a pratica già trattata", CloseDuplicate,
+                "Verificare il ticket precedente indicato dallo studente in VALIDAZIONE_TICKET; se chiuso con la stessa problematica, chiudere come duplicato.",
+                "Lo studente richiama un ticket precedente. Se il ticket precedente risulta chiuso e la problematica coincide, questo ticket può essere chiuso come duplicato.");
             AddRule(result, "GEN_DOC_01", "Richiesta documento o attestazione", ActionRequired,
                 "Gestire manualmente la produzione, il recupero o la verifica del documento richiesto.",
                 "Il ticket richiede ricevute, attestazioni, certificati o documenti ufficiali: non è una chiusura automatica.");
@@ -349,7 +353,7 @@ namespace ProcedureNet7
             AddRule(result, "DOM_01", "Domanda incompleta o stato sconosciuto", ActionRequired,
                 "Verificare compilazione, trasmissione e stato effettivo della domanda.",
                 "Lo stato disponibile della domanda non consente una chiusura automatica.");
-            AddRule(result, "DOM_02", "Finestra compilazione domanda chiusa", CloseResolved,
+            AddRule(result, "DOM_02", "Finestra compilazione domanda chiusa", CloseStandard,
                 "Confermare l'anno accademico citato nel ticket e chiudere con riscontro sulla finestra ormai conclusa.",
                 "La finestra di compilazione della domanda per l'anno accademico indicato risulta conclusa. Il ticket può essere chiuso con riscontro informativo standard.");
             AddRule(result, "DOM_03", "Finestra compilazione domanda attiva, futura o non riconosciuta", ActionRequired,
@@ -385,6 +389,12 @@ namespace ProcedureNet7
             AddRule(result, "PAG_16", "Classificazione pagamenti senza richiesta di erogazione", Verify,
                 "Rileggere il ticket e distinguere erogazioni della borsa da tasse o pagamenti effettuati dallo studente.",
                 "Il ticket è classificato nell'area pagamenti, ma il testo non contiene una richiesta di erogazione della borsa.");
+            AddRule(result, "TAX_01", "Rimborso tassa regionale", ActionRequired,
+                "Gestire nel flusso dedicato ai rimborsi tassa regionale; verificare domanda di rimborso, PagoPA/IUV e stato lavorazione.",
+                "La richiesta riguarda rimborso o pagamento della tassa regionale, non l'erogazione della borsa di studio. Serve lavorazione/verifica dedicata.");
+            AddRule(result, "TAX_02", "Tassa regionale informativa", ClosePersonalized,
+                "Predisporre riscontro informativo su tassa regionale, copertura o rimborsabilità.",
+                "La richiesta riguarda informazioni sulla tassa regionale o sui pagamenti effettuati dallo studente. Non usare i dati dei pagamenti BS come evidenza di chiusura.");
             AddRule(result, "PAG_04", "IBAN assente", DataMissing,
                 "Richiedere o verificare l'IBAN e la modalità di pagamento.",
                 "Per procedere è necessario verificare o aggiornare l'IBAN associato alla domanda.");
@@ -505,9 +515,18 @@ namespace ProcedureNet7
             AddRule(result, "CAR_01", "Carriera o iscrizione", Verify,
                 "Verificare carriera, anno di corso, crediti e precedenti partecipazioni.",
                 "La richiesta richiede una verifica puntuale della carriera e non è chiudibile automaticamente.");
-            AddRule(result, "CAR_02", "Cambio corso/sede o passaggio", CloseResolved,
+            AddRule(result, "CAR_02", "Cambio corso/sede o passaggio", CloseStandard,
                 "Rispondere che lo studente deve aprire l'istanza dedicata; poi chiudere il ticket.",
                 "La richiesta riguarda cambio corso, sede, passaggio, trasferimento o abbreviazione: lo studente deve aprire l'istanza dedicata.");
+            AddRule(result, "CAR_03", "Carriera, merito o inserimento dati già superati", CloseResolved,
+                "Confermare anno accademico, domanda trasmessa/completa, esito vincitore e assenza di blocchi; poi chiudere il ticket.",
+                "Il ticket riguarda carriera, CFU, esami, merito, carriera pregressa, passaggi, DOV/CIMEA, tirocinio o inserimento dati. Per lo stesso anno accademico la domanda risulta vincitrice, trasmessa/completa e senza blocchi.");
+            AddRule(result, "PLA_01", "Premio di laurea", ClosePersonalized,
+                "Gestire nel flusso premio di laurea: verificare domanda premio, data laurea, stato istruttoria ed eventuale correzione.",
+                "La richiesta riguarda il premio di laurea e non deve essere valutata con le regole ordinarie di graduatoria o domanda borsa.");
+            AddRule(result, "PIN_01", "PIN management domanda", ClosePersonalized,
+                "Predisporre riscontro standard su PIN management e necessità effettiva del codice per l'anno accademico richiesto.",
+                "La richiesta riguarda il PIN management della domanda. Serve riscontro istruttivo o verifica portale dedicata.");
             AddRule(result, "ALT_01", "Argomento non classificato", Verify,
                 "Leggere il ticket e assegnare l'ufficio o argomento corretto.",
                 "Il ticket non è classificato in modo affidabile. È necessaria una valutazione manuale.");
@@ -612,11 +631,11 @@ namespace ProcedureNet7
             int? daysOpen = creationDate.HasValue ? Math.Max(0, (DateTime.Today - creationDate.Value.Date).Days) : null;
 
             bool textHasMultipleAcademicYears = TicketOperationalAnalysis.HasMultipleAcademicYears(subject, studentMessage);
-            bool singleOperationalYear =
+            bool fallbackLatestAcademicYear =
                 !selection.HasRequestedAcademicYear &&
-                context.GetValidAcademicYears(fiscalCode).Count == 1;
+                selection.HasRecord;
             bool exactSingleAcademicYear =
-                (selection.IsExactAcademicYear || singleOperationalYear) &&
+                (selection.IsExactAcademicYear || fallbackLatestAcademicYear) &&
                 !textHasMultipleAcademicYears;
             ResolutionAssessment resolution = EvaluateResolvedCondition(
                 record,
@@ -1035,10 +1054,27 @@ namespace ProcedureNet7
             bool verifiedPortalSubmissionResolution = IsPortalSubmissionProblemResolved(source, topicCode, applicationState);
             bool verifiedManualDocumentRequest = IsManualDocumentOrAttestationRequest(source);
             bool verifiedClosedApplicationCompilation = IsClosedApplicationCompilationQuestion(source, record, recordSelectionIsReliable);
-            bool verifiedSectionCompilationResolution = IsSectionCompilationResolved(source, topicCode, record, applicationState);
+            bool verifiedSectionCompilationResolution = IsSectionCompilationResolved(
+                source,
+                topicCode,
+                record,
+                applicationState,
+                recordSelectionIsReliable);
+            bool verifiedCareerWinnerWithoutBlocksResolution = IsCareerIssueResolvedByWinnerWithoutBlocks(
+                source,
+                topicCode,
+                record,
+                applicationState,
+                recordSelectionIsReliable,
+                intent);
             bool verifiedPortalAlreadyWinnerResolution = IsPortalAlreadyWinnerMessageResolved(source, record);
             bool verifiedForeignIncomeResolution = IsForeignIncomeRequestResolved(source, record);
             bool verifiedCareerInstanceInstruction = IsCareerInstanceInstructionRequest(source, topicCode);
+            bool verifiedDuplicateReference = IsDuplicateTicketReference(source);
+            bool verifiedRegionalTaxRequest = IsRegionalTaxRequest(source);
+            bool verifiedRegionalTaxInformationRequest = IsRegionalTaxInformationRequest(source);
+            bool verifiedGraduationPrizeRequest = IsGraduationPrizeRequest(source);
+            bool verifiedPinManagementRequest = IsPinManagementRequest(source);
             if ((IsYes(source, "CLASSIFICAZIONE_DA_VERIFICARE") || string.IsNullOrWhiteSpace(topicCode)) &&
                 !verifiedPermitBlockRemoval &&
                 !verifiedPaymentResolution &&
@@ -1049,9 +1085,15 @@ namespace ProcedureNet7
                 !verifiedManualDocumentRequest &&
                 !verifiedClosedApplicationCompilation &&
                 !verifiedSectionCompilationResolution &&
+                !verifiedCareerWinnerWithoutBlocksResolution &&
                 !verifiedPortalAlreadyWinnerResolution &&
                 !verifiedForeignIncomeResolution &&
-                !verifiedCareerInstanceInstruction)
+                !verifiedCareerInstanceInstruction &&
+                !verifiedDuplicateReference &&
+                !verifiedRegionalTaxRequest &&
+                !verifiedRegionalTaxInformationRequest &&
+                !verifiedGraduationPrizeRequest &&
+                !verifiedPinManagementRequest)
             {
                 return Decision(Verify,
                     "Leggere messaggio e oggetto; correggere l'argomento prima della chiusura.",
@@ -1059,8 +1101,57 @@ namespace ProcedureNet7
                     "GEN_02");
             }
 
+            if (verifiedDuplicateReference)
+            {
+                return Decision(CloseDuplicate,
+                    "Cercare il ticket precedente in VALIDAZIONE_TICKET; se è chiuso e la problematica coincide, chiudere questo ticket come duplicato.",
+                    "Il testo richiama un ticket precedente: la chiusura dipende dalla conferma che la problematica sia già stata trattata e chiusa.",
+                    "DUP_01");
+            }
+
+            if (verifiedPinManagementRequest)
+            {
+                return Decision(ClosePersonalized,
+                    "Rispondere con istruzioni sul PIN management o verificare se il PIN sia richiesto per l'anno accademico indicato.",
+                    "La richiesta riguarda PIN management della domanda e richiede un riscontro istruttivo dedicato.",
+                    "PIN_01");
+            }
+
+            if (verifiedGraduationPrizeRequest)
+            {
+                return Decision(ClosePersonalized,
+                    "Gestire nel flusso premio di laurea: verificare domanda premio, data laurea e stato istruttoria.",
+                    "La richiesta riguarda il premio di laurea e non deve essere valutata con le regole ordinarie di graduatoria o domanda borsa.",
+                    "PLA_01");
+            }
+
+            if (verifiedRegionalTaxRequest)
+            {
+                return Decision(ActionRequired,
+                    "Gestire nel flusso dedicato alla tassa regionale: verificare domanda di rimborso, pagamento PagoPA/IUV e stato lavorazione.",
+                    "La richiesta riguarda rimborso o pagamento della tassa regionale, distinto dai pagamenti BS.",
+                    "TAX_01");
+            }
+
+            if (verifiedRegionalTaxInformationRequest)
+            {
+                return Decision(ClosePersonalized,
+                    "Predisporre riscontro informativo sulla tassa regionale, senza usare i pagamenti BS come evidenza.",
+                    "La richiesta riguarda informazioni sulla tassa regionale o pagamenti effettuati dallo studente.",
+                    "TAX_02");
+            }
+
             if (resolution.IsResolved)
             {
+                if (string.Equals(resolution.ResponseCode, "DOM_02", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Decision(
+                        CloseStandard,
+                        resolution.RequiredAction,
+                        resolution.Reason,
+                        resolution.ResponseCode);
+                }
+
                 return Decision(
                     CloseResolved,
                     resolution.RequiredAction,
@@ -1092,11 +1183,19 @@ namespace ProcedureNet7
                     "DOM_02");
             }
 
+            if (verifiedCareerWinnerWithoutBlocksResolution)
+            {
+                return Decision(CloseResolved,
+                    "Confermare anno accademico, domanda trasmessa/completa, esito vincitore e assenza di blocchi; poi chiudere il ticket.",
+                    "La richiesta riguarda carriera, CFU, esami, merito, carriera pregressa, passaggi, DOV/CIMEA, tirocinio o inserimento dati. Per lo stesso anno accademico la domanda risulta vincitrice, trasmessa/completa e senza blocchi.",
+                    "CAR_03");
+            }
+
             if (verifiedSectionCompilationResolution)
             {
                 return Decision(CloseResolved,
-                    "Confermare domanda trasmessa/completa, esito idoneo/vincitore e assenza di blocchi; poi chiudere il ticket.",
-                    "La richiesta riguarda come compilare o proseguire la domanda; la pratica è ora trasmessa/completa con esito coerente e senza blocchi.",
+                    "Confermare anno accademico, domanda trasmessa/completa, esito vincitore e assenza di blocchi; poi chiudere il ticket.",
+                    "La richiesta riguarda compilazione o inserimento dati della domanda; per lo stesso anno accademico la pratica risulta vincitrice, trasmessa/completa e senza blocchi.",
                     "DOM_04");
             }
 
@@ -1560,9 +1659,11 @@ namespace ProcedureNet7
             DataRow source,
             string topicCode,
             TicketOfficeRecord? record,
-            ApplicationState applicationState)
+            ApplicationState applicationState,
+            bool recordSelectionIsReliable)
         {
             if (record == null ||
+                !recordSelectionIsReliable ||
                 applicationState != ApplicationState.TRASMESSA_O_COMPLETA ||
                 !string.IsNullOrWhiteSpace(record.Blocks))
             {
@@ -1570,14 +1671,157 @@ namespace ProcedureNet7
             }
 
             string text = GetTicketText(source);
-            if (!IsApplicationCompilationQuestionText(text) || IsUploadDocumentProblemText(text))
+            if (!IsApplicationDataEntryQuestionText(text) || IsUploadDocumentProblemText(text))
                 return false;
 
-            string outcome = (record.BsOutcome ?? string.Empty).Trim();
-            if (string.Equals(topicCode, "ISCRIZIONE_E_CARRIERA", StringComparison.OrdinalIgnoreCase))
-                return outcome == "1" || outcome == "2";
+            // Le chiusure automatiche basate sul completamento della domanda sono riservate
+            // alle pratiche vincitrici. L'idoneità senza assegnazione non dimostra che la
+            // questione amministrativa sia definitivamente superata.
+            return string.Equals(record.BsOutcome?.Trim(), "2", StringComparison.OrdinalIgnoreCase);
+        }
 
-            return outcome == "2";
+        private static bool IsCareerIssueResolvedByWinnerWithoutBlocks(
+            DataRow source,
+            string topicCode,
+            TicketOfficeRecord? record,
+            ApplicationState applicationState,
+            bool recordSelectionIsReliable,
+            TicketIntentAssessment intent)
+        {
+            if (record == null ||
+                !recordSelectionIsReliable ||
+                applicationState != ApplicationState.TRASMESSA_O_COMPLETA ||
+                !string.Equals(record.BsOutcome?.Trim(), "2", StringComparison.OrdinalIgnoreCase) ||
+                !string.IsNullOrWhiteSpace(record.Blocks))
+            {
+                return false;
+            }
+
+            // Contestazioni, rinunce e malfunzionamenti tecnici richiedono una valutazione
+            // dedicata anche se la pratica risulta vincitrice e senza blocchi.
+            if (intent.Intent == TicketIntent.CONTESTAZIONE ||
+                intent.Intent == TicketIntent.RINUNCIA_O_RECESSO ||
+                intent.Intent == TicketIntent.ERRORE_TECNICO ||
+                intent.Intent == TicketIntent.RIMOZIONE_BLOCCO)
+            {
+                return false;
+            }
+
+            string text = GetTicketText(source);
+            if (HasPaymentOrAmountPriority(text) || IsManualDocumentOrAttestationRequest(source))
+                return false;
+
+            string secondaryTopicCode = ReadString(source, "ARGOMENTO_SECONDARIO");
+            return IsCareerIssueText(text, topicCode, secondaryTopicCode) ||
+                   IsCareerDataEntryQuestionText(text, topicCode);
+        }
+
+        private static bool IsCareerIssueText(
+            string text,
+            string topicCode,
+            string secondaryTopicCode)
+        {
+            bool hasCareerSecondaryTopic = TicketDomainText.TopicContainsAny(
+                secondaryTopicCode,
+                "CARRIERA",
+                "CREDITI",
+                "TIROCINIO",
+                "PASSAGGIO_TRASF",
+                "DOV_CIMEA");
+
+            bool hasCareerIssueText = TicketDomainText.ContainsAny(
+                text,
+                "cfu",
+                "crediti",
+                "riconoscimento crediti",
+                "convalida crediti",
+                "esami",
+                "merito",
+                "meriti",
+                "carriera pregressa",
+                "precedente carriera",
+                "passaggio",
+                "trasferimento",
+                "cambio corso",
+                "cambio sede",
+                "abbreviazione",
+                "dov",
+                "cimea",
+                "titolo estero",
+                "tirocinio",
+                "stage");
+
+            if (!string.Equals(topicCode, "ISCRIZIONE_E_CARRIERA", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return hasCareerSecondaryTopic || hasCareerIssueText;
+        }
+
+        private static bool IsCareerDataEntryQuestionText(
+            string text,
+            string topicCode)
+        {
+            if (!string.Equals(topicCode, "ISCRIZIONE_E_CARRIERA", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return TicketDomainText.ContainsAny(
+                text,
+                "compilare",
+                "compilazione",
+                "inserire",
+                "inserimento",
+                "dichiarare",
+                "dichiarazione",
+                "indicare",
+                "indicazione",
+                "selezionare",
+                "selezione",
+                "flag",
+                "flaggare",
+                "valorizzare",
+                "campo",
+                "sezione",
+                "dati di carriera",
+                "dati accademici");
+        }
+
+        private static bool IsApplicationDataEntryQuestionText(string text)
+        {
+            if (IsApplicationCompilationQuestionText(text))
+                return true;
+
+            if (HasPaymentOrAmountPriority(text))
+                return false;
+
+            bool applicationContext = TicketDomainText.ContainsAny(
+                text,
+                "domanda",
+                "borsa di studio",
+                "beneficio",
+                "bando",
+                "application");
+            if (!applicationContext)
+                return false;
+
+            return TicketDomainText.ContainsAny(
+                text,
+                "compilare",
+                "compilazione",
+                "inserire",
+                "inserimento",
+                "dichiarare",
+                "dichiarazione",
+                "indicare",
+                "indicazione",
+                "selezionare",
+                "selezione",
+                "flag",
+                "flaggare",
+                "valorizzare",
+                "campo",
+                "sezione",
+                "dati accademici",
+                "dati di carriera");
         }
 
         private static bool IsPortalAlreadyWinnerMessageResolved(
@@ -1658,6 +1902,110 @@ namespace ProcedureNet7
                 "università estera");
         }
 
+        private static bool IsDuplicateTicketReference(DataRow source)
+        {
+            string text = GetTicketText(source);
+            return TicketDomainText.ContainsAny(
+                text,
+                "ticket precedente",
+                "precedente ticket",
+                "ticket n",
+                "ticket numero",
+                "in riferimento al ticket",
+                "come da ticket",
+                "gia aperto un ticket",
+                "già aperto un ticket",
+                "ho gia aperto un ticket",
+                "ho già aperto un ticket",
+                "riscontro precedente",
+                "come da vostra risposta",
+                "mi era stato detto",
+                "as per previous ticket",
+                "previous ticket");
+        }
+
+        private static bool IsRegionalTaxRequest(DataRow source)
+        {
+            string text = GetTicketText(source);
+            bool regionalTax = TicketDomainText.ContainsAny(
+                text,
+                "tassa regionale",
+                "regional tax",
+                "pagopa",
+                "iuv");
+            if (!regionalTax)
+                return false;
+
+            return TicketDomainText.ContainsAny(
+                text,
+                "rimborso",
+                "rimborsare",
+                "restituzione",
+                "richiesta rimborso",
+                "domanda di rimborso",
+                "pagato per errore",
+                "pagamento errato",
+                "anno accademico sbagliato",
+                "stato rimborso",
+                "tempi di rimborso",
+                "refund",
+                "reimbursement");
+        }
+
+        private static bool IsRegionalTaxInformationRequest(DataRow source)
+        {
+            string text = GetTicketText(source);
+            bool regionalTax = TicketDomainText.ContainsAny(
+                text,
+                "tassa regionale",
+                "regional tax",
+                "pagopa",
+                "iuv");
+            if (!regionalTax || IsRegionalTaxRequest(source))
+                return false;
+
+            return TicketDomainText.ContainsAny(
+                text,
+                "devo pagare",
+                "posso pagare",
+                "copre la tassa",
+                "tasse universitarie",
+                "esonero tassa",
+                "ricevuta tassa",
+                "ricevuta pagopa",
+                "pagamento tassa",
+                "regional tax payment",
+                "tax payment");
+        }
+
+        private static bool IsGraduationPrizeRequest(DataRow source)
+        {
+            string text = GetTicketText(source);
+            return TicketDomainText.ContainsAny(
+                text,
+                "premio di laurea",
+                "premio laurea",
+                "domanda premio",
+                "richiesta premio",
+                "data laurea",
+                "data del conseguimento",
+                "conseguimento laurea",
+                "laurea premio");
+        }
+
+        private static bool IsPinManagementRequest(DataRow source)
+        {
+            string text = GetTicketText(source);
+            return TicketDomainText.ContainsAny(
+                text,
+                "pin management",
+                "senza pin",
+                "without pin",
+                "pin code",
+                "codice pin",
+                "pin gestione");
+        }
+
         private static bool TryGetAcademicYearStart(int academicYear, out int startYear)
         {
             startYear = 0;
@@ -1711,8 +2059,12 @@ namespace ProcedureNet7
             ResolutionAssessment resolution,
             TicketRecordSelection selection)
         {
+            if (decision.Decision.StartsWith(CloseDuplicate, StringComparison.OrdinalIgnoreCase))
+                return "CHIUDIBILE_DUPLICATO_DA_CONFERMARE";
             if (resolution.IsResolved && decision.Decision.StartsWith(CloseResolved, StringComparison.OrdinalIgnoreCase))
                 return "CHIUDIBILE_EVIDENZA_FORTE";
+            if (decision.Decision.StartsWith(CloseStandard, StringComparison.OrdinalIgnoreCase))
+                return "RISPOSTA_STANDARD_PROPONIBILE";
             if (resolution.HasRequestedConditions && !selection.IsExactAcademicYear)
                 return "NON_VALUTABILE_AA";
             if (resolution.HasRequestedConditions && !resolution.IsResolved)
@@ -1768,8 +2120,12 @@ namespace ProcedureNet7
             OperationalDecision decision,
             ResolutionAssessment resolution)
         {
-            if (resolution.IsResolved && decision.Decision.StartsWith(CloseResolved, StringComparison.OrdinalIgnoreCase))
+            if (decision.Decision.StartsWith(CloseDuplicate, StringComparison.OrdinalIgnoreCase) ||
+                decision.Decision.StartsWith(CloseStandard, StringComparison.OrdinalIgnoreCase) ||
+                resolution.IsResolved && decision.Decision.StartsWith(CloseResolved, StringComparison.OrdinalIgnoreCase))
+            {
                 return string.Empty;
+            }
             if (!string.IsNullOrWhiteSpace(resolution.UnresolvedConditions))
                 return resolution.UnresolvedConditions;
             return decision.Reason;
@@ -1784,6 +2140,10 @@ namespace ProcedureNet7
             {
                 return "Confermare evidenza e anno accademico; poi chiudere il ticket.";
             }
+            if (decision.Decision.StartsWith(CloseDuplicate, StringComparison.OrdinalIgnoreCase))
+                return "Verificare il ticket precedente in VALIDAZIONE_TICKET e chiudere come duplicato solo se la problematica coincide.";
+            if (decision.Decision.StartsWith(CloseStandard, StringComparison.OrdinalIgnoreCase))
+                return "Controllare rapidamente il testo e inviare il riscontro standard proposto.";
 
             return decision.ResponseCode switch
             {
@@ -1795,6 +2155,11 @@ namespace ProcedureNet7
                 "GEN_04D" => "Applicare la procedura amministrativa di rinuncia/recesso/cessazione.",
                 "GEN_04E" => "Verificare se la richiesta è compatibile con una chiusura per situazione già risolta.",
                 "GEN_06" => "Individuare l'anno accademico corretto e verificare il record dello stesso AA.",
+                "DUP_01" => "Cercare il ticket precedente e confrontare problematica, CF e argomento.",
+                "TAX_01" => "Verificare rimborso tassa regionale, PagoPA/IUV e stato della richiesta dedicata.",
+                "TAX_02" => "Predisporre riscontro informativo sulla tassa regionale.",
+                "PLA_01" => "Verificare domanda premio di laurea, data laurea e stato istruttoria.",
+                "PIN_01" => "Predisporre riscontro su PIN management o verificare la funzione portale.",
                 "PAG_16" => "Distinguere erogazione borsa da tasse o pagamenti effettuati dallo studente.",
                 "PAG_09" => "Controllare mandato, data accredito, canale e causale prima del riscontro.",
                 "PAG_11" => "Classificare il codice BS anomalo prima di calcolare importi o residui.",
@@ -1816,6 +2181,8 @@ namespace ProcedureNet7
             {
                 return "01_CHIUSURA_PROPOSTA";
             }
+            if (decision.Decision.StartsWith(CloseDuplicate, StringComparison.OrdinalIgnoreCase))
+                return "18_DUPLICATI";
 
             string code = decision.ResponseCode ?? string.Empty;
             if (string.Equals(code, "GEN_01", StringComparison.OrdinalIgnoreCase))
@@ -1824,6 +2191,12 @@ namespace ProcedureNet7
                 return "03_CLASSIFICAZIONE";
             if (string.Equals(code, "GEN_06", StringComparison.OrdinalIgnoreCase))
                 return "04_ANNO_ACCADEMICO";
+            if (code.StartsWith("TAX_", StringComparison.OrdinalIgnoreCase))
+                return "19_TASSA_REGIONALE";
+            if (code.StartsWith("PLA_", StringComparison.OrdinalIgnoreCase))
+                return "20_PREMIO_LAUREA";
+            if (code.StartsWith("PIN_", StringComparison.OrdinalIgnoreCase))
+                return "21_PIN_MANAGEMENT";
             if (string.Equals(code, "GEN_04A", StringComparison.OrdinalIgnoreCase))
                 return "05_CONTESTAZIONI";
             if (string.Equals(code, "GEN_04B", StringComparison.OrdinalIgnoreCase) ||
@@ -1865,8 +2238,10 @@ namespace ProcedureNet7
         {
             if (decision.Decision.StartsWith(CloseResolved, StringComparison.OrdinalIgnoreCase))
                 return "SI";
+            if (decision.Decision.StartsWith(CloseDuplicate, StringComparison.OrdinalIgnoreCase))
+                return "DUPLICATO_DA_CONFERMARE";
             if (decision.Decision.StartsWith(CloseStandard, StringComparison.OrdinalIgnoreCase))
-                return "DA_VERIFICARE";
+                return "RISPOSTA_STANDARD";
             if (decision.Decision.StartsWith(Verify, StringComparison.OrdinalIgnoreCase))
                 return "DA_VERIFICARE";
             return "NO";
@@ -1876,8 +2251,11 @@ namespace ProcedureNet7
         {
             if (decision.Decision.StartsWith(CloseResolved, StringComparison.OrdinalIgnoreCase))
                 return "P1";
-            if (decision.Decision.StartsWith(CloseStandard, StringComparison.OrdinalIgnoreCase))
+            if (decision.Decision.StartsWith(CloseDuplicate, StringComparison.OrdinalIgnoreCase) ||
+                decision.Decision.StartsWith(CloseStandard, StringComparison.OrdinalIgnoreCase))
+            {
                 return "P2";
+            }
             if (decision.Decision.StartsWith(ActionRequired, StringComparison.OrdinalIgnoreCase) ||
                 decision.Decision.StartsWith(DataMissing, StringComparison.OrdinalIgnoreCase))
                 return "P3";
@@ -1890,8 +2268,10 @@ namespace ProcedureNet7
         {
             if (resolution.IsResolved)
                 return $"Situazione già risolta sullo stesso anno: {resolution.Condition}";
+            if (decision.Decision.StartsWith(CloseDuplicate, StringComparison.OrdinalIgnoreCase))
+                return "Possibile duplicato di ticket già trattato";
             if (decision.Decision.StartsWith(CloseStandard, StringComparison.OrdinalIgnoreCase))
-                return "Controllo rapido prima della chiusura";
+                return "Risposta standard proponibile dopo controllo rapido";
             if (decision.Decision.StartsWith(ClosePersonalized, StringComparison.OrdinalIgnoreCase))
                 return "Riscontro assistito: non è una chiusura automatica";
             if (decision.Decision.StartsWith(ActionRequired, StringComparison.OrdinalIgnoreCase))
@@ -1927,7 +2307,7 @@ namespace ProcedureNet7
             if (!selection.HasRecord || applicationState == ApplicationState.SCONOSCIUTO)
                 return "BASSA";
             if (!selection.IsExactAcademicYear)
-                return "BASSA";
+                return selection.HasRequestedAcademicYear ? "BASSA" : "MEDIA";
             return "ALTA";
         }
 
@@ -1976,6 +2356,14 @@ namespace ProcedureNet7
                 string.Equals(operationalDataConfidence, "BASSA", StringComparison.OrdinalIgnoreCase))
             {
                 return "BASSA";
+            }
+
+            if (string.Equals(decision.ResponseCode, "CAR_03", StringComparison.OrdinalIgnoreCase) &&
+                contradictions.Count == 0 &&
+                !blocks.HasRelevantBlocks &&
+                string.Equals(operationalDataConfidence, "ALTA", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ALTA";
             }
 
             if ((decision.Decision.StartsWith(CloseResolved, StringComparison.OrdinalIgnoreCase) ||
@@ -2181,6 +2569,12 @@ namespace ProcedureNet7
                    string.Equals(condition, "SALDO_BORSA_PAGATO", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(condition, "INTEGRAZIONE_BORSA_PAGATA", StringComparison.OrdinalIgnoreCase);
         });
+
+        private static bool IsOperationallyClosableLabel(string value) =>
+            string.Equals(value, "SI", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "PROBABILE", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "RISPOSTA_STANDARD", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "DUPLICATO_DA_CONFERMARE", StringComparison.OrdinalIgnoreCase);
 
         private static void AddIfNotEmpty(List<string> values, string label, string value)
         {

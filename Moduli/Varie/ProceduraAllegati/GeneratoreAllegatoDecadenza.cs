@@ -40,44 +40,97 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
 
         public override void Generate(AllegatoContext context)
         {
-            string codBeneficio = NormalizeBeneficio(context.TipoBeneficio);
+            List<string> benefici = ResolveBenefici(context.TipoBeneficio);
 
             DataTable input = ReadAndValidateInput(context.FileExcel);
 
             Logger.LogInfo(10, $"Righe modello Decadenza lette: {input.Rows.Count}");
 
             CreateInputTempTable(input);
+            ValidateDomandePresenti(input, context);
 
-            Logger.LogInfo(30, "Esecuzione query Decadenza...");
+            int progress = 30;
 
-            DataTable result = ExecuteQuery(
-                GetDecadenzaQuery(),
-                new SqlParameter("@AA", SqlDbType.Char, 8) { Value = context.AnnoAccademico },
-                new SqlParameter("@CodBeneficio", SqlDbType.VarChar, 2) { Value = codBeneficio });
+            foreach (string codBeneficio in benefici)
+            {
+                Logger.LogInfo(progress, $"Esecuzione query Decadenza {codBeneficio}...");
 
-            ValidateQueryResult(input, result);
+                DataTable result = ExecuteQuery(
+                    GetQuery(codBeneficio),
+                    new SqlParameter("@AA", SqlDbType.Char, 8) { Value = context.AnnoAccademico },
+                    new SqlParameter("@CodBeneficio", SqlDbType.VarChar, 2) { Value = codBeneficio });
 
-            if (conRecuperoSomme)
-                ValidateRecuperiPresenti(result);
+                ExportScarti(input, result, context, codBeneficio);
 
-            string fileName = BuildPlaceholderFileName(context.AnnoAccademico);
-            string fullPath = ExportAllegato(result, context.SaveFolder, fileName, context.AnnoAccademico, codBeneficio);
+                if (result.Rows.Count == 0)
+                {
+                    Logger.LogWarning(
+                        progress + 20,
+                        $"Decadenza {codBeneficio}: nessuno studente valido. File allegato non creato.");
 
-            Logger.LogInfo(100, $"Creato allegato Decadenza: {fullPath}");
+                    progress = Math.Min(progress + 20, 90);
+                    continue;
+                }
+
+                if (conRecuperoSomme && IsBeneficioBorsa(codBeneficio))
+                    ValidateRecuperiPresenti(result, context);
+
+                string fileName = BuildPlaceholderFileName(context.AnnoAccademico, codBeneficio);
+                string fullPath = ExportAllegato(result, context.SaveFolder, fileName, context.AnnoAccademico, codBeneficio);
+
+                Logger.LogInfo(progress + 20, $"Creato allegato Decadenza {codBeneficio}: {fullPath}");
+                progress = Math.Min(progress + 20, 90);
+            }
         }
 
-        private static string NormalizeBeneficio(string beneficio)
+        private static List<string> ResolveBenefici(string beneficio)
         {
             if (string.IsNullOrWhiteSpace(beneficio))
-                return "BS";
+                return new List<string> { "BS" };
 
-            string normalized = beneficio.Trim().ToUpperInvariant();
+            List<string> selected = beneficio
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(b => b.Trim().Trim('\'').ToUpperInvariant())
+                .Where(b => !string.IsNullOrWhiteSpace(b))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-            if (normalized == "00" || normalized.Contains("BS"))
-                return "BS";
+            if (selected.Count == 0)
+                return new List<string> { "BS" };
 
-            throw new ValidationException(
-                "La generazione Decadenza è predisposta ora sul beneficio BS.");
+            if (selected.Contains("00", StringComparer.OrdinalIgnoreCase))
+                return new List<string> { "BS", "PA", "CI" };
+
+            string[] supported = { "BS", "PA", "CI" };
+            List<string> unsupported = selected
+                .Where(b => !supported.Contains(b, StringComparer.OrdinalIgnoreCase))
+                .OrderBy(b => b)
+                .ToList();
+
+            if (unsupported.Count > 0)
+            {
+                throw new ValidationException(
+                    "La generazione Decadenza è predisposta per i benefici BS, PA e CI. Benefici non gestiti: " +
+                    string.Join(", ", unsupported));
+            }
+
+            return selected;
+        }
+
+        private static bool IsBeneficioBorsa(string codBeneficio)
+        {
+            return codBeneficio.Equals("BS", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetDescrizioneBeneficio(string codBeneficio)
+        {
+            return codBeneficio.ToUpperInvariant() switch
+            {
+                "BS" => "Borsa di studio",
+                "PA" => "Posto alloggio",
+                "CI" => "Contributo integrativo",
+                _ => codBeneficio
+            };
         }
 
         private static DataTable ReadAndValidateInput(string filePath)
@@ -207,54 +260,136 @@ CREATE TABLE #InputDecadenza
             statCmd.ExecuteNonQuery();
         }
 
-        private static void ValidateQueryResult(DataTable input, DataTable result)
+        private void ValidateDomandePresenti(DataTable input, AllegatoContext context)
         {
-            if (result.Rows.Count == 0)
-                throw new ValidationException("La query non ha restituito righe per i codici fiscali indicati.");
+            DataTable errori = ExecuteQuery(
+                GetDomandeMancantiQuery(),
+                new SqlParameter("@AA", SqlDbType.Char, 8) { Value = context.AnnoAccademico });
 
-            HashSet<string> returned = result.AsEnumerable()
+            if (errori.Rows.Count == 0)
+                return;
+
+            string fullPath = ExportSimpleTable(
+                errori,
+                context.SaveFolder,
+                BuildSupportFileName("ERRORI_Decadenza_DomandeNonTrovate", context.AnnoAccademico, null));
+
+            throw new ValidationException(
+                "Elaborazione bloccata. Codici fiscali senza domanda valida per l'anno indicato. " +
+                $"File errori creato: {fullPath}");
+        }
+
+        private void ExportScarti(DataTable input, DataTable result, AllegatoContext context, string codBeneficio)
+        {
+            HashSet<string> included = result.AsEnumerable()
                 .Select(r => S(r, "Cod_fiscale").Trim())
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             List<string> missing = input.AsEnumerable()
                 .Select(r => r.Field<string>("Cod_fiscale") ?? "")
-                .Where(cf => !returned.Contains(cf))
+                .Where(cf => !included.Contains(cf))
                 .OrderBy(cf => cf)
                 .ToList();
 
-            if (missing.Count > 0)
-            {
-                throw new ValidationException(
-                    "Elaborazione bloccata. Codici fiscali non trovati o non idonei alla query Decadenza: " +
-                    string.Join(", ", missing));
-            }
-        }
+            if (missing.Count == 0)
+                return;
 
-        private static void ValidateRecuperiPresenti(DataTable result)
-        {
-            List<string> withoutRecovery = result.AsEnumerable()
-                .Where(r => D(r, "Recupero_borsa_di_studio") <= 0m && D(r, "Recupero_servizio_abitativo") <= 0m)
+            DataTable scarti = ExecuteQuery(
+                GetScartiQuery(codBeneficio),
+                new SqlParameter("@AA", SqlDbType.Char, 8) { Value = context.AnnoAccademico },
+                new SqlParameter("@CodBeneficio", SqlDbType.VarChar, 2) { Value = codBeneficio });
+
+            DataTable filtered = scarti.Clone();
+            HashSet<string> missingSet = missing.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (DataRow row in scarti.Rows)
+            {
+                if (missingSet.Contains(S(row, "Cod_fiscale")))
+                    filtered.ImportRow(row);
+            }
+
+            HashSet<string> filteredSet = filtered.AsEnumerable()
                 .Select(r => S(r, "Cod_fiscale"))
-                .Where(cf => !string.IsNullOrWhiteSpace(cf))
-                .OrderBy(cf => cf)
-                .ToList();
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            if (withoutRecovery.Count > 0)
+            foreach (DataRow row in input.Rows)
             {
-                throw new ValidationException(
-                    "Elaborazione bloccata. Decadenza con recupero somme selezionata, ma senza importi di recupero per: " +
-                    string.Join(", ", withoutRecovery));
+                string codFiscale = row.Field<string>("Cod_fiscale") ?? string.Empty;
+                if (!missingSet.Contains(codFiscale) || filteredSet.Contains(codFiscale))
+                    continue;
+
+                filtered.Rows.Add(
+                    codFiscale,
+                    string.Empty,
+                    codBeneficio,
+                    row.Field<string>("Motivo_decadenza") ?? string.Empty,
+                    "Non restituito dalla query Decadenza");
             }
+
+            if (filtered.Rows.Count == 0)
+                return;
+
+            string fullPath = ExportSimpleTable(
+                filtered,
+                context.SaveFolder,
+                BuildSupportFileName("SCARTI_Decadenza", context.AnnoAccademico, codBeneficio));
+
+            Logger.LogWarning(
+                null,
+                $"Decadenza {codBeneficio}: creato file scarti per {filtered.Rows.Count} studenti: {fullPath}");
         }
 
-        private string BuildPlaceholderFileName(string aa)
+        private void ValidateRecuperiPresenti(DataTable result, AllegatoContext context)
+        {
+            DataTable errori = new("ErroriDecadenza");
+            errori.Columns.Add("Cod_fiscale", typeof(string));
+            errori.Columns.Add("Num_domanda", typeof(string));
+            errori.Columns.Add("Motivo_decadenza", typeof(string));
+            errori.Columns.Add("Errore", typeof(string));
+
+            foreach (DataRow row in result.AsEnumerable()
+                .Where(r => D(r, "Liquidato") <= 0m || (D(r, "Recupero_borsa_di_studio") <= 0m && D(r, "Recupero_servizio_abitativo") <= 0m))
+                .OrderBy(r => S(r, "Cod_fiscale")))
+            {
+                errori.Rows.Add(
+                    S(row, "Cod_fiscale"),
+                    S(row, "Num_domanda"),
+                    S(row, "Motivo_decadenza"),
+                    D(row, "Liquidato") <= 0m
+                        ? "Decadenza con recupero somme BS senza pagamenti."
+                        : "Decadenza con recupero somme BS senza importi di recupero.");
+            }
+
+            if (errori.Rows.Count == 0)
+                return;
+
+            string fullPath = ExportSimpleTable(
+                errori,
+                context.SaveFolder,
+                BuildSupportFileName("ERRORI_Decadenza_RecuperiBS", context.AnnoAccademico, "BS"));
+
+            throw new ValidationException(
+                "Elaborazione bloccata. Decadenza con recupero somme selezionata, ma alcuni studenti BS non hanno importi di recupero. " +
+                $"File errori creato: {fullPath}");
+        }
+
+        private string BuildPlaceholderFileName(string aa, string codBeneficio)
         {
             string tipo = conRecuperoSomme
                 ? "ConRecuperoSomme"
                 : "SenzaRecuperoSomme";
 
-            return Sanitize($"PLACEHOLDER_Decadenza_{tipo}_{aa}_{DateTime.Now:yyyyMMddHHmmss}.xlsx");
+            return Sanitize($"PLACEHOLDER_Decadenza_{tipo}_{codBeneficio}_{aa}_{DateTime.Now:yyyyMMddHHmmss}.xlsx");
+        }
+
+        private static string BuildSupportFileName(string prefix, string aa, string? codBeneficio)
+        {
+            string beneficio = string.IsNullOrWhiteSpace(codBeneficio)
+                ? string.Empty
+                : $"_{codBeneficio}";
+
+            return Sanitize($"{prefix}{beneficio}_{aa}_{DateTime.Now:yyyyMMddHHmmss}.xlsx");
         }
 
         private string ExportAllegato(DataTable dataTable, string folderPath, string fileName, string aa, string codBeneficio)
@@ -270,9 +405,10 @@ CREATE TABLE #InputDecadenza
 
             int row = 1;
             string anno = $"{aa.Substring(0, 4)}/{aa.Substring(4, 4)}";
+            string descrizioneBeneficio = GetDescrizioneBeneficio(codBeneficio);
             string titolo = conRecuperoSomme
-                ? $"Decadenze con recupero somme - {codBeneficio} - {anno}"
-                : $"Decadenze senza recupero somme - {codBeneficio} - {anno}";
+                ? $"Decadenze con recupero somme - {descrizioneBeneficio} - {anno}"
+                : $"Decadenze senza recupero somme - {descrizioneBeneficio} - {anno}";
 
             ws.PageSetup.PageOrientation = XLPageOrientation.Landscape;
             ws.PageSetup.PaperSize = XLPaperSize.A4Paper;
@@ -348,17 +484,26 @@ CREATE TABLE #InputDecadenza
                 row++;
             }
 
-            ws.Cell(row, 1).Value = "Totale:";
+            bool hasEuroColumns = columns.Any(c => c.Column != null && EuroColumns.Contains(c.Column));
 
-            for (int i = 0; i < columns.Count; i++)
+            if (hasEuroColumns)
             {
-                string? columnName = columns[i].Column;
-                if (columnName != null && totals.TryGetValue(columnName, out decimal total))
-                    ws.Cell(row, i + 1).Value = total;
-            }
+                ws.Cell(row, 1).Value = "Totale:";
 
-            ws.Range(row, 1, row, totalColumns).Style.Font.SetBold();
-            ws.Range(row, 1, row, totalColumns).Style.Fill.SetBackgroundColor(XLColor.LightGray);
+                for (int i = 0; i < columns.Count; i++)
+                {
+                    string? columnName = columns[i].Column;
+                    if (columnName != null && totals.TryGetValue(columnName, out decimal total))
+                        ws.Cell(row, i + 1).Value = total;
+                }
+
+                ws.Range(row, 1, row, totalColumns).Style.Font.SetBold();
+                ws.Range(row, 1, row, totalColumns).Style.Fill.SetBackgroundColor(XLColor.LightGray);
+            }
+            else
+            {
+                row--;
+            }
 
             string euroFormat =
                 "_-[$€-it-IT]* #,##0.00_-;-[$€-it-IT]* #,##0.00_-;_-[$€-it-IT]* \"-\"??_-;_-@_-";
@@ -388,9 +533,53 @@ CREATE TABLE #InputDecadenza
             return fullPath;
         }
 
+        private static string ExportSimpleTable(DataTable dataTable, string folderPath, string fileName)
+        {
+            string fullPath = NormalizeLongPath(Path.Combine(folderPath, fileName));
+            System.IO.Directory.CreateDirectory(folderPath);
+
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add("Dettaglio");
+
+            for (int col = 0; col < dataTable.Columns.Count; col++)
+            {
+                ws.Cell(1, col + 1).Value = dataTable.Columns[col].ColumnName;
+                ws.Column(col + 1).Width = Math.Max(14, dataTable.Columns[col].ColumnName.Length + 2);
+            }
+
+            int row = 2;
+            foreach (DataRow dataRow in dataTable.Rows)
+            {
+                for (int col = 0; col < dataTable.Columns.Count; col++)
+                    ws.Cell(row, col + 1).Value = dataRow[col]?.ToString() ?? string.Empty;
+
+                row++;
+            }
+
+            if (dataTable.Columns.Count > 0)
+            {
+                var headerRange = ws.Range(1, 1, 1, dataTable.Columns.Count);
+                headerRange.Style
+                    .Fill.SetBackgroundColor(XLColor.CornflowerBlue)
+                    .Font.SetBold()
+                    .Font.SetFontColor(XLColor.White)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+                ws.Range(1, 1, Math.Max(1, row - 1), dataTable.Columns.Count).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                ws.Range(1, 1, Math.Max(1, row - 1), dataTable.Columns.Count).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+                ws.SheetView.FreezeRows(1);
+            }
+
+            wb.SaveAs(fullPath);
+            return fullPath;
+        }
+
         private List<AllegatoColumn> GetAllegatoColumns(DataTable dataTable)
         {
             List<AllegatoColumn> columns = GetBaseAllegatoColumns();
+
+            if (IsBeneficioSoloAnagrafico(dataTable))
+                return GetAnagraficaAllegatoColumns();
 
             if (!conRecuperoSomme)
             {
@@ -407,6 +596,17 @@ CREATE TABLE #InputDecadenza
             }
 
             return columns;
+        }
+
+        private static bool IsBeneficioSoloAnagrafico(DataTable dataTable)
+        {
+            return dataTable.Columns.Contains("Cod_beneficio")
+                && dataTable.AsEnumerable().All(r =>
+                {
+                    string codBeneficio = S(r, "Cod_beneficio");
+                    return codBeneficio.Equals("PA", StringComparison.OrdinalIgnoreCase)
+                        || codBeneficio.Equals("CI", StringComparison.OrdinalIgnoreCase);
+                });
         }
 
         private static List<AllegatoColumn> GetBaseAllegatoColumns()
@@ -441,6 +641,22 @@ CREATE TABLE #InputDecadenza
                 new("Trattenuta", "Trattenuta_applicata_I_rata"),
                 new("Num reversale", "Num_reversale"),
                 new("Recupero servizio", "Recupero_servizio_abitativo")
+            };
+        }
+
+        private static List<AllegatoColumn> GetAnagraficaAllegatoColumns()
+        {
+            return new List<AllegatoColumn>
+            {
+                new("N°", null),
+                new("Università", "Descrizione"),
+                new("Codice Fiscale", "Cod_fiscale"),
+                new("Motivo decadenza", "Motivo_decadenza"),
+                new("Num domanda", "Num_domanda"),
+                new("Codice studente", "Codice_Studente"),
+                new("Nome", "Nome"),
+                new("Cognome", "Cognome"),
+                new("Data di nascita", "data_nascita")
             };
         }
 
@@ -570,9 +786,104 @@ CREATE TABLE #InputDecadenza
             };
         }
 
-            private static string GetDecadenzaQuery()
+        private static string GetQuery(string codBeneficio)
+        {
+            return IsBeneficioBorsa(codBeneficio)
+                ? GetDecadenzaQuery()
+                : GetDecadenzaAnagraficaQuery();
+        }
+
+        private static string GetDomandeMancantiQuery()
+        {
+            return @"
+SELECT
+    i.Cod_fiscale,
+    i.Motivo_decadenza,
+    'Domanda non trovata per anno accademico e tipo bando LZ' AS Errore
+FROM #InputDecadenza i
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Domanda d
+    WHERE d.Cod_fiscale = i.Cod_fiscale
+      AND d.Anno_accademico = @AA
+      AND d.Tipo_bando = 'LZ'
+)
+ORDER BY i.Cod_fiscale;";
+        }
+
+        private static string GetScartiQuery(string codBeneficio)
+        {
+            string esitoExists = codBeneficio.ToUpperInvariant() switch
             {
-                return @"
+                "BS" => @"EXISTS (
+        SELECT 1
+        FROM vEsiti_concorsiBS e
+        WHERE e.Anno_accademico = d.Anno_accademico
+          AND e.Num_domanda = d.Num_domanda
+    )",
+                "PA" => @"EXISTS (
+        SELECT 1
+        FROM vEsiti_concorsiPA e
+        WHERE e.Anno_accademico = d.Anno_accademico
+          AND e.Num_domanda = d.Num_domanda
+    )",
+                "CI" => @"EXISTS (
+        SELECT 1
+        FROM vEsiti_concorsiCI e
+        WHERE e.Anno_accademico = d.Anno_accademico
+          AND e.Num_domanda = d.Num_domanda
+    )",
+                _ => "1 = 0"
+            };
+
+            return $@"
+;WITH Domande AS (
+    SELECT
+        i.Cod_fiscale,
+        i.Motivo_decadenza,
+        d.Anno_accademico,
+        d.Num_domanda
+    FROM #InputDecadenza i
+    INNER JOIN Domanda d
+        ON d.Cod_fiscale = i.Cod_fiscale
+       AND d.Anno_accademico = @AA
+       AND d.Tipo_bando = 'LZ'
+)
+SELECT
+    d.Cod_fiscale,
+    d.Num_domanda,
+    @CodBeneficio AS Cod_beneficio,
+    d.Motivo_decadenza,
+    CASE
+        WHEN NOT EXISTS (
+            SELECT 1
+            FROM Benefici_richiesti br
+            WHERE br.Anno_accademico = d.Anno_accademico
+              AND br.Num_domanda = d.Num_domanda
+              AND br.Cod_beneficio = @CodBeneficio
+              AND br.Data_fine_validita IS NULL
+        ) THEN 'Beneficio richiesto attivo non presente'
+        WHEN NOT ({esitoExists}) THEN 'Esito beneficio non presente'
+        ELSE 'Non restituito dalla query Decadenza'
+    END AS Motivo_scarto
+FROM Domande d
+WHERE NOT (
+    EXISTS (
+        SELECT 1
+        FROM Benefici_richiesti br
+        WHERE br.Anno_accademico = d.Anno_accademico
+          AND br.Num_domanda = d.Num_domanda
+          AND br.Cod_beneficio = @CodBeneficio
+          AND br.Data_fine_validita IS NULL
+    )
+    AND {esitoExists}
+)
+ORDER BY d.Cod_fiscale;";
+        }
+
+        private static string GetDecadenzaQuery()
+        {
+            return @"
 ;WITH CodiciPagamentoBS AS (
     SELECT DISTINCT x.Cod_tipo_pagam
     FROM (
@@ -620,9 +931,9 @@ PagamentiAgg AS (
         p.Anno_accademico,
         p.Num_domanda,
         SUM(p.Imp_pagato) AS ImportoPagato,
-        STRING_AGG(p.Cod_tipo_pagam, ', ') AS TipiPagamento,
-        STRING_AGG(p.Cod_mandato, '/') AS Mandati,
-        STRING_AGG(CONVERT(varchar(20), p.Ese_finanziario), '/') AS Ese_finanziari
+        STRING_AGG(p.Cod_tipo_pagam, '#') AS TipiPagamento,
+        STRING_AGG(p.Cod_mandato, '#') AS Mandati,
+        STRING_AGG(CONVERT(varchar(20), p.Ese_finanziario), '#') AS Ese_finanziari
     FROM Pagamenti p
     INNER JOIN Domande d
         ON d.Anno_accademico = p.Anno_accademico
@@ -823,14 +1134,20 @@ JOIN vDATIGENERALI_dom dg
 JOIN vResidenza res
     ON res.ANNO_ACCADEMICO = d.Anno_accademico
    AND res.COD_FISCALE = d.Cod_fiscale
-JOIN vSpecifiche_impegni si
+JOIN Specifiche_impegni si
     ON si.Anno_accademico = d.Anno_accademico
    AND si.Num_domanda = d.Num_domanda
-   AND si.Cod_beneficio = @CodBeneficio
+   AND si.Cod_beneficio = 'BS'  and si.Data_validita =  (SELECT        MAX(Data_validita) AS Expr1
+                               FROM            dbo.Specifiche_impegni AS ap
+                               WHERE        (Anno_accademico = si.Anno_accademico) AND (Cod_fiscale = si.Cod_fiscale) and Cod_beneficio = 'bs' )
+JOIN Benefici_richiesti br
+    ON br.Anno_accademico = d.Anno_accademico
+   AND br.Num_domanda = d.Num_domanda
+   AND br.Cod_beneficio = @CodBeneficio
+   AND br.Data_fine_validita IS NULL
 JOIN vEsiti_concorsiBS bs
     ON bs.Anno_accademico = d.Anno_accademico
    AND bs.Num_domanda = d.Num_domanda
-   AND bs.cod_tipo_esito <> 0
 LEFT JOIN vEsiti_concorsiPA pa
     ON pa.Anno_accademico = d.Anno_accademico
    AND pa.Num_domanda = d.Num_domanda
@@ -858,7 +1175,73 @@ LEFT JOIN vStanza vz
    AND vz.Cod_Stanza = apa.Cod_Stanza
 ORDER BY
     d.Cod_fiscale;";
-            }
+        }
+
+        private static string GetDecadenzaAnagraficaQuery()
+        {
+            return @"
+;WITH Domande AS (
+    SELECT
+        d.Anno_accademico,
+        d.Tipo_bando,
+        d.Num_domanda,
+        d.Cod_fiscale,
+        i.Motivo_decadenza
+    FROM #InputDecadenza i
+    INNER JOIN Domanda d
+        ON d.Cod_fiscale = i.Cod_fiscale
+    WHERE d.Anno_accademico = @AA
+      AND d.Tipo_bando = 'LZ'
+)
+SELECT
+    d.Anno_accademico,
+    @CodBeneficio AS Cod_beneficio,
+    ss.Descrizione,
+    d.Cod_fiscale,
+    d.Motivo_decadenza,
+    d.Num_domanda,
+    st.Codice_Studente,
+    st.Nome,
+    st.Cognome,
+    CONVERT(char(12), st.Data_nascita, 103) AS data_nascita
+FROM Domande d
+JOIN Studente st
+    ON st.Cod_fiscale = d.Cod_fiscale
+JOIN vAppartenenza app
+    ON app.Anno_accademico = d.Anno_accademico
+   AND app.Cod_fiscale = d.Cod_fiscale
+   AND app.Tipo_bando = d.Tipo_bando
+JOIN Sede_studi ss
+    ON ss.Cod_sede_studi = app.Cod_sede_studi
+   AND ss.Cod_ente = app.Cod_ente
+JOIN Benefici_richiesti br
+    ON br.Anno_accademico = d.Anno_accademico
+   AND br.Num_domanda = d.Num_domanda
+   AND br.Cod_beneficio = @CodBeneficio
+   AND br.Data_fine_validita IS NULL
+WHERE
+    (
+        @CodBeneficio = 'PA'
+        AND EXISTS (
+            SELECT 1
+            FROM vEsiti_concorsiPA pa
+            WHERE pa.Anno_accademico = d.Anno_accademico
+              AND pa.Num_domanda = d.Num_domanda
+        )
+    )
+    OR
+    (
+        @CodBeneficio = 'CI'
+        AND EXISTS (
+            SELECT 1
+            FROM vEsiti_concorsiCI ci
+            WHERE ci.Anno_accademico = d.Anno_accademico
+              AND ci.Num_domanda = d.Num_domanda
+        )
+    )
+ORDER BY
+    d.Cod_fiscale;";
+        }
 
         private static string TrasformaTipiPagamento(string input)
         {
@@ -869,14 +1252,38 @@ ORDER BY
             {
                 { "BSP0", "Prima Rata" },
                 { "BSI0", "Integrazione Prima Rata" },
+                { "BSS0", "Saldo" },
+                { "BSS1", "Saldo" },
+                { "BSS2", "Saldo" },
                 { "01", "Prima Rata" },
                 { "BSP1", "Prima Rata" }
             };
 
-            foreach (var kvp in mapping)
-                input = input.Replace(kvp.Key, kvp.Value);
+            List<string> translated = new();
 
-            return input;
+            foreach (string code in input.Split('#', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                translated.Add(mapping.TryGetValue(code, out string? value)
+                    ? value
+                    : "Altro");
+            }
+
+            return string.Join("#", translated
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(GetTipoPagamentoOrder)
+                .ThenBy(v => v, StringComparer.OrdinalIgnoreCase));
+        }
+
+        private static int GetTipoPagamentoOrder(string tipoPagamento)
+        {
+            return tipoPagamento switch
+            {
+                "Prima Rata" => 0,
+                "Integrazione Prima Rata" => 1,
+                "Saldo" => 2,
+                "Altro" => 3,
+                _ => 4
+            };
         }
     }
 }

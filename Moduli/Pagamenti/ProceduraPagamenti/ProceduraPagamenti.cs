@@ -18,7 +18,7 @@ namespace ProcedureNet7
 {
     public partial class ProceduraPagamenti : BaseProcedure<ArgsPagamenti>
     {
-        string debugStudente = "GNVMTN02H57A509X";
+        string debugStudente = "DGRMTN97T70D643J";
         string selectedSaveFolder = string.Empty;
         string selectedAA = string.Empty;
 

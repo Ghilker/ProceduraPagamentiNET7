@@ -241,6 +241,8 @@ namespace ProcedureNet7
             var values = new List<string>();
             AddIfNotEmpty(values, "sede", record.StudyLocation);
             AddIfNotEmpty(values, "esito BS", PaymentsTicketDomainModule.FormatOutcome(record.BsOutcome));
+            AddIfNotEmpty(values, "status compilazione", record.CompilationStatus.ToString(CultureInfo.InvariantCulture));
+            values.Add(string.IsNullOrWhiteSpace(record.Blocks) ? "blocchi assenti" : "blocchi presenti");
             return JoinEvidence(values);
         }
     }

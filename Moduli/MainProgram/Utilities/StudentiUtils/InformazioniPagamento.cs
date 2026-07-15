@@ -25,7 +25,6 @@ namespace ProcedureNet7
         public List<Pagamento> PagamentiEffettuati { get; set; } = new List<Pagamento>();
         public List<Reversale> Reversali { get; set; } = new List<Reversale>();
         public List<Detrazione> Detrazioni { get; set; } = new List<Detrazione>();
-        public double GeneratoreFlussoReversaleNONLOTOCCAREGIACOMOTIAMMAZZO { get; set; }
 
     }
 }

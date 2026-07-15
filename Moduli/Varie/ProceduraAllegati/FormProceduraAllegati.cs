@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.Data;
+using System;
+using System.ComponentModel.DataAnnotations;
 using System.Data.SqlClient;
 using ClosedXML.Excel;
 using ProcedureNet7.ProceduraAllegatiSpace;
@@ -17,7 +17,7 @@ namespace ProcedureNet7
 
         private readonly Dictionary<string, string> proceduraAllegatiBeneficiItems = new()
         {
-            { "00", "00" },
+            { "00", "Tutti" },
             { "BS", "BS" },
             { "PA", "PA" },
             { "CI", "CI" }
@@ -103,8 +103,21 @@ namespace ProcedureNet7
 
         private string GetSelectedBenefici()
         {
-            return Utilities.GetCheckBoxSelectedCodes(
-                selectedBeneficiStrip.Items);
+            List<string> selectedCodes = new();
+
+            foreach (ToolStripMenuItem item in selectedBeneficiStrip.Items)
+            {
+                if (!item.Checked)
+                    continue;
+
+                string code = item.Tag?.ToString()?.Trim() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(code))
+                    selectedCodes.Add("'" + code.Replace("'", "''") + "'");
+            }
+
+            return selectedCodes.Count == 0
+                ? "''"
+                : string.Join(", ", selectedCodes);
         }
 
         private void RunProcedureBtnClick(object sender, EventArgs e)
@@ -184,20 +197,24 @@ namespace ProcedureNet7
 
         public void GeneraTemplate(string tipoAllegato, string annoAccademico)
         {
-            switch (tipoAllegato)
+            if (!CatalogoModelliAllegati.TryGet(tipoAllegato, out ModelloAllegatoDefinition? modello)
+                || modello is null)
             {
-                case "40":
-                case "41":
-                    GeneraTemplateDecadenza(annoAccademico);
-                    break; 
+                MessageBox.Show(
+                    "Tipo allegato non gestito.",
+                    "Attenzione",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
 
-                default:
-                    MessageBox.Show(
-                        "Template non ancora implementato");
-                    break;
+                return;
             }
+
+            GeneraTemplateAllegato(modello, annoAccademico);
         }
-        private void GeneraTemplateDecadenza(string annoAccademico)
+
+        private void GeneraTemplateAllegato(
+            ModelloAllegatoDefinition modello,
+            string annoAccademico)
         {
             string? filePath = null;
 
@@ -205,16 +222,11 @@ namespace ProcedureNet7
             {
                 using SaveFileDialog saveDialog = new();
 
-                saveDialog.Filter =
-                    "Excel (*.xlsx)|*.xlsx";
-
-                saveDialog.FileName =
-                    $"Template_Decadenza_{annoAccademico}.xlsx";
+                saveDialog.Filter = "Excel (*.xlsx)|*.xlsx";
+                saveDialog.FileName = GetTemplateFileName(modello, annoAccademico);
 
                 if (saveDialog.ShowDialog() == DialogResult.OK)
-                {
                     filePath = saveDialog.FileName;
-                }
             });
 
             if (string.IsNullOrWhiteSpace(filePath))
@@ -223,18 +235,48 @@ namespace ProcedureNet7
                 return;
             }
 
-            DataTable dt = new();
-
-            dt.Columns.Add("Codice fiscale");
-            dt.Columns.Add("Motivo decadenza");
-
             using XLWorkbook wb = new();
-            wb.Worksheets.Add(dt, "Decadenza");
+            var ws = wb.Worksheets.Add(modello.NomeFoglio);
+
+            for (int index = 0; index < modello.Colonne.Count; index++)
+            {
+                int colonna = index + 1;
+                string intestazione = modello.Colonne[index];
+
+                ws.Cell(1, colonna).Value = intestazione;
+                ws.Column(colonna).Width = Math.Max(16, intestazione.Length + 2);
+
+                if (intestazione.Equals(CatalogoModelliAllegati.CodiceFiscale, StringComparison.OrdinalIgnoreCase))
+                    ws.Column(colonna).Style.NumberFormat.Format = "@";
+            }
+
+            var intestazioni = ws.Range(1, 1, 1, modello.Colonne.Count);
+            intestazioni.Style
+                .Fill.SetBackgroundColor(XLColor.CornflowerBlue)
+                .Font.SetBold()
+                .Font.SetFontColor(XLColor.White)
+                .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center)
+                .Alignment.SetVertical(XLAlignmentVerticalValues.Center)
+                .Alignment.SetWrapText(true);
+
+            ws.Row(1).Height = 28;
+            ws.SheetView.FreezeRows(1);
+
             wb.SaveAs(filePath);
 
             Logger.LogInfo(
                 null,
-                $"Creato template: {filePath}");
+                $"Creato template per '{modello.Descrizione}': {filePath}");
+        }
+
+        private static string GetTemplateFileName(
+            ModelloAllegatoDefinition modello,
+            string annoAccademico)
+        {
+            string aa = annoAccademico?.Trim() ?? string.Empty;
+            string suffissoAnno = string.IsNullOrWhiteSpace(aa) ? string.Empty : $"_{aa}";
+
+            return $"Template_{modello.Codice}_{modello.NomeFile}{suffissoAnno}.xlsx";
         }
         private void ProceduraAllegatiSavebtn_Click(object sender, EventArgs e)
         {

@@ -281,7 +281,7 @@ namespace ProcedureNet7
                     studente.InformazioniPersonali.Cognome,
                     studente.InformazioniPersonali.Nome,
                     studente.InformazioniPagamento.ImportoDaPagareLordo,
-                    studente.InformazioniPagamento.GeneratoreFlussoReversaleNONLOTOCCAREGIACOMOTIAMMAZZO,
+                    studente.InformazioniPagamento.ImportoReversale,
                     studente.InformazioniPagamento.ImportoDaPagare,
                     1,
                     studente.InformazioniConto.IBAN,

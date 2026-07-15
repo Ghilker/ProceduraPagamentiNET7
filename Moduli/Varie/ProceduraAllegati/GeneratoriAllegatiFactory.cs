@@ -14,6 +14,15 @@ namespace ProcedureNet7.ProceduraAllegatiSpace
 
             Register(new GeneratoreAllegatoDecadenza(connection, GeneratoreAllegatoDecadenza.Modalita.SenzaRecuperoSomme));
             Register(new GeneratoreAllegatoDecadenza(connection, GeneratoreAllegatoDecadenza.Modalita.ConRecuperoSomme));
+            Register(new GeneratoreAllegatoRiammissioneVincitore(connection));
+            Register(new GeneratoreAllegatoRiammissioneVincitore(
+                connection,
+                GeneratoreAllegatoRiammissioneVincitore.Modalita.IdoneoAVincitore));
+            Register(new GeneratoreAllegatoRiammissioneIdoneo(connection));
+            Register(new GeneratoreAllegatoModificaImporto(connection));
+            Register(new GeneratoreAllegatoModificaImporto(
+                connection,
+                GeneratoreAllegatoModificaImporto.Modalita.CambioStatusSede));
         }
 
         public IGeneratoreAllegato GetRequired(string codice)

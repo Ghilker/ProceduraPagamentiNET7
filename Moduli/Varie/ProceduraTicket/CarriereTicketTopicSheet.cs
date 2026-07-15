@@ -24,6 +24,7 @@ namespace ProcedureNet7
             AddOfficeColumn(result, "CRITERIO_SELEZIONE_RECORD");
             AddOfficeColumn(result, "NUM_DOMANDA");
             AddOfficeColumn(result, "STATUS_COMPILAZIONE", typeof(int));
+            AddOfficeColumn(result, "ESITO_BS");
             result.Columns.Add("TIPO_CARRIERA", typeof(string));
             result.Columns.Add("CATEGORIA_DOMANDE_STUDENTE", typeof(string));
             result.Columns.Add("NUMERO_ANNI_ACCADEMICI", typeof(int));
@@ -90,6 +91,7 @@ namespace ProcedureNet7
                 row["AA_RECORD_OPERATIVO"] = FormatAcademicYear(record.AcademicYear);
                 row["NUM_DOMANDA"] = record.ApplicationNumber;
                 row["STATUS_COMPILAZIONE"] = record.CompilationStatus;
+                row["ESITO_BS"] = PaymentsTicketDomainModule.FormatOutcome(record.BsOutcome);
                 row["ANNO_IMMATRICOLAZIONE"] = record.EnrollmentYear;
                 row["ANNO_CORSO"] = record.CourseYear;
                 row["TIPO_STUDI"] = record.StudyType;
@@ -170,6 +172,8 @@ namespace ProcedureNet7
                 indications.Add("domanda non trasmessa/completa");
             if (!string.IsNullOrWhiteSpace(record.Blocks))
                 indications.Add("blocchi presenti");
+            else if (record.CompilationStatus >= 90 && string.Equals(record.BsOutcome, "2", StringComparison.OrdinalIgnoreCase))
+                indications.Add("domanda vincitrice trasmessa/completa senza blocchi");
 
             return string.Join("; ", indications);
         }
