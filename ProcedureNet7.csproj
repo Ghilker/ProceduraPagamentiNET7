@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Tests\**\*</DefaultItemExcludes>
     <Configurations>Debug;Release;PAGAMENTI;VARIE;VERIFICHE</Configurations>
     <SignAssembly>True</SignAssembly>
     <UseWPF>False</UseWPF>
