@@ -18,7 +18,7 @@ namespace ProcedureNet7
 {
     public partial class ProceduraPagamenti
     {
-        private void ProcessStudentList()
+        private void ProcessStudentListCore()
         {
             if (studentiDaPagare.Count == 0)
             {
@@ -163,65 +163,6 @@ namespace ProcedureNet7
             _ = dropCmd.ExecuteNonQuery();
         }
 
-        private void ExportStudentiRimossi(IEnumerable<string> codFiscali, string fileName, string motivazione)
-        {
-            ExportStudentiRimossi(
-                codFiscali.Select(codFiscale => (CodFiscale: codFiscale, Motivazione: motivazione)),
-                fileName);
-        }
-
-        private void ExportStudentiRimossi(IEnumerable<(string CodFiscale, string Motivazione)> studenti, string fileName)
-        {
-            var studentiList = studenti
-                .Where(s => !string.IsNullOrWhiteSpace(s.CodFiscale))
-                .GroupBy(s => s.CodFiscale, StringComparer.OrdinalIgnoreCase)
-                .Select(g => (
-                    CodFiscale: g.Key,
-                    Motivazione: string.Join(" | ", g.Select(x => x.Motivazione).Where(m => !string.IsNullOrWhiteSpace(m)).Distinct())))
-                .OrderBy(s => s.CodFiscale, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (studentiList.Count == 0)
-            {
-                return;
-            }
-
-            DataTable studentiRimossi = new();
-            studentiRimossi.Columns.Add("CodFiscale");
-            studentiRimossi.Columns.Add("NumDomanda");
-            studentiRimossi.Columns.Add("Cognome");
-            studentiRimossi.Columns.Add("Nome");
-            studentiRimossi.Columns.Add("CodEnte");
-            studentiRimossi.Columns.Add("AnnoAccademico");
-            studentiRimossi.Columns.Add("Beneficio");
-            studentiRimossi.Columns.Add("CategoriaPagamento");
-            studentiRimossi.Columns.Add("TipoPagamento");
-            studentiRimossi.Columns.Add("Impegno");
-            studentiRimossi.Columns.Add("ImportoDaPagare");
-            studentiRimossi.Columns.Add("Motivazione");
-
-            foreach (var item in studentiList)
-            {
-                studentiDaPagare.TryGetValue(item.CodFiscale, out StudentePagamenti? studente);
-
-                studentiRimossi.Rows.Add(
-                    item.CodFiscale,
-                    studente?.InformazioniPersonali.NumDomanda ?? string.Empty,
-                    studente?.InformazioniPersonali.Cognome ?? string.Empty,
-                    studente?.InformazioniPersonali.Nome ?? string.Empty,
-                    studente?.InformazioniIscrizione.CodEnte ?? string.Empty,
-                    selectedAA,
-                    isTR ? "TR" : tipoBeneficio,
-                    categoriaPagam,
-                    codTipoPagamento,
-                    studente?.InformazioniPagamento.NumeroImpegno ?? string.Empty,
-                    studente?.InformazioniPagamento.ImportoDaPagare.ToString("F2", CultureInfo.InvariantCulture) ?? string.Empty,
-                    item.Motivazione);
-            }
-
-            Utilities.ExportDataTableToExcel(studentiRimossi, GetCurrentPagamentoFolder(), fileName: fileName);
-        }
-
         private void ControlloPagamenti()
         {
             if (!studenteForzato)
@@ -280,7 +221,7 @@ namespace ProcedureNet7
                             )
                     )
                     SELECT DISTINCT
-                        mce.CODICE_FISCALE
+                        mce.CODICE_FISCALE, mcg.COD_MANDATO, mce.CODICE_MOVIMENTO
                     FROM
                         MOVIMENTI_CONTABILI_ELEMENTARI mce
                         INNER JOIN #CFEstrazione cf
@@ -294,6 +235,7 @@ namespace ProcedureNet7
                         AND mce.STATO = '2'";
 
                 HashSet<string> studentiDaRimuovereHash = new();
+                var motiviMovimenti = new List<(string CodFiscale, MotivoEsclusionePagamento Motivazione)>();
 
                 using SqlCommand readData = new(sqlPagam, CONNECTION, sqlTransaction)
                 {
@@ -321,15 +263,17 @@ namespace ProcedureNet7
                         if (studente != null)
                         {
                             studentiDaRimuovereHash.Add(studente.InformazioniPersonali.CodFiscale);
+                            motiviMovimenti.Add((codFiscale, Esclusione("Movimento contabile già presente",
+                                $"Risulta un movimento contabile per {DescrizioneBeneficio(isTR ? "TR" : tipoBeneficio)} nell'anno selezionato. " +
+                                $"Mandato: {Utilities.SafeGetString(reader, "COD_MANDATO")}; riferimento movimento: {Utilities.SafeGetString(reader, "CODICE_MOVIMENTO")}.")));
                             continue;
                         }
                     }
                 }
 
                 ExportStudentiRimossi(
-                    studentiDaRimuovereHash,
-                    "Studenti rimossi controllo movimentazioni",
-                    $"Movimento contabile gia presente per {ambitoMandati}");
+                    motiviMovimenti,
+                    "Controllo movimentazioni");
 
                 foreach (string codFiscale in studentiDaRimuovereHash)
                 {
@@ -410,12 +354,14 @@ namespace ProcedureNet7
                 }
 
                 HashSet<string> studentiDaRimuovereHash = new();
+                var motiviPagamenti = new List<(string CodFiscale, MotivoEsclusionePagamento Motivazione)>();
                 foreach (var pair in studentiDaPagare)
                 {
                     if (studenteForzato) { continue; }
 
                     StudentePagamenti studenteDaControllare = pair.Value;
                     bool stessoPagamento = false;
+                    Pagamento? pagamentoPrecedente = null;
                     bool okTassaRegionale = false;
                     if (studenteDaControllare.InformazioniPersonali.CodFiscale == debugStudente)
                     {
@@ -435,6 +381,7 @@ namespace ProcedureNet7
                         if (pagamento.codTipoPagam == codTipoPagamento)
                         {
                             stessoPagamento = true;
+                            pagamentoPrecedente = pagamento;
                             if (tipoBeneficio == TipoBeneficio.PremioDiLaurea.ToCode())
                             {
                                 stessoPagamento = false;
@@ -471,6 +418,14 @@ namespace ProcedureNet7
                     if ((stessoPagamento || (isTR && !okTassaRegionale)) && !studentiDaRimuovereHash.Contains(studenteDaControllare.InformazioniPersonali.CodFiscale))
                     {
                         studentiDaRimuovereHash.Add(studenteDaControllare.InformazioniPersonali.CodFiscale);
+                        motiviPagamenti.Add((pair.Key, stessoPagamento
+                            ? Esclusione("Pagamento già registrato",
+                                $"«{DescrizionePagamento(codTipoPagamento)}» risulta già registrato per {Euro(pagamentoPrecedente!.importoPagamento)} e non stornato. Lo stesso pagamento non viene emesso una seconda volta.", pagamentoPrecedente.importoPagamento)
+                            : PagamentoEsclusioniRules.TassaRegionaleNonAmmessa(
+                                studenteDaControllare.InformazioniPagamento.PagamentiEffettuati,
+                                studenteDaControllare.InformazioniIscrizione.AnnoCorso,
+                                studenteDaControllare.InformazioniBeneficio.SuperamentoEsami,
+                                studenteDaControllare.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)));
                         continue;
                     }
 
@@ -480,13 +435,15 @@ namespace ProcedureNet7
                     if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode() && !isTR && Math.Abs(studenteDaControllare.InformazioniBeneficio.ImportoBeneficio - studenteDaControllare.InformazioniPagamento.ImportoPagato) < 5)
                     {
                         studentiDaRimuovereHash.Add(studenteDaControllare.InformazioniPersonali.CodFiscale);
+                        motiviPagamenti.Add((pair.Key, PagamentoEsclusioniRules.DifferenzaEntroSoglia(
+                            studenteDaControllare.InformazioniBeneficio.ImportoBeneficio,
+                            studenteDaControllare.InformazioniPagamento.ImportoPagato, "Importo del beneficio")));
                     }
                 }
 
                 ExportStudentiRimossi(
-                    studentiDaRimuovereHash,
-                    "Studenti rimossi controllo pagamenti",
-                    "Pagamento gia presente o pagamento completo");
+                    motiviPagamenti,
+                    "Controllo pagamenti precedenti");
 
                 foreach (string codFiscale in studentiDaRimuovereHash)
                 {
@@ -519,6 +476,7 @@ namespace ProcedureNet7
             {
                 Logger.LogDebug(null, "Inizio del controllo delle riemissioni per gli studenti");
                 HashSet<string> studentiDaRimuovere = new();
+                var motivi = new List<(string CodFiscale, MotivoEsclusionePagamento Motivazione)>();
                 foreach (var pair in studentiDaPagare)
                 {
                     StudentePagamenti studente = pair.Value;
@@ -529,6 +487,8 @@ namespace ProcedureNet7
                     if (studente.InformazioniPagamento.PagamentiEffettuati == null || studente.InformazioniPagamento.PagamentiEffettuati.Count <= 0)
                     {
                         studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
+                        motivi.Add((pair.Key, PagamentoEsclusioniRules.RiemissioneNonAmmessa(
+                            firstPart, lastValue, studente.InformazioniPagamento.PagamentiEffettuati, DescrizionePagamento)));
                         continue;
                     }
 
@@ -579,12 +539,13 @@ namespace ProcedureNet7
                     if (!pagamentoPossibile)
                     {
                         studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
+                        motivi.Add((pair.Key, PagamentoEsclusioniRules.RiemissioneNonAmmessa(
+                            firstPart, lastValue, studente.InformazioniPagamento.PagamentiEffettuati, DescrizionePagamento)));
                     }
                 }
                 ExportStudentiRimossi(
-                    studentiDaRimuovere,
-                    "Studenti rimossi controllo riemissioni",
-                    "Riemissione non ammissibile o pagamento originario non ritirato dall'azienda");
+                    motivi,
+                    "Controllo riemissioni");
 
                 foreach (string codFiscale in studentiDaRimuovere)
                 {
@@ -597,12 +558,15 @@ namespace ProcedureNet7
             {
                 Logger.LogDebug(null, "Inizio del controllo delle integrazioni per gli studenti");
                 HashSet<string> studentiDaRimuovere = new();
+                var motivi = new List<(string CodFiscale, MotivoEsclusionePagamento Motivazione)>();
                 foreach (var pair in studentiDaPagare)
                 {
                     StudentePagamenti studente = pair.Value;
                     if (studente.InformazioniPagamento.PagamentiEffettuati == null || studente.InformazioniPagamento.PagamentiEffettuati.Count <= 0)
                     {
                         studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
+                        motivi.Add((pair.Key, PagamentoEsclusioniRules.IntegrazioneNonAmmessa(
+                            tipoBeneficio, selectedTipoPagamento, studente.InformazioniPagamento.PagamentiEffettuati, DescrizionePagamento)));
                         continue;
                     }
                     bool pagamentoPossibile = false;
@@ -674,12 +638,13 @@ namespace ProcedureNet7
                     if (!pagamentoPossibile)
                     {
                         studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
+                        motivi.Add((pair.Key, PagamentoEsclusioniRules.IntegrazioneNonAmmessa(
+                            tipoBeneficio, selectedTipoPagamento, studente.InformazioniPagamento.PagamentiEffettuati, DescrizionePagamento)));
                     }
                 }
                 ExportStudentiRimossi(
-                    studentiDaRimuovere,
-                    "Studenti rimossi controllo integrazioni",
-                    "Integrazione non ammissibile per pagamenti precedenti");
+                    motivi,
+                    "Controllo integrazioni");
 
                 foreach (string codFiscale in studentiDaRimuovere)
                 {
@@ -713,11 +678,30 @@ namespace ProcedureNet7
                     }
                 }
 
-                Logger.LogInfo(null, $"Trovati {studentiDaRimuovere.Count} studenti senza provvedimento");
-                ExportStudentiRimossi(
-                    studentiDaRimuovere,
-                    "Studenti senza provvedimento modifica importo",
-                    "Assente dal controllo provvedimenti");
+                var motiviImporti = new List<(string CodFiscale, MotivoEsclusionePagamento Motivazione)>();
+                var studentiConDettaglio = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (studentiDaRimuovere.Count > 0)
+                {
+                    // Read the evidence used by the academic-year rule without changing its selection.
+                    using SqlDataReader reader = readData.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        string cf = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
+                        if (!studentiDaRimuovere.Contains(cf)) continue;
+                        double? beneficio = reader.IsDBNull(reader.GetOrdinal("Imp_beneficio"))
+                            ? null : Utilities.SafeGetDouble(reader, "Imp_beneficio");
+                        double? assegnato = reader.IsDBNull(reader.GetOrdinal("Importo_assegnato"))
+                            ? null : Utilities.SafeGetDouble(reader, "Importo_assegnato");
+                        if (beneficio.HasValue && assegnato.HasValue && beneficio == assegnato) continue;
+                        studentiConDettaglio.Add(cf);
+                        motiviImporti.Add((cf, PagamentoEsclusioniRules.ImportiNonCoincidenti(beneficio, assegnato)));
+                    }
+                }
+                foreach (string cf in studentiDaRimuovere.Where(cf => !studentiConDettaglio.Contains(cf)))
+                    motiviImporti.Add((cf, Esclusione("Posizione contabile non confermata",
+                        $"Per l'A.A. {PagamentoEsclusioniRules.AnnoAccademico(selectedAA)} non è stata confermata una posizione vincitrice con assegnazione contabile attiva e importo coincidente con quello della borsa.")));
+                Logger.LogInfo(null, $"Trovati {studentiDaRimuovere.Count} studenti con posizione contabile non confermata");
+                ExportStudentiRimossi(motiviImporti, "Confronto importo borsa e assegnazione contabile");
 
                 // Remove students not present in the query
                 foreach (string codFiscale in studentiDaRimuovere)
@@ -736,27 +720,26 @@ namespace ProcedureNet7
             // Check for payment blocks
             string sqlKiller = $@"
                     SELECT DISTINCT
-                        Domanda.cod_fiscale 
+                        Domanda.cod_fiscale, blocco.Cod_tipologia_blocco, tipoBlocco.Descrizione AS DescrizioneBlocco
                     FROM 
                         Domanda 
                         INNER JOIN #CFEstrazione cfe ON Domanda.Cod_fiscale = cfe.Cod_fiscale 
+                        INNER JOIN vMotivazioni_blocco_pagamenti blocco
+                            ON blocco.Anno_accademico = Domanda.Anno_accademico AND blocco.Num_domanda = Domanda.Num_domanda
+                        LEFT JOIN Tipologie_motivazioni_blocco_pag tipoBlocco
+                            ON tipoBlocco.Cod_tipologia_blocco = blocco.Cod_tipologia_blocco
                     WHERE
-                        Domanda.anno_accademico = '{selectedAA}' and
-                        Domanda.num_domanda in (
-                            SELECT DISTINCT Num_domanda
-                                FROM vMotivazioni_blocco_pagamenti
-                                WHERE Anno_accademico = '{selectedAA}' 
-                                    AND Data_fine_validita IS NULL 
-                                    AND Blocco_pagamento_attivo = 1";
+                        Domanda.anno_accademico = '{selectedAA}'
+                        AND blocco.Data_fine_validita IS NULL
+                        AND blocco.Blocco_pagamento_attivo = 1";
             if (tipoBeneficio == TipoBeneficio.BuonoLibro.ToCode())
             {
-                sqlKiller += " AND cod_tipologia_blocco in ('BPD', 'BSS', 'BS1')";
+                sqlKiller += " AND blocco.cod_tipologia_blocco in ('BPD', 'BSS', 'BS1')";
             }
             if (ignoraBloccoBppPrimaRataBorsa)
             {
-                sqlKiller += " AND cod_tipologia_blocco <> 'BPP'";
+                sqlKiller += " AND blocco.cod_tipologia_blocco <> 'BPP'";
             }
-            sqlKiller += " )";
 
             if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode())
             {
@@ -778,6 +761,7 @@ namespace ProcedureNet7
             };
             Logger.LogInfo(12, $"Lavorazione studenti - controllo eliminabili");
             HashSet<string> listaStudentiDaEliminareBlocchi = new();
+            var motiviBlocchi = new List<(string CodFiscale, MotivoEsclusionePagamento Motivazione)>();
             using (SqlDataReader reader = readData.ExecuteReader())
             {
                 while (reader.Read())
@@ -788,9 +772,13 @@ namespace ProcedureNet7
                         string test = "";
                     }
                     studentiDaPagare.TryGetValue(codFiscale, out StudentePagamenti? studente);
-                    if (studente != null && !listaStudentiDaEliminareBlocchi.Contains(studente.InformazioniPersonali.CodFiscale))
+                    if (studente != null)
                     {
                         listaStudentiDaEliminareBlocchi.Add(studente.InformazioniPersonali.CodFiscale);
+                        string descrizione = Utilities.SafeGetString(reader, "DescrizioneBlocco").Trim();
+                        string codice = Utilities.SafeGetString(reader, "Cod_tipologia_blocco").Trim();
+                        motiviBlocchi.Add((codFiscale, Esclusione("Blocco attivo sulla domanda",
+                            $"La domanda presenta il blocco «{(string.IsNullOrWhiteSpace(descrizione) ? $"descrizione non disponibile, riferimento {codice}" : descrizione)}», attivo alla data di elaborazione. Il blocco impedisce questo pagamento.")));
                     }
                 }
             }
@@ -999,25 +987,26 @@ namespace ProcedureNet7
             Logger.LogInfo(12, $"Numero studenti da eliminare perché non più vincitori = {listaStudentiDaEliminareNonVincitori.Count}");
             Logger.LogInfo(12, $"Numero studenti da eliminare per PEC mancante = {listaStudentiDaEliminarePEC.Count}");
             ExportStudentiRimossi(
-                listaStudentiDaEliminareBlocchi,
-                "Studenti rimossi controllo blocchi",
-                "Blocco pagamento attivo al momento dell'estrazione");
+                motiviBlocchi,
+                "Controllo blocchi");
             ExportStudentiRimossi(
                 listaStudentiDaEliminareIBAN,
                 "Studenti rimossi controllo IBAN mancante",
-                "IBAN mancante al momento dell'estrazione");
+                Esclusione("IBAN mancante", "Le coordinate di pagamento esaminate non riportano un IBAN."));
             ExportStudentiRimossi(
                 listaStudentiDaBloccareIBAN,
                 "Studenti rimossi controllo IBAN non valido",
-                "IBAN non valido al momento dell'estrazione");
+                Esclusione("IBAN non valido", "L'IBAN registrato non supera il controllo formale di validità."));
             ExportStudentiRimossi(
                 listaStudentiDaEliminareNonVincitori,
                 "Studenti rimossi controllo non vincitori",
-                "Studente non vincitore al momento dell'estrazione");
+                Esclusione("Esito diverso da vincitore",
+                    $"Per {DescrizioneBeneficio(tipoBeneficio)} nell'anno accademico selezionato risulta un esito diverso da vincitore."));
             ExportStudentiRimossi(
                 listaStudentiDaEliminarePEC,
                 "Studenti rimossi controllo PEC",
-                "PEC mancante al momento dell'estrazione");
+                Esclusione("PEC assente con recapiti non sufficienti",
+                    "Non risulta una PEC per uno studente residente all'estero che presenta anche recapiti di reperibilità e domicilio rientranti nei casi non sufficienti previsti dal controllo."));
 
             foreach (string codFiscale in listaStudentiDaEliminareBlocchi)
             {
@@ -1060,10 +1049,7 @@ namespace ProcedureNet7
                 PopulateStudentReversali();
                 PopulateStudentDetrazioni();
                 PopulateNucleoFamiliare();
-                if (!isIntegrazione)
-                {
-                    PopulateStudentiAssegnazioni();
-                }
+                PopulateStudentiAssegnazioni();
             }
             PopulateStudentiImpegni();
             PopulateStudentServizioSanitario();
@@ -1433,7 +1419,8 @@ namespace ProcedureNet7
                 ExportStudentiRimossi(
                     studentiDaRimuovere,
                     "Studenti rimossi vecchio esito PA",
-                    "Studente gia vincitore PA escluso dalla selezione richiesta");
+                    Esclusione("Precedente esito di posto alloggio escluso dalla selezione",
+                        "Lo storico riporta un esito di vincitore del posto alloggio; la selezione richiesta esclude questi studenti."));
 
                 foreach (string codFiscale in studentiDaRimuovere)
                 {
@@ -1589,13 +1576,14 @@ namespace ProcedureNet7
                         Assegnazione_PA.id_assegnazione_pa
                     FROM            
                         Assegnazione_PA 
-                        INNER JOIN vStanza 
+                        LEFT JOIN vStanza
                             ON Assegnazione_PA.Cod_Stanza = vStanza.Cod_Stanza 
                             AND Assegnazione_PA.Cod_Pensionato = vStanza.Cod_Pensionato 
-                        INNER JOIN Costo_Servizio 
+                        LEFT JOIN Costo_Servizio
                             ON vStanza.Tipo_costo_Stanza = Costo_Servizio.Tipo_stanza 
                             AND Assegnazione_PA.Anno_Accademico = Costo_Servizio.Anno_accademico 
                             AND Assegnazione_PA.Cod_Pensionato = Costo_Servizio.Cod_pensionato
+                            AND Costo_Servizio.Cod_periodo = 'M'
                         INNER JOIN #CFEstrazione cfe 
                             ON Assegnazione_PA.Cod_fiscale = cfe.Cod_fiscale 
                     WHERE        
@@ -1603,7 +1591,6 @@ namespace ProcedureNet7
                         (Assegnazione_PA.Cod_movimento = '01') AND 
                         (Assegnazione_PA.Ind_Assegnazione = 1) AND 
                         (Assegnazione_PA.Status_Assegnazione = 0) AND
-                        Costo_Servizio.Cod_periodo = 'M' AND 
                         Assegnazione_PA.Data_Accettazione IS NOT NULL
                     ORDER BY Assegnazione_PA.id_assegnazione_pa
                 ";
@@ -1611,6 +1598,16 @@ namespace ProcedureNet7
                 Logger.LogInfo(50, "Lavorazione studenti - inserimento in assegnazioni");
                 HashSet<string> processedFiscalCodes = new();
                 HashSet<string> studentiDaRimuovere = new();
+                var motiviAssegnazioni = new List<(string CodFiscale, MotivoEsclusionePagamento Motivazione)>();
+
+                void RegistraErrorePA(StudentePagamenti studente, MotivoEsclusionePagamento causa)
+                {
+                    if (!studentiConErroriPA.TryGetValue(studente, out var errori))
+                        studentiConErroriPA.Add(studente, errori = new List<string>());
+                    errori.Add(causa.Dettaglio);
+                    studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
+                    motiviAssegnazioni.Add((studente.InformazioniPersonali.CodFiscale, causa));
+                }
 
                 using (SqlCommand readData = new(dataQuery, CONNECTION, sqlTransaction))
                 {
@@ -1636,21 +1633,14 @@ namespace ProcedureNet7
                     }
                 }
 
-                var assegnazioniInfoPerStudente = assegnazioniList
-                    .GroupBy(a => a.CodFiscale)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => new
-                        {
-                            Count = g.Count(),
-                            SingleStartEndEqual = g.Count() == 1 &&
-                                                  DateTime.TryParse(g.First().DataDecorrenza, out var s) &&
-                                                  DateTime.TryParse(g.First().DataFineAssegnazione, out var e) &&
-                                                  s == e
-                        });
-
-                // Keep track of fiscal codes for which we already evaluated the "remove" decision
-                HashSet<string> removalEvaluated = new();
+                var assegnazioniPerStudente = assegnazioniList.GroupBy(a => a.CodFiscale, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.Select(a => a.IdAssegnazionePa).Distinct().Count(), StringComparer.OrdinalIgnoreCase);
+                foreach (var studente in studentiDaPagare.Values)
+                {
+                    if (PagamentoEsclusioniRules.VincitoreSenzaAssegnazione(studente.InformazioniBeneficio.EsitoPA,
+                            assegnazioniPerStudente.ContainsKey(studente.InformazioniPersonali.CodFiscale)))
+                        RegistraErrorePA(studente, PagamentoEsclusioniRules.AssegnazioneMancante(selectedAA));
+                }
 
                 // ---------------------------
                 // 3) Process data OFFLINE
@@ -1661,7 +1651,7 @@ namespace ProcedureNet7
                 {
                     // For convenience
                     string codFiscale = assegnazione.CodFiscale;
-                    if (!studentiDaPagare.TryGetValue(codFiscale, out StudentePagamenti? studente))
+                    if (!studentiDaPagare.TryGetValue(codFiscale, out StudentePagamenti? studente) || studente == null)
                     {
                         // Studente not found in our dictionary
                         continue;
@@ -1670,17 +1660,32 @@ namespace ProcedureNet7
                     {
                         string test = "";
                     }
-                    // If stanza is 'XXX' or studente is null, just skip it
-                    if (studente == null || assegnazione.CodStanza == "XXX")
+                    if (string.IsNullOrWhiteSpace(assegnazione.CodStanza) || assegnazione.CodStanza.Trim() == "XXX")
                     {
-                        studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
+                        RegistraErrorePA(studente, Esclusione("Assegnazione senza stanza utilizzabile",
+                            $"L'assegnazione di posto alloggio {assegnazione.IdAssegnazionePa} non riporta una stanza utilizzabile."));
                         continue;
                     }
+                    if (string.IsNullOrWhiteSpace(assegnazione.TipoStanza) || string.IsNullOrWhiteSpace(assegnazione.ImportoMensileStr))
+                    {
+                        RegistraErrorePA(studente, Esclusione("Dati economici dell'assegnazione incompleti",
+                            $"Assegnazione {assegnazione.IdAssegnazionePa}. Dati mancanti: " +
+                            string.Join(" e ", new[] {
+                                string.IsNullOrWhiteSpace(assegnazione.TipoStanza) ? "tipologia della stanza" : null,
+                                string.IsNullOrWhiteSpace(assegnazione.ImportoMensileStr) ? "tariffa mensile" : null
+                            }.Where(d => d != null)) + ". La trattenuta del posto alloggio non può essere determinata."));
+                        continue;
+                    }
+
+                    // Integrations still check PA anomalies but retain their existing calculation path.
+                    if (isIntegrazione) continue;
 
                     // If selectedRichiestoPA is 0 or 3 => remove the student
                     if (selectedRichiestoPA == "0" || selectedRichiestoPA == "3")
                     {
                         studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
+                        motiviAssegnazioni.Add((codFiscale, Esclusione("Posto alloggio escluso dal filtro selezionato",
+                            "Risulta un'assegnazione di posto alloggio; il filtro scelto per questa elaborazione esclude gli studenti con assegnazione.")));
                         continue;
                     }
 
@@ -1745,7 +1750,15 @@ namespace ProcedureNet7
                     // ---------------------
                     else if (categoriaPagam == "SA")
                     {
-                        if (!DateTime.TryParse(assegnazione.DataFineAssegnazione?.Trim(), out DateTime endDate))
+                        if (!DateTime.TryParseExact(assegnazione.DataDecorrenza?.Trim(), "dd/MM/yyyy",
+                                CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime startDate))
+                        {
+                            RegistraErrorePA(studente, Esclusione("Data iniziale dell'assegnazione assente o non valida",
+                                $"L'assegnazione {assegnazione.IdAssegnazionePa} non presenta una data di decorrenza valida."));
+                            continue;
+                        }
+                        if (!DateTime.TryParseExact(assegnazione.DataFineAssegnazione?.Trim(), "dd/MM/yyyy",
+                                CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime endDate))
                         {
                             endDate = DateTime.MaxValue;
                         }
@@ -1758,7 +1771,7 @@ namespace ProcedureNet7
                         AssegnazioneDataCheck result = studente.AddAssegnazione(
                             assegnazione.CodPensionato?.Trim() ?? "",
                             assegnazione.CodStanza?.Trim() ?? "",
-                            DateTime.Parse(assegnazione.DataDecorrenza?.Trim() ?? "01/01/0001"),
+                            startDate,
                             endDate,
                             assegnazione.CodFineAssegnazione?.Trim() ?? "",
                             assegnazione.TipoStanza?.Trim() ?? "",
@@ -1776,28 +1789,25 @@ namespace ProcedureNet7
                             string message = result switch
                             {
                                 AssegnazioneDataCheck.Eccessivo =>
-                                    "Assegnazione posto alloggio superiore alle mensilità possibili (10 mesi)",
+                                    "Durata del posto alloggio superiore a 10 mesi",
                                 AssegnazioneDataCheck.Incorretto =>
-                                    "Assegnazione posto alloggio con data fine minore della data di entrata",
+                                    "Fine dell'assegnazione precedente all'inizio",
                                 AssegnazioneDataCheck.DataUguale =>
-                                    "Assegnazione posto alloggio con data decorrenza e fine uguali",
+                                    "Inizio e fine dell'assegnazione coincidenti",
                                 AssegnazioneDataCheck.DataDecorrenzaMinoreDiMin =>
-                                    "Assegnazione posto alloggio con data decorrenza minore del minimo previsto dal bando",
+                                    "Inizio dell'assegnazione prima del periodo previsto",
                                 AssegnazioneDataCheck.DataFineAssMaggioreMax =>
-                                    "Assegnazione posto alloggio con data fine maggiore del massimo previsto dal bando",
+                                    "Fine dell'assegnazione oltre il periodo previsto",
                                 AssegnazioneDataCheck.MancanzaDataFineAssegnazione =>
-                                    "Assegnazione posto alloggio senza data fine",
+                                    "Data di fine assegnazione assente",
                                 // Fallback
-                                _ => "Errore sconosciuto"
+                                _ => "Date dell'assegnazione non utilizzabili"
                             };
 
-                            if (!studentiConErroriPA.TryGetValue(studente, out List<string>? value))
-                            {
-                                value = new List<string>();
-                                studentiConErroriPA.Add(studente, value);
-                            }
-                            studentiDaRimuovere.Add(studente.InformazioniPersonali.CodFiscale);
-                            value.Add(message);
+                            RegistraErrorePA(studente, Esclusione(message,
+                                $"{message}. Assegnazione {assegnazione.IdAssegnazionePa}: inizio {assegnazione.DataDecorrenza}; " +
+                                $"fine {(string.IsNullOrWhiteSpace(assegnazione.DataFineAssegnazione) ? "non registrata" : assegnazione.DataFineAssegnazione)}. " +
+                                $"Periodo di riferimento: {min_data_PA:dd/MM/yyyy} – {max_data_PA:dd/MM/yyyy}."));
                         }
                     }
                 }
@@ -1807,9 +1817,8 @@ namespace ProcedureNet7
                 // -----------------------------
                 // Remove the students we flagged
                 ExportStudentiRimossi(
-                    studentiDaRimuovere,
-                    "Studenti rimossi controllo assegnazioni PA",
-                    "Escluso dal controllo assegnazioni posto alloggio");
+                    motiviAssegnazioni,
+                    "Controllo assegnazioni posto alloggio");
 
                 foreach (string codFiscale in studentiDaRimuovere)
                 {
@@ -1841,7 +1850,7 @@ namespace ProcedureNet7
                         string codEnte = s?.InformazioniIscrizione?.CodEnte ?? "";
                         string annoCorso = (s?.InformazioniIscrizione?.AnnoCorso ?? 0).ToString();
                         string esitoPA = (s?.InformazioniBeneficio?.EsitoPA ?? 0).ToString();
-                        int nAss = s?.InformazioniPagamento?.Assegnazioni?.Count ?? 0;
+                        int nAss = assegnazioniPerStudente.TryGetValue(cf, out int count) ? count : 0;
                         string msg = string.Join(" | ", errori.Distinct());
 
                         dtErr.Rows.Add(cf, numDomanda, cognome, nome, codEnte, annoCorso, esitoPA, nAss, msg);
@@ -1970,50 +1979,12 @@ namespace ProcedureNet7
                     Logger.LogWarning(null,
                         $"Trovati {studentiSenzaImpegno.Count} studenti senza impegno");
 
-                    DataTable studentiSenzaImpegnoTable = new();
-                    studentiSenzaImpegnoTable.Columns.Add("CodFiscale");
-                    studentiSenzaImpegnoTable.Columns.Add("NumDomanda");
-                    studentiSenzaImpegnoTable.Columns.Add("Cognome");
-                    studentiSenzaImpegnoTable.Columns.Add("Nome");
-                    studentiSenzaImpegnoTable.Columns.Add("CodEnte");
-                    studentiSenzaImpegnoTable.Columns.Add("AnnoAccademico");
-                    studentiSenzaImpegnoTable.Columns.Add("Beneficio");
-                    studentiSenzaImpegnoTable.Columns.Add("CategoriaPagamento");
-                    studentiSenzaImpegnoTable.Columns.Add("ImpegnoRichiesto");
-                    studentiSenzaImpegnoTable.Columns.Add("ImpegnoPrimaRata");
-                    studentiSenzaImpegnoTable.Columns.Add("ImpegnoSaldo");
-                    studentiSenzaImpegnoTable.Columns.Add("CategoriaCU");
-                    studentiSenzaImpegnoTable.Columns.Add("Motivazione");
-
-                    foreach (string codFiscale in studentiSenzaImpegno.OrderBy(cf => cf, StringComparer.OrdinalIgnoreCase))
-                    {
-                        studentiDaPagare.TryGetValue(codFiscale, out StudentePagamenti? studente);
-                        specificheImpegniByCf.TryGetValue(codFiscale, out PopulateStudentiImpegniDTO? specifiche);
-
-                        string motivazione = specifiche is null
-                            ? "Nessuna riga valida in Specifiche_impegni"
-                            : $"Impegno {(categoriaPagam == "PR" ? "prima rata" : "saldo")} non valorizzato";
-
-                        studentiSenzaImpegnoTable.Rows.Add(
-                            codFiscale,
-                            studente?.InformazioniPersonali.NumDomanda ?? string.Empty,
-                            studente?.InformazioniPersonali.Cognome ?? string.Empty,
-                            studente?.InformazioniPersonali.Nome ?? string.Empty,
-                            studente?.InformazioniIscrizione.CodEnte ?? string.Empty,
-                            selectedAA,
-                            currentBeneficio,
-                            categoriaPagam,
-                            categoriaPagam == "PR" ? "Prima rata" : "Saldo",
-                            specifiche?.ImpegnoPrimaRata ?? string.Empty,
-                            specifiche?.ImpegnoSaldo ?? string.Empty,
-                            specifiche?.CategoriaCU ?? string.Empty,
-                            motivazione);
-                    }
-
-                    Utilities.ExportDataTableToExcel(
-                        studentiSenzaImpegnoTable,
-                        GetCurrentPagamentoFolder(),
-                        fileName: "Studenti senza impegno");
+                    ExportStudentiRimossi(studentiSenzaImpegno.Select(cf =>
+                        (CodFiscale: cf, Motivazione: Esclusione("Impegno di spesa non disponibile",
+                            specificheImpegniByCf.ContainsKey(cf)
+                                ? $"Non risulta indicato l'impegno di spesa per {(categoriaPagam == "PR" ? "la prima rata" : "il saldo")}."
+                                : $"Non risulta un'assegnazione contabile valida per {DescrizioneBeneficio(currentBeneficio)} nell'anno accademico selezionato."))),
+                        "Controllo impegni di spesa");
                 }
                 if (studentiDaRimuovereIntegrazione.Any())
                 {
@@ -2022,10 +1993,6 @@ namespace ProcedureNet7
                         $"con importo borsa diverso da quello assegnato");
                 }
 
-                foreach (string codFiscale in studentiSenzaImpegno)
-                {
-                    studentiDaPagare.Remove(codFiscale);
-                }
                 foreach (string codFiscale in studentiDaRimuovereIntegrazione)
                 {
                     Logger.LogDebug(null,
@@ -2033,10 +2000,15 @@ namespace ProcedureNet7
                 }
 
                 ExportStudentiRimossi(
-                    studentiDaRimuovereIntegrazione,
-                    "Studenti rimossi integrazione importi",
-                    "Importo borsa diverso dall'importo assegnato nelle specifiche impegni");
+                    studentiDaRimuovereIntegrazione.Select(cf => (CodFiscale: cf, Motivazione: PagamentoEsclusioniRules.ImportiNonCoincidenti(
+                        studentiDaPagare[cf].InformazioniBeneficio.ImportoBeneficio, specificheImpegniByCf[cf].ImportoAssegnato))),
+                    "Controllo importi per integrazione");
 
+                // Capture both explanations before removing students with overlapping anomalies.
+                foreach (string codFiscale in studentiSenzaImpegno)
+                {
+                    studentiDaPagare.Remove(codFiscale);
+                }
                 foreach (string codFiscale in studentiDaRimuovereIntegrazione)
                 {
                     studentiDaPagare.Remove(codFiscale);
@@ -2183,7 +2155,7 @@ namespace ProcedureNet7
                 ConcurrentDictionary<string, bool> studentiDaRimuovereDallaTabella = new();
                 ConcurrentDictionary<string, double> studentiPAnegativo = new();
                 ConcurrentDictionary<string, bool> studentiConImportoLimitato = new();
-                ConcurrentBag<(string CodFiscale, string Motivazione)> studentiRimossiBag = new();
+                ConcurrentBag<(string CodFiscale, MotivoEsclusionePagamento Motivazione)> studentiRimossiBag = new();
                 ConcurrentBag<(string CodFiscale, string Motivazione)> studentiPagatiComePendolari = new();
 
                 Parallel.ForEach(studentiDaPagare, pair =>
@@ -2244,7 +2216,8 @@ namespace ProcedureNet7
                         if (studente.InformazioniPagamento.NumeroImpegno != selectedImpegno)
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Impegno diverso da quello selezionato"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Impegno diverso da quello selezionato",
+                                $"Impegno assegnato: {studente.InformazioniPagamento.NumeroImpegno}; impegno selezionato per l'elaborazione: {selectedImpegno}.")));
                             return;
                         }
                     }
@@ -2325,14 +2298,16 @@ namespace ProcedureNet7
                         if (!studenteForzato && categoriaPagam == "SA" && hasPrimaRata && primaRataStorno && !riemessaPrimaRata)
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Prima rata non riemessa"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Prima rata stornata e non riemessa",
+                                "La prima rata risulta stornata (ritirata dall'azienda), senza una successiva riemissione valida. Il saldo non può essere liquidato finché manca la riemissione della prima rata.")));
                             return;
                         }
 
                         if (!studenteForzato && categoriaPagam == "SA" && integrazionePrimaRata && stornoIntegrazionePrimaRata && !riemessaIntegrazionePrimaRata)
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Integrazione prima rata non riemessa"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Integrazione della prima rata stornata",
+                                "L'integrazione della prima rata risulta stornata (ritirata dall'azienda), senza una successiva riemissione valida. Questa situazione impedisce la liquidazione del saldo.")));
                             return;
                         }
 
@@ -2401,7 +2376,8 @@ namespace ProcedureNet7
                     if (Math.Abs(importoMassimo - studente.InformazioniPagamento.ImportoPagato) < 5 && !isTR)
                     {
                         studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                        studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Importo da pagare minore di €5"));
+                        studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale,
+                            PagamentoEsclusioniRules.DifferenzaEntroSoglia(importoMassimo, studente.InformazioniPagamento.ImportoPagato, "Importo massimo del beneficio")));
                         return;
                     }
 
@@ -2411,13 +2387,15 @@ namespace ProcedureNet7
                         if (categoriaPagam == "PR")
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Semestre filtro solo saldo"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Prima rata non prevista per semestre filtro",
+                                "Lo studente è al primo anno con semestre filtro confermato. Per questa posizione è previsto il pagamento del saldo, non della prima rata selezionata.")));
                             return;
                         }
                         if (!studente.InformazioniBeneficio.SuperamentoEsami)
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Semestre filtro senza superamento esami"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Superamento esami non registrato per semestre filtro",
+                                "Per lo studente al primo anno con semestre filtro confermato non risulta registrato il superamento degli esami richiesto dal controllo.")));
                             return;
                         }
                     }
@@ -2438,7 +2416,8 @@ namespace ProcedureNet7
                         else if (isAcconto && DateTime.Parse(selectedDataRiferimento) <= percentDate)
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Acconto non previsto per la data di riferimento"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Acconto non previsto alla data selezionata",
+                                $"Data di riferimento selezionata: {selectedDataRiferimento}. Per questa posizione di iscrizione l'acconto è ammesso solo con data di riferimento successiva al {percentDate:dd/MM/yyyy}.")));
                             return;
                         }
                         else
@@ -2466,7 +2445,8 @@ namespace ProcedureNet7
                             else if (!studente.InformazioniBeneficio.SuperamentoEsami && !studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)
                             {
                                 studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                                studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Senza superamento esami"));
+                                studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Superamento esami non registrato",
+                                    "Per lo studente al primo anno non risulta registrato il superamento degli esami né per la borsa né per la tassa regionale.")));
 
                                 return;
                             }
@@ -2484,7 +2464,10 @@ namespace ProcedureNet7
                             if (!((studente.InformazioniIscrizione.AnnoCorso == 1 || studente.InformazioniIscrizione.AnnoCorsoCalcolato == 1) && (studente.InformazioniBeneficio.SuperamentoEsami || studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale)))
                             {
                                 studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                                studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Non ha saldo/saldo non riemesso"));
+                                studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione(
+                                    hasSaldo ? "Saldo stornato e non riemesso" : "Saldo della borsa non registrato",
+                                    (hasSaldo ? "Il saldo della borsa risulta stornato (ritirato dall'azienda) e non riemesso. " : "Non risulta registrato il saldo della borsa. ") +
+                                    "Il rimborso della tassa regionale richiede il saldo oppure la posizione di primo anno con superamento degli esami registrato, che qui non risulta.")));
                                 return;
                             }
                         }
@@ -2492,21 +2475,25 @@ namespace ProcedureNet7
                         if (studente.InformazioniPersonali.Disabile || studente.InformazioniPersonali.EsoneroTassaRegionale)
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Esonero tassa regionale o disabilita"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Esenzione rilevata per la tassa regionale",
+                                "Il rimborso non è previsto dal controllo perché risulta " +
+                                (studente.InformazioniPersonali.EsoneroTassaRegionale ? "registrato l'esonero dalla tassa regionale" : "registrata la condizione di disabilità") + ".")));
                             return;
                         }
 
                         if (studente.InformazioniIscrizione.TipoCorso == 6 || studente.InformazioniIscrizione.TipoCorso == 7)
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Tipo corso non ammesso per tassa regionale"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Corso non ammesso al rimborso tassa regionale",
+                                $"La tipologia di corso registrata (riferimento {studente.InformazioniIscrizione.TipoCorso}) rientra tra quelle escluse dal controllo del rimborso.")));
                             return;
                         }
 
                         if ((studente.InformazioniIscrizione.AnnoCorso == 1 || studente.InformazioniIscrizione.AnnoCorsoCalcolato == 1) && !(studente.InformazioniBeneficio.SuperamentoEsami || studente.InformazioniBeneficio.SuperamentoEsamiTassaRegionale))
                         {
                             studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Tassa regionale senza superamento esami"));
+                            studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, Esclusione("Superamento esami non registrato per tassa regionale",
+                                "Per lo studente al primo anno non risulta registrato il superamento degli esami richiesto dal controllo del rimborso.")));
                             return;
                         }
                     }
@@ -2517,22 +2504,30 @@ namespace ProcedureNet7
                     if (Math.Abs(importiPagati - (importoMassimo - importoReversali)) < 5)
                     {
                         studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                        studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Importo da pagare minore di € 5"));
+                        studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale,
+                            PagamentoEsclusioniRules.DifferenzaEntroSoglia(importoMassimo - importoReversali, importiPagati, "Importo massimo al netto delle reversali")));
                         return;
                     }
 
                     double importoDaPagareLordo = Math.Round(importoDaPagare - importiPagati - importoReversali, 2);
                     LimitaImportoBorsa(ref importoDaPagareLordo);
                     studente.SetImportoDaPagareLordo(importoDaPagareLordo);
+                    double importoPrimaTrattenute = importoDaPagare;
                     importoDaPagare -= (importiPagati + importoPA + importoDetrazioni + importoReversali);
                     importoDaPagare = Math.Round(importoDaPagare, 2);
                     LimitaImportoBorsa(ref importoDaPagare);
 
+                    // Record calculated values before an exclusion can return early.
+                    // Unreached calculations stay absent, rather than appearing as zero in the audit.
+                    _importiAudit[studente.InformazioniPersonali.CodFiscale] = new ImportiAuditPagamento(
+                        isRiemissione ? importoDaPagare : importoDaPagareLordo, importoDaPagare);
 
                     if ((importoDaPagare == 0 || Math.Abs(importoDaPagare) < 5) && !studentiDaRimuovereDallaTabella.ContainsKey(studente.InformazioniPersonali.CodFiscale))
                     {
                         studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                        studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Importo da pagare minore di € 5"));
+                        studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale,
+                            PagamentoEsclusioniRules.ImportoNonLiquidabile(importoDaPagare,
+                                PagamentoEsclusioniRules.DettaglioCalcolo(importoPrimaTrattenute, importiPagati, importoPA, importoDetrazioni, importoReversali))));
                         return;
                     }
 
@@ -2547,7 +2542,9 @@ namespace ProcedureNet7
                     if (importoDaPagare < 0 && !studentiDaRimuovereDallaTabella.ContainsKey(studente.InformazioniPersonali.CodFiscale))
                     {
                         studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                        studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Importo da pagare negativo"));
+                        studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale,
+                            PagamentoEsclusioniRules.ImportoNonLiquidabile(importoDaPagare,
+                                PagamentoEsclusioniRules.DettaglioCalcolo(importoPrimaTrattenute, importiPagati, importoPA, importoDetrazioni, importoReversali))));
                         return;
                     }
                 });
@@ -2563,12 +2560,14 @@ namespace ProcedureNet7
                 {
                     StudentePagamenti studente = pair.Value;
 
-                    if (studente.InformazioniPagamento.ImportoDaPagare > 0)
+                    if (studentiDaRimuovereDallaTabella.ContainsKey(pair.Key) || studente.InformazioniPagamento.ImportoDaPagare > 0)
                     {
                         continue;
                     }
                     studentiDaRimuovereDallaTabella[studente.InformazioniPersonali.CodFiscale] = true;
-                    studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale, "Importo da pagare minore o uguale a 0"));
+                    studentiRimossiBag.Add((studente.InformazioniPersonali.CodFiscale,
+                        PagamentoEsclusioniRules.ImportoNonLiquidabile(studente.InformazioniPagamento.ImportoDaPagare,
+                            "L'importo è stato verificato al termine del calcolo.")));
                 }
 
                 // Remove students from the database
@@ -2637,16 +2636,6 @@ namespace ProcedureNet7
                 // Export removed students with reasons
                 if (studentiRimossiBag.Count > 0)
                 {
-                    DataTable studentiRimossi = new DataTable();
-                    studentiRimossi.Columns.Add("CodFiscale");
-                    studentiRimossi.Columns.Add("Motivazione");
-
-                    foreach (var item in studentiRimossiBag)
-                    {
-                        studentiRimossi.Rows.Add(item.CodFiscale, item.Motivazione);
-                    }
-
-                    Utilities.ExportDataTableToExcel(studentiRimossi, GetCurrentPagamentoFolder(), fileName: "Studenti rimossi con motivi");
                     ExportStudentiRimossi(
                         studentiRimossiBag,
                         "Studenti rimossi calcolo importi");

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ProcedureNet7
 {
@@ -6,6 +7,9 @@ namespace ProcedureNet7
     {
         public Domicilio Domicilio { get; set; } = new Domicilio();
         public DomicilioSnapshot? IstanzaDomicilio { get; set; }
+        public bool UsaNuovaGestioneDomicili { get; set; }
+        public List<DomicilioAnalisiInput> DomiciliNuovaGestione { get; set; } = new();
+        public OutcomeAnalisiDomicili? OutcomeDomicili { get; set; }
         public bool ContrattoValido { get; set; }
         public bool ProrogaValido { get; set; }
         public bool ContrattoEnte { get; set; }

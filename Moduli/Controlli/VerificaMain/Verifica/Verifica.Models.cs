@@ -27,13 +27,46 @@ namespace ProcedureNet7.Verifica
         public string TempPipelineTable { get; set; } = "#VerificaPipelineTargets";
         public DateTime ReferenceDate { get; set; } = DateTime.Now;
         public VerificaFaseElaborativa FaseElaborativa { get; set; } = VerificaFaseElaborativa.Unknown;
+        public bool ScriviSulDatabase { get; set; }
 
         public Dictionary<StudentKey, StudenteInfo> Students { get; } = new();
         public HashSet<(string ComuneA, string ComuneB)> ComuniEquiparati { get; } = new();
+        public HashSet<string> ComuniPensionatiAttivi { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<StudentKey> SelezionatiCiUe { get; } = new();
         public CalcParams CalcParams { get; set; } = new();
         public List<string> CodiciFiscaliFiltro { get; } = new();
         public EsamiCatalog EsamiCatalog { get; } = new();
         public CreditiRichiestiCatalog CreditiRichiestiCatalog { get; } = new();
+        public HashSet<StudentKey> BorsaStoricaStessoAnnoConflitti { get; } = new();
+        public HashSet<StudentKey> BorsaStoricaRichiedeRevisione { get; } = new();
+        public Dictionary<StudentKey, List<string>> DiagnosticaBorsaStoricaStessoAnno { get; } = new();
+
+        public void ResetBorsaStoricaStessoAnno()
+        {
+            BorsaStoricaStessoAnnoConflitti.Clear();
+            BorsaStoricaRichiedeRevisione.Clear();
+            DiagnosticaBorsaStoricaStessoAnno.Clear();
+        }
+
+        public void AddDiagnosticaBorsaStoricaStessoAnno(StudentKey key, string diagnostica, bool richiedeRevisione)
+        {
+            if (!DiagnosticaBorsaStoricaStessoAnno.TryGetValue(key, out var items))
+            {
+                items = new List<string>();
+                DiagnosticaBorsaStoricaStessoAnno[key] = items;
+            }
+
+            if (!string.IsNullOrWhiteSpace(diagnostica))
+                items.Add(diagnostica);
+
+            if (richiedeRevisione)
+                BorsaStoricaRichiedeRevisione.Add(key);
+        }
+
+        public string GetDiagnosticaBorsaStoricaStessoAnno(StudentKey key)
+            => DiagnosticaBorsaStoricaStessoAnno.TryGetValue(key, out var items)
+                ? string.Join(" || ", items)
+                : string.Empty;
 
         public StudenteInfo GetOrCreateStudent(StudentKey key)
         {
@@ -252,10 +285,17 @@ namespace ProcedureNet7.Verifica
             });
         }
 
-        public decimal? Resolve(int tipologiaCorso, int annoCorso, bool invalido, string? codCorsoLaurea, string? codSedeStudi)
+        public CreditoRichiestoRow? Resolve(
+            int tipologiaCorso,
+            int annoCorsoNormalizzato,
+            int annoCorsoOriginale,
+            bool invalido,
+            string? codCorsoLaurea,
+            string? codSedeStudi)
         {
             string corso = NormalizeCodCorsoLaurea(codCorsoLaurea);
             string gruppoAteneo = ResolveGruppoAteneo(codSedeStudi);
+            bool hasAnnoAlternativo = annoCorsoOriginale != annoCorsoNormalizzato;
 
             CreditoRichiestoRow? best = null;
             int bestPriority = int.MaxValue;
@@ -263,21 +303,35 @@ namespace ProcedureNet7.Verifica
 
             foreach (var item in _items)
             {
-                if (item.TipologiaCorso != tipologiaCorso || item.AnnoCorso != annoCorso || item.Disabile != invalido)
+                if (item.TipologiaCorso != tipologiaCorso || item.Disabile != invalido)
                     continue;
 
                 int priority;
-                if (!string.IsNullOrEmpty(corso) && string.Equals(item.CodCorsoLaurea, corso, StringComparison.OrdinalIgnoreCase))
+                if (!IsDefaultCodCorso(corso)
+                    && string.Equals(item.CodCorsoLaurea, corso, StringComparison.OrdinalIgnoreCase))
                 {
-                    priority = 0;
+                    if (item.AnnoCorso == annoCorsoNormalizzato)
+                        priority = 0;
+                    else if (hasAnnoAlternativo && item.AnnoCorso == annoCorsoOriginale)
+                        priority = 1;
+                    else
+                        continue;
                 }
                 else if (!string.IsNullOrEmpty(gruppoAteneo) && string.Equals(item.CodCorsoLaurea, gruppoAteneo, StringComparison.OrdinalIgnoreCase))
                 {
-                    priority = 1;
+                    if (item.AnnoCorso == annoCorsoNormalizzato)
+                        priority = 2;
+                    else if (hasAnnoAlternativo && item.AnnoCorso == annoCorsoOriginale)
+                        priority = 3;
+                    else
+                        continue;
                 }
-                else if (IsDefaultCodCorso(item.CodCorsoLaurea))
+                else if (IsDefaultCodCorso(item.CodCorsoLaurea)
+                         && item.AnnoCorso == annoCorsoNormalizzato)
                 {
-                    priority = 2;
+                    // Quando l'anno viene normalizzato, la riga generica relativa
+                    // all'anno originale può rappresentare una diversa durata legale.
+                    priority = 4;
                 }
                 else
                 {
@@ -292,7 +346,7 @@ namespace ProcedureNet7.Verifica
                 }
             }
 
-            return best?.CreditiRichiesti;
+            return best;
         }
 
         private static string ResolveGruppoAteneo(string? codSedeStudi)

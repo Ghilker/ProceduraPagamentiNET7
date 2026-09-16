@@ -743,7 +743,7 @@ CREATE TABLE #StatusSedeClassBase
     CodSedeStudi NVARCHAR(50) NOT NULL,
     CodSedeDistaccata NVARCHAR(50) NOT NULL,
     AlwaysA BIT NOT NULL,
-    CONSTRAINT PK_StatusSedeClassBase PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
+    PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
 );";
 
             using (var createCommand = new SqlCommand(createSql, context.Connection) { CommandTimeout = 9999999 })

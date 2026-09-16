@@ -7,12 +7,12 @@ using System.Linq;
 namespace ProcedureNet7
 {
     /// <summary>
-    /// Espone, per i ticket di pagamenti, una riga per domanda e anno accademico dal 2024/2025.
+    /// Espone, per i ticket di pagamenti, una riga per domanda e anno accademico dal 2025/2026.
     /// Gli importi ricevuti escludono sempre Ritirato_azienda = 1; gli storni sono mostrati a parte.
     /// </summary>
     internal static class TicketPaymentYearWorkbook
     {
-        public const int FirstAcademicYear = 20242025;
+        public const int FirstAcademicYear = 20252026;
         private static readonly CultureInfo ItalianCulture = CultureInfo.GetCultureInfo("it-IT");
 
         public static DataTable Build(TicketTopicSheetContext context, DataTable operationalQueue)

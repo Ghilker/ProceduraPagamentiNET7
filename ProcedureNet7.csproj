@@ -41,6 +41,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
     <None Remove="Moduli\Varie\ProceduraControlloTicket\ControlloTicketKeywords.json" />
   </ItemGroup>
 

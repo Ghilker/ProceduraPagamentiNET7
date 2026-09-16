@@ -39,6 +39,10 @@ namespace ProcedureNet7
 
         public decimal? EsamiMinimiRichiestiMerito { get; set; }
         public decimal? CreditiMinimiRichiestiMerito { get; set; }
+        public int? IdCreditiRichiestiSelezionato { get; set; }
+        public int? AnnoCreditiRichiestiSelezionato { get; set; }
+        public string CodCorsoCreditiRichiestiSelezionato { get; set; } = string.Empty;
+        public decimal? SogliaCreditiSelezionata { get; set; }
         public decimal? EsamiMinimiRichiestiPassaggio { get; set; }
         public decimal? CreditiMinimiRichiestiPassaggio { get; set; }
         public string RegolaMeritoApplicata { get; set; } = string.Empty;

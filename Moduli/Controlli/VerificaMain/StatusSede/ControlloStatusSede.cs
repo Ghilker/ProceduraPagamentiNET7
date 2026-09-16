@@ -23,7 +23,8 @@ namespace ProcedureNet7
                     info,
                     context.AnnoAccademico,
                     context.ComuniEquiparati,
-                    context.ReferenceDate.Date);
+                    context.ReferenceDate.Date,
+                    context.FaseElaborativa);
             }
         }
 
@@ -31,23 +32,26 @@ namespace ProcedureNet7
             StudenteInfo info,
             string annoAccademico,
             HashSet<(string ComuneA, string ComuneB)>? comuniEquiparati = null,
-            DateTime? referenceDate = null)
+            DateTime? referenceDate = null,
+            VerificaFaseElaborativa faseElaborativa = VerificaFaseElaborativa.Unknown)
         {
             if (info == null)
                 throw new ArgumentNullException(nameof(info));
 
             var evaluator = new StatusSedeEvaluator(
                 comuniEquiparati ?? new HashSet<(string ComuneA, string ComuneB)>(),
-                (referenceDate ?? DateTime.Today).Date);
+                (referenceDate ?? DateTime.Today).Date,
+                faseElaborativa);
 
             var (aaStart, aaEnd) = GetAaDateRange(annoAccademico);
-            var decision = evaluator.Evaluate(info, aaStart, aaEnd);
+            var decision = evaluator.Evaluate(info, annoAccademico, aaStart, aaEnd);
+            var outcomeDomicili = info.InformazioniSede.OutcomeDomicili;
 
             return new StatusSedeResult(
                 decision.SuggestedStatus,
                 decision.Reason,
-                decision.DomicilioPresente,
-                decision.DomicilioValido,
+                outcomeDomicili?.Presente ?? decision.DomicilioPresente,
+                outcomeDomicili?.Valido ?? decision.DomicilioValido,
                 decision.FuoriSedeCertoPerSaldo);
         }
 
@@ -55,9 +59,15 @@ namespace ProcedureNet7
             StudenteInfo info,
             string annoAccademico,
             HashSet<(string ComuneA, string ComuneB)>? comuniEquiparati = null,
-            DateTime? referenceDate = null)
+            DateTime? referenceDate = null,
+            VerificaFaseElaborativa faseElaborativa = VerificaFaseElaborativa.Unknown)
         {
-            var result = ValutaStatusSede(info, annoAccademico, comuniEquiparati, referenceDate);
+            var result = ValutaStatusSede(
+                info,
+                annoAccademico,
+                comuniEquiparati,
+                referenceDate,
+                faseElaborativa);
 
             info.InformazioniSede.StatusSedeSuggerito = result.SuggestedStatus;
             info.InformazioniSede.MotivoStatusSede = result.Reason;
@@ -106,6 +116,10 @@ namespace ProcedureNet7
         {
             if (info == null)
                 throw new ArgumentNullException(nameof(info));
+
+            // Il vincitore PA ha diritto al fuori sede anche senza domicilio, incluso il saldo.
+            if (IsVincitorePa(info))
+                return false;
 
             string statusAttuale = (info.InformazioniSede.StatusSede ?? "").Trim().ToUpperInvariant();
             string statusCalcolato = (statusSede.SuggestedStatus ?? "").Trim().ToUpperInvariant();
@@ -213,15 +227,20 @@ WHERE Data_Fine_Validita IS NULL;";
             if (info == null)
                 throw new ArgumentNullException(nameof(info));
 
-            string statusAttuale = (info.InformazioniSede.StatusSede ?? "").Trim().ToUpperInvariant();
-            string statusCalcolato = (info.InformazioniSede.StatusSedeSuggerito ?? "").Trim().ToUpperInvariant();
-            string motivo = info.InformazioniSede.MotivoStatusSede ?? "Status sede calcolato non valorizzato";
+            bool vincitorePa = IsVincitorePa(info);
+            string statusCalcolato = vincitorePa
+                ? "B"
+                : (info.InformazioniSede.StatusSedeSuggerito ?? "").Trim().ToUpperInvariant();
+            string motivo = vincitorePa
+                ? MotivoFuoriSedeVincitorePa
+                : info.InformazioniSede.MotivoStatusSede ?? "Status sede calcolato non valorizzato";
 
             statusSede = new StatusSedeResult(
                 statusCalcolato,
                 motivo,
                 info.InformazioniSede.DomicilioPresente,
-                info.InformazioniSede.DomicilioValido);
+                info.InformazioniSede.DomicilioValido,
+                vincitorePa || (statusCalcolato == "B" && info.InformazioniSede.DomicilioValido));
 
             return DevePagareComePendolarePerPagamentoDaResult(
                 info,
@@ -229,19 +248,56 @@ WHERE Data_Fine_Validita IS NULL;";
                 statusSede);
         }
 
+        private const string MotivoFuoriSedeVincitorePa = "PA: vincitore (2) => fuori sede anche senza domicilio";
+
+        private static bool IsVincitorePa(StudenteInfo info)
+        {
+            var beneficio = info.InformazioniBeneficio;
+            return beneficio.VincitorePA
+                   || beneficio.EsitoPA == 2
+                   || (beneficio.EsitiConcorsoByBenefit.TryGetValue("PA", out var pa)
+                       && pa.CodTipoEsito == 2);
+        }
+
         private sealed class StatusSedeEvaluator
         {
             private readonly HashSet<(string ComuneA, string ComuneB)> _comuniEquiparati;
             private readonly DateTime _referenceDate;
+            private readonly VerificaFaseElaborativa _faseElaborativa;
 
-            public StatusSedeEvaluator(HashSet<(string ComuneA, string ComuneB)> comuniEquiparati, DateTime referenceDate)
+            public StatusSedeEvaluator(
+                HashSet<(string ComuneA, string ComuneB)> comuniEquiparati,
+                DateTime referenceDate,
+                VerificaFaseElaborativa faseElaborativa)
             {
                 _comuniEquiparati = comuniEquiparati ?? new HashSet<(string ComuneA, string ComuneB)>();
                 _referenceDate = referenceDate.Date;
+                _faseElaborativa = faseElaborativa;
             }
 
-            public StatusSedeDecision Evaluate(StudenteInfo info, DateTime aaStart, DateTime aaEnd)
+            public StatusSedeDecision Evaluate(
+                StudenteInfo info,
+                string annoAccademico,
+                DateTime aaStart,
+                DateTime aaEnd)
             {
+                var comuneSede = (info.InformazioniIscrizione.ComuneSedeStudi ?? "").Trim();
+                DomResult? domicilioNuovaGestione = null;
+
+                if (info.InformazioniSede.UsaNuovaGestioneDomicili)
+                {
+                    domicilioNuovaGestione = DomicilioValidator.Validate(
+                        info,
+                        annoAccademico,
+                        aaStart,
+                        aaEnd,
+                        _referenceDate,
+                        _faseElaborativa,
+                        comune => IsComuneCompatibile(comune, comuneSede));
+                }
+
+                if (IsVincitorePa(info))
+                    return StatusSedeDecision.Fixed("B", MotivoFuoriSedeVincitorePa);
 
                 var forced = (info.InformazioniSede.ForzaturaStatusSede ?? "").Trim().ToUpperInvariant();
                 if (IsValidStatus(forced))
@@ -270,7 +326,6 @@ WHERE Data_Fine_Validita IS NULL;";
                 }
 
                 var comuneRes = GetComuneResidenza(info);
-                var comuneSede = (info.InformazioniIscrizione.ComuneSedeStudi ?? "").Trim();
 
                 if (Eq(comuneRes, comuneSede))
                     return StatusSedeDecision.Fixed("A", "Comune residenza = Comune sede studi");
@@ -298,12 +353,26 @@ WHERE Data_Fine_Validita IS NULL;";
                 if (pendolareDefaultSameProvNoLists)
                     return StatusSedeDecision.Fixed("C", "Stessa provincia ma assente da COMUNI_INSEDE/COMUNI_PENDOLARI/COMUNI_FUORISEDE => pendolare default");
 
-                var dom = DomicilioValidator.Validate(info, aaStart, aaEnd, _referenceDate);
+                var dom = domicilioNuovaGestione
+                          ?? DomicilioValidator.Validate(
+                              info,
+                              annoAccademico,
+                              aaStart,
+                              aaEnd,
+                              _referenceDate,
+                              _faseElaborativa,
+                              comune => IsComuneCompatibile(comune, comuneSede));
                 if (!dom.Presente)
                     return StatusSedeDecision.WithDom("D", "Dati domicilio non presenti => pendolare calcolato (D)", dom);
 
                 if (dom.Valido)
                 {
+                    if (dom.ComuneCompatibileGiaValutato)
+                        return StatusSedeDecision.WithDom(
+                            "B",
+                            $"{dom.Source}: domicilio valido e comuni della copertura compatibili con la sede di studi => fuori sede (B) | {dom.Reason}",
+                            dom);
+
                     if (IsTipoEnteErasmus(dom.TipoEnte))
                         return StatusSedeDecision.WithDom(
                             "B",
@@ -361,7 +430,14 @@ WHERE Data_Fine_Validita IS NULL;";
 
         internal static class DomicilioValidator
         {
-            public static DomResult Validate(StudenteInfo info, DateTime aaStart, DateTime aaEnd, DateTime referenceDate)
+            public static DomResult Validate(
+                StudenteInfo info,
+                string annoAccademico,
+                DateTime aaStart,
+                DateTime aaEnd,
+                DateTime referenceDate,
+                VerificaFaseElaborativa faseElaborativa,
+                Func<string, bool> comuneAmmesso)
             {
                 int minMesiDom = info.InformazioniSede.MinMesiDomicilioFuoriSede;
                 string infoSemFiltro = "";
@@ -370,6 +446,19 @@ WHERE Data_Fine_Validita IS NULL;";
                     minMesiDom = 3;
                     infoSemFiltro = " SEMESTRE FILTRO";
                 }
+
+                if (info.InformazioniSede.UsaNuovaGestioneDomicili)
+                {
+                    return ValidateNuovaGestione(
+                        info,
+                        annoAccademico,
+                        minMesiDom,
+                        referenceDate,
+                        faseElaborativa,
+                        comuneAmmesso,
+                        infoSemFiltro);
+                }
+
                 var corrente = ValidateSnapshot(
                     BuildCurrentSnapshot(info),
                     minMesiDom,
@@ -477,6 +566,71 @@ WHERE Data_Fine_Validita IS NULL;";
                         : istanza.TipoEnte,
                     Source: "DOMICILIO CORRENTE + ISTANZA",
                     ValidoCertoPerSaldo: false);
+            }
+
+            private static DomResult ValidateNuovaGestione(
+                StudenteInfo info,
+                string annoAccademico,
+                int minMesiDom,
+                DateTime referenceDate,
+                VerificaFaseElaborativa faseElaborativa,
+                Func<string, bool> comuneAmmesso,
+                string infoSemFiltro)
+            {
+                var outcome = AnalizzatoreDomicili.Analizza(
+                    info.InformazioniSede.DomiciliNuovaGestione,
+                    annoAccademico,
+                    new OpzioniAnalisiDomicili
+                    {
+                        GraduatoriaProvvisoria =
+                            faseElaborativa == VerificaFaseElaborativa.GraduatorieProvvisorie,
+                        MesiMinimi = minMesiDom > 0 ? minMesiDom : 10,
+                        GiorniMassimiInterruzione = 15,
+                        DataRiferimento = referenceDate.Date,
+                        AbilitaFinestraProrogaTrentaGiorni = true,
+                        ComuneAmmesso = comuneAmmesso
+                    });
+
+                info.InformazioniSede.OutcomeDomicili = outcome;
+
+                string comuni = string.Join(", ", outcome.ComuniCoinvolti);
+                string tipoEnte = outcome.ContieneContrattoErasmus
+                    ? "SE"
+                    : outcome.ContieneContrattoEnte
+                        ? "ENTE"
+                        : string.Empty;
+                string anomalie = outcome.Anomalie.Count > 0
+                    ? $" | anomalie rilevate={outcome.Anomalie.Count}"
+                    : string.Empty;
+
+                return new DomResult(
+                    Presente: outcome.Presente,
+                    Valido: outcome.Valido,
+                    Reason:
+                        $"{outcome.Motivo}{infoSemFiltro}" +
+                        $" | periodo totale={FormatPeriodo(outcome.DataInizioTotale, outcome.DataFineTotale)}" +
+                        $" | mesi coperti={outcome.MesiCoperti}" +
+                        anomalie,
+                    ComuneDomicilio: comuni,
+                    TipoEnte: tipoEnte,
+                    Source: "DOMICILI/CONTRATTI/PROROGHE",
+                    ValidoCertoPerSaldo: outcome.ValidoCertoPerSaldo,
+                    ComuneCompatibileGiaValutato: true);
+            }
+
+            private static string FormatPeriodo(DateTime? dataInizio, DateTime? dataFine)
+            {
+                if (!dataInizio.HasValue && !dataFine.HasValue)
+                    return "n/d";
+
+                string inizio = dataInizio.HasValue
+                    ? dataInizio.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+                    : "n/d";
+                string fine = dataFine.HasValue
+                    ? dataFine.Value.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
+                    : "n/d";
+
+                return $"{inizio}-{fine}";
             }
 
             private static DomResult ValidateSnapshot(
@@ -657,7 +811,8 @@ WHERE Data_Fine_Validita IS NULL;";
             string ComuneDomicilio,
             string TipoEnte,
             string Source,
-            bool ValidoCertoPerSaldo)
+            bool ValidoCertoPerSaldo,
+            bool ComuneCompatibileGiaValutato = false)
         {
             public DomResult(
                 bool Presente,
@@ -666,7 +821,15 @@ WHERE Data_Fine_Validita IS NULL;";
                 string ComuneDomicilio,
                 string TipoEnte,
                 string Source)
-                : this(Presente, Valido, Reason, ComuneDomicilio, TipoEnte, Source, Valido)
+                : this(
+                    Presente,
+                    Valido,
+                    Reason,
+                    ComuneDomicilio,
+                    TipoEnte,
+                    Source,
+                    Valido,
+                    ComuneCompatibileGiaValutato: false)
             {
             }
         }

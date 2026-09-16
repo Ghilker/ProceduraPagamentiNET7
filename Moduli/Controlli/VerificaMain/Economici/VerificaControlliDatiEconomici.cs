@@ -228,9 +228,14 @@ namespace ProcedureNet7
             _ => int.TryParse(aa?.Substring(0, 4), out var year) ? year - 2 : 0
         };
 
-        internal static string GetFiltroCodTipoPagam(string aa) =>
-            aa == "20252026"
-                ? "(p.Cod_tipo_pagam IN ('01','06','09','34','39','41','R1','R3','R4','R9','RR','S0','S1','S3','S5') OR p.Cod_tipo_pagam LIKE 'BSA%' OR p.Cod_tipo_pagam LIKE 'BSI%' OR p.Cod_tipo_pagam LIKE 'BSS%' OR p.Cod_tipo_pagam LIKE 'PL%')"
+        internal static string GetFiltroCodTipoPagam(string aa)
+        {
+            bool includeNuoviCodici = int.TryParse(aa, out int aaNumero)
+                && aaNumero >= 20252026;
+
+            return includeNuoviCodici
+                ? "(p.Cod_tipo_pagam IN ('01','06','09','34','39','41','R1','R3','R4','R9','RR','S0','S1','S3','S5') OR p.Cod_tipo_pagam LIKE 'BSI%' OR p.Cod_tipo_pagam LIKE 'BSS%' OR p.Cod_tipo_pagam LIKE 'BSP%' OR p.Cod_tipo_pagam LIKE 'PL%')"
                 : "p.Cod_tipo_pagam IN ('01','06','09','34','39','41','R1','R3','R4','R9','RR','S0','S1','S3','S5')";
+        }
     }
 }

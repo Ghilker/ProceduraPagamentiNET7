@@ -31,7 +31,6 @@ namespace ProcedureNet7
                 evaluation.Add("GEN001");
             }
 
-            ApplyPhaseSensitiveRules(context, evaluation);
             ApplyForzatureGenerali(context, evaluation);
 
             if (facts.IscrizioneFuoriTermine == true)
@@ -51,16 +50,6 @@ namespace ProcedureNet7
             {
                 if (context.Pipeline.AnnoAccademico != "20122013" && context.Pipeline.AnnoAccademico != "20162017")
                     evaluation.Add("GEN005");
-            }
-        }
-
-        private static void ApplyPhaseSensitiveRules(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
-        {
-            if (context.Pipeline.FaseElaborativa == VerificaFaseElaborativa.GraduatorieProvvisorie
-                || context.Pipeline.FaseElaborativa == VerificaFaseElaborativa.GraduatorieDefinitive)
-            {
-                if (context.Facts.DomandaTrasmessa == false)
-                    evaluation.Add("GEN088");
             }
         }
 

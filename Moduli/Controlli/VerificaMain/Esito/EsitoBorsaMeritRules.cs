@@ -411,13 +411,28 @@ namespace ProcedureNet7
 
             int annoCatalogo = NormalizeAnnoCorsoCreditiRichiesti(iscr, anno);
 
-            return context.Pipeline.CreditiRichiestiCatalog.Resolve(
-                       iscr.TipoCorso,
-                       annoCatalogo,
-                       invalido,
-                       iscr.CodCorsoLaurea,
-                       iscr.CodSedeStudi)
-                   ?? 0m;
+            iscr.IdCreditiRichiestiSelezionato = null;
+            iscr.AnnoCreditiRichiestiSelezionato = null;
+            iscr.CodCorsoCreditiRichiestiSelezionato = string.Empty;
+            iscr.SogliaCreditiSelezionata = null;
+
+            CreditoRichiestoRow? row = context.Pipeline.CreditiRichiestiCatalog.Resolve(
+                iscr.TipoCorso,
+                annoCatalogo,
+                anno,
+                invalido,
+                iscr.CodCorsoLaurea,
+                iscr.CodSedeStudi);
+
+            if (row == null)
+                return 0m;
+
+            iscr.IdCreditiRichiestiSelezionato = row.IdCreditiRichiesti;
+            iscr.AnnoCreditiRichiestiSelezionato = row.AnnoCorso;
+            iscr.CodCorsoCreditiRichiestiSelezionato = row.CodCorsoLaurea;
+            iscr.SogliaCreditiSelezionata = row.CreditiRichiesti;
+
+            return row.CreditiRichiesti;
         }
 
         private static int NormalizeAnnoCorsoCreditiRichiesti(InformazioniIscrizione iscr, int anno)

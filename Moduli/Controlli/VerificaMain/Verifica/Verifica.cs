@@ -16,6 +16,7 @@ namespace ProcedureNet7.Verifica
 
         public IReadOnlyList<StudenteInfo> OutputVerificaList { get; private set; } = Array.Empty<StudenteInfo>();
         public DataTable OutputVerifica { get; private set; } = BuildOutputTable();
+        public DataTable OutputDomiciliDiagnostica { get; private set; } = BuildDomiciliDiagnosticTable();
 
         public override void RunProcedure(ArgsVerifica args)
         {
@@ -29,12 +30,17 @@ namespace ProcedureNet7.Verifica
             var raccoltaDati = new global::ProcedureNet7.VerificaRaccoltaDati(context.Connection);
             var modules = BuildModules();
 
+            Logger.LogInfo(
+                null,
+                $"[Verifica] Scrittura risultati sul database: {(context.ScriviSulDatabase ? "ATTIVA" : "DISATTIVA")}");
+
             VerificaExecutionSupport.ExecuteTimed("Verifica.RaccoltaDati", () => raccoltaDati.PopolaContesto(context), () => $"AA={context.AnnoAccademico}");
 
             if (context.Students.Count == 0)
             {
                 OutputVerificaList = Array.Empty<StudenteInfo>();
                 OutputVerifica = BuildOutputTable();
+                OutputDomiciliDiagnostica = BuildDomiciliDiagnosticTable();
                 Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath);
                 return;
             }
@@ -44,18 +50,36 @@ namespace ProcedureNet7.Verifica
                 VerificaExecutionSupport.ExecuteTimed($"Verifica.Module.{module.Name}", () => module.Calculate(context), () => $"students={context.Students.Count}");
             }
 
+            if (context.ScriviSulDatabase)
+            {
+                VerificaExecutionSupport.ExecuteTimed(
+                    "Verifica.BlocchiIncongruenze.Writer",
+                    () => VerificaBlocchiIncongruenzeWriter.Sincronizza(context),
+                    () => $"students={context.Students.Count}");
+            }
+
             VerificaExecutionSupport.ExecuteTimed("Verifica.Output", () =>
             {
                 (OutputVerificaList, OutputVerifica) = BuildOrderedOutputs(context);
+                OutputDomiciliDiagnostica = BuildDomiciliDiagnosticTable(context);
             }, () => $"students={context.Students.Count}");
 
             VerificaExecutionSupport.ExecuteTimed("Verifica.Export", () => Utilities.ExportDataTableToExcel(OutputVerifica, _folderPath), () => $"rows={OutputVerifica.Rows.Count}");
+            VerificaExecutionSupport.ExecuteTimed(
+                "Verifica.ExportDomiciliDiagnostica",
+                () => Utilities.ExportDataTableToExcel(
+                    OutputDomiciliDiagnostica,
+                    _folderPath,
+                    includeHeaders: true,
+                    fileName: $"Verifica_Domicili_{_aa}_{DateTime.Now:yyyyMMdd_HHmmss}"),
+                () => $"rows={OutputDomiciliDiagnostica.Rows.Count}");
         }
 
         private static IReadOnlyList<IVerificaModule> BuildModules()
             => new IVerificaModule[]
             {
                 new VerificaControlliDatiEconomici(),
+                new CalcoloBlocchiIncongruenze(),
                 new ControlloStatusSede(),
                 new CalcoloImportoBorsa(),
                 new CalcoloEsitoBorsa()
@@ -70,10 +94,13 @@ namespace ProcedureNet7.Verifica
                 IncludeEsclusi = true,
                 IncludeNonTrasmesse = true,
                 TempPipelineTable = "#VerificaPipelineTargets",
-                FaseElaborativa = ResolveFaseElaborativa(args, _folderPath)
+                FaseElaborativa = args._faseElaborativa == 2
+                    ? VerificaFaseElaborativa.GraduatorieDefinitive
+                    : VerificaFaseElaborativa.GraduatorieProvvisorie,
+                ScriviSulDatabase = args._scriviSulDatabase
             };
 
-            var cfFilter = new List<string>() { }; //GetStringListArg(args, "_codiciFiscali", "CodiciFiscali", "CodiciFiscale", "CF");
+            var cfFilter = args._codiciFiscali;
             if (cfFilter != null && cfFilter.Count > 0)
             {
                 foreach (var cf in cfFilter.Select(NormalizeCf).Where(cf => !string.IsNullOrWhiteSpace(cf)).Distinct(StringComparer.OrdinalIgnoreCase))

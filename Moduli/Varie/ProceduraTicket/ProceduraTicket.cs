@@ -19,8 +19,8 @@ namespace ProcedureNet7
 
         private const int CurrentApplicationAcademicYear = 20262027;
 
-        // Anni per cui il riepilogo mantiene il dettaglio storico già presente.
-        private readonly List<int> _targetYears = new() { 20242025, 20252026, 20262027 };
+        // Anni per cui il riepilogo espone il dettaglio operativo.
+        private readonly List<int> _targetYears = new() { 20252026, 20262027 };
 
         public ProceduraTicket(MasterForm masterForm, SqlConnection mainConn) : base(masterForm, mainConn) { }
 

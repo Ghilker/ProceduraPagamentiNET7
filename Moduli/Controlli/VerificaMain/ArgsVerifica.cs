@@ -10,6 +10,8 @@ namespace ProcedureNet7
     {
         public string? _selectedAA = "20242025";
         public string? _folderPath = "D://";
+        public int _faseElaborativa = 1; // 1 = provvisorie, 2 = definitive
+        public bool _scriviSulDatabase;
 
         // stesso input di ProceduraControlloDatiEconomici (opzionale)
         public List<string>? _codiciFiscali;

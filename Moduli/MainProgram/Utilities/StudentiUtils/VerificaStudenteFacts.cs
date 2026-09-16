@@ -102,6 +102,7 @@ namespace ProcedureNet7
         public HashSet<string> BeneficiRichiesti { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> BeneficiPregressiNonRestituiti { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> BeneficiRinunciaPregressa { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool RinunciaInCorso { get; set; }
         public bool BorsaPregressaNonRestituitaConfliggente { get; set; }
         public int? AnnoBorsaRichiestoNormalizzato { get; set; }
         public string AnniBorsaPregressaUsufruitiNormalizzati { get; set; } = string.Empty;
@@ -113,9 +114,13 @@ namespace ProcedureNet7
         public bool HasCoUniversitarioEntroScadenza { get; set; }
         public bool HasCoOrdinarioConIntegrazioneEsteriEntroScadenza { get; set; }
         public bool HasCoOrdinarioSemestreFiltroEntroScadenza { get; set; }
+        public bool UltimaCoImportataOrdinariaSenzaUniversitaria { get; set; }
+        public bool IseeOrdinarioInAttesaRegolarizzazione { get; set; }
         public bool HasCiUniversitarioEntroScadenza { get; set; }
         public bool OrigineEconomicaAdeguata { get; set; }
         public string MotivoAdeguatezzaOrigine { get; set; } = string.Empty;
+        public HashSet<string> CodiciBlocchiIncongruenze { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> CodiciIncongruenzeNonEscludenti { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> SlashMotiviEsclusioneByBenefit { get; } = new(StringComparer.OrdinalIgnoreCase);
         public bool? RiconoscimentoTitoloEstero { get; set; }
         public string SedeIstituzioneUniversitariaTitolo { get; set; } = string.Empty;

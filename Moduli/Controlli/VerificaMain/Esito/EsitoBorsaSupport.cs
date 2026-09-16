@@ -25,7 +25,6 @@ namespace ProcedureNet7
             { "ISC004", "Interruzione carriera dichiarata senza numero anni valido" },
             { "ISC006", "Corso di laurea mancante per studente anni successivi" },
             { "ISC008", "Anno di corso non classificabile" },
-            { "GEN088", "Domanda non validabile nella fase elaborativa corrente" },
             { "GEN093", "Iscrizione fuori termine" },
             { "GEN094", "Domanda non trasmessa" },
             { "GENDOC", "Documento di riconoscimento mancante" },
@@ -34,8 +33,8 @@ namespace ProcedureNet7
             { "RED013", "Valore ISEE oltre la soglia ammessa" },
             { "RED086", "Stato ISEE non ammesso" },
             { "RED087", "Codice fiscale dello studente indipendente presente nell'attestazione ISEE della famiglia di origine" },
-            { "RED031", "Attestazione ISEE origine non adeguata: manca CO universitaria/ridotta/corrente oppure CO ordinaria valida con integrazione redditi esteri" },
-            { "RED033", "Integrazione ISEE universitaria/corrente nucleo di origine non presente entro il 31 dicembre dell'anno di avvio" },
+            { "RED031", "Attestazione ISEE origine non adeguata: manca CO universitaria/ridotta/corrente; se l'ultima importata è ordinaria, il termine di regolarizzazione è il 10 dicembre" },
+            { "RED033", "Termine scaduto: integrazione ISEE universitaria/corrente del nucleo di origine non importata entro il 31 dicembre dell'anno di avvio" },
             { "MER001", "Dati di merito assenti o non sufficienti per il calcolo" },
             { "MER088", "Studente già in possesso di altra borsa" },
             { "MER005", "Crediti dichiarati incongruenti con il corso di studi" },
@@ -55,6 +54,24 @@ namespace ProcedureNet7
             { "BS001", "Anno di corso oltre il limite ammesso per la borsa" },
             { "BS002", "Beneficio borsa già fruito e non restituito" },
             { "BS003", "Rinuncia pregressa alla borsa di studio" },
+            { "BS004", "Borsa già assegnata per lo stesso anno di corso equivalente" },
+            { "PA001", "Requisiti di status sede non ammessi per il posto alloggio: richiesto status B o D" },
+            { "PA002", "Comune della sede di studi non presente tra i pensionati attivi" },
+            { "PA003", "Anno di corso oltre il limite ammesso per il posto alloggio" },
+            { "PA004", "Beneficio già fruito e non restituito per il posto alloggio" },
+            { "PA005", "Rinuncia pregressa o corrente al posto alloggio" },
+            { "PA006", "Decadenza dal posto alloggio" },
+            { "PA007", "Revoca del posto alloggio per incompatibilità con il bando" },
+            { "CI001", "Primo anno non ammesso al contributo integrativo salvo tipologia corso 5" },
+            { "CI002", "Corso specialistico di tipologia 7 non ammesso al contributo integrativo" },
+            { "CI003", "Anno di corso oltre il limite ammesso per il contributo integrativo" },
+            { "CI004", "Beneficio già fruito e non restituito per il contributo integrativo" },
+            { "CI005", "Rinuncia pregressa o corrente al contributo integrativo" },
+            { "CI006", "Studente non selezionato per il contributo integrativo" },
+            { "CI007", "Decadenza dal contributo integrativo" },
+            { "CI008", "Revoca del contributo integrativo per incompatibilità con il bando" },
+            { "ISC009", "Comune della sede di studi mancante o non classificabile" },
+            { "ISC010", "Comune di residenza mancante o non classificabile" },
             { "VAR003", "Revoca di tutti i benefici da variazione" },
             { "VAR004", "Decadenza della borsa di studio da variazione" },
             { "VAR011", "Revoca della borsa per incompatibilità con il bando" },
@@ -75,6 +92,7 @@ namespace ProcedureNet7
         public const string MotivoAdeguatezzaOrigineCoUniversitario = "CO_UNIVERSITARIO";
         public const string MotivoAdeguatezzaOrigineCoOrdinarioConIntegrazioneEsteri = "CO_ORDINARIO_CON_INTEGRAZIONE_ESTERI";
         public const string MotivoAdeguatezzaOrigineCoOrdinarioSemestreFiltro = "CO_ORDINARIO_SEMESTRE_FILTRO";
+        public const string MotivoAdeguatezzaOrigineCoOrdinarioInAttesaRegolarizzazione = "CO_ORDINARIO_IN_ATTESA_REGOLARIZZAZIONE";
         public const string MotivoAdeguatezzaOrigineMancanteIseeBase = "MANCANTE_ISEE_BASE";
         public const string MotivoAdeguatezzaOrigineMancanteCoAdeguata = "MANCANTE_CO_ADEGUATA";
 
@@ -86,6 +104,9 @@ namespace ProcedureNet7
             bool hasCoOrdinarioConIntegrazioneEsteri,
             bool hasCoOrdinarioSemestreFiltro)
             => hasCoUniversitario || hasCoOrdinarioConIntegrazioneEsteri || hasCoOrdinarioSemestreFiltro;
+
+        public static bool IsEntroScadenzaRegolarizzazioneIseeOrdinario(DateTime referenceDate, int aaInizio)
+            => aaInizio > 0 && referenceDate.Date <= new DateTime(aaInizio, 12, 10);
 
         public static string GetMotivoAdeguatezzaOrigine(
             bool hasIseeBaseEntroScadenza,

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <Compile Include="../../Moduli/Pagamenti/ProceduraPagamenti/PagamentoEsclusioniWorkbook.cs" Link="Production/PagamentoEsclusioniWorkbook.cs" />
+    <Compile Include="../../Moduli/Pagamenti/ProceduraPagamenti/PagamentoEsclusioniRules.cs" Link="Production/PagamentoEsclusioniRules.cs" />
+    <Compile Include="../../Moduli/Pagamenti/ProceduraPagamenti/PagamentoAuditWorkbook.cs" Link="Production/PagamentoAuditWorkbook.cs" />
+    <Compile Include="../../Moduli/Pagamenti/ProceduraPagamenti/PagamentoFlussoRules.cs" Link="Production/PagamentoFlussoRules.cs" />
+    <Compile Include="../../Moduli/MainProgram/Utilities/StudentiUtils/Pagamento.cs" Link="Production/Pagamento.cs" />
+  </ItemGroup>
+</Project>

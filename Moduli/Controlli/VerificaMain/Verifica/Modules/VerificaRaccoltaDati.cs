@@ -207,9 +207,19 @@ FROM D;";
             LoadResidenza(context);
             LoadStatusSedeClassificationFlags(context);
             LoadEsitoPaPerAlloggio(context);
-            LoadDomicilioCorrente(context);
-            LoadIstanzaDomicilioAperta(context);
-            LoadUltimaIstanzaChiusaDomicilio(context);
+
+            if (AnalizzatoreDomicili.UsaNuovaGestione(context.AnnoAccademico))
+            {
+                LoadDomiciliNuovaGestione(context);
+            }
+            else
+            {
+                LoadDomicilioCorrente(context);
+                LoadIstanzaDomicilioAperta(context);
+                LoadUltimaIstanzaChiusaDomicilio(context);
+            }
+
+            LoadComuniPensionatiAttivi(context);
 
             foreach (var pair in LoadComuniEquiparatiFromDb())
                 _comuniEquiparati.Add(pair);
@@ -223,6 +233,8 @@ FROM D;";
         {
             context.Students.Clear();
             context.ComuniEquiparati.Clear();
+            context.ComuniPensionatiAttivi.Clear();
+            context.SelezionatiCiUe.Clear();
 
             var table = BuildPipelineTargetsDataTable();
 

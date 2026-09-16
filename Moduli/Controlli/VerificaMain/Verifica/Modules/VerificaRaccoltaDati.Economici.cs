@@ -78,7 +78,7 @@ CREATE TABLE #VerificaEconomiciSemestreFlags
     CodFiscale NVARCHAR(32) NOT NULL,
     NumDomanda NUMERIC(18,0) NOT NULL,
     ConfermaSemestreFiltro BIT NOT NULL,
-    CONSTRAINT PK_VerificaEconomiciSemestreFlags PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
+    PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
 );";
 
             using (var command = new SqlCommand(sql, _conn) { CommandTimeout = 9999999 })
@@ -521,6 +521,9 @@ SET
                 return;
 
             const string createSql = @"
+IF OBJECT_ID('tempdb..#EconomicSplitFlags') IS NOT NULL
+    DROP TABLE #EconomicSplitFlags;
+
 CREATE TABLE #EconomicSplitFlags
 (
     CodFiscale varchar(16) NOT NULL,
@@ -530,7 +533,7 @@ CREATE TABLE #EconomicSplitFlags
     IsOrigEE bit NOT NULL,
     IsIntIT_CI bit NOT NULL,
     IsIntDI bit NOT NULL,
-    CONSTRAINT PK_EconomicSplitFlags PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
+    PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
 );";
 
             using (var createCommand = new SqlCommand(createSql, _conn) { CommandTimeout = 9999999 })
@@ -737,7 +740,12 @@ OUTER APPLY
       AND UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'CO'
       AND cte.firmata_il IS NOT NULL
       AND cte.firmata_il <= @FirmataIlMax
-      AND ({GetSqlPredicateAttestazioneUniversitaria("cte")} OR ((t.IsIntDI = 1 OR ISNULL(sf.ConfermaSemestreFiltro, 0) = 1) AND {GetSqlPredicateAttestazioneOrdinaria("cte")}))
+      AND
+      (
+          {GetSqlPredicateAttestazioneUniversitaria("cte")}
+          OR ((t.IsIntDI = 1 OR ISNULL(sf.ConfermaSemestreFiltro, 0) = 1) AND {GetSqlPredicateAttestazioneOrdinaria("cte")})
+          OR (@ConsentiOrdinarioInAttesa = 1 AND {GetSqlPredicateAttestazioneOrdinaria("cte")})
+      )
     ORDER BY
         CASE WHEN {GetSqlPredicateAttestazioneUniversitaria("cte")} THEN 0 ELSE 1 END,
         cte.firmata_il DESC,
@@ -757,6 +765,9 @@ WHERE t.IsOrigIT_CO = 1
 
             command.Parameters.Add("@AA", SqlDbType.Char, 8).Value = aa;
             command.Parameters.Add("@EseFin", SqlDbType.Int).Value = eseFin;
+            int aaInizio = EsitoBorsaSupport.ParseAnnoAccademicoStartFromString(aa);
+            command.Parameters.Add("@ConsentiOrdinarioInAttesa", SqlDbType.Bit).Value =
+                EsitoBorsaSupport.IsEntroScadenzaRegolarizzazioneIseeOrdinario(CurrentContext.ReferenceDate, aaInizio);
             AddDataValiditaMaxParameter(command, aa);
             AddFirmataIlMaxParameter(command, aa);
 
@@ -1126,6 +1137,31 @@ UltimoNucleo AS
     FROM NucleiRanked
     WHERE rn = 1
 ),
+UltimeCoRanked AS
+(
+    SELECT
+        cte.Num_domanda,
+        CASE WHEN {attestazioneOrdinariaPredicate} THEN 1 ELSE 0 END AS IsOrdinaria,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY cte.Num_domanda
+            ORDER BY cte.data_validita DESC, cte.firmata_il DESC
+        ) AS rn
+    FROM Certificaz_ISEE cte
+    INNER JOIN Targets t
+        ON t.NumDomanda = cte.Num_domanda
+    WHERE cte.Anno_accademico = @AA
+      AND UPPER(ISNULL(cte.tipologia_certificazione,'')) = 'CO'
+      AND cte.firmata_il IS NOT NULL
+      AND cte.firmata_il <= @FirmataIlMax
+      AND {attestazioneBasePredicate}
+),
+UltimaCo AS
+(
+    SELECT Num_domanda, IsOrdinaria
+    FROM UltimeCoRanked
+    WHERE rn = 1
+),
 CertFlags AS
 (
     SELECT
@@ -1186,6 +1222,11 @@ SELECT
     ISNULL(cf.HasCOUniversitarioEntroScadenza, 0) AS CoAttestazioneOk,
     ISNULL(cf.HasCOOrdinarioConIntegrazioneEsteriEntroScadenza, 0) AS CoOrdinarioConIntegrazioneEsteriOk,
     ISNULL(cf.HasCOOrdinarioSemestreFiltroEntroScadenza, 0) AS CoOrdinarioSemestreFiltroOk,
+    CASE
+        WHEN ISNULL(uc.IsOrdinaria, 0) = 1
+         AND ISNULL(cf.HasCOUniversitarioEntroScadenza, 0) = 0
+        THEN 1 ELSE 0
+    END AS UltimaCoOrdinariaSenzaUniversitaria,
     ISNULL(cf.HasCIUniversitarioEntroScadenza, 0) AS CiAttestazioneOk,
     ISNULL(cf.NumeroCertificazioniImportate, 0) AS NumeroCertificazioniImportate,
     ISNULL(cf.NumeroModificheDopoScadenzaBase, 0) AS NumeroModificheDopoScadenzaBase
@@ -1193,7 +1234,9 @@ FROM Targets t
 LEFT JOIN UltimeTipologie tr
     ON tr.Num_domanda = t.NumDomanda
 LEFT JOIN CertFlags cf
-    ON cf.Num_domanda = t.NumDomanda;";
+    ON cf.Num_domanda = t.NumDomanda
+LEFT JOIN UltimaCo uc
+    ON uc.Num_domanda = t.NumDomanda;";
 
             using var command = new SqlCommand(sql, _conn)
             {
@@ -1239,7 +1282,14 @@ LEFT JOIN CertFlags cf
                     bool coUniversitarioOk = reader.SafeGetInt("CoAttestazioneOk") != 0;
                     bool coOrdinarioConIntegrazioneEsteriOk = reader.SafeGetInt("CoOrdinarioConIntegrazioneEsteriOk") != 0;
                     bool coOrdinarioSemestreFiltroOk = reader.SafeGetInt("CoOrdinarioSemestreFiltroOk") != 0;
-                    bool coOk = EsitoBorsaSupport.IsCoAdeguataOrigine(coUniversitarioOk, coOrdinarioConIntegrazioneEsteriOk, coOrdinarioSemestreFiltroOk);
+                    bool ultimaCoOrdinariaSenzaUniversitaria = reader.SafeGetInt("UltimaCoOrdinariaSenzaUniversitaria") != 0;
+                    int aaInizio = EsitoBorsaSupport.ParseAnnoAccademicoStartFromString(aa);
+                    bool iseeOrdinarioInAttesaRegolarizzazione =
+                        baseOk
+                        && ultimaCoOrdinariaSenzaUniversitaria
+                        && EsitoBorsaSupport.IsEntroScadenzaRegolarizzazioneIseeOrdinario(CurrentContext.ReferenceDate, aaInizio);
+                    bool coOk = EsitoBorsaSupport.IsCoAdeguataOrigine(coUniversitarioOk, coOrdinarioConIntegrazioneEsteriOk, coOrdinarioSemestreFiltroOk)
+                                || iseeOrdinarioInAttesaRegolarizzazione;
                     bool origineEconomicaAdeguata = baseOk && coOk;
                     raw.CoAttestazioneOk = origineEconomicaAdeguata;
 
@@ -1249,15 +1299,20 @@ LEFT JOIN CertFlags cf
                     facts.HasCoUniversitarioEntroScadenza = coUniversitarioOk;
                     facts.HasCoOrdinarioConIntegrazioneEsteriEntroScadenza = coOrdinarioConIntegrazioneEsteriOk;
                     facts.HasCoOrdinarioSemestreFiltroEntroScadenza = coOrdinarioSemestreFiltroOk;
+                    facts.UltimaCoImportataOrdinariaSenzaUniversitaria = ultimaCoOrdinariaSenzaUniversitaria;
+                    facts.IseeOrdinarioInAttesaRegolarizzazione = iseeOrdinarioInAttesaRegolarizzazione;
                     facts.OrigineEconomicaAdeguata = origineEconomicaAdeguata;
-                    facts.MotivoAdeguatezzaOrigine = EsitoBorsaSupport.GetMotivoAdeguatezzaOrigine(
-                        baseOk,
-                        coUniversitarioOk,
-                        coOrdinarioConIntegrazioneEsteriOk,
-                        coOrdinarioSemestreFiltroOk);
+                    facts.MotivoAdeguatezzaOrigine = iseeOrdinarioInAttesaRegolarizzazione
+                        ? EsitoBorsaSupport.MotivoAdeguatezzaOrigineCoOrdinarioInAttesaRegolarizzazione
+                        : EsitoBorsaSupport.GetMotivoAdeguatezzaOrigine(
+                            baseOk,
+                            coUniversitarioOk,
+                            coOrdinarioConIntegrazioneEsteriOk,
+                            coOrdinarioSemestreFiltroOk);
 
                     // Prima deve esistere un ISEE base firmato entro il 22/07; per ConfermaSemestreFiltro=1 entro il 31/12.
                     // Poi serve una CO UNIVERSITARIA/RIDOTTA/CORRENTE entro il 31/12.
+                    // Se l'ultima CO importata è ORDINARIA e non ne esiste una universitaria, è ammessa in attesa di regolarizzazione fino al 10/12 incluso.
                     // Eccezioni: CO ORDINARIA adeguata se il nucleo indipendente ha integrazione di redditi esteri oppure se lo studente è semestre filtro.
                     // Se manca una delle condizioni non viene caricata una fonte economica italiana: EsitoBorsaIncomeRules produrrà RED031.
                     if (origineEconomicaAdeguata)

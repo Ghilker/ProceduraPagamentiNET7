@@ -48,8 +48,17 @@ namespace ProcedureNet7
             if (!richiedeIntegrazione)
                 return;
 
-            if (tipoIntegrazione == "IT" && integrazioneFonte != "CI")
+            DateTime scadenzaImportazioneIntegrazione =
+                new DateTime(context.AaInizio, 12, 31);
+            bool termineImportazioneScaduto =
+                context.Pipeline.ReferenceDate.Date > scadenzaImportazioneIntegrazione;
+
+            if (tipoIntegrazione == "IT" &&
+                integrazioneFonte != "CI" &&
+                termineImportazioneScaduto)
+            {
                 evaluation.Add("RED033");
+            }
         }
 
         private static void ApplyStatusIseeRules(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)

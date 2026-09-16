@@ -9,7 +9,9 @@ namespace ProcedureNet7.Verifica
 {
     internal sealed partial class Verifica
     {
+        private const decimal IseeMinimoResidentiEsteroPerCoefficiente = 7002.97m;
         private static readonly IReadOnlyList<string> OutputBenefitCodes = EsitoBorsaSupport.SupportedBenefitCodes;
+        private static readonly IReadOnlyList<string> OutputExclusionReasonBenefitCodes = new[] { "BS", "PA", "CI" };
 
         private static DataTable BuildOutputTable()
         {
@@ -24,10 +26,13 @@ namespace ProcedureNet7.Verifica
             {
                 dt.Columns.Add($"EsitoAttuale_{codBeneficio}", typeof(int));
                 dt.Columns.Add($"EsitoCalcolato_{codBeneficio}", typeof(int));
-            }
 
-            dt.Columns.Add("CodiciEsclusioneCalcolata_BS", typeof(string));
-            dt.Columns.Add("DescrizioneEsclusioneCalcolata_BS", typeof(string));
+                if (OutputExclusionReasonBenefitCodes.Contains(codBeneficio, StringComparer.OrdinalIgnoreCase))
+                {
+                    dt.Columns.Add($"CodiciEsclusioneCalcolata_{codBeneficio}", typeof(string));
+                    dt.Columns.Add($"DescrizioneEsclusioneCalcolata_{codBeneficio}", typeof(string));
+                }
+            }
 
             dt.Columns.Add("TipoRedditoOrigine", typeof(string));
             dt.Columns.Add("TipoRedditoIntegrazione", typeof(string));
@@ -35,6 +40,12 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("HasCOUniversitarioEntroScadenza", typeof(bool));
             dt.Columns.Add("HasCOOrdinarioConIntegrazioneEsteriEntroScadenza", typeof(bool));
             dt.Columns.Add("HasCOOrdinarioSemestreFiltroEntroScadenza", typeof(bool));
+            dt.Columns.Add("UltimaCOImportataOrdinariaSenzaUniversitaria", typeof(bool));
+            dt.Columns.Add("IseeOrdinarioInAttesaRegolarizzazione", typeof(bool));
+            dt.Columns.Add("CodiciBlocchiIncongruenze", typeof(string));
+            dt.Columns.Add("DescrizioneBlocchiIncongruenze", typeof(string));
+            dt.Columns.Add("CodiciIncongruenzeNonEscludenti", typeof(string));
+            dt.Columns.Add("DescrizioneIncongruenzeNonEscludenti", typeof(string));
             dt.Columns.Add("HasCIUniversitarioEntroScadenza", typeof(bool));
             dt.Columns.Add("OrigineEconomicaAdeguata", typeof(bool));
             dt.Columns.Add("MotivoAdeguatezzaOrigine", typeof(string));
@@ -67,6 +78,14 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("SerieProrogaDomicilio", typeof(string));
             dt.Columns.Add("DomicilioPresente", typeof(bool));
             dt.Columns.Add("DomicilioValido", typeof(bool));
+            dt.Columns.Add("GestioneDomicili", typeof(string));
+            dt.Columns.Add("EsitoAnalisiDomicili", typeof(string));
+            dt.Columns.Add("DataInizioTotaleDomicili", typeof(string));
+            dt.Columns.Add("DataFineTotaleDomicili", typeof(string));
+            dt.Columns.Add("MesiCopertiDomicili", typeof(int));
+            dt.Columns.Add("ValidoCertoPerSaldoDomicili", typeof(bool));
+            dt.Columns.Add("MotivoAnalisiDomicili", typeof(string));
+            dt.Columns.Add("AnomalieAnalisiDomicili", typeof(string));
             dt.Columns.Add("HasAlloggio12", typeof(bool));
             dt.Columns.Add("HasIstanzaDomicilio", typeof(bool));
             dt.Columns.Add("CodTipoIstanzaDomicilio", typeof(string));
@@ -110,6 +129,10 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("DiagnosticaIscrizioneVB", typeof(string));
             dt.Columns.Add("EsamiMinimiRichiestiMerito", typeof(decimal));
             dt.Columns.Add("CreditiMinimiRichiestiMerito", typeof(decimal));
+            dt.Columns.Add("IdCreditiRichiestiSelezionato", typeof(int));
+            dt.Columns.Add("AnnoCreditiRichiestiSelezionato", typeof(int));
+            dt.Columns.Add("CodCorsoCreditiRichiestiSelezionato", typeof(string));
+            dt.Columns.Add("SogliaCreditiSelezionata", typeof(decimal));
             dt.Columns.Add("EsamiMinimiRichiestiPassaggioMerito", typeof(decimal));
             dt.Columns.Add("CreditiMinimiRichiestiPassaggioMerito", typeof(decimal));
             dt.Columns.Add("SlashMotiviEsclusioneBS", typeof(string));
@@ -132,6 +155,9 @@ namespace ProcedureNet7.Verifica
             dt.Columns.Add("AnniBorsaPregressaNonRestituitaConfliggenti", typeof(string));
             dt.Columns.Add("BorsaPregressaEsteraNonRichiedeRestituzione", typeof(bool));
             dt.Columns.Add("DiagnosticaBorsaPregressaRestituzioni", typeof(string));
+            dt.Columns.Add("BorsaStoricaStessoAnnoConfliggente", typeof(bool));
+            dt.Columns.Add("BorsaStoricaRichiedeRevisione", typeof(bool));
+            dt.Columns.Add("DiagnosticaBorsaStoricaStessoAnno", typeof(string));
 
             dt.Columns.Add("StatusSedeRiferimentoImportoBorsa", typeof(string));
             dt.Columns.Add("ImportoBaseBorsa", typeof(decimal));
@@ -193,6 +219,7 @@ namespace ProcedureNet7.Verifica
             var eco = info.InformazioniEconomiche;
             var sede = info.InformazioniSede;
             var dom = info.InformazioniSede.Domicilio;
+            var outcomeDomicili = sede.OutcomeDomicili;
             var iscr = info.InformazioniIscrizione;
             var impBorsa = info.InformazioniImportoBorsa;
             decimal? importoAssegnatoBsAttuale = GetImportoAssegnato(context, key, "BS");
@@ -215,6 +242,22 @@ namespace ProcedureNet7.Verifica
             row["HasCOUniversitarioEntroScadenza"] = facts?.HasCoUniversitarioEntroScadenza == true;
             row["HasCOOrdinarioConIntegrazioneEsteriEntroScadenza"] = facts?.HasCoOrdinarioConIntegrazioneEsteriEntroScadenza == true;
             row["HasCOOrdinarioSemestreFiltroEntroScadenza"] = facts?.HasCoOrdinarioSemestreFiltroEntroScadenza == true;
+            row["UltimaCOImportataOrdinariaSenzaUniversitaria"] = facts?.UltimaCoImportataOrdinariaSenzaUniversitaria == true;
+            row["IseeOrdinarioInAttesaRegolarizzazione"] = facts?.IseeOrdinarioInAttesaRegolarizzazione == true;
+            var codiciBlocchiIncongruenze = facts?.CodiciBlocchiIncongruenze
+                .OrderBy(static code => code, StringComparer.OrdinalIgnoreCase)
+                .ToArray() ?? Array.Empty<string>();
+            row["CodiciBlocchiIncongruenze"] = string.Join(";", codiciBlocchiIncongruenze);
+            row["DescrizioneBlocchiIncongruenze"] = string.Join(
+                " | ",
+                codiciBlocchiIncongruenze.Select(VerificaBlocchiIncongruenzeCatalog.GetDescrizione));
+            var codiciIncongruenze = facts?.CodiciIncongruenzeNonEscludenti
+                .OrderBy(static code => code, StringComparer.OrdinalIgnoreCase)
+                .ToArray() ?? Array.Empty<string>();
+            row["CodiciIncongruenzeNonEscludenti"] = string.Join(";", codiciIncongruenze);
+            row["DescrizioneIncongruenzeNonEscludenti"] = string.Join(
+                " | ",
+                codiciIncongruenze.Select(VerificaBlocchiIncongruenzeCatalog.GetDescrizioneIncongruenza));
             row["HasCIUniversitarioEntroScadenza"] = facts?.HasCiUniversitarioEntroScadenza == true;
             row["OrigineEconomicaAdeguata"] = facts?.OrigineEconomicaAdeguata == true;
             row["MotivoAdeguatezzaOrigine"] = facts?.MotivoAdeguatezzaOrigine ?? "";
@@ -244,15 +287,33 @@ namespace ProcedureNet7.Verifica
             row["ProvinciaResidenza"] = sede.Residenza.provincia ?? "";
             row["ComuneSedeStudi"] = info.InformazioniIscrizione.ComuneSedeStudi ?? "";
             row["ProvinciaSede"] = info.InformazioniIscrizione.ProvinciaSedeStudi ?? "";
-            row["ComuneDomicilio"] = dom?.codComuneDomicilio ?? "";
+            row["ComuneDomicilio"] = sede.UsaNuovaGestioneDomicili
+                ? string.Join(", ", outcomeDomicili?.ComuniCoinvolti ?? new List<string>())
+                : dom?.codComuneDomicilio ?? "";
             row["SerieContrattoDomicilio"] = dom?.codiceSerieLocazione ?? "";
             row["DataRegistrazioneDomicilio"] = FormatDateForExport(dom?.dataRegistrazioneLocazione);
-            row["DataDecorrenzaDomicilio"] = FormatDateForExport(dom?.dataDecorrenzaLocazione);
-            row["DataScadenzaDomicilio"] = FormatDateForExport(dom?.dataScadenzaLocazione);
+            row["DataDecorrenzaDomicilio"] = sede.UsaNuovaGestioneDomicili
+                ? FormatDateForExport(outcomeDomicili?.DataInizioTotale)
+                : FormatDateForExport(dom?.dataDecorrenzaLocazione);
+            row["DataScadenzaDomicilio"] = sede.UsaNuovaGestioneDomicili
+                ? FormatDateForExport(outcomeDomicili?.DataFineTotale)
+                : FormatDateForExport(dom?.dataScadenzaLocazione);
             row["ProrogatoDomicilio"] = dom?.prorogatoLocazione ?? false;
             row["SerieProrogaDomicilio"] = dom?.codiceSerieProrogaLocazione ?? "";
             row["DomicilioPresente"] = sede.DomicilioPresente;
             row["DomicilioValido"] = sede.DomicilioValido;
+            row["GestioneDomicili"] = sede.UsaNuovaGestioneDomicili
+                ? "DOMICILI_CONTRATTI_PROROGHE"
+                : "LUOGO_REPERIBILITA_STUDENTE";
+            row["EsitoAnalisiDomicili"] = outcomeDomicili?.Esito.ToString() ?? "";
+            row["DataInizioTotaleDomicili"] = FormatDateForExport(outcomeDomicili?.DataInizioTotale);
+            row["DataFineTotaleDomicili"] = FormatDateForExport(outcomeDomicili?.DataFineTotale);
+            SetIfHasValue(row, "MesiCopertiDomicili", outcomeDomicili?.MesiCoperti);
+            row["ValidoCertoPerSaldoDomicili"] = outcomeDomicili?.ValidoCertoPerSaldo == true;
+            row["MotivoAnalisiDomicili"] = outcomeDomicili?.Motivo ?? "";
+            row["AnomalieAnalisiDomicili"] = outcomeDomicili == null
+                ? ""
+                : string.Join(" | ", outcomeDomicili.Anomalie);
             row["HasAlloggio12"] = sede.HasAlloggio12;
             row["HasIstanzaDomicilio"] = sede.HasIstanzaDomicilio;
             row["CodTipoIstanzaDomicilio"] = sede.CodTipoIstanzaDomicilio ?? "";
@@ -305,6 +366,10 @@ namespace ProcedureNet7.Verifica
             row["DiagnosticaIscrizioneVB"] = facts?.DiagnosticaIscrizione ?? string.Empty;
             SetIfHasValue(row, "EsamiMinimiRichiestiMerito", iscr.EsamiMinimiRichiestiMerito);
             SetIfHasValue(row, "CreditiMinimiRichiestiMerito", iscr.CreditiMinimiRichiestiMerito);
+            SetIfHasValue(row, "IdCreditiRichiestiSelezionato", iscr.IdCreditiRichiestiSelezionato);
+            SetIfHasValue(row, "AnnoCreditiRichiestiSelezionato", iscr.AnnoCreditiRichiestiSelezionato);
+            row["CodCorsoCreditiRichiestiSelezionato"] = iscr.CodCorsoCreditiRichiestiSelezionato ?? string.Empty;
+            SetIfHasValue(row, "SogliaCreditiSelezionata", iscr.SogliaCreditiSelezionata);
             SetIfHasValue(row, "EsamiMinimiRichiestiPassaggioMerito", iscr.EsamiMinimiRichiestiPassaggio);
             SetIfHasValue(row, "CreditiMinimiRichiestiPassaggioMerito", iscr.CreditiMinimiRichiestiPassaggio);
             row["SlashMotiviEsclusioneBS"] = facts?.SlashMotiviEsclusioneBS ?? "";
@@ -327,6 +392,9 @@ namespace ProcedureNet7.Verifica
             row["AnniBorsaPregressaNonRestituitaConfliggenti"] = facts?.AnniBorsaPregressaNonRestituitaConfliggenti ?? "";
             row["BorsaPregressaEsteraNonRichiedeRestituzione"] = facts?.BorsaPregressaEsteraNonRichiedeRestituzione == true;
             row["DiagnosticaBorsaPregressaRestituzioni"] = facts?.DiagnosticaBorsaPregressaRestituzioni ?? "";
+            row["BorsaStoricaStessoAnnoConfliggente"] = context.BorsaStoricaStessoAnnoConflitti.Contains(key);
+            row["BorsaStoricaRichiedeRevisione"] = context.BorsaStoricaRichiedeRevisione.Contains(key);
+            row["DiagnosticaBorsaStoricaStessoAnno"] = context.GetDiagnosticaBorsaStoricaStessoAnno(key);
 
             row["StatusSedeRiferimentoImportoBorsa"] = impBorsa.StatusSedeRiferimento ?? "";
             SetNullableDecimal(row, "ImportoBaseBorsa", impBorsa.ImportoBase);
@@ -382,11 +450,18 @@ namespace ProcedureNet7.Verifica
                 : null;
 
             decimal? iseeDsu = info.InformazioniEconomiche.Calcolate.ISEEDSU;
+            bool residenteEstero = string.Equals(
+                info.InformazioniSede.Residenza.provincia?.Trim(),
+                "EE",
+                StringComparison.OrdinalIgnoreCase);
+            decimal? iseePerCoefficiente = iseeDsu.HasValue && residenteEstero
+                ? Math.Max(iseeDsu.Value, IseeMinimoResidentiEsteroPerCoefficiente)
+                : iseeDsu;
             decimal? iseeMax = context.CalcParams?.SogliaIsee > 0m
                 ? context.CalcParams.SogliaIsee
                 : null;
-            decimal? iseeN = iseeDsu.HasValue && iseeMax.HasValue
-                ? Clamp01(1m - (iseeDsu.Value / iseeMax.Value))
+            decimal? iseeN = iseePerCoefficiente.HasValue && iseeMax.HasValue
+                ? Clamp01(1m - (iseePerCoefficiente.Value / iseeMax.Value))
                 : null;
 
             decimal? coefficiente = cfn.HasValue && mediaN.HasValue && iseeN.HasValue
@@ -399,7 +474,7 @@ namespace ProcedureNet7.Verifica
             SetNullableDecimal(row, "CFN_Calcolato", cfn);
             SetNullableDecimal(row, "MediaVoti_Calcolata", media.HasValue ? RoundCoefficient(media.Value) : null);
             SetNullableDecimal(row, "MediaN_Calcolata", mediaN.HasValue ? RoundCoefficient(mediaN.Value) : null);
-            SetNullableDecimal(row, "ISEEDSU_Coefficiente", iseeDsu);
+            SetNullableDecimal(row, "ISEEDSU_Coefficiente", iseePerCoefficiente);
             SetNullableDecimal(row, "ISEEMax_Coefficiente", iseeMax);
             SetNullableDecimal(row, "ISEEN_Calcolato", iseeN.HasValue ? RoundCoefficient(iseeN.Value) : null);
             SetNullableDecimal(row, "CoefficienteCongiunto_Calcolato", coefficiente);
@@ -467,8 +542,11 @@ namespace ProcedureNet7.Verifica
             context.TryGetEsitiConcorsoByBenefit(key, out var rawByBenefit);
             context.TryGetEsitiCalcolatiByBenefit(key, out var calcolatiByBenefit);
 
-            row["CodiciEsclusioneCalcolata_BS"] = string.Empty;
-            row["DescrizioneEsclusioneCalcolata_BS"] = string.Empty;
+            foreach (var codBeneficio in OutputExclusionReasonBenefitCodes)
+            {
+                row[$"CodiciEsclusioneCalcolata_{codBeneficio}"] = string.Empty;
+                row[$"DescrizioneEsclusioneCalcolata_{codBeneficio}"] = string.Empty;
+            }
 
             foreach (var codBeneficio in OutputBenefitCodes)
             {
@@ -496,10 +574,10 @@ namespace ProcedureNet7.Verifica
                 {
                     esitoCalcolato = calcolato.EsitoCalcolato;
 
-                    if (string.Equals(codBeneficio, "BS", StringComparison.OrdinalIgnoreCase))
+                    if (OutputExclusionReasonBenefitCodes.Contains(codBeneficio, StringComparer.OrdinalIgnoreCase))
                     {
-                        row["CodiciEsclusioneCalcolata_BS"] = calcolato.CodiciMotivo ?? string.Empty;
-                        row["DescrizioneEsclusioneCalcolata_BS"] = calcolato.Motivi ?? string.Empty;
+                        row[$"CodiciEsclusioneCalcolata_{codBeneficio}"] = calcolato.CodiciMotivo ?? string.Empty;
+                        row[$"DescrizioneEsclusioneCalcolata_{codBeneficio}"] = calcolato.Motivi ?? string.Empty;
                     }
                 }
 

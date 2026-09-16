@@ -140,6 +140,124 @@ JOIN Incongruenze i
   ON i.Anno_accademico = @AA
  AND i.Num_domanda = CAST(t.NumDomanda AS INT);";
 
+        private const string EsitoBorsaStoricoStessoAnnoSql = @"
+SET NOCOUNT ON;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
+;WITH D AS
+(
+    SELECT
+        CAST(t.NumDomanda AS INT) AS NumDomanda,
+        t.CodFiscale
+    FROM {TEMP_TABLE} t
+),
+DOMANDE_STORICHE_RANKED AS
+(
+    SELECT
+        D.NumDomanda,
+        D.CodFiscale,
+        CAST(dom.Num_domanda AS INT) AS NumDomandaStorica,
+        CONVERT(NVARCHAR(8), dom.Anno_accademico) AS AnnoAccademicoStorico,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY D.NumDomanda, dom.Anno_accademico, dom.Num_domanda
+            ORDER BY dom.Data_validita DESC, dom.Tipo_bando
+        ) AS rn
+    FROM D
+    JOIN Domanda dom
+      ON dom.Cod_fiscale = D.CodFiscale
+    WHERE dom.Tipo_bando = 'lz'
+      AND dom.Anno_accademico < @AA
+),
+DOMANDE_STORICHE AS
+(
+    SELECT
+        NumDomanda,
+        CodFiscale,
+        NumDomandaStorica,
+        AnnoAccademicoStorico
+    FROM DOMANDE_STORICHE_RANKED
+    WHERE rn = 1
+),
+ESITI_STORICI_RANKED AS
+(
+    SELECT
+        ds.NumDomanda,
+        ds.CodFiscale,
+        ds.NumDomandaStorica,
+        ds.AnnoAccademicoStorico,
+        TRY_CONVERT(INT, ec.Cod_tipo_esito) AS CodTipoEsitoStorico,
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY ds.NumDomanda, ds.AnnoAccademicoStorico, ds.NumDomandaStorica
+            ORDER BY ec.Data_validita DESC
+        ) AS rn
+    FROM DOMANDE_STORICHE ds
+    JOIN ESITI_CONCORSI ec
+      ON ec.Anno_accademico = ds.AnnoAccademicoStorico
+     AND ec.Num_domanda = ds.NumDomandaStorica
+    WHERE UPPER(LTRIM(RTRIM(ISNULL(ec.Cod_beneficio, '')))) = 'BS'
+)
+SELECT
+    es.NumDomanda,
+    es.CodFiscale,
+    es.NumDomandaStorica,
+    es.AnnoAccademicoStorico,
+    es.CodTipoEsitoStorico,
+    ISNULL(iscr.HasIscrizione, 0) AS HasIscrizione,
+    iscr.TipoCorsoStorico,
+    iscr.AnnoCorsoStorico,
+    iscr.DurataLegaleStorica
+FROM ESITI_STORICI_RANKED es
+OUTER APPLY
+(
+    SELECT TOP (1)
+        CAST(1 AS BIT) AS HasIscrizione,
+        TRY_CONVERT(INT, i.COD_TIPOLOGIA_STUDI) AS TipoCorsoStorico,
+        TRY_CONVERT(INT, i.ANNO_CORSO) AS AnnoCorsoStorico,
+        corso.DurataLegaleStorica
+    FROM ISCRIZIONI i
+    OUTER APPLY
+    (
+        SELECT TOP (1)
+            TRY_CONVERT(INT, cl.DURATA_LEGALE) AS DurataLegaleStorica
+        FROM CORSI_LAUREA cl
+        WHERE cl.COD_CORSO_LAUREA = i.COD_CORSO_LAUREA
+          AND cl.COD_TIPO_ORDINAMENTO = i.COD_TIPO_ORDINAMENTO
+          AND cl.COD_FACOLTA = i.COD_FACOLTA
+        ORDER BY
+            CASE
+                WHEN
+                    (
+                        TRY_CONVERT(INT, LEFT(CONVERT(NVARCHAR(20), cl.ANNO_ACCAD_INIZIO), 4)) IS NULL
+                        OR TRY_CONVERT(INT, LEFT(CONVERT(NVARCHAR(20), cl.ANNO_ACCAD_INIZIO), 4))
+                           <= TRY_CONVERT(INT, LEFT(es.AnnoAccademicoStorico, 4))
+                    )
+                    AND
+                    (
+                        NULLIF(LTRIM(RTRIM(CONVERT(NVARCHAR(20), cl.ANNO_ACCAD_FINE))), '') IS NULL
+                        OR TRY_CONVERT(INT, LEFT(CONVERT(NVARCHAR(20), cl.ANNO_ACCAD_FINE), 4))
+                           >= TRY_CONVERT(INT, LEFT(es.AnnoAccademicoStorico, 4))
+                    )
+                    THEN 0
+                ELSE 1
+            END,
+            TRY_CONVERT(INT, LEFT(CONVERT(NVARCHAR(20), cl.ANNO_ACCAD_INIZIO), 4)) DESC
+    ) corso
+    WHERE i.COD_FISCALE = es.CodFiscale
+      AND i.ANNO_ACCADEMICO = es.AnnoAccademicoStorico
+      AND
+      (
+          i.TIPO_BANDO IS NULL
+          OR i.TIPO_BANDO = 'lz'
+      )
+    ORDER BY i.DATA_VALIDITA DESC
+) iscr
+WHERE es.rn = 1
+  AND es.CodTipoEsitoStorico = @CodTipoEsitoVincitoreStorico;";
+
+        private const int CodTipoEsitoVincitoreStorico = 2;
+
         private static readonly string[] CarrieraTitoloAvvenimentoMarkers =
         {
             "CONSEG", "LAUR", "DIPL", "TITOLO", "ABIL"
@@ -167,6 +285,7 @@ JOIN Incongruenze i
             LoadEsitoBorsaRedditoUeFacts(context);
             LoadEsitoBorsaLaureaSpecFacts(context);
             BuildEsitoBorsaPregressaFacts(context);
+            LoadEsitoBorsaStoricoStessoAnnoFacts(context);
             BuildEsitoBorsaGeneralFactsFromCarrieraPregressa(context);
         }
 
@@ -414,9 +533,11 @@ DG_RANKED AS
         TRY_CONVERT(BIT, dg.PERMESSO_SOGG_PROVV) AS PermessoSoggProvv,
         TRY_CONVERT(BIT, dg.ISCRIZIONE_FUORITERMINE) AS IscrizioneFuoriTermine,
         TRY_CONVERT(BIT, dg.RINUNCIA_IN_CORSO) AS RinunciaBenefici,
+        TRY_CONVERT(BIT, dg.Rinuncia_in_corso) AS RinunciaInCorso,
         TRY_CONVERT(BIT, dg.NUBILE_PROLE) AS NubileProle,
         TRY_CONVERT(BIT, dg.RIFUG_POLITICO) AS RifugiatoPolitico,
         TRY_CONVERT(BIT, dg.INVALIDO) AS Invalido,
+        TRY_CONVERT(BIT, dg.SELEZIONATO_CEE) AS SelezionatoCee,
         ROW_NUMBER() OVER
         (
             PARTITION BY dg.NUM_DOMANDA
@@ -435,9 +556,11 @@ DG AS
         PermessoSoggProvv,
         IscrizioneFuoriTermine,
         RinunciaBenefici,
+        RinunciaInCorso,
         NubileProle,
         RifugiatoPolitico,
-        Invalido
+        Invalido,
+        SelezionatoCee
     FROM DG_RANKED
     WHERE RN = 1
 ),
@@ -536,9 +659,11 @@ SELECT
     ISNULL(CIT.Straniero, CAST(0 AS BIT)) AS Straniero,
     ISNULL(CIT.CittadinanzaUe, CAST(0 AS BIT)) AS CittadinanzaUe,
     ISNULL(RES.ResidenzaUe, CAST(0 AS BIT)) AS ResidenzaUe,
+    ISNULL(DG.RinunciaInCorso, CAST(0 AS BIT)) AS RinunciaInCorso,
     ISNULL(DG.NubileProle, CAST(0 AS BIT)) AS NubileProle,
     ISNULL(DG.RifugiatoPolitico, CAST(0 AS BIT)) AS RifugiatoPolitico,
-    ISNULL(DG.Invalido, CAST(0 AS BIT)) AS Invalido
+    ISNULL(DG.Invalido, CAST(0 AS BIT)) AS Invalido,
+    ISNULL(DG.SelezionatoCee, CAST(0 AS BIT)) AS SelezionatoCee
 FROM D
 LEFT JOIN DG
     ON DG.NumDomanda = D.NumDomanda
@@ -562,10 +687,14 @@ OPTION (RECOMPILE);";
                 facts.Straniero = GetNullableBool(reader, "Straniero");
                 facts.CittadinanzaUe = GetNullableBool(reader, "CittadinanzaUe");
                 facts.ResidenzaUe = GetNullableBool(reader, "ResidenzaUe");
+                facts.RinunciaInCorso = reader.SafeGetBool("RinunciaInCorso");
                 facts.NubileProle = GetNullableBool(reader, "NubileProle");
 
                 info.InformazioniPersonali.Rifugiato = reader.SafeGetBool("RifugiatoPolitico");
                 info.InformazioniPersonali.Disabile = reader.SafeGetBool("Invalido");
+
+                if (reader.SafeGetBool("SelezionatoCee"))
+                    context.SelezionatiCiUe.Add(key);
             });
         }
 
@@ -755,6 +884,156 @@ WHERE ANNO_ACCADEMICO = @AA
             }
         }
 
+        private void LoadEsitoBorsaStoricoStessoAnnoFacts(VerificaPipelineContext context)
+        {
+            using var scope = MeasureCollectionStep(
+                "VerificaRaccoltaDati.LoadEsitoBorsaStoricoStessoAnnoFacts",
+                $"AA={context.AnnoAccademico}");
+
+            context.ResetBorsaStoricaStessoAnno();
+
+            using var cmd = CreatePopulationCommand(EsitoBorsaStoricoStessoAnnoSql, context);
+            cmd.Parameters.Add("@CodTipoEsitoVincitoreStorico", SqlDbType.Int).Value = CodTipoEsitoVincitoreStorico;
+            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            {
+                var iscr = info.InformazioniIscrizione;
+                if (iscr == null || !IsTipologiaCorsoGestitaPerStorico(iscr.TipoCorso))
+                    return;
+
+                int? annoEquivalenteCorrente = NormalizeAnnoCorsoEquivalenteStorico(
+                    iscr.TipoCorso,
+                    iscr.AnnoCorso);
+
+                if (!annoEquivalenteCorrente.HasValue)
+                    return;
+
+                var key = CreateStudentKey(
+                    info.InformazioniPersonali.CodFiscale,
+                    info.InformazioniPersonali.NumDomanda);
+                var facts = GetOrCreateEsitoBorsaFacts(context, key);
+                var anniBorsaRestituiti = ParseAnnoCarrieraSet(
+                    facts.AnniBorsaPregressaRestituitiNormalizzati);
+
+                string aaStorico = reader.SafeGetString("AnnoAccademicoStorico").Trim();
+                int numDomandaStorica = reader.SafeGetInt("NumDomandaStorica");
+                int codTipoEsitoStorico = reader.SafeGetInt("CodTipoEsitoStorico");
+                bool hasIscrizione = reader.SafeGetBool("HasIscrizione");
+                int tipoCorsoStorico = reader.SafeGetInt("TipoCorsoStorico");
+                int annoCorsoStorico = reader.SafeGetInt("AnnoCorsoStorico");
+                int durataLegaleStorica = reader.SafeGetInt("DurataLegaleStorica");
+
+                bool richiedeRevisione = false;
+                int? annoEquivalenteStorico = null;
+                string stato;
+
+                if (!hasIscrizione)
+                {
+                    richiedeRevisione = true;
+                    stato = "REVISIONE_ISCRIZIONE_STORICA_MANCANTE";
+                }
+                else if (tipoCorsoStorico == 0)
+                {
+                    richiedeRevisione = true;
+                    stato = "REVISIONE_TIPOLOGIA_STORICA_MANCANTE";
+                }
+                else if (!IsTipologiaCorsoGestitaPerStorico(tipoCorsoStorico))
+                {
+                    stato = "IGNORATO_TIPOLOGIA_STORICA_NON_GESTITA";
+                }
+                else if (annoCorsoStorico == 0)
+                {
+                    richiedeRevisione = true;
+                    stato = "REVISIONE_ANNO_CORSO_STORICO_MANCANTE";
+                }
+                else if (annoCorsoStorico < 0)
+                {
+                    stato = "IGNORATO_ANNO_STORICO_FUORI_CORSO";
+                }
+                else
+                {
+                    annoEquivalenteStorico = NormalizeAnnoCorsoEquivalenteStorico(
+                        tipoCorsoStorico,
+                        annoCorsoStorico);
+
+                    if (!annoEquivalenteStorico.HasValue)
+                    {
+                        richiedeRevisione = true;
+                        stato = "REVISIONE_ANNO_STORICO_NON_NORMALIZZABILE";
+                    }
+                    else if (annoEquivalenteStorico.Value == annoEquivalenteCorrente.Value)
+                    {
+                        if (anniBorsaRestituiti.Contains(annoEquivalenteStorico.Value))
+                        {
+                            stato = "NESSUN_CONFLITTO_BORSA_RESTITUITA";
+                        }
+                        else
+                        {
+                            context.BorsaStoricaStessoAnnoConflitti.Add(key);
+                            stato = "CONFLITTO_STESSO_ANNO_EQUIVALENTE";
+                        }
+                    }
+                    else
+                    {
+                        stato = "NESSUN_CONFLITTO";
+                    }
+                }
+
+                context.AddDiagnosticaBorsaStoricaStessoAnno(
+                    key,
+                    BuildDiagnosticaBorsaStoricaStessoAnno(
+                        aaStorico,
+                        numDomandaStorica,
+                        codTipoEsitoStorico,
+                        tipoCorsoStorico,
+                        annoCorsoStorico,
+                        durataLegaleStorica,
+                        annoEquivalenteStorico,
+                        iscr.TipoCorso,
+                        iscr.AnnoCorso,
+                        annoEquivalenteCorrente.Value,
+                        stato),
+                    richiedeRevisione);
+            });
+        }
+
+        private static bool IsTipologiaCorsoGestitaPerStorico(int tipoCorso)
+            => tipoCorso == 3 || tipoCorso == 4 || tipoCorso == 5;
+
+        private static int? NormalizeAnnoCorsoEquivalenteStorico(int tipoCorso, int annoCorso)
+        {
+            if (!IsTipologiaCorsoGestitaPerStorico(tipoCorso) || annoCorso <= 0)
+                return null;
+
+            return tipoCorso == 5
+                ? annoCorso + 3
+                : annoCorso;
+        }
+
+        private static string BuildDiagnosticaBorsaStoricaStessoAnno(
+            string aaStorico,
+            int numDomandaStorica,
+            int codTipoEsitoStorico,
+            int tipoCorsoStorico,
+            int annoCorsoStorico,
+            int durataLegaleStorica,
+            int? annoEquivalenteStorico,
+            int tipoCorsoCorrente,
+            int annoCorsoCorrente,
+            int annoEquivalenteCorrente,
+            string stato)
+            => string.Concat(
+                "AAStorico=", aaStorico,
+                ";NumDomandaStorica=", numDomandaStorica.ToString(CultureInfo.InvariantCulture),
+                ";CodTipoEsitoStorico=", codTipoEsitoStorico.ToString(CultureInfo.InvariantCulture),
+                ";TipoCorsoStorico=", tipoCorsoStorico == 0 ? "" : tipoCorsoStorico.ToString(CultureInfo.InvariantCulture),
+                ";AnnoCorsoStorico=", annoCorsoStorico == 0 ? "" : annoCorsoStorico.ToString(CultureInfo.InvariantCulture),
+                ";DurataLegaleStorica=", durataLegaleStorica == 0 ? "" : durataLegaleStorica.ToString(CultureInfo.InvariantCulture),
+                ";AnnoEquivalenteStorico=", annoEquivalenteStorico?.ToString(CultureInfo.InvariantCulture) ?? "",
+                ";TipoCorsoCorrente=", tipoCorsoCorrente.ToString(CultureInfo.InvariantCulture),
+                ";AnnoCorsoCorrente=", annoCorsoCorrente.ToString(CultureInfo.InvariantCulture),
+                ";AnnoEquivalenteCorrente=", annoEquivalenteCorrente.ToString(CultureInfo.InvariantCulture),
+                ";Stato=", stato);
+
         private void BuildEsitoBorsaPregressaFacts(VerificaPipelineContext context)
         {
             foreach (var pair in context.Students)
@@ -780,25 +1059,30 @@ WHERE ANNO_ACCADEMICO = @AA
                     string benefici = NormalizeUpper(item?.BeneficiUsufruiti);
                     string restituzioni = NormalizeUpper(item?.ImportiRestituiti);
                     string codAvvenimento = NormalizeUpper(item?.CodAvvenimento);
-                    bool isCarrieraPregressaEstera = IsCarrieraPregressaEstera(item?.SedeIstituzioneUniversitaria);
 
                     bool hasBorsa = HasBorsaMarker(benefici);
                     bool hasRestituzione = HasMeaningfulRestitution(restituzioni);
+                    bool rinunciaEstera = IsRinunciaCarrieraPregressa(codAvvenimento)
+                        && IsCarrieraPregressaEstera(item?.SedeIstituzioneUniversitaria);
 
-                    // Se la carriera pregressa è stata effettuata all'estero (Sede_istituzione_universitaria = 2),
-                    // il beneficio non restituito non blocca la borsa.
-                    if (isCarrieraPregressaEstera && hasBorsa && !hasRestituzione)
+                    if (rinunciaEstera)
                         facts.BorsaPregressaEsteraNonRichiedeRestituzione = true;
 
                     // La rinuncia (RI) con Benefici_usufruiti_LZ/Importi_restituiti_LZ viene gestita sotto con mappatura 3+2/ciclo unico.
                     // Evita il vecchio confronto secco 1° anno con 1° anno, non valido per studenti che richiedono una magistrale.
-                    if (!isCarrieraPregressaEstera && codAvvenimento != "RI" && hasBorsa && !hasRestituzione)
+                    // Per una rinuncia relativa a una carriera estera il controllo dei benefici usufruiti e non restituiti viene saltato.
+                    if (!rinunciaEstera && codAvvenimento != "RI" && hasBorsa && !hasRestituzione)
                         facts.UsufruitoBeneficioBorsaNonRestituito = true;
 
                     if (IsRinunciaBorsa(codAvvenimento, benefici))
                         facts.RinunciaBorsa = true;
 
-                    AddPregressaBenefitFacts(facts, benefici, restituzioni, codAvvenimento, isCarrieraPregressaEstera);
+                    AddPregressaBenefitFacts(
+                        facts,
+                        benefici,
+                        restituzioni,
+                        codAvvenimento,
+                        skipBeneficiUsufruitiNonRestituiti: rinunciaEstera);
                 }
 
                 if (HasBeneficiRiUsufruitiNonRestituiti(context, pair.Key, facts))
@@ -838,15 +1122,16 @@ WHERE ANNO_ACCADEMICO = @AA
                 if (codAvvenimento != "RI")
                     continue;
 
-                if (!IsFlagOne(row.BeneficiUsufruiti))
-                    continue;
-
-                if (IsCarrieraPregressaEstera(row.SedeIstituzioneUniversitaria))
+                bool rinunciaEstera = IsCarrieraPregressaEstera(row.SedeIstituzioneUniversitaria);
+                if (rinunciaEstera)
                 {
                     facts.BorsaPregressaEsteraNonRichiedeRestituzione = true;
-                    diagnostica.Add(BuildDiagnosticaBeneficiRiEstera(row));
+                    diagnostica.Add(BuildDiagnosticaBeneficiRi(row, "SKIP_RINUNCIA_ESTERA", fallbackOrdinale: false));
                     continue;
                 }
+
+                if (!IsFlagOne(row.BeneficiUsufruiti))
+                    continue;
 
                 var anniUsufruiti = ParseAnnoCarrieraSet(row.AnniBeneficiUsufruitiLz);
                 if (anniUsufruiti.Count == 0)
@@ -909,25 +1194,13 @@ WHERE ANNO_ACCADEMICO = @AA
             return string.Concat(
                 "RI;TipoPregresso=", tipo,
                 ";SedeIstituzioneUniversitaria=", NormalizeUpper(row.SedeIstituzioneUniversitaria),
-                ";CarrieraEstera=0",
+                ";CarrieraEstera=", IsCarrieraPregressaEstera(row.SedeIstituzioneUniversitaria) ? "1" : "0",
                 ";TipologiaCorso=", NormalizeUpper(row.TipologiaCorso),
                 ";Durata=", row.DurataLegTitoloConseguito?.ToString(CultureInfo.InvariantCulture) ?? "",
                 ";AnnoAvvenimento=", row.AnnoAvvenimento?.ToString(CultureInfo.InvariantCulture) ?? "",
                 ";AnniUsufruitiRaw=", row.AnniBeneficiUsufruitiLz ?? string.Empty,
                 ";AnniRestituitiRaw=", row.AnniImportiRestituitiLz ?? string.Empty);
         }
-
-        private static string BuildDiagnosticaBeneficiRiEstera(CarrieraPregressaBeneficiRiRaw row)
-            => string.Concat(
-                "RI;TipoPregresso=ESTERO_NON_RICHIEDE_RESTITUZIONE",
-                ";SedeIstituzioneUniversitaria=", NormalizeUpper(row.SedeIstituzioneUniversitaria),
-                ";CarrieraEstera=1",
-                ";Regola=beneficio_pregresso_estero_non_bloccante",
-                ";TipologiaCorso=", NormalizeUpper(row.TipologiaCorso),
-                ";Durata=", row.DurataLegTitoloConseguito?.ToString(CultureInfo.InvariantCulture) ?? "",
-                ";AnnoAvvenimento=", row.AnnoAvvenimento?.ToString(CultureInfo.InvariantCulture) ?? "",
-                ";AnniUsufruitiRaw=", row.AnniBeneficiUsufruitiLz ?? string.Empty,
-                ";AnniRestituitiRaw=", row.AnniImportiRestituitiLz ?? string.Empty);
 
         private static int NormalizeAnnoBeneficioCorrente(InformazioniIscrizione iscr, int annoCarrieraDomanda)
         {
@@ -1020,13 +1293,6 @@ WHERE ANNO_ACCADEMICO = @AA
             int annoCorso = iscr.AnnoCorso;
             if (annoCorso > 0)
                 return annoCorso;
-
-            if (annoCorso < 0)
-            {
-                int durataNormale = EsitoBorsaSupport.GetDurataNormaleCorso(iscr);
-                if (durataNormale > 0)
-                    return durataNormale + Math.Abs(annoCorso);
-            }
 
             return 0;
         }
@@ -1433,19 +1699,37 @@ WHERE ANNO_ACCADEMICO = @AA
             return Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
 
-        private static void AddPregressaBenefitFacts(EsitoBorsaFacts facts, string benefici, string restituzioni, string codAvvenimento, bool isCarrieraPregressaEstera)
+        private static void AddPregressaBenefitFacts(
+            EsitoBorsaFacts facts,
+            string benefici,
+            string restituzioni,
+            string codAvvenimento,
+            bool skipBeneficiUsufruitiNonRestituiti = false)
         {
             foreach (string beneficio in EsitoBorsaSupport.SupportedBenefitCodes)
             {
                 bool hasBenefit = HasBenefitMarker(benefici, beneficio);
                 bool hasRestituzione = HasMeaningfulRestitution(restituzioni);
 
-                if (!isCarrieraPregressaEstera && hasBenefit && !hasRestituzione && !(beneficio == "BS" && codAvvenimento == "RI"))
+                if (!skipBeneficiUsufruitiNonRestituiti
+                    && hasBenefit
+                    && !hasRestituzione
+                    && !(beneficio == "BS" && codAvvenimento == "RI"))
+                {
                     facts.BeneficiPregressiNonRestituiti.Add(beneficio);
+                }
 
                 if (IsRinunciaBenefit(codAvvenimento, benefici, beneficio))
                     facts.BeneficiRinunciaPregressa.Add(beneficio);
             }
+        }
+
+        private static bool IsRinunciaCarrieraPregressa(string? codAvvenimento)
+        {
+            string codice = NormalizeUpper(codAvvenimento);
+            return codice == "RI"
+                || codice == "RN"
+                || codice.Contains("RIN", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsCarrieraPregressaEstera(string? sedeIstituzioneUniversitaria)

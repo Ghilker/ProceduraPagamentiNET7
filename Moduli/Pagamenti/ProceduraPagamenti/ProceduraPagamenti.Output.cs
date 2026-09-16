@@ -83,13 +83,22 @@ namespace ProcedureNet7
         {
             _flussoWrittenCF.Clear();
             _flussoFilesByCF.Clear();
+            _motiviNonFlusso.Clear();
 
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files");
 
             string beneficioFolderPath = GetCurrentPagamentoFolder();
 
             bool doAllImpegni = selectedImpegno == "0000";
-            IEnumerable<string> impegnoList = doAllImpegni ? impegniList : new List<string> { selectedImpegno };
+            var impegnoList = doAllImpegni ? impegniList.ToList() : new List<string> { selectedImpegno };
+
+            foreach (var studente in studentiDaPagare.Values)
+            {
+                var motivo = PagamentoFlussoRules.ImpegnoNonElaborato(
+                    studente.InformazioniPagamento.NumeroImpegno, selectedImpegno, impegnoList);
+                if (motivo != null)
+                    _motiviNonFlusso[studente.InformazioniPersonali.CodFiscale] = motivo;
+            }
 
             try
             {
@@ -247,12 +256,9 @@ namespace ProcedureNet7
                     string catCU = s.InformazioniPagamento?.CategoriaCU ?? "";
                     bool hasPA = HasPAForStudent(s, categoriaPagam);
 
-                    string motivo = BuildNonFlussoReason(
-                        s,
-                        catCU,
-                        selectedRichiestoPA,
-                        tipoStudente,
-                        categoriaPagam);
+                    var causa = _motiviNonFlusso.TryGetValue(s.InformazioniPersonali.CodFiscale, out var registrata)
+                        ? registrata : PagamentoFlussoRules.MancatoInserimento(completata: true);
+                    string motivo = $"{causa.Motivo}: {causa.Dettaglio}";
 
                     dt.Rows.Add(
                         impegno,
@@ -391,6 +397,14 @@ namespace ProcedureNet7
                 string codEnteFlusso,
                 string impegnoFlusso)
             {
+                foreach (var studente in students)
+                {
+                    var motivo = PagamentoFlussoRules.AnnoCorsoNonElaborato(
+                        studente.InformazioniIscrizione.AnnoCorso, processMatricole, processAnniSuccessivi);
+                    if (motivo != null)
+                        _motiviNonFlusso[studente.InformazioniPersonali.CodFiscale] = motivo;
+                }
+
                 if (processMatricole && processAnniSuccessivi)
                 {
                     ProcessAndWriteStudents(students, folderPath, $"{nomeFileInizio}", codEnteFlusso, impegnoFlusso);
@@ -422,23 +436,24 @@ namespace ProcedureNet7
                     DataTable dataTableFlusso = GenerareFlussoDataTable(students, codEnteFlusso);
 
                     string baseName = $"flusso_{fileName}_{impegnoFlusso}";
-                    foreach (var st in students)
-                    {
-                        var cf = st.InformazioniPersonali.CodFiscale;
-                        if (string.IsNullOrWhiteSpace(cf)) continue;
-
-                        _flussoWrittenCF.Add(cf);
-                        if (!_flussoFilesByCF.TryGetValue(cf, out var list))
-                        {
-                            list = new List<string>();
-                            _flussoFilesByCF[cf] = list;
-                        }
-                        list.Add(baseName);
-                    }
-
                     if (dataTableFlusso != null && dataTableFlusso.Rows.Count > 0)
                     {
                         Utilities.WriteDataTableToTextFile(dataTableFlusso, folderPath, baseName);
+
+                        // Mark students only after their flow file was successfully written.
+                        foreach (var st in students)
+                        {
+                            var cf = st.InformazioniPersonali.CodFiscale;
+                            if (string.IsNullOrWhiteSpace(cf)) continue;
+
+                            _flussoWrittenCF.Add(cf);
+                            if (!_flussoFilesByCF.TryGetValue(cf, out var list))
+                            {
+                                list = new List<string>();
+                                _flussoFilesByCF[cf] = list;
+                            }
+                            list.Add(baseName);
+                        }
                     }
 
                     if (insertInDatabase)
@@ -845,47 +860,7 @@ namespace ProcedureNet7
                 && (s?.InformazioniBeneficio?.VincitorePA == true);
         }
 
-        private string BuildNonFlussoReason(StudentePagamenti s, string categoriaCU, string selectedRichiestoPA, string tipoStudente, string categoriaPagam)
-        {
-            if (s == null)
-                return "Oggetto Studente nullo o non inizializzato.";
-
-            if (s.InformazioniPersonali == null)
-                return "Dati anagrafici mancanti.";
-
-            if (s.InformazioniPagamento == null)
-                return "Dati pagamento mancanti.";
-
-            if (s.InformazioniIscrizione == null)
-                return "Dati iscrizione mancanti.";
-
-            bool hasAlloggioEffective = IsAlloggioEffective(s, categoriaCU, categoriaPagam);
-            bool hasIBAN = !string.IsNullOrWhiteSpace(s.InformazioniConto?.IBAN);
-            bool hasImporto = s.InformazioniPagamento.ImportoDaPagare > 0;
-            int annoCorso = s.InformazioniIscrizione.AnnoCorso;
-
-            if (tipoStudente == "0" && annoCorso != 1)
-                return $"Studente di anno {annoCorso}, ma tipoStudente=0 (solo matricole).";
-
-            if (tipoStudente == "1" && annoCorso == 1)
-                return $"Studente matricola (AnnoCorso=1), ma tipoStudente=1 (solo anni successivi).";
-
-            if (!hasIBAN)
-                return "IBAN mancante o non valido: lo studente non può essere incluso nel flusso.";
-
-            if (!hasImporto)
-                return $"Importo da pagare pari a zero ({s.InformazioniPagamento.ImportoDaPagare}).";
-
-            if (hasAlloggioEffective && !(selectedRichiestoPA == "2" || selectedRichiestoPA == "1"))
-                return $"Studente CON PA, ma selectedRichiestoPA={selectedRichiestoPA} non consente flussi CON PA.";
-
-            if (!hasAlloggioEffective && !(selectedRichiestoPA == "2" || selectedRichiestoPA == "0" || selectedRichiestoPA == "3"))
-                return $"Studente SENZA PA, ma selectedRichiestoPA={selectedRichiestoPA} non consente flussi SENZA PA.";
-
-            return "Studente non scritto nel flusso per esclusione tecnica o errore successivo.";
-        }
-
-        private DataTable BuildFullAuditDataTable(IEnumerable<StudentePagamenti> students, string impegno)
+        private DataTable BuildFullAuditDataTable(IEnumerable<StudentePagamenti> students, string? impegno)
         {
             var dt = new DataTable();
 
@@ -1021,7 +996,7 @@ namespace ProcedureNet7
                 bool hasPA = HasPAForStudent(s, categoriaPagam);
 
                 dt.Rows.Add(
-                    impegno,
+                    impegno ?? pay?.NumeroImpegno ?? "",
                     categoriaPagam,
                     pay?.CategoriaCU ?? "",
                     tipoStudente,
@@ -1075,9 +1050,9 @@ namespace ProcedureNet7
                     dom?.contrLocazione == true ? "1" : "0",
                     dom?.contrEnte == true ? "1" : "0",
                     dom?.conoscenzaDatiContratto == true ? "1" : "0",
-                    dom?.dataRegistrazioneLocazione == default ? "" : dom.dataRegistrazioneLocazione.ToString("yyyy-MM-dd"),
-                    dom?.dataDecorrenzaLocazione == default ? "" : dom.dataDecorrenzaLocazione.ToString("yyyy-MM-dd"),
-                    dom?.dataScadenzaLocazione == default ? "" : dom.dataScadenzaLocazione.ToString("yyyy-MM-dd"),
+                    dom == null || dom.dataRegistrazioneLocazione == default ? "" : dom.dataRegistrazioneLocazione.ToString("yyyy-MM-dd"),
+                    dom == null || dom.dataDecorrenzaLocazione == default ? "" : dom.dataDecorrenzaLocazione.ToString("yyyy-MM-dd"),
+                    dom == null || dom.dataScadenzaLocazione == default ? "" : dom.dataScadenzaLocazione.ToString("yyyy-MM-dd"),
                     dom?.codiceSerieLocazione ?? "",
                     dom?.durataMesiLocazione.ToString(),
                     dom?.prorogatoLocazione == true ? "1" : "0",

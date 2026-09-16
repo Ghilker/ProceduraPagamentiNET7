@@ -18,7 +18,10 @@ namespace ProcedureNet7
                 if (!IsAnnoCorsoAmmissibile(context))
                     evaluation.Add("BS001");
 
-                if (HasBeneficioPregressoNonRestituito(context.Facts, beneficio))
+                bool hasBorsaStoricaStessoAnno = HasBorsaStoricaStessoAnno(context);
+                if (hasBorsaStoricaStessoAnno)
+                    evaluation.Add("BS004");
+                else if (HasBeneficioPregressoNonRestituito(context.Facts, beneficio))
                     evaluation.Add("BS002");
 
                 if (HasRinunciaPregressa(context.Facts, beneficio) || context.Facts.RinunciaBorsa == true || context.Facts.RinunciaBS)
@@ -58,13 +61,21 @@ namespace ProcedureNet7
 
         private static bool HasBeneficioPregressoNonRestituito(EsitoBorsaFacts facts, string beneficio)
         {
-            if (facts.ForzaturaRinunciaNoEsclusione)
+            if (facts.ForzaturaRinunciaNoEsclusione || facts.RinunciaInCorso)
                 return false;
 
             if (string.Equals(beneficio, "BS", StringComparison.OrdinalIgnoreCase))
                 return facts.UsufruitoBeneficioBorsaNonRestituito || facts.BeneficiPregressiNonRestituiti.Contains("BS");
 
             return facts.BeneficiPregressiNonRestituiti.Contains(beneficio);
+        }
+
+        private static bool HasBorsaStoricaStessoAnno(EsitoBorsaStudentContext context)
+        {
+            if (context.Facts.ForzaturaRinunciaNoEsclusione)
+                return false;
+
+            return context.Pipeline.BorsaStoricaStessoAnnoConflitti.Contains(context.Key);
         }
 
         private static bool HasRinunciaPregressa(EsitoBorsaFacts facts, string beneficio)
