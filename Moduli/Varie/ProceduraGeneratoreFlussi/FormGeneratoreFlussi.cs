@@ -22,6 +22,18 @@ namespace ProcedureNet7
         {
             _masterForm = masterForm;
             InitializeComponent();
+            label1.Text = "GENERATORE FLUSSI";
+            openFileDialog.Filter = "File Excel (*.xlsx)|*.xlsx";
+            openFileDialog.CheckFileExists = true;
+            Controls.Add(new Label
+            {
+                Location = new Point(29, 145), Size = new Size(735, 125),
+                Text = "Compilare il primo foglio del modello Excel. Reversali vuote = zero.\r\n" +
+                    "Il netto deve coincidere con lordo meno reversali. Importi con massimo 2 decimali.\r\n" +
+                    "Impegno facoltativo: lasciarlo tutto vuoto per un flusso unico; altrimenti compilare ogni riga.\r\n" +
+                    "Le anomalie bloccano la generazione e vengono elencate in un report.\r\n" +
+                    "I flussi e il riepilogo vengono salvati nella sottocartella flussi_gg_mm_aaaa."
+            });
         }
 
         private void RunProcedureBtnClick(object sender, EventArgs e)
@@ -31,10 +43,26 @@ namespace ProcedureNet7
                 return;
             }
 
-            _masterForm.RunBackgroundWorker(RunGeneratoreFlussi);
+            // Congela i percorsi sul thread UI prima di avviare il lavoro.
+            var args = new ArgsProceduraGeneratoreFlussi
+            {
+                FilePath = selectedFilePath,
+                FolderPath = selectedFolderPath
+            };
+            try
+            {
+                new ArgsValidation().Validate(args);
+                if (!File.Exists(args.FilePath))
+                    throw new ValidationException("Il file Excel selezionato non esiste.");
+                _masterForm.RunBackgroundWorker(connection => RunGeneratoreFlussi(connection, args));
+            }
+            catch (ValidationException ex)
+            {
+                MessageBox.Show(this, ex.Message, "Dati mancanti", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
-        private void RunGeneratoreFlussi(SqlConnection mainConnection)
+        private void RunGeneratoreFlussi(SqlConnection mainConnection, ArgsProceduraGeneratoreFlussi args)
         {
             try
             {
@@ -42,15 +70,8 @@ namespace ProcedureNet7
                 {
                     throw new Exception("Master form non può essere nullo a questo punto!");
                 }
-                ArgsValidation argsValidation = new ArgsValidation();
-                ArgsProceduraGeneratoreFlussi argsProceduraGeneratoreFlussi = new ArgsProceduraGeneratoreFlussi
-                {
-                    FilePath = selectedFilePath,
-                    FolderPath = selectedFolderPath
-                };
-                argsValidation.Validate(argsProceduraGeneratoreFlussi);
-                ProceduraGeneratoreFlussi proceduraGeneratoreFlussi = new(_masterForm, mainConnection);
-                proceduraGeneratoreFlussi.RunProcedure(argsProceduraGeneratoreFlussi);
+                using ProceduraGeneratoreFlussi proceduraGeneratoreFlussi = new(_masterForm, mainConnection);
+                proceduraGeneratoreFlussi.RunProcedure(args);
             }
             catch (ValidationException ex)
             {
@@ -84,20 +105,7 @@ namespace ProcedureNet7
 
                     if (saveFileDialog.ShowDialog() == DialogResult.OK)
                     {
-                        // Creazione DataTable con 4 colonne
-                        DataTable modello = new DataTable("FlussoDati");
-                        modello.Columns.Add("Codice fiscale", typeof(string));
-                        modello.Columns.Add("Totale lordo", typeof(decimal));
-                        modello.Columns.Add("Reversali", typeof(string));
-                        modello.Columns.Add("Importo netto", typeof(decimal));
-
-                        // Crea file Excel
-                        using (var workbook = new XLWorkbook())
-                        {
-                            var worksheet = workbook.Worksheets.Add(modello, "Modello");
-                            worksheet.Columns().AdjustToContents();
-                            workbook.SaveAs(saveFileDialog.FileName);
-                        }
+                        GeneratoreFlussiFile.CreaModello(saveFileDialog.FileName);
 
                         MessageBox.Show("File modello Excel generato con successo!", "Completato",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
