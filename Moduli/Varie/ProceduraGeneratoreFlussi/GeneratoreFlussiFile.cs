@@ -109,16 +109,20 @@ namespace ProcedureNet7
                 return valore;
             }
             string iban = Regex.Replace(Leggi("IBAN"), @"\s", "").ToUpperInvariant();
-            if (!IbanValidatorUtil.ValidateIban(iban))
+            bool girocontoInterno = riga.Lordo == riga.Reversali && riga.Netto == 0m;
+            if (!girocontoInterno && !IbanValidatorUtil.ValidateIban(iban))
                 errori.Add($"Riga {riga.NumeroRiga}, CF {riga.CodiceFiscale}: IBAN assente o non valido.");
             string swift = Regex.Replace(Leggi("Swift"), @"\s", "").ToUpperInvariant();
-            if (swift.Length > 0 && !Regex.IsMatch(swift, @"^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$"))
+            if (!girocontoInterno && swift.Length > 0 && !Regex.IsMatch(swift, @"^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$"))
                 errori.Add($"Riga {riga.NumeroRiga}, CF {riga.CodiceFiscale}: codice SWIFT non valido.");
             string provincia = Richiesto("provincia_residenza").ToUpperInvariant();
             bool estero = provincia == "EE";
             string cap = estero ? "00000" : Richiesto("CAP");
-            if (!estero && !Regex.IsMatch(cap, @"^\d{5}$"))
-                errori.Add($"Riga {riga.NumeroRiga}, CF {riga.CodiceFiscale}: CAP italiano non valido.");
+            // I CAP memorizzati come numeri possono perdere gli zeri iniziali (4010 -> 04010).
+            if (!estero && Regex.IsMatch(cap, @"^[0-9]{1,5}$"))
+                cap = cap.PadLeft(5, '0');
+            if (!estero && !Regex.IsMatch(cap, @"^[0-9]{5}$"))
+                errori.Add($"Riga {riga.NumeroRiga}, CF {riga.CodiceFiscale}: CAP letto dal database '{cap}': formato non valido (attese 5 cifre).");
             string dataNascita = "";
             if (dati["Data_nascita"] is DateTime data && data > DateTime.MinValue && data.Date <= DateTime.Today)
                 dataNascita = data.ToString("ddMMyyyy", CultureInfo.InvariantCulture);
@@ -164,7 +168,7 @@ namespace ProcedureNet7
                 "Reversali vuote = zero. Importo netto = Totale lordo - Reversali. Sono ammesse righe con netto zero.",
                 "Impegno facoltativo: tutto vuoto = flusso unico; se usato, deve essere compilato in ogni riga.",
                 "Un CF può comparire su impegni diversi; i duplicati CF/impegno sono bloccati. Le righe vuote vengono ignorate.",
-                "Vengono verificati anagrafica, residenza e IBAN nel database per studenti con domanda LZ."
+                "Vengono verificati anagrafica e residenza per studenti con domanda LZ. I controlli IBAN e SWIFT sono esclusi per i giroconti con lordo uguale a reversale e netto zero."
               
             };
             for (int i = 0; i < note.Length; i++) istruzioni.Cell(i + 1, 1).Value = note[i];

@@ -44,7 +44,7 @@ namespace ProcedureNet7
                 ArgsElaborazioneFileUni argsElaborazioneFileUni = new()
                 {
                     _selectedUniFolder = selectedFolderPath,
-                    _selectedAA = "20232024"
+                    _selectedAA = "20262027"
                 };
                 argsValidation.Validate(argsElaborazioneFileUni);
                 ElaborazioneFileUni elaborazioneFileUni = new(_masterForm, mainConnection);
