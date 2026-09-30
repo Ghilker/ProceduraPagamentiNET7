@@ -16,10 +16,110 @@ namespace ProcedureNet7
 
         List<StudenteElaborazione> studentiRimossi = new();
 
+        private static readonly Dictionary<string, string> decodTipoCorso = new()
+        {
+            {"3", "triennale" },
+            {"4", "ciclo unico" },
+            {"5", "magistrale" },
+            {"6", "dottorato" },
+            {"7", "specializzazione" },
+        };
+
         public ElaborazioneFileUni(MasterForm? _masterForm, SqlConnection? connection_string) : base(_masterForm, connection_string) { }
+
+        private static string GetTipoCorsoDescription(string codice, string origine, StudenteElaborazione studente, string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(codice) || !decodTipoCorso.TryGetValue(codice, out string? descrizione))
+            {
+                string valore = string.IsNullOrWhiteSpace(codice) ? "vuoto" : $"non riconosciuto ('{codice}')";
+                throw new InvalidOperationException($"File '{fileName}', CF '{studente.codFiscale}': tipo corso {origine} {valore}. Verificare il dato prima di proseguire.");
+            }
+
+            return descrizione;
+        }
+
+        internal static void ValidateStudentForComparison(StudenteElaborazione studente, string fileName, string annoAccademico)
+        {
+            if (studente.tipoCorsoUni != "-1")
+            {
+                GetTipoCorsoDescription(studente.tipoCorsoUni, "nel file Excel (TIPO_CORSO_UNI)", studente, fileName);
+            }
+
+            if (string.IsNullOrWhiteSpace(studente.numDomanda))
+            {
+                throw new InvalidOperationException($"File '{fileName}', CF '{studente.codFiscale}': la ricerca nel database non ha restituito dati di domanda/iscrizione/merito per l'anno accademico {annoAccademico}. Verificare l'anno e la presenza dei dati richiesti dalla ricerca.");
+            }
+
+            GetTipoCorsoDescription(studente.tipoCorsoDic, "nel database (Cod_tipologia_studi)", studente, fileName);
+        }
+
+        internal static string GetTipoCorsoMismatchReason(StudenteElaborazione studente, string fileName)
+        {
+            string tipoCorsoUni = GetTipoCorsoDescription(studente.tipoCorsoUni, "nel file Excel (TIPO_CORSO_UNI)", studente, fileName);
+            string tipoCorsoDic = GetTipoCorsoDescription(studente.tipoCorsoDic, "nel database (Cod_tipologia_studi)", studente, fileName);
+            return $"Tipo corso riscontrato {tipoCorsoUni} -  Tipo corso dichiarato {tipoCorsoDic}";
+        }
+
+        internal static void PopulateCongruenzaAnno(List<StudenteElaborazione> studenteElaborazioneList, string annoAccademico)
+        {
+            foreach (StudenteElaborazione studente in studenteElaborazioneList)
+            {
+                // Check if immatriculation year is valid and course year is available
+                if (!string.IsNullOrEmpty(studente.aaImmatricolazioneUni) && studente.annoCorsoUni != 0)
+                {
+                    try
+                    {
+                        // Extract start year and current year
+                        int startYearImmatricolazione = int.Parse(studente.aaImmatricolazioneUni.Substring(0, 4)); // e.g., 2020
+                        int startYearCurrent = int.Parse(annoAccademico.Substring(0, 4));
+
+                        // Calculate the expected course year based on the difference between the current year and immatriculation year
+                        int yearsInCourse = startYearCurrent - startYearImmatricolazione + 1; // +1 accounts for the fact they start in the 1st year
+
+                        // Determine the legal duration of the course based on course type
+                        int legalDuration = studente.durataLegaleCorso;
+
+                        // Determine expected course year based on whether the student is out of time (fuori corso)
+                        int expectedCourseYear;
+                        if (yearsInCourse <= legalDuration)
+                        {
+                            // If within legal duration, the expected course year is positive
+                            expectedCourseYear = yearsInCourse;
+                        }
+                        else
+                        {
+                            // If beyond legal duration, calculate how many years they are "out of time"
+                            expectedCourseYear = (yearsInCourse - legalDuration) * -1; // Negative number for out-of-time years
+                        }
+
+                        // Compare with the student's actual university course year
+                        if (expectedCourseYear == studente.annoCorsoUni)
+                        {
+                            studente.congruenzaAnno = true; // The coherence check passes
+                        }
+                        else
+                        {
+                            studente.congruenzaAnno = false; // The coherence check fails
+                        }
+                    }
+                    catch
+                    {
+                        // Handle any errors in parsing or calculations
+                        studente.congruenzaAnno = false;
+                    }
+                }
+                else
+                {
+                    // If data is missing or invalid, set the check to false
+                    studente.congruenzaAnno = false;
+                }
+            }
+        }
 
         public override void RunProcedure(ArgsElaborazioneFileUni args)
         {
+            string annoAccademico = args._selectedAA;
+            Logger.LogInfo(0, $"Elaborazione file università - anno accademico {annoAccademico}");
             folderPath = args._selectedUniFolder;
             inputFolder = Path.Combine(folderPath, "Da elaborare");
             outputFolder = Path.Combine(folderPath, "Da controllare");
@@ -268,13 +368,14 @@ namespace ProcedureNet7
                             AND Domanda.Num_domanda = esiti_pa.Num_domanda 
                             AND esiti_pa.Cod_beneficio = 'PA'
                         WHERE        
-                            Domanda.Anno_accademico = '20242025' 
+                            Domanda.Anno_accademico = @AnnoAccademico
                             AND Domanda.Tipo_bando = 'lz' 
-                            AND (Corsi_laurea.Anno_accad_fine IS NULL OR Corsi_laurea.Anno_accad_fine = '20242025')
+                            AND (Corsi_laurea.Anno_accad_fine IS NULL OR Corsi_laurea.Anno_accad_fine = @AnnoAccademico)
 
                             ";
 
                 SqlCommand readData = new(queryData, CONNECTION);
+                readData.Parameters.Add("@AnnoAccademico", SqlDbType.VarChar, 8).Value = annoAccademico;
 
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -343,6 +444,10 @@ namespace ProcedureNet7
                         }
                     }
                 }
+                foreach (StudenteElaborazione studente in studenteElaborazioneList)
+                {
+                    ValidateStudentForComparison(studente, Path.GetFileName(filePath), annoAccademico);
+                }
                 if (studenteElaborazioneList.Count > 0)
                 {
                     string test = "";
@@ -351,9 +456,9 @@ namespace ProcedureNet7
                 PopulateSeTipo(studenteElaborazioneList);
                 PopulateSeAnno(studenteElaborazioneList);
                 PopulateSeCFU(studenteElaborazioneList);
-                PopulateCongruenzaAnno(studenteElaborazioneList);
+                PopulateCongruenzaAnno(studenteElaborazioneList, annoAccademico);
 
-                ProcessStudents(studenteElaborazioneList, uniName);
+                ProcessStudents(studenteElaborazioneList, uniName, Path.GetFileName(filePath));
 
                 PopulateDataInFile(studenteElaborazioneList, filePath, nameAndDate, initialStudentData);
             }
@@ -1231,65 +1336,7 @@ namespace ProcedureNet7
                     }
                 }
             }
-            void PopulateCongruenzaAnno(List<StudenteElaborazione> studenteElaborazioneList)
-            {
-                string currentAcademicYear = "20242025"; // Example: This should be passed dynamically depending on the year you're checking
-
-                foreach (StudenteElaborazione studente in studenteElaborazioneList)
-                {
-                    // Check if immatriculation year is valid and course year is available
-                    if (!string.IsNullOrEmpty(studente.aaImmatricolazioneUni) && studente.annoCorsoUni != 0)
-                    {
-                        try
-                        {
-                            // Extract start year and current year
-                            int startYearImmatricolazione = int.Parse(studente.aaImmatricolazioneUni.Substring(0, 4)); // e.g., 2020
-                            int startYearCurrent = int.Parse(currentAcademicYear.Substring(0, 4)); // e.g., 2024
-
-                            // Calculate the expected course year based on the difference between the current year and immatriculation year
-                            int yearsInCourse = startYearCurrent - startYearImmatricolazione + 1; // +1 accounts for the fact they start in the 1st year
-
-                            // Determine the legal duration of the course based on course type
-                            int legalDuration = studente.durataLegaleCorso;
-
-                            // Determine expected course year based on whether the student is out of time (fuori corso)
-                            int expectedCourseYear;
-                            if (yearsInCourse <= legalDuration)
-                            {
-                                // If within legal duration, the expected course year is positive
-                                expectedCourseYear = yearsInCourse;
-                            }
-                            else
-                            {
-                                // If beyond legal duration, calculate how many years they are "out of time"
-                                expectedCourseYear = (yearsInCourse - legalDuration) * -1; // Negative number for out-of-time years
-                            }
-
-                            // Compare with the student's actual university course year
-                            if (expectedCourseYear == studente.annoCorsoUni)
-                            {
-                                studente.congruenzaAnno = true; // The coherence check passes
-                            }
-                            else
-                            {
-                                studente.congruenzaAnno = false; // The coherence check fails
-                            }
-                        }
-                        catch
-                        {
-                            // Handle any errors in parsing or calculations
-                            studente.congruenzaAnno = false;
-                        }
-                    }
-                    else
-                    {
-                        // If data is missing or invalid, set the check to false
-                        studente.congruenzaAnno = false;
-                    }
-                }
-            }
-
-            void ProcessStudents(List<StudenteElaborazione> studenteElaborazioneList, string uniType)
+            void ProcessStudents(List<StudenteElaborazione> studenteElaborazioneList, string uniType, string fileName)
             {
                 string queryData = $@"
                     SELECT DISTINCT 
@@ -1302,12 +1349,13 @@ namespace ProcedureNet7
 	                    Crediti_richiesti 
 	                    LEFT OUTER JOIN Corsi_laurea ON Crediti_richiesti.Cod_corso_laurea = Corsi_laurea.Cod_corso_laurea
                     WHERE        
-                    (Crediti_richiesti.Anno_accademico = 20242025) AND 
-                    (Corsi_laurea.Anno_accad_fine IS NULL) OR (Crediti_richiesti.Anno_accademico = 20242025) AND (Crediti_richiesti.Cod_corso_laurea IN ('LUISS', 'LUMSA', 'UNINT'))
+                    (Crediti_richiesti.Anno_accademico = @AnnoAccademico) AND
+                    (Corsi_laurea.Anno_accad_fine IS NULL) OR (Crediti_richiesti.Anno_accademico = @AnnoAccademico) AND (Crediti_richiesti.Cod_corso_laurea IN ('LUISS', 'LUMSA', 'UNINT'))
                     ORDER BY Crediti_richiesti.Cod_corso_laurea, Crediti_richiesti.Tipologia_corso, Crediti_richiesti.Anno_corso
                     ";
 
                 SqlCommand readData = new(queryData, CONNECTION);
+                readData.Parameters.Add("@AnnoAccademico", SqlDbType.VarChar, 8).Value = annoAccademico;
 
                 using (SqlDataReader reader = readData.ExecuteReader())
                 {
@@ -1431,16 +1479,7 @@ namespace ProcedureNet7
                         {
                             studente.blocchiDaMettere.Add("ITD");
 
-                            Dictionary<string, string> decodTipoCorso = new()
-                            {
-                                {"3", "triennale" },
-                                {"4", "ciclo unico" },
-                                {"5", "magistrale" },
-                                {"6", "dottorato" },
-                                {"7", "specializzazione" },
-                            };
-
-                            studente.motivazioniBlocchiInseriti.Add("ITD", $"Tipo corso riscontrato {decodTipoCorso[studente.tipoCorsoUni]} -  Tipo corso dichiarato {decodTipoCorso[studente.tipoCorsoDic]}");
+                            studente.motivazioniBlocchiInseriti.Add("ITD", GetTipoCorsoMismatchReason(studente, fileName));
                             studente.incongruenzeDaMettere.Add("64");
                         }
                     }
