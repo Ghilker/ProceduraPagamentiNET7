@@ -42,6 +42,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ProcedureNet7.Verifica.Tests" />
     <Compile Remove="Tests\**\*.cs" />
     <None Remove="Moduli\Varie\ProceduraControlloTicket\ControlloTicketKeywords.json" />
   </ItemGroup>
@@ -122,4 +123,19 @@
     </Compile>
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="DrosoAssets\**\*" Exclude="DrosoAssets\**\__pycache__\**;DrosoAssets\**\*.pyc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="DrosoAssets\model\best.pt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="DrosoAssets\model\model.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

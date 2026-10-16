@@ -13,6 +13,7 @@ namespace ProcedureNet7
         public string provincia;
         public string CAP;
         public string nomeComune;
+        public int? TipoComune { get; set; }
 
         public Residenza()
         {

@@ -174,6 +174,8 @@ namespace ProcedureNet7
         public string CodBeneficio { get; set; } = string.Empty;
         public bool Richiesto { get; set; }
         public int EsitoCalcolato { get; set; }
+        public int? EsitoCalcolatoSenzaForzature { get; set; }
+        public decimal? ImportoCalcolato { get; set; }
         public string CodiciMotivo { get; set; } = string.Empty;
         public string Motivi { get; set; } = string.Empty;
     }

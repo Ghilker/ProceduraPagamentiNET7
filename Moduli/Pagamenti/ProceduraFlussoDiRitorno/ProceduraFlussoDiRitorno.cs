@@ -67,6 +67,9 @@ namespace ProcedureNet7
 
                 if (!ignoraFlussi1)
                 {
+                    Logger.LogInfo(80, "Inserimento blocchi BSS per IBAN errato agli studenti scartati");
+                    AddBlocksStudentiScartati(CONNECTION, sqlTransaction);
+
                     Logger.LogInfo(82, "Annullamento pagamenti scartati");
                     Scartati(CONNECTION, sqlTransaction);
                 }
@@ -308,6 +311,9 @@ namespace ProcedureNet7
             sb.AppendLine($"Studenti con movimento associato: {studentiConMovimento}");
             sb.AppendLine($"Pagamenti effettivi da confermare: {pagamentiEffettivi}");
             sb.AppendLine($"Pagamenti scartati nel flusso: {pagamentiScartati}");
+
+            if (!ignoraFlussi1 && pagamentiScartati > 0)
+                sb.AppendLine("Agli studenti scartati viene applicato il blocco BSS per IBAN errato.");
 
             if (ignoraFlussi1 && pagamentiScartati > 0)
                 sb.AppendLine("Nota: gli scartati del flusso non verranno annullati perche' e' attiva l'opzione 'Ignora flussi a 1'.");
@@ -971,6 +977,93 @@ namespace ProcedureNet7
         // ─────────────────────────────────────────────────────────────────────────────
         // SCARTATI
         // ─────────────────────────────────────────────────────────────────────────────
+        private void AddBlocksStudentiScartati(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
+        {
+            if (studentiScartati.Count == 0)
+                return;
+
+            const string tempName = "#TempScartatiBSS";
+            string createTemp = $@"
+                IF OBJECT_ID('tempdb..{tempName}') IS NOT NULL DROP TABLE {tempName};
+                CREATE TABLE {tempName}
+                (
+                    CodFiscale CHAR(16) COLLATE Latin1_General_CI_AS NOT NULL,
+                    NumMandato VARCHAR(20) COLLATE Latin1_General_CI_AS NOT NULL
+                );";
+
+            using (var createCmd = new SqlCommand(createTemp, CONNECTION, sqlTransaction))
+                createCmd.ExecuteNonQuery();
+
+            var studentiPerAnno = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var codFiscaliAssociati = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            try
+            {
+                var table = new DataTable();
+                table.Columns.Add("CodFiscale", typeof(string));
+                table.Columns.Add("NumMandato", typeof(string));
+                foreach (var studente in studentiScartati)
+                    table.Rows.Add(studente.codFiscale, studente.numMandatoFlusso);
+
+                BulkInsertIntoSqlTable(CONNECTION, table, tempName, sqlTransaction);
+
+                string query = $@"
+                    SELECT DISTINCT p.Anno_accademico, d.Cod_fiscale
+                    FROM Pagamenti p
+                    INNER JOIN Domanda d
+                        ON d.Anno_accademico = p.Anno_accademico
+                       AND d.Num_domanda = p.Num_domanda
+                    INNER JOIN {tempName} s
+                        ON s.CodFiscale = d.Cod_fiscale
+                       AND s.NumMandato = p.Cod_mandato
+                    WHERE p.Ese_finanziario = @esercizioFinanziario
+                      AND d.Tipo_bando IN ('lz', 'l2')
+                      AND p.Anno_accademico IS NOT NULL
+                      AND LTRIM(RTRIM(p.Anno_accademico)) <> '';";
+
+                using var cmd = new SqlCommand(query, CONNECTION, sqlTransaction);
+                cmd.Parameters.Add("@esercizioFinanziario", SqlDbType.Int).Value = DateTime.Now.Year;
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    string annoAccademico = Utilities.SafeGetString(reader, "Anno_accademico").Trim();
+                    string codFiscale = Utilities.SafeGetString(reader, "Cod_fiscale").Trim();
+                    if (!studentiPerAnno.TryGetValue(annoAccademico, out var codFiscali))
+                    {
+                        codFiscali = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        studentiPerAnno.Add(annoAccademico, codFiscali);
+                    }
+                    codFiscali.Add(codFiscale);
+                    codFiscaliAssociati.Add(codFiscale);
+                }
+            }
+            finally
+            {
+                using var drop = new SqlCommand($"DROP TABLE {tempName};", CONNECTION, sqlTransaction);
+                drop.ExecuteNonQuery();
+            }
+
+            var senzaAnno = studentiScartati
+                .Select(s => s.codFiscale)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(cf => !codFiscaliAssociati.Contains(cf))
+                .ToList();
+            if (senzaAnno.Count > 0)
+                throw new InvalidOperationException($"Impossibile applicare il blocco BSS: anno accademico del pagamento non trovato per {string.Join(", ", senzaAnno)}.");
+
+            foreach (var gruppo in studentiPerAnno)
+            {
+                var result = BlocksUtil.AddBlock(CONNECTION, sqlTransaction, gruppo.Value.ToList(), "BSS", gruppo.Key, "IBANFlussoRitorno", true);
+                var bloccati = new HashSet<string>(result.ActuallyAdded, StringComparer.OrdinalIgnoreCase);
+                bloccati.UnionWith(result.AlreadyHasBlock);
+                var senzaBlocco = gruppo.Value.Where(cf => !bloccati.Contains(cf)).ToList();
+                if (senzaBlocco.Count > 0)
+                    throw new InvalidOperationException($"Blocco BSS non applicato per l'anno {gruppo.Key}: {string.Join(", ", senzaBlocco)}.");
+
+                Logger.LogInfo(81, $"Blocchi BSS scartati: anno={gruppo.Key}, aggiunti={result.ActuallyAdded.Count}, gia_presenti={result.AlreadyHasBlock.Count}");
+            }
+        }
+
         private void Scartati(SqlConnection CONNECTION, SqlTransaction sqlTransaction)
         {
             foreach (var studente in studentiScartati)

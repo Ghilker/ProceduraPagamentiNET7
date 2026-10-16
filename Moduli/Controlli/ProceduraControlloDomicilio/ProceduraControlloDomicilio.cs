@@ -612,7 +612,7 @@ ORDER BY a.id_allegato;";
                                 contract.DataInizio,
                                 contract.DataFine,
                                 null,
-                                RequireFiscalCode: !contract.HasSubentro),
+                                RequireFiscalCode: !contract.HasSubentro, ComuneDomicilio: domicile.Comune),
                             "DOC_001",
                             "Non risulta un PDF attivo del contratto di locazione.",
                             "Recuperare o richiedere il contratto allo studente.");

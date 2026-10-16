@@ -33,7 +33,8 @@ namespace ProcedureNet7
             string annoAccademico,
             HashSet<(string ComuneA, string ComuneB)>? comuniEquiparati = null,
             DateTime? referenceDate = null,
-            VerificaFaseElaborativa faseElaborativa = VerificaFaseElaborativa.Unknown)
+            VerificaFaseElaborativa faseElaborativa = VerificaFaseElaborativa.Unknown,
+            bool ignoraForzature = false)
         {
             if (info == null)
                 throw new ArgumentNullException(nameof(info));
@@ -44,7 +45,7 @@ namespace ProcedureNet7
                 faseElaborativa);
 
             var (aaStart, aaEnd) = GetAaDateRange(annoAccademico);
-            var decision = evaluator.Evaluate(info, annoAccademico, aaStart, aaEnd);
+            var decision = evaluator.Evaluate(info, annoAccademico, aaStart, aaEnd, ignoraForzature);
             var outcomeDomicili = info.InformazioniSede.OutcomeDomicili;
 
             return new StatusSedeResult(
@@ -279,7 +280,8 @@ WHERE Data_Fine_Validita IS NULL;";
                 StudenteInfo info,
                 string annoAccademico,
                 DateTime aaStart,
-                DateTime aaEnd)
+                DateTime aaEnd,
+                bool ignoraForzature)
             {
                 var comuneSede = (info.InformazioniIscrizione.ComuneSedeStudi ?? "").Trim();
                 DomResult? domicilioNuovaGestione = null;
@@ -300,7 +302,7 @@ WHERE Data_Fine_Validita IS NULL;";
                     return StatusSedeDecision.Fixed("B", MotivoFuoriSedeVincitorePa);
 
                 var forced = (info.InformazioniSede.ForzaturaStatusSede ?? "").Trim().ToUpperInvariant();
-                if (IsValidStatus(forced))
+                if (!ignoraForzature && IsValidStatus(forced))
                     return StatusSedeDecision.Fixed(forced, "Forzatura manuale (primaria)");
 
                 if (info.InformazioniSede.AlwaysA)

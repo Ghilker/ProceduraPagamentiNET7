@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Moduli/Varie/ProceduraDroso/*.cs" Link="Source/%(Filename)%(Extension)" />
+    <Compile Include="../../Moduli/MainProgram/Utilities/Logger.cs" Link="Source/Logger.cs" />
+    <Compile Include="../../Moduli/MainProgram/Utilities/MessageUtils.cs" Link="Source/MessageUtils.cs" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
+  </ItemGroup>
+</Project>

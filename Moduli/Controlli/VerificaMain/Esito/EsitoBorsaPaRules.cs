@@ -42,7 +42,15 @@ namespace ProcedureNet7
         private static void ApplyStatusSede(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
             string status = EsitoBorsaSupport.NormalizeUpper(
-                context.Info?.InformazioniSede?.StatusSedeSuggerito);
+                context.IgnoraForzature && !string.IsNullOrWhiteSpace(context.Info?.InformazioniSede?.ForzaturaStatusSede)
+                    ? ControlloStatusSede.ValutaStatusSede(
+                        context.Info,
+                        context.Pipeline.AnnoAccademico,
+                        context.Pipeline.ComuniEquiparati,
+                        context.Pipeline.ReferenceDate,
+                        context.Pipeline.FaseElaborativa,
+                        ignoraForzature: true).SuggestedStatus
+                    : context.Info?.InformazioniSede?.StatusSedeSuggerito);
 
             if (!string.Equals(status, "B", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(status, "D", StringComparison.OrdinalIgnoreCase))
@@ -101,7 +109,7 @@ namespace ProcedureNet7
 
         private static void ApplyBeneficioPregresso(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
-            if (context.Facts.ForzaturaRinunciaNoEsclusione || context.Facts.RinunciaInCorso)
+            if (context.ForzaturaRinunciaNoEsclusione || context.Facts.RinunciaInCorso)
                 return;
 
             if (context.Facts.UsufruitoBeneficioBorsaNonRestituito
@@ -113,7 +121,7 @@ namespace ProcedureNet7
 
         private static void ApplyVariazioniSpecifiche(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
-            bool rinunciaPregressa = !context.Facts.ForzaturaRinunciaNoEsclusione
+            bool rinunciaPregressa = !context.ForzaturaRinunciaNoEsclusione
                 && context.Facts.BeneficiRinunciaPregressa.Contains("PA");
 
             if (rinunciaPregressa || EsitoBorsaSupport.HasRinunciaVariazione(context.Facts, "PA"))

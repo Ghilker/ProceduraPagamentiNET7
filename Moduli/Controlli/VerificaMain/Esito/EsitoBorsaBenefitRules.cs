@@ -21,10 +21,10 @@ namespace ProcedureNet7
                 bool hasBorsaStoricaStessoAnno = HasBorsaStoricaStessoAnno(context);
                 if (hasBorsaStoricaStessoAnno)
                     evaluation.Add("BS004");
-                else if (HasBeneficioPregressoNonRestituito(context.Facts, beneficio))
+                else if (HasBeneficioPregressoNonRestituito(context, beneficio))
                     evaluation.Add("BS002");
 
-                if (HasRinunciaPregressa(context.Facts, beneficio) || context.Facts.RinunciaBorsa == true || context.Facts.RinunciaBS)
+                if (HasRinunciaPregressa(context, beneficio) || context.Facts.RinunciaBorsa == true || context.Facts.RinunciaBS)
                     evaluation.Add("BS003");
 
                 if (context.Facts.DecadutoBS)
@@ -59,9 +59,10 @@ namespace ProcedureNet7
                 && annoCorsoCalcolato >= sogliaFuoriCorsoMinima;
         }
 
-        private static bool HasBeneficioPregressoNonRestituito(EsitoBorsaFacts facts, string beneficio)
+        private static bool HasBeneficioPregressoNonRestituito(EsitoBorsaStudentContext context, string beneficio)
         {
-            if (facts.ForzaturaRinunciaNoEsclusione || facts.RinunciaInCorso)
+            var facts = context.Facts;
+            if (context.ForzaturaRinunciaNoEsclusione || facts.RinunciaInCorso)
                 return false;
 
             if (string.Equals(beneficio, "BS", StringComparison.OrdinalIgnoreCase))
@@ -72,15 +73,16 @@ namespace ProcedureNet7
 
         private static bool HasBorsaStoricaStessoAnno(EsitoBorsaStudentContext context)
         {
-            if (context.Facts.ForzaturaRinunciaNoEsclusione)
+            if (context.ForzaturaRinunciaNoEsclusione)
                 return false;
 
             return context.Pipeline.BorsaStoricaStessoAnnoConflitti.Contains(context.Key);
         }
 
-        private static bool HasRinunciaPregressa(EsitoBorsaFacts facts, string beneficio)
+        private static bool HasRinunciaPregressa(EsitoBorsaStudentContext context, string beneficio)
         {
-            if (facts.ForzaturaRinunciaNoEsclusione)
+            var facts = context.Facts;
+            if (context.ForzaturaRinunciaNoEsclusione)
                 return false;
 
             if (string.Equals(beneficio, "BS", StringComparison.OrdinalIgnoreCase))

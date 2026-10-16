@@ -8,6 +8,7 @@ namespace ProcedureNet7
     {
         private const int EsitoEscluso = 0;
         private const int EsitoIdoneo = 1;
+        private const int EsitoVincitore = 2;
 
         private static readonly EsitoBorsaRuleEngine RuleEngine = new();
 
@@ -37,11 +38,10 @@ namespace ProcedureNet7
                 foreach (var codBeneficio in benefitCodes)
                 {
                     var studentContext = new EsitoBorsaStudentContext(context, pair.Key, info, aaInizio, aaNumero, config, codBeneficio);
-                    var evaluation = RuleEngine.Evaluate(studentContext);
-                    var result = BuildBenefitResult(studentContext, evaluation);
+                    var result = CalculateBenefitResult(studentContext);
                     results[codBeneficio] = result;
 
-                    if (evaluation.HasErrors)
+                    if (result.EsitoCalcolato == EsitoEscluso)
                         esclusi++;
                     else
                         idonei++;
@@ -62,13 +62,35 @@ namespace ProcedureNet7
                 $"[Verifica.Module.{Name}] Regole applicate | students={context.Students.Count} | benefitRows={benefitRows} | idonei={idonei} | esclusi={esclusi} | sogliaIsee={config.SogliaIsee.ToString(CultureInfo.InvariantCulture)} | sogliaIsp={config.SogliaIsp.ToString(CultureInfo.InvariantCulture)}");
         }
 
-        private static EsitoBeneficioCalcolato BuildBenefitResult(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
+        internal static EsitoBeneficioCalcolato CalculateBenefitResult(EsitoBorsaStudentContext context)
         {
+            var evaluation = RuleEngine.Evaluate(context);
+            var contextSenzaForzature = new EsitoBorsaStudentContext(
+                context.Pipeline, context.Key, context.Info, context.AaInizio, context.AaNumero,
+                context.Config, context.CodBeneficio, ignoraForzature: true);
+            var evaluationSenzaForzature = RuleEngine.Evaluate(contextSenzaForzature);
+
+            int esitoAmmesso = EsitoIdoneo;
+            if (context.Pipeline.TryGetEsitiConcorsoByBenefit(context.Key, out var esitiAttuali) &&
+                esitiAttuali.TryGetValue(context.CodBeneficio, out var esitoAttuale) &&
+                esitoAttuale?.CodTipoEsito == EsitoVincitore)
+            {
+                esitoAmmesso = EsitoVincitore;
+            }
+
+            int esitoCalcolato = evaluation.HasErrors ? EsitoEscluso : esitoAmmesso;
             return new EsitoBeneficioCalcolato
             {
                 CodBeneficio = context.CodBeneficio,
                 Richiesto = EsitoBorsaSupport.IsBenefitRequested(context.Facts, context.CodBeneficio),
-                EsitoCalcolato = evaluation.HasErrors ? EsitoEscluso : EsitoIdoneo,
+                EsitoCalcolato = esitoCalcolato,
+                EsitoCalcolatoSenzaForzature = evaluationSenzaForzature.HasErrors ? EsitoEscluso : esitoAmmesso,
+                ImportoCalcolato = context.CodBeneficio switch
+                {
+                    "BS" => esitoCalcolato == EsitoEscluso ? 0m : context.Info.InformazioniImportoBorsa.ImportoFinale,
+                    "PA" => 0m,
+                    _ => null
+                },
                 CodiciMotivo = evaluation.HasErrors ? string.Join(";", evaluation.ErrorCodes) : string.Empty,
                 Motivi = evaluation.HasErrors ? string.Join(" | ", evaluation.ErrorCodes.ConvertAll(EsitoBorsaSupport.GetMotivoEsclusione)) : string.Empty
             };
@@ -79,6 +101,8 @@ namespace ProcedureNet7
             if (results != null && results.TryGetValue("BS", out var bs))
             {
                 info.EsitoBorsaCalcolato = bs.EsitoCalcolato;
+                info.InformazioniImportoBorsa.ImportoFinale = bs.ImportoCalcolato;
+                info.InformazioniImportoBorsa.CalcoloEseguito = bs.ImportoCalcolato.HasValue;
                 info.CodiciMotivoEsitoBorsaCalcolato = bs.CodiciMotivo ?? string.Empty;
                 info.MotiviEsitoBorsaCalcolato = bs.Motivi ?? string.Empty;
                 return;

@@ -109,12 +109,13 @@ namespace ProcedureNet7
                             // carica tutti gli impegni compatibili
                             impegniList.Clear();
                             using (SqlCommand readData = new SqlCommand(
-                                       "SELECT num_impegno FROM impegni WHERE Cod_beneficio = @ben AND categoria_pagamento = @cat",
+                                       "SELECT DISTINCT num_impegno FROM impegni WHERE Cod_beneficio = @ben AND categoria_pagamento = @cat AND anno_accademico = @anno",
                                        CONNECTION,
                                        sqlTransaction))
                             {
                                 readData.Parameters.AddWithValue("@ben", codBeneficioCalc);
                                 readData.Parameters.AddWithValue("@cat", categoriaPagam);
+                                readData.Parameters.AddWithValue("@anno", selectedAA);
                                 using SqlDataReader reader = readData.ExecuteReader();
                                 while (reader.Read())
                                 {

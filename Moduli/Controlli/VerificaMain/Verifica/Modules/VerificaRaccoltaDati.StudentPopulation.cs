@@ -319,6 +319,7 @@ SELECT
     coeff.MeritoConseguito,
     coeff.MeritoMinimoPrevisto,
     coeff.MeritoMassimoConseguibile,
+    coeff.SistemaValutazione,
     coeff.CoefficienteCongiunto
 FROM {TEMP_TABLE} t
 OUTER APPLY
@@ -328,6 +329,7 @@ OUTER APPLY
         TRY_CONVERT(DECIMAL(18,8), v.Merito_conseguito) AS MeritoConseguito,
         TRY_CONVERT(DECIMAL(18,8), v.Merito_minimo_previsto) AS MeritoMinimoPrevisto,
         TRY_CONVERT(DECIMAL(18,8), v.Merito_massimo_conseguibile) AS MeritoMassimoConseguibile,
+        v.Sistema_valutazione AS SistemaValutazione,
         TRY_CONVERT(DECIMAL(18,8), v.Coefficiente_congiunto) AS CoefficienteCongiunto
     FROM VCoefficiente_merito_normalizzato v
     WHERE v.Num_domanda = CAST(t.NumDomanda AS INT)
@@ -387,10 +389,12 @@ SELECT
     CAST(t.NumDomanda AS INT) AS NumDomanda,
     t.CodFiscale,
     ISNULL(r.COD_COMUNE,'') AS ComuneResidenza,
-    UPPER(ISNULL(r.PROVINCIA_RESIDENZA,'')) AS ProvinciaResidenza
+    UPPER(ISNULL(r.PROVINCIA_RESIDENZA,'')) AS ProvinciaResidenza,
+    TRY_CONVERT(INT, c.Tipo_Comune) AS TipoComuneResidenza
 FROM {TEMP_TABLE} t
 JOIN vRESIDENZA r
   ON UPPER(r.COD_FISCALE) = UPPER(t.CodFiscale)
+LEFT JOIN Comuni c ON c.Cod_comune = r.COD_COMUNE
 WHERE r.ANNO_ACCADEMICO = @AA
   AND (r.TIPO_BANDO = 'LZ' OR r.TIPO_BANDO IS NULL);";
 
@@ -655,6 +659,7 @@ WHERE rn = 1;";
                 coeff.MeritoConseguito = ReadNullableDecimal(reader, "MeritoConseguito");
                 coeff.MeritoMinimoPrevisto = ReadNullableDecimal(reader, "MeritoMinimoPrevisto");
                 coeff.MeritoMassimoConseguibile = ReadNullableDecimal(reader, "MeritoMassimoConseguibile");
+                coeff.SistemaValutazione = reader.SafeGetString("SistemaValutazione").Trim().ToUpperInvariant();
                 coeff.CoefficienteCongiunto = ReadNullableDecimal(reader, "CoefficienteCongiunto");
             });
         }
@@ -710,6 +715,10 @@ WHERE rn = 1;";
                 string comuneResidenza = reader.SafeGetString("ComuneResidenza").Trim();
                 string provinciaResidenza = reader.SafeGetString("ProvinciaResidenza").Trim().ToUpperInvariant();
                 info.SetResidenza(string.Empty, comuneResidenza, provinciaResidenza, string.Empty, comuneResidenza);
+                int tipoComuneOrdinal = reader.GetOrdinal("TipoComuneResidenza");
+                info.InformazioniSede.Residenza.TipoComune = reader.IsDBNull(tipoComuneOrdinal)
+                    ? null
+                    : reader.GetInt32(tipoComuneOrdinal);
             });
         }
 

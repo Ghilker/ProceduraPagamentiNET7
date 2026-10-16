@@ -9,7 +9,6 @@ namespace ProcedureNet7
 {
     internal static class ControlloDomicilioPdfAnalyzer
     {
-        private const int MaxPagesToRead = 10;
         private const int MaxPdfBytes = 20 * 1024 * 1024;
 
         static ControlloDomicilioPdfAnalyzer()
@@ -75,15 +74,6 @@ namespace ProcedureNet7
                 return analysis;
             }
 
-            if (extracted.Truncated)
-            {
-                analysis.State.Add(
-                    DomicilioControlSeverity.VerificaManuale,
-                    "PDF_005",
-                    $"Il PDF contiene {extracted.PageCount} pagine; il controllo automatico ha letto le prime {MaxPagesToRead}.",
-                    "Verificare manualmente le pagine non analizzate.");
-            }
-
             if (extracted.FailedPages.Count > 0)
             {
                 analysis.State.Add(
@@ -123,6 +113,7 @@ namespace ProcedureNet7
             analysis.ExtractedEndDate = ParseDate(extracted.EndDate);
             analysis.ExtractedFiscalCodes = FormatFiscalCodes(extracted);
 
+            ValidateMunicipality(analysis, extracted, expectation);
             ValidateFiscalCode(analysis, extracted, expectation);
             ValidateReference(analysis, extracted, expectation.Reference);
 
@@ -166,7 +157,7 @@ namespace ProcedureNet7
             if (extracted.PageCount <= 0)
                 throw new InvalidDataException("nessuna pagina presente");
 
-            var pages = Math.Min(extracted.PageCount, MaxPagesToRead);
+            var pages = extracted.PageCount;
             var text = new StringBuilder();
             for (var page = 1; page <= pages; page++)
             {
@@ -186,14 +177,13 @@ namespace ProcedureNet7
                     // Le ricevute RLI normalmente contengono tutti i dati utili nelle
                     // prime due pagine. Le pagine successive vengono saltate soltanto
                     // quando tipologia, soggetto, estremi, date e contratto richiamato
-                    // risultano già tutti presenti e coerenti con i dati attesi.
+                    // e comune dell'immobile risultano già tutti presenti e coerenti con i dati attesi.
                     if (page >= 2 && page < pages &&
                         CanStopAfterCurrentPage(text.ToString(), expectation, out var completedExtraction))
                     {
                         completedExtraction.PageCount = extracted.PageCount;
                         completedExtraction.PagesRead = extracted.PagesRead;
                         completedExtraction.FailedPages.AddRange(extracted.FailedPages);
-                        completedExtraction.StoppedWhenComplete = true;
                         extracted = completedExtraction;
                         break;
                     }
@@ -207,7 +197,6 @@ namespace ProcedureNet7
                 }
             }
 
-            extracted.Truncated = !extracted.StoppedWhenComplete && extracted.PageCount > pages;
             extracted.Text = NormalizeSpaces(text.ToString());
             return extracted;
         }
@@ -223,6 +212,10 @@ namespace ProcedureNet7
                 return false;
 
             ExtractFields(snapshot, expectation.Type);
+
+            if (expectation.Type == DomicilioPdfDocumentType.Contratto &&
+                !HasExpectedMunicipality(normalizedText, expectation.ComuneDomicilio))
+                return false;
 
             var expectedCf = NormalizeAlphaNumeric(expectation.CodFiscale);
             if (expectation.RequireFiscalCode)
@@ -280,6 +273,47 @@ namespace ProcedureNet7
             return true;
         }
 
+        private static void ValidateMunicipality(
+            DomicilioPdfAnalysis analysis,
+            PdfExtractedData document,
+            DomicilioPdfExpectation expectation)
+        {
+            // Il requisito riguarda il documento del contratto: le ricevute degli
+            // adempimenti successivi possono identificare soltanto il contratto.
+            if (expectation.Type != DomicilioPdfDocumentType.Contratto ||
+                HasExpectedMunicipality(document.Text, expectation.ComuneDomicilio))
+                return;
+
+            var incomplete = document.FailedPages.Count > 0;
+            analysis.State.Add(
+                incomplete || string.IsNullOrWhiteSpace(expectation.ComuneDomicilio)
+                    ? DomicilioControlSeverity.VerificaManuale
+                    : DomicilioControlSeverity.NonConforme,
+                "PDF_024",
+                incomplete
+                    ? "Il comune dell'immobile non è stato verificato perché la lettura del PDF è incompleta."
+                    : "Nel PDF non è stato riscontrato il comune del domicilio associato all'immobile.",
+                "Verificare il comune dell'immobile e acquisire un documento che lo riporti; il comune dell'ufficio di registrazione non è sufficiente.");
+        }
+
+        private static bool HasExpectedMunicipality(string text, string municipality)
+        {
+            if (string.IsNullOrWhiteSpace(municipality))
+                return false;
+
+            // Non basta trovare il nome della città: deve essere associato
+            // esplicitamente all'immobile, non all'ufficio o ai soggetti.
+            var name = Regex.Escape(NormalizeSpaces(municipality.Trim()));
+            var propertyLabel =
+                @"(?:comune\s+(?:(?:dell['’]?|di)\s*)?immobile\s*[:\-]?\s*" +
+                @"|immobile\s+(?:sito|situato|ubicato)\s+(?:nel\s+comune\s+di|in|a)\s+" +
+                @"|dati\s+(?:degli\s+immobili|dell['’]immobile)\s*[:\-]?\s*comune\s*[:\-]?\s*" +
+                @"|dati\s+(?:degli\s+immobili|dell['’]immobile)\b" +
+                @"(?:(?!\bufficio\b|\bsoggetti\b|\bdati\s+del\s+contratto\b)[\s\S]){0,600}?" +
+                @"\bubicato\s+nel\s+comune\s+di\s+)";
+            return Regex.IsMatch(text, propertyLabel + name + @"(?![\p{L}\p{N}'’\-])",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
         private static bool DateMatches(DateTime? expected, string? extracted)
             => !expected.HasValue || ParseDate(extracted)?.Date == expected.Value.Date;
 
@@ -637,7 +671,11 @@ namespace ProcedureNet7
             if (Regex.IsMatch(text, @"Dati\s+(?:generali\s+)?del\s+contratto", RegexOptions.IgnoreCase)) score++;
             if (Regex.IsMatch(text, @"Codice\s+Identificativo\s+del\s+contratto", RegexOptions.IgnoreCase)) score++;
             if (Regex.IsMatch(text, @"Locatori|Conduttori|locatore\s*/\s*\(B\)\s*conduttore", RegexOptions.IgnoreCase)) score++;
-            return score >= 2;
+            // La dicitura RLI e il riepilogo "Registrazione dei contratti"
+            // compaiono anche nelle ricevute di cessione: da soli non bastano.
+            return score >= 2 && Regex.IsMatch(text,
+                @"Ricevuta\s+di\s+avvenuta\s+registrazione|registrat[oa]\s+il\s*\d|Dati\s+(?:generali\s+)?del\s+contratto",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         }
 
         private static bool HasPdfSignature(byte[] file)
@@ -876,8 +914,6 @@ namespace ProcedureNet7
         {
             public int PageCount { get; set; }
             public int PagesRead { get; set; }
-            public bool Truncated { get; set; }
-            public bool StoppedWhenComplete { get; set; }
             public bool FieldsExtracted { get; set; }
             public List<int> FailedPages { get; } = new();
             public string Text { get; set; } = string.Empty;

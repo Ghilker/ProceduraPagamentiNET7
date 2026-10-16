@@ -11,7 +11,8 @@ namespace ProcedureNet7
             int aaInizio,
             int aaNumero,
             EsitoBorsaRuleConfig config,
-            string codBeneficio)
+            string codBeneficio,
+            bool ignoraForzature = false)
         {
             Pipeline = pipeline;
             Key = key;
@@ -21,6 +22,7 @@ namespace ProcedureNet7
             Config = config;
             CodBeneficio = EsitoBorsaSupport.NormalizeUpper(codBeneficio);
             Facts = GetFacts(pipeline, key);
+            IgnoraForzature = ignoraForzature;
         }
 
         public VerificaPipelineContext Pipeline { get; }
@@ -31,6 +33,8 @@ namespace ProcedureNet7
         public int AaNumero { get; }
         public EsitoBorsaRuleConfig Config { get; }
         public string CodBeneficio { get; }
+        public bool IgnoraForzature { get; }
+        public bool ForzaturaRinunciaNoEsclusione => !IgnoraForzature && Facts.ForzaturaRinunciaNoEsclusione;
 
         public InformazioniIscrizione? Iscrizione => Info?.InformazioniIscrizione;
         public bool Invalido => Info?.InformazioniPersonali?.Disabile == true;

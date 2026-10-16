@@ -21,6 +21,19 @@ namespace ProcedureNet7
         public List<string> NothingToRemove { get; } = new();
     }
 
+    public sealed class IncongruenzaAddResult
+    {
+        public List<string> AlreadyHasIncongruenza { get; } = new();
+        public List<string> PreviouslyRemovedButSkipped { get; } = new();
+        public List<string> ActuallyAdded { get; } = new();
+    }
+
+    public sealed class IncongruenzaRemoveResult
+    {
+        public List<string> ActuallyRemoved { get; } = new();
+        public List<string> NothingToRemove { get; } = new();
+    }
+
     public static class BlocksUtil
     {
         private const string TipoBandoFilter = "('lz','l2')";
@@ -514,6 +527,216 @@ WHERE mbp.Cod_tipologia_blocco = @block
         {
             var dict = HasBlock(conn, transaction, new List<string> { codFiscale }, blockCode, annoAccademico);
             return dict.TryGetValue(codFiscale, out bool v) && v;
+        }
+
+        /// <summary>
+        /// Inserisce l'incongruenza sulle domande lz/l2 dei codici fiscali indicati.
+        /// Le incongruenze attive non vengono duplicate; quelle chiuse vengono
+        /// reinserite solo se inserisciGiaRimossi è true. La transazione è gestita dal chiamante.
+        /// </summary>
+        public static IncongruenzaAddResult AddIncongruenza(
+            SqlConnection conn,
+            SqlTransaction transaction,
+            List<string> codFiscaleList,
+            string incongruenzaCode,
+            string annoAccademico,
+            string utente,
+            bool inserisciGiaRimossi = false)
+        {
+            EnsureOpen(conn);
+            ArgumentNullException.ThrowIfNull(transaction);
+
+            var result = new IncongruenzaAddResult();
+            var cfList = NormalizeCfList(codFiscaleList);
+            if (cfList.Count == 0)
+                return result;
+
+            string sql = $@"
+SET NOCOUNT ON;
+
+IF NOT EXISTS (
+    SELECT 1 FROM dbo.Tipologie_incongruenze
+    WHERE Anno_accademico = @aa AND Cod_incongruenza = @incongruenza
+)
+    THROW 50001, 'Incongruenza non presente nel catalogo per l''anno accademico indicato.', 1;
+
+DECLARE @Base TABLE (Num_domanda DECIMAL(18,0) NOT NULL PRIMARY KEY, Cod_fiscale CHAR(16), Id_domanda INT);
+
+INSERT INTO @Base (Num_domanda, Cod_fiscale, Id_domanda)
+SELECT d.Num_domanda, d.Cod_fiscale, d.Id_domanda
+FROM dbo.Domanda d
+INNER JOIN {CfTempTable} cf ON cf.CodFiscale = d.Cod_fiscale
+WHERE d.Anno_accademico = @aa
+  AND d.tipo_bando IN {TipoBandoFilter};
+
+-- RS1: già attive
+SELECT DISTINCT b.Cod_fiscale
+FROM @Base b
+WHERE EXISTS (
+    SELECT 1 FROM dbo.Incongruenze i WITH (UPDLOCK, HOLDLOCK)
+    WHERE i.Anno_accademico = @aa
+      AND i.Num_domanda = b.Num_domanda
+      AND i.Cod_incongruenza = @incongruenza
+      AND i.Data_fine_validita IS NULL
+);
+
+-- RS2: già chiuse e da non reinserire
+SELECT DISTINCT b.Cod_fiscale
+FROM @Base b
+WHERE @insGiaRimossi = 0
+  AND EXISTS (
+    SELECT 1 FROM dbo.Incongruenze i
+    WHERE i.Anno_accademico = @aa
+      AND i.Num_domanda = b.Num_domanda
+      AND i.Cod_incongruenza = @incongruenza
+      AND i.Data_fine_validita IS NOT NULL
+);
+
+DECLARE @Added TABLE (Num_domanda DECIMAL(18,0) NOT NULL);
+
+INSERT INTO dbo.Incongruenze
+    (Anno_accademico, Num_domanda, Cod_incongruenza, Data_validita,
+     Data_fine_validita, Cod_forzatura, Utente, Id_domanda, EliminataDa)
+OUTPUT inserted.Num_domanda INTO @Added(Num_domanda)
+SELECT @aa, b.Num_domanda, @incongruenza, CURRENT_TIMESTAMP,
+       NULL, NULL, @utente, b.Id_domanda, NULL
+FROM @Base b
+WHERE NOT EXISTS (
+    SELECT 1 FROM dbo.Incongruenze i WITH (UPDLOCK, HOLDLOCK)
+    WHERE i.Anno_accademico = @aa
+      AND i.Num_domanda = b.Num_domanda
+      AND i.Cod_incongruenza = @incongruenza
+      AND i.Data_fine_validita IS NULL
+)
+AND (
+    @insGiaRimossi = 1
+    OR NOT EXISTS (
+        SELECT 1 FROM dbo.Incongruenze i
+        WHERE i.Anno_accademico = @aa
+          AND i.Num_domanda = b.Num_domanda
+          AND i.Cod_incongruenza = @incongruenza
+          AND i.Data_fine_validita IS NOT NULL
+    )
+);
+
+-- RS3: effettivamente inserite
+SELECT DISTINCT b.Cod_fiscale
+FROM @Base b
+INNER JOIN @Added a ON a.Num_domanda = b.Num_domanda;
+";
+
+            using var cmd = new SqlCommand(sql, conn, transaction) { CommandTimeout = 300 };
+            AddIncongruenzaParameters(cmd, incongruenzaCode, annoAccademico, utente);
+            cmd.Parameters.Add("@insGiaRimossi", SqlDbType.Bit).Value = inserisciGiaRimossi;
+
+            try
+            {
+                CreateAndPopulateCfTempTable(conn, transaction, cfList);
+                using var rdr = cmd.ExecuteReader();
+                while (rdr.Read())
+                    result.AlreadyHasIncongruenza.Add(rdr.GetString(0));
+
+                rdr.NextResult();
+                while (rdr.Read())
+                    result.PreviouslyRemovedButSkipped.Add(rdr.GetString(0));
+
+                rdr.NextResult();
+                while (rdr.Read())
+                    result.ActuallyAdded.Add(rdr.GetString(0));
+            }
+            finally
+            {
+                DropCfTempTable(conn, transaction);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Chiude le incongruenze attive sulle domande lz/l2 impostando
+        /// Data_fine_validita ed EliminataDa, senza cancellare lo storico.
+        /// La transazione è gestita dal chiamante.
+        /// </summary>
+        public static IncongruenzaRemoveResult RemoveIncongruenza(
+            SqlConnection conn,
+            SqlTransaction transaction,
+            List<string> codFiscaleList,
+            string incongruenzaCode,
+            string annoAccademico,
+            string utente)
+        {
+            EnsureOpen(conn);
+            ArgumentNullException.ThrowIfNull(transaction);
+
+            var result = new IncongruenzaRemoveResult();
+            var cfList = NormalizeCfList(codFiscaleList);
+            if (cfList.Count == 0)
+                return result;
+
+            string sql = $@"
+SET NOCOUNT ON;
+
+DECLARE @Removed TABLE (Cod_fiscale CHAR(16) NOT NULL);
+
+UPDATE i
+SET Data_fine_validita = CURRENT_TIMESTAMP,
+    EliminataDa = @utente
+OUTPUT d.Cod_fiscale INTO @Removed(Cod_fiscale)
+FROM dbo.Incongruenze i
+INNER JOIN dbo.Domanda d
+    ON d.Anno_accademico = i.Anno_accademico
+   AND d.Num_domanda = i.Num_domanda
+INNER JOIN {CfTempTable} cf ON cf.CodFiscale = d.Cod_fiscale
+WHERE i.Anno_accademico = @aa
+  AND i.Cod_incongruenza = @incongruenza
+  AND i.Data_fine_validita IS NULL
+  AND d.tipo_bando IN {TipoBandoFilter};
+
+-- RS1: effettivamente chiuse, anche in presenza di duplicati attivi
+SELECT DISTINCT Cod_fiscale FROM @Removed;
+
+-- RS2: nessuna incongruenza attiva da chiudere
+SELECT cf.CodFiscale
+FROM {CfTempTable} cf
+WHERE NOT EXISTS (SELECT 1 FROM @Removed r WHERE r.Cod_fiscale = cf.CodFiscale);
+";
+
+            using var cmd = new SqlCommand(sql, conn, transaction) { CommandTimeout = 300 };
+            AddIncongruenzaParameters(cmd, incongruenzaCode, annoAccademico, utente);
+
+            try
+            {
+                CreateAndPopulateCfTempTable(conn, transaction, cfList);
+                using var rdr = cmd.ExecuteReader();
+                while (rdr.Read())
+                    result.ActuallyRemoved.Add(rdr.GetString(0));
+
+                rdr.NextResult();
+                while (rdr.Read())
+                    result.NothingToRemove.Add(rdr.GetString(0));
+            }
+            finally
+            {
+                DropCfTempTable(conn, transaction);
+            }
+
+            return result;
+        }
+
+        private static void AddIncongruenzaParameters(
+            SqlCommand cmd, string incongruenzaCode, string annoAccademico, string utente)
+        {
+            string code = (incongruenzaCode ?? string.Empty).Trim().ToUpperInvariant();
+            if (code.Length == 0 || code.Length > 2)
+                throw new ArgumentException("Il codice incongruenza deve contenere da 1 a 2 caratteri.", nameof(incongruenzaCode));
+            if (annoAccademico == null || annoAccademico.Length != 8 || annoAccademico.Any(c => c < '0' || c > '9'))
+                throw new ArgumentException("L'anno accademico deve contenere 8 cifre.", nameof(annoAccademico));
+            if (utente != null && utente.Length > 20)
+                throw new ArgumentException("L'utente può contenere al massimo 20 caratteri.", nameof(utente));
+
+            cmd.Parameters.Add("@aa", SqlDbType.Char, 8).Value = annoAccademico;
+            cmd.Parameters.Add("@incongruenza", SqlDbType.VarChar, 2).Value = code;
+            cmd.Parameters.Add("@utente", SqlDbType.VarChar, 20).Value = utente ?? string.Empty;
         }
 
         private static void EnsureOpen(SqlConnection conn)

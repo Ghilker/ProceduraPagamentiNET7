@@ -199,7 +199,7 @@ namespace ProcedureNet7
         DateTime? StartDate,
         DateTime? EndDate,
         string? ContractReference,
-        bool RequireFiscalCode = true);
+        bool RequireFiscalCode = true, string ComuneDomicilio = "");
 
     internal sealed class DomicilioPdfAnalysis
     {

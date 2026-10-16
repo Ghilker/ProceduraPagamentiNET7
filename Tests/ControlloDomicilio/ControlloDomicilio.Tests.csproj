@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net7.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/ControlloDomicilioModels.cs" Link="Source/Models.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/ControlloDomicilioPdfAnalyzer.cs" Link="Source/Analyzer.cs" />
+    <PackageReference Include="itext" Version="9.6.0" />
+    <PackageReference Include="itext.bouncy-castle-adapter" Version="9.6.0" />
+  </ItemGroup>
+</Project>

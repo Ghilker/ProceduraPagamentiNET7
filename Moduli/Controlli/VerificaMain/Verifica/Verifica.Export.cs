@@ -9,7 +9,7 @@ namespace ProcedureNet7.Verifica
 {
     internal sealed partial class Verifica
     {
-        private const decimal IseeMinimoResidentiEsteroPerCoefficiente = 7002.97m;
+        private const decimal IseeMinimoResidentiEsteroPerCoefficiente = 7000m;
         private static readonly IReadOnlyList<string> OutputBenefitCodes = EsitoBorsaSupport.SupportedBenefitCodes;
         private static readonly IReadOnlyList<string> OutputExclusionReasonBenefitCodes = new[] { "BS", "PA", "CI" };
 
@@ -26,6 +26,11 @@ namespace ProcedureNet7.Verifica
             {
                 dt.Columns.Add($"EsitoAttuale_{codBeneficio}", typeof(int));
                 dt.Columns.Add($"EsitoCalcolato_{codBeneficio}", typeof(int));
+                dt.Columns.Add($"EsitoCalcolatoSenzaForzature_{codBeneficio}", typeof(int));
+                dt.Columns.Add($"VerificaForzature_{codBeneficio}", typeof(string));
+
+                if (codBeneficio is "BS" or "PA")
+                    dt.Columns.Add($"ImportoCalcolato_{codBeneficio}", typeof(decimal));
 
                 if (OutputExclusionReasonBenefitCodes.Contains(codBeneficio, StringComparer.OrdinalIgnoreCase))
                 {
@@ -434,13 +439,13 @@ namespace ProcedureNet7.Verifica
                 return;
             }
 
-            decimal? meritoConseguito = iscr.NumeroCrediti.HasValue
-                ? iscr.NumeroCrediti.Value + Math.Max(iscr.CreditiUtilizzati ?? 0m, 0m)
-                : null;
-            decimal? meritoMinimo = iscr.CreditiMinimiRichiestiMerito
+            bool usaEsami = string.Equals(attuale.SistemaValutazione.Trim(), "E", StringComparison.OrdinalIgnoreCase);
+            // Il VB usa il merito conseguito senza sommare i crediti di bonus utilizzati.
+            decimal? meritoConseguito = usaEsami ? iscr.NumeroEsami : iscr.NumeroCrediti;
+            decimal? meritoMinimo = (usaEsami ? iscr.EsamiMinimiRichiestiMerito : iscr.CreditiMinimiRichiestiMerito)
                                     ?? attuale.MeritoMinimoPrevisto;
             decimal? meritoMassimo = attuale.MeritoMassimoConseguibile;
-            decimal? cfn = CalculateNormalizedValue(meritoConseguito, meritoMinimo, meritoMassimo);
+            decimal? cfn = CalculateCfn(meritoConseguito, meritoMinimo, meritoMassimo);
 
             decimal? media = iscr.NumeroEsami > 0 && iscr.SommaVoti.HasValue
                 ? iscr.SommaVoti.Value / iscr.NumeroEsami.Value
@@ -454,7 +459,12 @@ namespace ProcedureNet7.Verifica
                 info.InformazioniSede.Residenza.provincia?.Trim(),
                 "EE",
                 StringComparison.OrdinalIgnoreCase);
-            decimal? iseePerCoefficiente = iseeDsu.HasValue && residenteEstero
+            int? tipoComune = info.InformazioniSede.Residenza.TipoComune;
+            bool applicaMinimoEstero = residenteEstero
+                && tipoComune.HasValue && tipoComune.Value != 1 && tipoComune.Value != 3
+                && int.TryParse(context.AnnoAccademico, NumberStyles.Integer, CultureInfo.InvariantCulture, out int aaNumero)
+                && aaNumero >= 20262027;
+            decimal? iseePerCoefficiente = iseeDsu.HasValue && applicaMinimoEstero
                 ? Math.Max(iseeDsu.Value, IseeMinimoResidentiEsteroPerCoefficiente)
                 : iseeDsu;
             decimal? iseeMax = context.CalcParams?.SogliaIsee > 0m
@@ -487,16 +497,19 @@ namespace ProcedureNet7.Verifica
                 BuildCoefficientComparisonMessage(attuale, cfn, mediaN, iseeN, coefficiente, differenzaCoefficiente);
         }
 
-        private static decimal? CalculateNormalizedValue(decimal? value, decimal? minimum, decimal? maximum)
+        private static decimal? CalculateCfn(decimal? value, decimal? minimum, decimal? maximum)
         {
-            if (!value.HasValue || !minimum.HasValue || !maximum.HasValue)
+            if (!value.HasValue || !minimum.HasValue || !maximum.HasValue || minimum.Value == 0m)
                 return null;
 
             decimal range = maximum.Value - minimum.Value;
-            if (range <= 0m)
+            if (range == 0m)
+                return 1m;
+            if (range < 0m)
                 return null;
 
-            return RoundCoefficient(Clamp01((value.Value - minimum.Value) / range));
+            // Nessun clamp: anche CFN negativi o superiori a 1 sono salvati dal legacy.
+            return decimal.Round((value.Value - minimum.Value) / range, 2, MidpointRounding.AwayFromZero);
         }
 
         private static decimal Clamp01(decimal value)
@@ -550,16 +563,21 @@ namespace ProcedureNet7.Verifica
 
             foreach (var codBeneficio in OutputBenefitCodes)
             {
+                row[$"VerificaForzature_{codBeneficio}"] = string.Empty;
+                if (codBeneficio is "BS" or "PA")
+                    SetNullableDecimal(row, $"ImportoCalcolato_{codBeneficio}", null);
                 bool richiesto = facts != null && EsitoBorsaSupport.IsBenefitRequested(facts, codBeneficio);
                 if (!richiesto)
                 {
                     SetNullableInt(row, $"EsitoAttuale_{codBeneficio}", null);
                     SetNullableInt(row, $"EsitoCalcolato_{codBeneficio}", null);
+                    SetNullableInt(row, $"EsitoCalcolatoSenzaForzature_{codBeneficio}", null);
                     continue;
                 }
 
                 int? esitoAttuale = null;
                 int? esitoCalcolato = null;
+                int? esitoCalcolatoSenzaForzature = null;
 
                 if (rawByBenefit != null &&
                     rawByBenefit.TryGetValue(codBeneficio, out var raw) &&
@@ -573,6 +591,9 @@ namespace ProcedureNet7.Verifica
                     calcolato != null)
                 {
                     esitoCalcolato = calcolato.EsitoCalcolato;
+                    esitoCalcolatoSenzaForzature = calcolato.EsitoCalcolatoSenzaForzature;
+                    if (codBeneficio is "BS" or "PA")
+                        SetNullableDecimal(row, $"ImportoCalcolato_{codBeneficio}", calcolato.ImportoCalcolato);
 
                     if (OutputExclusionReasonBenefitCodes.Contains(codBeneficio, StringComparer.OrdinalIgnoreCase))
                     {
@@ -583,6 +604,12 @@ namespace ProcedureNet7.Verifica
 
                 SetNullableInt(row, $"EsitoAttuale_{codBeneficio}", esitoAttuale);
                 SetNullableInt(row, $"EsitoCalcolato_{codBeneficio}", esitoCalcolato);
+                SetNullableInt(row, $"EsitoCalcolatoSenzaForzature_{codBeneficio}", esitoCalcolatoSenzaForzature);
+                if (esitoCalcolato.HasValue && esitoCalcolatoSenzaForzature.HasValue
+                    && esitoCalcolato.Value != esitoCalcolatoSenzaForzature.Value)
+                {
+                    row[$"VerificaForzature_{codBeneficio}"] = "DA CONTROLLARE";
+                }
             }
         }
 

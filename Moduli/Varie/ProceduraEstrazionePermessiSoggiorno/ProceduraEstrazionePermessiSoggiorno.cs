@@ -87,6 +87,7 @@ WITH base AS (
        AND d.Anno_accademico IN (20262027)
        AND d.Tipo_bando like 'l%'
 	   inner join vStatus_compilazione vsc on d.Anno_accademico = vsc.anno_accademico and d.Num_domanda = vsc.num_domanda and vsc.status_compilazione >= 90
+       inner join vesiti_concorsiPA vpa on d.anno_accademico = vpa.anno_accademico and d.num_domanda = vpa.num_domanda and vpa.cod_tipo_esito = 2
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
 	--where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
@@ -148,7 +149,7 @@ WHERE rn = 1
                         SendEmailWithAttachment(
                             newToEmails, ccEmails, dtNew, currentDateFolder,
                             filePrefix: "ps_new",
-                            subject: $"Estrazione studenti per PS (AA 20262027) - {DateTime.Now:dd/MM/yyyy}",
+                            subject: $"Estrazione studenti per PS da lavorare con urgenza (AA 20262027) - {DateTime.Now:dd/MM/yyyy}",
                             htmlBody: GetMailBodyNew(),
                             minRowsPerEmail: 10
                         );
@@ -234,7 +235,7 @@ WHERE rn = 1
         private string GetMailBodyNew() => @"
 <p>Buongiorno,</p>
 <p>su richiesta di Rita che legge in copia,</p>
-<p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri dell'anno accademico 20262027 per cui devono essere validati i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
+<p>in allegato troverai l'estrazione aggiornata alla data odierna relativa agli studenti stranieri richiedenti PA dell'anno accademico 20262027 per cui devono essere validati urgentemente i documenti di soggiorno (passaporto/richiesta o rinnovo PS/permesso di soggiorno).</p>
 <p>Grazie e buon lavoro!</p>
 <p>Giacomo Pavone</p>";
 

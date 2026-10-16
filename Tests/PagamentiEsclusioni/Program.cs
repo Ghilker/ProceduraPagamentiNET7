@@ -267,6 +267,34 @@ Check(auditZero.Worksheet(1).Cell(AuditRow(luca.CodFiscale), AuditCol("ImportoNe
       && auditZero.Worksheet(1).Cell(AuditRow(luca.CodFiscale), AuditCol("ImportoNetto")).GetDouble() == 0,
     "Un netto realmente calcolato a zero deve rimanere distinto da un calcolo assente.");
 
+Check(PagamentoFlussoRules.ImpegniDaElaborare("0000", new[] { "1367", "326", "1367" })
+        .SequenceEqual(new[] { "1367", "326" }),
+    "Un impegno ripetuto deve essere elaborato una sola volta, mantenendo l'ordine.");
+
+Check(PagamentoFlussoRules.ImpegniDaElaborare("1367", new[] { "326", "1367", "1367" })
+        .SequenceEqual(new[] { "1367" }), "La selezione singola deve restare limitata all'impegno scelto.");
+Check(PagamentoFlussoRules.ImpegniDaElaborare("0000", Array.Empty<string>()).Count == 0,
+    "Nessun impegno disponibile non deve generare elaborazioni.");
+
+var studentiElaboratiFlusso = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+PagamentoFlussoRules.RegistraStudentiFlusso(new[] { "CF1", "CF2" }, studentiElaboratiFlusso);
+bool duplicatoBloccato = false;
+try { PagamentoFlussoRules.RegistraStudentiFlusso(new[] { "CF3", "cf1" }, studentiElaboratiFlusso); }
+catch (InvalidOperationException) { duplicatoBloccato = true; }
+Check(duplicatoBloccato && studentiElaboratiFlusso.SetEquals(new[] { "CF1", "CF2" }),
+    "Un secondo gruppo con studente già elaborato deve essere bloccato senza registrare parte del gruppo.");
+duplicatoBloccato = false;
+try { PagamentoFlussoRules.RegistraStudentiFlusso(new[] { "CF3", "cf3" }, studentiElaboratiFlusso); }
+catch (InvalidOperationException) { duplicatoBloccato = true; }
+Check(duplicatoBloccato && !studentiElaboratiFlusso.Contains("CF3"),
+    "Anche uno studente ripetuto nello stesso gruppo deve bloccare il gruppo prima della scrittura.");
+PagamentoFlussoRules.RegistraStudentiFlusso(new[] { "CF3" }, studentiElaboratiFlusso);
+Check(studentiElaboratiFlusso.Count == 3, "Gruppi disgiunti devono essere ammessi.");
+studentiElaboratiFlusso.Clear();
+PagamentoFlussoRules.RegistraStudentiFlusso(new[] { "CF1" }, studentiElaboratiFlusso);
+Check(studentiElaboratiFlusso.SetEquals(new[] { "CF1" }),
+    "Il nuovo ciclo di pagamento deve consentire lo stesso studente, ad esempio per un'integrazione.");
+
 if (args.Length > 0)
 {
     Directory.CreateDirectory(args[0]);

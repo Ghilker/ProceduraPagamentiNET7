@@ -18,6 +18,8 @@ namespace ProcedureNet7
 {
     public partial class ProceduraPagamenti
     {
+        private readonly HashSet<string> _studentiElaboratiFlusso = new(StringComparer.OrdinalIgnoreCase);
+
         private void IncrementImpegno(string impegno, string categoriaCU, bool withSS, bool withDetrazioni, int count)
         {
             if (!impegnoAmount.TryGetValue(impegno, out var perImpegno))
@@ -81,6 +83,8 @@ namespace ProcedureNet7
 
         private void GenerateOutputFiles()
         {
+            // Ogni generazione riguarda un solo tipo di pagamento e anno accademico.
+            _studentiElaboratiFlusso.Clear();
             _flussoWrittenCF.Clear();
             _flussoFilesByCF.Clear();
             _motiviNonFlusso.Clear();
@@ -89,8 +93,7 @@ namespace ProcedureNet7
 
             string beneficioFolderPath = GetCurrentPagamentoFolder();
 
-            bool doAllImpegni = selectedImpegno == "0000";
-            var impegnoList = doAllImpegni ? impegniList.ToList() : new List<string> { selectedImpegno };
+            var impegnoList = PagamentoFlussoRules.ImpegniDaElaborare(selectedImpegno, impegniList);
 
             foreach (var studente in studentiDaPagare.Values)
             {
@@ -433,6 +436,9 @@ namespace ProcedureNet7
             {
                 if (students.Any())
                 {
+                    // Blocca l'intero gruppo prima di scrivere file o movimenti contabili.
+                    PagamentoFlussoRules.RegistraStudentiFlusso(
+                        students.Select(s => s.InformazioniPersonali.CodFiscale), _studentiElaboratiFlusso);
                     DataTable dataTableFlusso = GenerareFlussoDataTable(students, codEnteFlusso);
 
                     string baseName = $"flusso_{fileName}_{impegnoFlusso}";

@@ -208,6 +208,9 @@ namespace ProcedureNet7
                             FormAggiuntaProvvedimenti provvedimenti = new FormAggiuntaProvvedimenti(this);
                             ShowFormInPanel(provvedimenti);
                             break;
+                        case ProcedureVarie.PrelavorazioneDocumentiDroso:
+                            ShowFormInPanel(new FormProceduraDroso(this));
+                            break;
                         case ProcedureVarie.EstrazionePermessiSoggiorno:
                             FormProceduraEstrazionePermessiSoggiorno estrazionePermessiSoggiorno = new FormProceduraEstrazionePermessiSoggiorno(this);
                             ShowFormInPanel(estrazionePermessiSoggiorno);
@@ -304,13 +307,23 @@ namespace ProcedureNet7
                 throw new ArgumentNullException(nameof(runProcedure));
             }
 
-            if (backgroundWorker.IsBusy)
+            if (backgroundWorker.IsBusy || drosoBusy)
             {
                 Logger.LogWarning(null, "Attendere che la procedura finisca!");
                 return;
             }
 
             backgroundWorker.RunWorkerAsync(runProcedure);
+        }
+
+        private bool drosoBusy;
+        public void SetDrosoBusy(bool busy)
+        {
+            if (busy && (drosoBusy || backgroundWorker.IsBusy || _backgroundWorker?.IsBusy == true))
+                throw new InvalidOperationException("Attendere il termine della procedura in corso.");
+            drosoBusy = busy;
+            procedureSelect.Enabled = !busy;
+            connectionPanel.Enabled = !busy;
         }
 
         public Panel GetProcedurePanel()
@@ -352,6 +365,8 @@ namespace ProcedureNet7
             SpecificheImpegni,
             [ProcedureCategory("Varie", "Funzionario")]
             EstrazionePermessiSoggiorno,
+            [ProcedureCategory("Varie", "Funzionario")]
+            PrelavorazioneDocumentiDroso,
             [ProcedureCategory("Varie", "Funzionario")]
             EstrazioneIstanze,
             [ProcedureCategory("Varie", "Funzionario")]

@@ -1,0 +1,13 @@
+{
+  "Checkpoint": "F8DD5D50E95024899256960A543DA93109093BC7F8A1C1C684F6BCFD822FB4A1",
+  "InputMode": "visual_only",
+  "TargetPrecision": 0.95,
+  "MinimumExamples": 20,
+  "Thresholds": {
+    "PERMESSO_SOGGIORNO": 0.6029657125473022,
+    "RICEVUTA": 0.5125231742858887,
+    "PASSAPORTO": 0.46222713589668274,
+    "ERRATO": 0.8895891904830933
+  },
+  "ValidationReport": "D:\\DrosoDocLab\\V1-20261013-085314-3355\\evaluations\\20261013-085357-workflow-61e2de\\validation\\validation-20261014-064936.json"
+}

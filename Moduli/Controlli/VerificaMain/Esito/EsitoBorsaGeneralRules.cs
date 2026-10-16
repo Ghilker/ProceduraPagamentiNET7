@@ -31,7 +31,8 @@ namespace ProcedureNet7
                 evaluation.Add("GEN001");
             }
 
-            ApplyForzatureGenerali(context, evaluation);
+            if (!context.IgnoraForzature)
+                ApplyForzatureGenerali(context, evaluation);
 
             if (facts.IscrizioneFuoriTermine == true)
                 evaluation.Add("GEN093");

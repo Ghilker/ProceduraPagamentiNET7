@@ -66,6 +66,7 @@ namespace ProcedureNet7
         public decimal? MeritoConseguito { get; set; }
         public decimal? MeritoMinimoPrevisto { get; set; }
         public decimal? MeritoMassimoConseguibile { get; set; }
+        public string SistemaValutazione { get; set; } = string.Empty;
         public decimal? CoefficienteCongiunto { get; set; }
     }
 

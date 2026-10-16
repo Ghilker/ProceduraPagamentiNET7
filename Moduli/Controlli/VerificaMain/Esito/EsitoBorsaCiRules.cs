@@ -17,7 +17,7 @@ namespace ProcedureNet7
             ApplyTipologiaEPrimoAnno(context, evaluation);
             ApplyLimiteAnniFuoriCorso(context, evaluation);
             ApplyBeneficioPregresso(context, evaluation);
-            ApplySelezioneUe(context, evaluation);
+            //ApplySelezioneUe(context, evaluation);
             ApplyVariazioniSpecifiche(context, evaluation);
         }
 
@@ -95,7 +95,7 @@ namespace ProcedureNet7
 
         private static void ApplyBeneficioPregresso(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
-            if (context.Facts.ForzaturaRinunciaNoEsclusione || context.Facts.RinunciaInCorso)
+            if (context.ForzaturaRinunciaNoEsclusione || context.Facts.RinunciaInCorso)
                 return;
 
             if (context.Facts.UsufruitoBeneficioBorsaNonRestituito
@@ -127,7 +127,7 @@ namespace ProcedureNet7
 
         private static void ApplyVariazioniSpecifiche(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
-            bool rinunciaPregressa = !context.Facts.ForzaturaRinunciaNoEsclusione
+            bool rinunciaPregressa = !context.ForzaturaRinunciaNoEsclusione
                 && context.Facts.BeneficiRinunciaPregressa.Contains("CI");
 
             if (rinunciaPregressa || EsitoBorsaSupport.HasRinunciaVariazione(context.Facts, "CI"))

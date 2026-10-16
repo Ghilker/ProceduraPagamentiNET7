@@ -2,6 +2,25 @@ namespace ProcedureNet7;
 
 internal static class PagamentoFlussoRules
 {
+    internal static List<string> ImpegniDaElaborare(string selezionato, IEnumerable<string> impegni)
+        => selezionato == "0000"
+            ? impegni.Distinct(StringComparer.Ordinal).ToList()
+            : new List<string> { selezionato };
+
+    internal static void RegistraStudentiFlusso(IEnumerable<string> codiciFiscali,
+        HashSet<string> studentiElaborati)
+    {
+        var nuovi = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string codiceFiscale in codiciFiscali)
+        {
+            if (!nuovi.Add(codiceFiscale) || studentiElaborati.Contains(codiceFiscale))
+                throw new InvalidOperationException(
+                    $"Pagamento duplicato nella stessa elaborazione per {codiceFiscale}. Generazione interrotta.");
+        }
+
+        studentiElaborati.UnionWith(nuovi);
+    }
+
     internal static MotivoEsclusionePagamento? ImpegnoNonElaborato(string? impegno,
         string impegnoSelezionato, IReadOnlyCollection<string> impegniDaElaborare)
     {
