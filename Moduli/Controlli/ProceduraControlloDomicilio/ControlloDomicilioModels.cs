@@ -1,3 +1,4 @@
+
 using System.Globalization;
 
 namespace ProcedureNet7
@@ -86,18 +87,22 @@ namespace ProcedureNet7
     internal sealed class DomicilioControlRecord
     {
         public int Id { get; init; }
+        public DateTime DataValidita { get; set; }
+        public DateTime? DataModifica { get; set; }
         public string AnnoAccademico { get; init; } = string.Empty;
         public decimal NumDomanda { get; init; }
         public string CodFiscale { get; init; } = string.Empty;
         public string Studente { get; init; } = string.Empty;
-        public string CodComune { get; init; } = string.Empty;
-        public string Comune { get; init; } = string.Empty;
-        public string Indirizzo { get; init; } = string.Empty;
-        public string NumeroCivico { get; init; } = string.Empty;
-        public string Cap { get; init; } = string.Empty;
-        public string TipoDomicilio { get; init; } = string.Empty;
-        public DateTime? DataInizio { get; init; }
-        public DateTime? DataFine { get; init; }
+        public bool InserimentoDatiContratto { get; set; }
+        public string CodProvincia { get; set; } = string.Empty;
+        public string CodComune { get; set; } = string.Empty;
+        public string Comune { get; set; } = string.Empty;
+        public string Indirizzo { get; set; } = string.Empty;
+        public string NumeroCivico { get; set; } = string.Empty;
+        public string Cap { get; set; } = string.Empty;
+        public string TipoDomicilio { get; set; } = string.Empty;
+        public DateTime? DataInizio { get; set; }
+        public DateTime? DataFine { get; set; }
         public List<ContrattoControlRecord> Contratti { get; } = new();
         public DomicilioControlState State { get; } = new();
 
@@ -112,21 +117,24 @@ namespace ProcedureNet7
     internal sealed class ContrattoControlRecord
     {
         public int Id { get; init; }
+        public DateTime DataValidita { get; set; }
+        public DateTime? DataModifica { get; set; }
         public int IdDomicilio { get; init; }
-        public int TipoContratto { get; init; }
-        public string NumeroSerie { get; init; } = string.Empty;
-        public DateTime? DataRegistrazione { get; init; }
-        public DateTime DataInizio { get; init; }
-        public DateTime? DataFine { get; init; }
-        public string TipoEnte { get; init; } = string.Empty;
-        public string DenominazioneEnte { get; init; } = string.Empty;
-        public string ImportoRata { get; init; } = string.Empty;
-        public string NumeroSerieSubentro { get; init; } = string.Empty;
-        public DateTime? DataInizioSubentro { get; init; }
-        public DateTime? DataCessazione { get; init; }
+        public int TipoContratto { get; set; }
+        public string NumeroSerie { get; set; } = string.Empty;
+        public DateTime? DataRegistrazione { get; set; }
+        public DateTime DataInizio { get; set; }
+        public DateTime? DataFine { get; set; }
+        public string TipoEnte { get; set; } = string.Empty;
+        public string DenominazioneEnte { get; set; } = string.Empty;
+        public string ImportoRata { get; set; } = string.Empty;
+        public string NumeroSerieSubentro { get; set; } = string.Empty;
+        public DateTime? DataInizioSubentro { get; set; }
+        public DateTime? DataCessazione { get; set; }
         public List<ProrogaControlRecord> Proroghe { get; } = new();
         public List<DomicilioAttachmentRecord> AllegatiContratto { get; } = new();
         public List<DomicilioAttachmentRecord> AllegatiSubentro { get; } = new();
+        public List<DomicilioAttachmentRecord> AllegatiLearningAgreement { get; } = new();
         public DomicilioControlState State { get; } = new();
         public DomicilioControlState SubentroState { get; } = new();
 
@@ -160,10 +168,12 @@ namespace ProcedureNet7
     internal sealed class ProrogaControlRecord
     {
         public int Id { get; init; }
+        public DateTime DataValidita { get; set; }
+        public DateTime? DataModifica { get; set; }
         public int IdContratto { get; init; }
-        public string NumeroSerie { get; init; } = string.Empty;
-        public DateTime DataDecorrenza { get; init; }
-        public DateTime DataScadenza { get; init; }
+        public string NumeroSerie { get; set; } = string.Empty;
+        public DateTime DataDecorrenza { get; set; }
+        public DateTime DataScadenza { get; set; }
         public List<DomicilioAttachmentRecord> Allegati { get; } = new();
         public DomicilioControlState State { get; } = new();
     }
@@ -188,7 +198,9 @@ namespace ProcedureNet7
     {
         Contratto,
         Subentro,
-        Proroga
+        Proroga,
+        ContrattoEnte,
+        LearningAgreement
     }
 
     internal sealed record DomicilioPdfExpectation(
@@ -199,7 +211,9 @@ namespace ProcedureNet7
         DateTime? StartDate,
         DateTime? EndDate,
         string? ContractReference,
-        bool RequireFiscalCode = true, string ComuneDomicilio = "");
+        bool RequireFiscalCode = true, string ComuneDomicilio = "",
+        string TipoEnte = "", string DenominazioneEnte = "", decimal? ImportoMensileRata = null,
+        bool ReadAllPages = false);
 
     internal sealed class DomicilioPdfAnalysis
     {
@@ -216,6 +230,10 @@ namespace ProcedureNet7
         public DateTime? ExtractedStartDate { get; set; }
         public DateTime? ExtractedEndDate { get; set; }
         public string ExtractedFiscalCodes { get; set; } = string.Empty;
+        public string ExtractedEnteType { get; set; } = string.Empty;
+        public string ExtractedEnteName { get; set; } = string.Empty;
+        public decimal? ExtractedMonthlyAmount { get; set; }
+        public string ExtractedMunicipality { get; set; } = string.Empty;
         public DomicilioControlState State { get; } = new();
 
         public string ExtractedData => string.Join("; ", new[]
@@ -224,80 +242,12 @@ namespace ProcedureNet7
             ExtractedRegistrationDate.HasValue ? $"Registrazione={ExtractedRegistrationDate:dd/MM/yyyy}" : null,
             ExtractedStartDate.HasValue ? $"Decorrenza={ExtractedStartDate:dd/MM/yyyy}" : null,
             ExtractedEndDate.HasValue ? $"Scadenza={ExtractedEndDate:dd/MM/yyyy}" : null,
-            string.IsNullOrWhiteSpace(ExtractedFiscalCodes) ? null : $"Codici fiscali={ExtractedFiscalCodes}"
+            string.IsNullOrWhiteSpace(ExtractedFiscalCodes) ? null : $"Codici fiscali={ExtractedFiscalCodes}",
+            string.IsNullOrWhiteSpace(ExtractedEnteType) ? null : $"Tipo ente={ExtractedEnteType}",
+            string.IsNullOrWhiteSpace(ExtractedEnteName) ? null : $"Denominazione ente={ExtractedEnteName}",
+            ExtractedMonthlyAmount.HasValue ? $"Rata mensile={ExtractedMonthlyAmount.Value.ToString("0.00", CultureInfo.InvariantCulture)}" : null,
+            string.IsNullOrWhiteSpace(ExtractedMunicipality) ? null : $"Comune immobile={ExtractedMunicipality}"
         }.Where(x => !string.IsNullOrWhiteSpace(x)));
     }
 
-    internal sealed class DomicilioCsvRow
-    {
-        public string AnnoAccademico { get; init; } = string.Empty;
-        public string NumDomanda { get; init; } = string.Empty;
-        public string CodFiscale { get; init; } = string.Empty;
-        public string Studente { get; init; } = string.Empty;
-        public string Elemento { get; init; } = string.Empty;
-        public string IdDomicilio { get; init; } = string.Empty;
-        public string ComuneDomicilio { get; init; } = string.Empty;
-        public string IndirizzoDomicilio { get; init; } = string.Empty;
-        public string TitoloDomicilio { get; init; } = string.Empty;
-        public string DataInizioDomicilio { get; init; } = string.Empty;
-        public string DataFineDomicilio { get; init; } = string.Empty;
-        public string IdContratto { get; init; } = string.Empty;
-        public string TipoContratto { get; init; } = string.Empty;
-        public string SerieContratto { get; init; } = string.Empty;
-        public string DataRegistrazioneContratto { get; init; } = string.Empty;
-        public string DataDecorrenzaContratto { get; init; } = string.Empty;
-        public string DataScadenzaContratto { get; init; } = string.Empty;
-        public string SerieSubentro { get; init; } = string.Empty;
-        public string DataSubentro { get; init; } = string.Empty;
-        public string DataCessazione { get; init; } = string.Empty;
-        public string IdProroga { get; init; } = string.Empty;
-        public string SerieProroga { get; init; } = string.Empty;
-        public string DataDecorrenzaProroga { get; init; } = string.Empty;
-        public string DataScadenzaProroga { get; init; } = string.Empty;
-        public string IdAllegato { get; init; } = string.Empty;
-        public string StatoAllegato { get; init; } = string.Empty;
-        public string NomeFile { get; init; } = string.Empty;
-        public string PdfValido { get; init; } = string.Empty;
-        public string PdfLeggibile { get; init; } = string.Empty;
-        public string TipoDocumentoRiconosciuto { get; init; } = string.Empty;
-        public string CodiceFiscaleNelPdf { get; init; } = string.Empty;
-        public string DatiPdfCongruenti { get; init; } = string.Empty;
-        public string DatiEstrattiDalPdf { get; init; } = string.Empty;
-        public string Esito { get; init; } = string.Empty;
-        public string Priorita { get; init; } = string.Empty;
-        public string CodiciAnomalia { get; init; } = string.Empty;
-        public string Anomalie { get; init; } = string.Empty;
-        public string AzioneUfficio { get; init; } = string.Empty;
-
-        public static readonly string[] Headers =
-        {
-            "ANNO_ACCADEMICO", "NUM_DOMANDA", "COD_FISCALE", "STUDENTE", "ELEMENTO",
-            "ID_DOMICILIO", "COMUNE_DOMICILIO", "INDIRIZZO_DOMICILIO", "TITOLO_DOMICILIO",
-            "DATA_INIZIO_DOMICILIO", "DATA_FINE_DOMICILIO", "ID_CONTRATTO", "TIPO_CONTRATTO",
-            "SERIE_CONTRATTO", "DATA_REGISTRAZIONE_CONTRATTO", "DATA_DECORRENZA_CONTRATTO",
-            "DATA_SCADENZA_CONTRATTO", "SERIE_SUBENTRO", "DATA_SUBENTRO", "DATA_CESSAZIONE",
-            "ID_PROROGA", "SERIE_PROROGA", "DATA_DECORRENZA_PROROGA", "DATA_SCADENZA_PROROGA",
-            "ID_ALLEGATO", "STATO_ALLEGATO", "NOME_FILE", "PDF_VALIDO", "PDF_LEGGIBILE",
-            "TIPO_DOCUMENTO_RICONOSCIUTO", "CODICE_FISCALE_NEL_PDF", "DATI_PDF_CONGRUENTI",
-            "DATI_ESTRATTI_DAL_PDF", "ESITO", "PRIORITA", "CODICI_ANOMALIA", "ANOMALIE",
-            "AZIONE_UFFICIO"
-        };
-
-        public string[] Values => new[]
-        {
-            AnnoAccademico, NumDomanda, CodFiscale, Studente, Elemento, IdDomicilio,
-            ComuneDomicilio, IndirizzoDomicilio, TitoloDomicilio, DataInizioDomicilio,
-            DataFineDomicilio, IdContratto, TipoContratto, SerieContratto,
-            DataRegistrazioneContratto, DataDecorrenzaContratto, DataScadenzaContratto,
-            SerieSubentro, DataSubentro, DataCessazione, IdProroga, SerieProroga,
-            DataDecorrenzaProroga, DataScadenzaProroga, IdAllegato, StatoAllegato,
-            NomeFile, PdfValido, PdfLeggibile, TipoDocumentoRiconosciuto,
-            CodiceFiscaleNelPdf, DatiPdfCongruenti, DatiEstrattiDalPdf, Esito, Priorita,
-            CodiciAnomalia, Anomalie, AzioneUfficio
-        };
-
-        public static string Date(DateTime? value) => value?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? string.Empty;
-        public static string Decimal(decimal value) => value.ToString(CultureInfo.InvariantCulture);
-        public static string Bool(bool? value) => value.HasValue ? (value.Value ? "SI" : "NO") : "NON_VERIFICABILE";
-    }
 }

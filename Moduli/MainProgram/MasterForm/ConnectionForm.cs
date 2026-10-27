@@ -179,7 +179,7 @@ namespace ProcedureNet7
                 Logger.LogDebug(null, $"Connected to server {databaseName.Text}");
                 connectionLabel.ForeColor = Color.DarkGreen;
 
-                _masterForm.SetupConnection(outConnection);
+                _masterForm.SetupConnection(outConnection, CONNECTION_STRING);
             }
             else
             {

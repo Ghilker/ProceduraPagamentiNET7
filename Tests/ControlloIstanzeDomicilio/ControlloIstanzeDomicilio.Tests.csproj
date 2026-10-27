@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Shared/DomicilioAutomationContracts.cs" Link="Source/AutomationContracts.cs" />
+    <Compile Include="../../Shared/DomicilioAutomationSnapshot.cs" Link="Source/AutomationSnapshot.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraLavorazioneAutomaticaDomicilio/DomicilioAutomaticEngine.cs" Link="Source/AutomationEngine.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraLavorazioneAutomaticaDomicilio/DomicilioAutomaticReport.cs" Link="Source/AutomationReport.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/ControlloDomicilioModels.cs" Link="Source/Models.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/ControlloDomicilioPdfAnalyzer.cs" Link="Source/PdfAnalyzer.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/IstanzaDomicilioModels.cs" Link="Source/IstanzaModels.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/IstanzaDomicilioData.cs" Link="Source/IstanzaData.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/IstanzaDomicilioValidator.cs" Link="Source/Validator.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/IstanzaDomicilioReport.cs" Link="Source/Report.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/ProceduraControlloDomicilio.cs" Link="Source/Procedure.cs" />
+    <PackageReference Include="itext" Version="9.6.0" />
+    <PackageReference Include="itext.bouncy-castle-adapter" Version="9.6.0" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
+  </ItemGroup>
+</Project>

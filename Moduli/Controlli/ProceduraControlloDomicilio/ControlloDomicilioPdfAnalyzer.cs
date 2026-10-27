@@ -9,7 +9,7 @@ namespace ProcedureNet7
 {
     internal static class ControlloDomicilioPdfAnalyzer
     {
-        private const int MaxPdfBytes = 20 * 1024 * 1024;
+        internal const int MaxPdfBytes = 20 * 1024 * 1024;
 
         static ControlloDomicilioPdfAnalyzer()
         {
@@ -94,6 +94,13 @@ namespace ProcedureNet7
             }
 
             analysis.Readable = true;
+            if (extracted.TextlessPages.Count > 0 && (expectation.ReadAllPages ||
+                expectation.Type is DomicilioPdfDocumentType.ContrattoEnte or DomicilioPdfDocumentType.LearningAgreement))
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_TEXT_INCOMPLETE",
+                    $"Le pagine {string.Join(", ", extracted.TextlessPages)} non contengono testo estraibile: il documento non può essere verificato integralmente senza lettura manuale.",
+                    "Verificare le pagine senza testo; non viene eseguito OCR.");
+            if (expectation.Type is DomicilioPdfDocumentType.ContrattoEnte or DomicilioPdfDocumentType.LearningAgreement)
+                return AnalyzeSpecialDocument(analysis, extracted, expectation);
             analysis.TypeRecognized = LooksLikeDocument(extracted.Text, expectation.Type);
             if (!analysis.TypeRecognized)
             {
@@ -112,10 +119,11 @@ namespace ProcedureNet7
                 : extracted.StartDate);
             analysis.ExtractedEndDate = ParseDate(extracted.EndDate);
             analysis.ExtractedFiscalCodes = FormatFiscalCodes(extracted);
+            if (expectation.ReadAllPages) ValidateAllPageFields(analysis, extracted, expectation);
 
             ValidateMunicipality(analysis, extracted, expectation);
             ValidateFiscalCode(analysis, extracted, expectation);
-            ValidateReference(analysis, extracted, expectation.Reference);
+            ValidateReference(analysis, extracted, expectation.Reference, expectation.Type, allowTextMatch: !expectation.ReadAllPages);
 
             if (expectation.Type == DomicilioPdfDocumentType.Contratto)
             {
@@ -126,15 +134,21 @@ namespace ProcedureNet7
             else if (expectation.Type == DomicilioPdfDocumentType.Subentro)
             {
                 ValidateDate(analysis, "data del subentro", expectation.StartDate, analysis.ExtractedStartDate, "PDF_013");
-                ValidateContractLink(analysis, extracted, expectation.ContractReference);
+                ValidateContractLink(analysis, extracted, expectation.ContractReference, allowTextMatch: !expectation.ReadAllPages);
             }
             else
             {
                 ValidateDate(analysis, "data di decorrenza della proroga", expectation.StartDate, analysis.ExtractedStartDate, "PDF_014");
                 ValidateDate(analysis, "data di scadenza della proroga", expectation.EndDate, analysis.ExtractedEndDate, "PDF_015");
-                ValidateContractLink(analysis, extracted, expectation.ContractReference);
+                ValidateContractLink(analysis, extracted, expectation.ContractReference, allowTextMatch: !expectation.ReadAllPages);
             }
 
+            SetDataCoherence(analysis);
+            return analysis;
+        }
+
+        private static void SetDataCoherence(DomicilioPdfAnalysis analysis)
+        {
             analysis.DataCoherent = analysis.State.Findings.Any(x =>
                     x.Severity == DomicilioControlSeverity.NonConforme &&
                     x.Code.StartsWith("PDF_", StringComparison.Ordinal))
@@ -144,7 +158,197 @@ namespace ProcedureNet7
                     x.Code.StartsWith("PDF_", StringComparison.Ordinal))
                     ? null
                     : true;
+        }
+
+        private static DomicilioPdfAnalysis AnalyzeSpecialDocument(DomicilioPdfAnalysis analysis,
+            PdfExtractedData extracted, DomicilioPdfExpectation expectation)
+        {
+            ExtractFields(extracted, expectation.Type);
+            analysis.ExtractedFiscalCodes = FormatFiscalCodes(extracted);
+            analysis.TypeRecognized = expectation.Type == DomicilioPdfDocumentType.LearningAgreement
+                ? Regex.IsMatch(extracted.Text, @"\blearning\s+agreement\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+                : Regex.IsMatch(extracted.Text,
+                    @"\b(?:contratto|accordo)\s+(?:(?:di|per|con)\s+)?(?:alloggio|ospitalit[aà]|ente)\b|\baccommodation\s+agreement\b",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (!analysis.TypeRecognized)
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_007",
+                    $"Il testo non identifica con certezza un {DocumentLabel(expectation.Type)}.",
+                    "Verificare manualmente la tipologia del documento.");
+
+            if (expectation.Type == DomicilioPdfDocumentType.LearningAgreement)
+            {
+                // The backend stores the PDF, but no proposed mobility/university
+                // fields against which its contents can be checked. Readability or
+                // the document title alone cannot establish substantive compliance.
+                analysis.FiscalCodePresent = extracted.FiscalCodes.Contains(expectation.CodFiscale.Trim(), StringComparer.OrdinalIgnoreCase);
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_LA_POLICY",
+                    "Il Learning Agreement richiede una verifica manuale: l'istanza non contiene dati di mobilità e ateneo confrontabili che ne consentano la validazione automatica.",
+                    "Verificare studente, accordo e periodo di mobilità nel Learning Agreement.");
+                SetDataCoherence(analysis);
+                return analysis;
+            }
+
+            // Free-form prose is deliberately not interpreted as a declared field.
+            // Every required value must have an explicit label and a single value
+            // over the complete document, with no conflicting later pages.
+            var cf = DeclaredValues(extracted.RawText, @"(?:Codice\s*fiscale\s*(?:dello\s*)?studente|Studente\s*[-:]?\s*(?:CF|Codice\s*fiscale))");
+            var starts = DeclaredValues(extracted.RawText, @"(?:Data\s*(?:di\s*)?(?:inizio|decorrenza)(?:\s*(?:del\s*)?(?:contratto|rapporto|alloggio))?|Decorrenza|Start\s*date)");
+            var ends = DeclaredValues(extracted.RawText, @"(?:Data\s*(?:di\s*)?(?:fine|scadenza)(?:\s*(?:del\s*)?(?:contratto|rapporto|alloggio))?|Scadenza|End\s*date)");
+            foreach (Match period in Regex.Matches(extracted.RawText,
+                         @"^[ \t]*(?:Durata|Periodo)(?:\s+del\s+contratto)?[ \t]*:?[ \t]*dal[ \t]*(?<start>\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})[ \t]+al[ \t]*(?<end>\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})[ \t]*\r?$",
+                         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline))
+            {
+                starts.Add(period.Groups["start"].Value);
+                ends.Add(period.Groups["end"].Value);
+            }
+            var municipality = DeclaredValues(extracted.RawText, @"Comune\s*(?:(?:dell['’]?|di)\s*)?(?:immobile|alloggio|struttura)");
+            var enteName = DeclaredValues(extracted.RawText, @"Denominazione\s*(?:(?:dell['’]?|di)\s*)?ente");
+            var enteType = DeclaredValues(extracted.RawText, @"(?:Tipo|Tipologia)\s*(?:di\s*)?ente");
+            var amounts = DeclaredValues(extracted.RawText, @"(?:(?:Importo\s*)?(?:mensile|rata\s*mensile)|Canone\s*mensile|Monthly\s*(?:amount|rent))");
+
+            var startKeys = starts.Select(DateKey).ToList();
+            var endKeys = ends.Select(DateKey).ToList();
+            var amountKeys = amounts.Select(value => ParseMonthlyAmount(value)?.ToString("0.00", CultureInfo.InvariantCulture) ?? "").ToList();
+            var enteTypeKeys = enteType.Select(EnteTypeKey).ToList();
+            analysis.ExtractedStartDate = ParseIsoDate(SingleDeclaredValue(startKeys));
+            analysis.ExtractedEndDate = ParseIsoDate(SingleDeclaredValue(endKeys));
+            analysis.ExtractedMunicipality = SingleDeclaredValue(municipality);
+            analysis.ExtractedEnteName = SingleDeclaredValue(enteName);
+            analysis.ExtractedEnteType = SingleDeclaredValue(enteTypeKeys);
+            analysis.ExtractedMonthlyAmount = decimal.TryParse(SingleDeclaredValue(amountKeys), NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out var amount) ? amount : null;
+
+            analysis.FiscalCodePresent = ValidateDeclaredValue(analysis, "CF", "codice fiscale dello studente",
+                NormalizeSpecialValue(expectation.CodFiscale), cf.Select(NormalizeSpecialValue));
+            ValidateDeclaredValue(analysis, "INIZIO", "data di decorrenza", IsoDate(expectation.StartDate), startKeys);
+            ValidateDeclaredValue(analysis, "FINE", "data di scadenza", IsoDate(expectation.EndDate), endKeys);
+            ValidateDeclaredValue(analysis, "COMUNE", "comune dell'immobile", NormalizeSpecialValue(expectation.ComuneDomicilio), municipality.Select(NormalizeSpecialValue));
+            ValidateDeclaredValue(analysis, "ENTE", "denominazione dell'ente", NormalizeSpecialValue(expectation.DenominazioneEnte), enteName.Select(NormalizeSpecialValue));
+            ValidateDeclaredValue(analysis, "TIPO_ENTE", "tipo di ente", EnteTypeKey(expectation.TipoEnte), enteTypeKeys);
+            ValidateDeclaredValue(analysis, "RATA", "rata mensile", expectation.ImportoMensileRata?.ToString("0.00", CultureInfo.InvariantCulture) ?? "", amountKeys);
+            SetDataCoherence(analysis);
             return analysis;
+        }
+
+        private static List<string> DeclaredValues(string text, string label)
+            => Regex.Matches(text, @"^[ \t]*" + label + @"[ \t]*[:=][ \t]*(?<value>[^\r\n]{0,160})[ \t]*\r?$",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline)
+                .Cast<Match>().Select(match => match.Groups["value"].Value.Trim()).ToList();
+
+        private static string SingleDeclaredValue(IEnumerable<string> candidates)
+        {
+            var values = candidates.Select(value => value.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return values.Count == 1 ? values[0] : "";
+        }
+
+        private static bool? ValidateDeclaredValue(DomicilioPdfAnalysis analysis, string code, string label,
+            string expected, IEnumerable<string> candidates)
+        {
+            var values = candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (string.IsNullOrWhiteSpace(expected) || values.Count != 1 || string.IsNullOrWhiteSpace(values[0]))
+            {
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_ENTE_" + code,
+                    $"Il campo {label} del contratto con ente non è confrontabile: valore atteso assente oppure campo PDF mancante, ambiguo o non interpretabile.",
+                    "Confrontare manualmente il campo con i dati proposti nell'istanza.");
+                return null;
+            }
+            if (string.Equals(expected, values[0], StringComparison.OrdinalIgnoreCase)) return true;
+            analysis.State.Add(DomicilioControlSeverity.NonConforme, "PDF_ENTE_" + code + "_DIFF",
+                $"Il campo {label} del contratto con ente non corrisponde: atteso {expected}, PDF {values[0]}.",
+                "Validare la difformità e correggere l'istanza o richiedere il documento corretto.");
+            return false;
+        }
+
+        private static string NormalizeSpecialValue(string? value)
+            => Regex.Replace((value ?? "").Trim().ToUpperInvariant(), @"\s+", " ");
+        private static string IsoDate(DateTime? value) => value?.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+        private static string DateKey(string value) => IsoDate(ParseDate(value));
+        private static DateTime? ParseIsoDate(string value)
+            => DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;
+        private static string EnteTypeKey(string value)
+        {
+            var normalized = Regex.Replace(NormalizeSpecialValue(value), @"[ /-]+", " ");
+            return normalized switch
+            {
+                "EP" or "ENTE PUBBLICO PRIVATO" or "ENTE PUBBLICO O PRIVATO" => "EP",
+                "IR" or "ISTITUTO RELIGIOSO" => "IR",
+                "FA" or "FONDAZIONE ASSOCIAZIONE" or "FONDAZIONE O ASSOCIAZIONE" => "FA",
+                "SE" or "ERASMUS SOCRATES" or "ERASMUS O SOCRATES" => "SE",
+                _ => ""
+            };
+        }
+
+        private static decimal? ParseMonthlyAmount(string value)
+        {
+            var number = Regex.Replace(value, @"€|\bEUR(?:O)?\b", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Trim();
+            if (Regex.IsMatch(number, @"^\d{1,3}(?:\.\d{3})+,\d{2}$", RegexOptions.CultureInvariant))
+                number = number.Replace(".", "").Replace(',', '.');
+            else if (Regex.IsMatch(number, @"^\d+(?:,\d{1,2})$", RegexOptions.CultureInvariant))
+                number = number.Replace(',', '.');
+            else if (!Regex.IsMatch(number, @"^\d+(?:\.\d{1,2})?$", RegexOptions.CultureInvariant))
+                return null;
+            return decimal.TryParse(number, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var result) && result > 0 ? result : null;
+        }
+
+        private static void ValidateAllPageFields(DomicilioPdfAnalysis analysis, PdfExtractedData document,
+            DomicilioPdfExpectation expectation)
+        {
+            List<string> Values(string pattern, int group = 1) => Regex.Matches(document.Text, pattern,
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+                .Cast<Match>().Select(match => match.Groups[group].Value.Trim()).ToList();
+            void Check(string label, IEnumerable<string> candidates)
+            {
+                var values = candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (values.Count <= 1 && values.All(value => !string.IsNullOrWhiteSpace(value))) return;
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_AMBIGUOUS_FIELDS",
+                    $"La lettura integrale trova valori distinti o non interpretabili per {label}; non è possibile scegliere automaticamente una delle ricevute o dei dati presenti.",
+                    "Verificare tutte le pagine e individuare il documento riferito all'operazione.");
+            }
+
+            Check("codice identificativo del contratto", Values(@"Codice\s+Identificativo\s+del\s+contratto\s*[:\-]?\s*([A-Z0-9]{10,60})").Select(NormalizeReference));
+            Check("periodo del contratto", Regex.Matches(document.Text,
+                    @"(?:Durata|Periodo)\s*[:\-]?\s*dal\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})\s*al\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Cast<Match>()
+                .Select(match => DateKey(match.Groups[1].Value) + "|" + DateKey(match.Groups[2].Value)));
+            Check("numero e serie di registrazione", Regex.Matches(document.Text,
+                    @"(?:al\s+)?n\.?\s*([0-9]+)\s*[-–—\/]?\s*serie\s*([A-Z0-9]+)",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Cast<Match>()
+                .Select(match => NormalizeRegistrationNumber(match.Groups[1].Value) + "|" + NormalizeSeries(match.Groups[2].Value)));
+            Check("contratto richiamato", Regex.Matches(document.Text,
+                    @"\banno\s*(\d{4})\s*[,;/\-]?\s*serie\s*([A-Z0-9]+)\s*[,;/\-]?\s*n(?:umero)?\.?\s*0*([0-9]+)",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Cast<Match>()
+                .Select(match => match.Groups[1].Value + "|" + NormalizeSeries(match.Groups[2].Value) + "|" + NormalizeRegistrationNumber(match.Groups[3].Value)));
+
+            if (expectation.Type == DomicilioPdfDocumentType.Contratto)
+            {
+                Check("data di registrazione", Values(@"registrat[oa]\s+il\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})\s+al\s+n\.?")
+                    .Concat(Values(@"(?:data\s+di\s+registrazione|registrazione\s+in\s+data)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})")).Select(DateKey));
+                var cities = DeclaredValues(document.RawText, @"(?:Comune\s*(?:(?:dell['’]?|di)\s*)?immobile|Dati\s+(?:degli\s+immobili|dell['’]immobile)\s*:?\s*Comune)");
+                cities.AddRange(Regex.Matches(document.RawText,
+                        @"^[ \t]*immobile\s+(?:sito|situato|ubicato)\s+(?:nel\s+comune\s+di|in|a)\s+(?<city>[^\r\n]{1,100})\r?$",
+                        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline)
+                    .Cast<Match>().Select(match => match.Groups["city"].Value));
+                Check("comune dell'immobile", cities.Select(NormalizeSpecialValue));
+            }
+            else
+            {
+                Check("protocollo dell'adempimento", Values(@"(?:protocollo(?:\s+di\s+ricezione)?\s*[:\-]?|acquisito\s+con\s+protocollo)\s*([0-9]{10,25}(?:\s*[-/]\s*[0-9]{4,8})?)").Select(NormalizeReference));
+                if (string.IsNullOrWhiteSpace(document.EventProtocol))
+                    analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_EVENT_REFERENCE",
+                        "La lettura integrale non individua un protocollo esplicitamente riferito all'adempimento: la sola presenza degli estremi nel testo non è sufficiente.",
+                        "Verificare gli estremi del subentro o della proroga.");
+                if (expectation.Type == DomicilioPdfDocumentType.Proroga)
+                {
+                    Check("decorrenza della proroga", Values(@"(?:decorrenza|inizio)\s+(?:della\s+)?proroga\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})").Select(DateKey));
+                    Check("scadenza della proroga", Values(@"(?:scadenza|fine)\s+(?:della\s+)?proroga\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})").Select(DateKey));
+                }
+                else
+                    Check("data del subentro", Values(@"(?:cessione|subentro)[\s\S]{0,140}?(?:dalla\s+data|con\s+decorrenza(?:\s+dal)?|dal)\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})")
+                        .Concat(Values(@"(?:data|decorrenza|inizio)\s+(?:del\s+|di\s+)?(?:subentro|cessione)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})")).Select(DateKey));
+            }
+            var expectedFiscalCode = NormalizeAlphaNumeric(expectation.CodFiscale);
+            Check("ruolo dello studente", document.FiscalCodeRoles
+                .Where(role => NormalizeAlphaNumeric(role.FiscalCode) == expectedFiscalCode).Select(role => role.Role));
         }
 
         private static PdfExtractedData ReadPdf(byte[] file, DomicilioPdfExpectation expectation)
@@ -172,7 +376,9 @@ namespace ProcedureNet7
                     }
 
                     var strategy = new SimpleTextExtractionStrategy();
-                    text.AppendLine(PdfTextExtractor.GetTextFromPage(pdfPage, strategy) ?? string.Empty);
+                    var pageText = PdfTextExtractor.GetTextFromPage(pdfPage, strategy) ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(pageText)) extracted.TextlessPages.Add(page);
+                    text.AppendLine(pageText);
 
                     // Le ricevute RLI normalmente contengono tutti i dati utili nelle
                     // prime due pagine. Le pagine successive vengono saltate soltanto
@@ -197,7 +403,8 @@ namespace ProcedureNet7
                 }
             }
 
-            extracted.Text = NormalizeSpaces(text.ToString());
+            extracted.RawText = text.ToString();
+            extracted.Text = NormalizeSpaces(extracted.RawText);
             return extracted;
         }
 
@@ -208,6 +415,10 @@ namespace ProcedureNet7
         {
             var normalizedText = NormalizeSpaces(text);
             snapshot = new PdfExtractedData { Text = normalizedText };
+            // Special contracts need every labelled value, including any conflicting
+            // values in later pages. They never use the RLI early-stop shortcut.
+            if (expectation.ReadAllPages || expectation.Type is DomicilioPdfDocumentType.ContrattoEnte or DomicilioPdfDocumentType.LearningAgreement)
+                return false;
             if (!LooksLikeDocument(normalizedText, expectation.Type))
                 return false;
 
@@ -348,6 +559,11 @@ namespace ProcedureNet7
                 ValidateSubentryFiscalCode(analysis, extracted, expectedFiscalCode, expected);
                 return;
             }
+            if (expectation.ReadAllPages && expectation.Type is DomicilioPdfDocumentType.Contratto or DomicilioPdfDocumentType.Proroga)
+            {
+                ValidateTenantFiscalCode(analysis, extracted, expectation.Type, expectedFiscalCode, expected);
+                return;
+            }
 
             var found = extracted.FiscalCodes.Any(x =>
                 string.Equals(NormalizeAlphaNumeric(x), expected, StringComparison.OrdinalIgnoreCase));
@@ -366,6 +582,48 @@ namespace ProcedureNet7
                     $"Il codice fiscale {expectedFiscalCode.Trim()} non è presente nel PDF ({detected}).",
                     "Verificare l'intestatario e richiedere il documento corretto se necessario.");
             }
+        }
+
+        private static void ValidateTenantFiscalCode(DomicilioPdfAnalysis analysis, PdfExtractedData extracted,
+            DomicilioPdfDocumentType type, string expectedFiscalCode, string expected)
+        {
+            var roles = extracted.FiscalCodeRoles
+                .Where(role => NormalizeAlphaNumeric(role.FiscalCode) == expected)
+                .Select(role => role.Role).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var label = type == DomicilioPdfDocumentType.Proroga ? "proroga" : "contratto";
+            if (roles.Count == 1 && string.Equals(roles[0], "B", StringComparison.OrdinalIgnoreCase))
+            {
+                analysis.FiscalCodePresent = true;
+                return;
+            }
+
+            analysis.FiscalCodePresent = null;
+            if (roles.Count == 0)
+            {
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_TENANT_ROLE_MISSING",
+                    $"Nel documento di {label} il codice fiscale {expectedFiscalCode.Trim()} non è associato esplicitamente al ruolo di conduttore (B). La sola presenza del codice fiscale non permette l'accoglimento automatico.",
+                    "Verificare il ruolo dello studente nella tabella dei soggetti del documento.");
+                return;
+            }
+            if (roles.Count > 1)
+            {
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_TENANT_ROLE_AMBIGUOUS",
+                    $"Nel documento di {label} il codice fiscale dello studente compare con ruoli distinti ({string.Join(", ", roles)}).",
+                    "Verificare tutte le pagine e individuare il ruolo pertinente alla richiesta.");
+                return;
+            }
+            if (type == DomicilioPdfDocumentType.Proroga && string.Equals(roles[0], "D", StringComparison.OrdinalIgnoreCase))
+            {
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_TENANT_ROLE_UNSUPPORTED",
+                    "Nella proroga lo studente risulta conduttore cessionario (D); questa indicazione richiede una verifica manuale del collegamento con il subentro e non viene equiparata automaticamente al ruolo ordinario B.",
+                    "Verificare lo studente come conduttore corrente del contratto prorogato.");
+                return;
+            }
+
+            analysis.FiscalCodePresent = false;
+            analysis.State.Add(DomicilioControlSeverity.NonConforme, "PDF_TENANT_ROLE_INCOMPATIBLE",
+                $"Nel documento di {label} il codice fiscale {expectedFiscalCode.Trim()} ha il ruolo {RoleDescription(roles[0])}, non quello di conduttore (B).",
+                "Verificare i soggetti del documento e acquisire un documento coerente con il ruolo dello studente.");
         }
 
         private static void ValidateSubentryFiscalCode(
@@ -418,13 +676,17 @@ namespace ProcedureNet7
         private static void ValidateReference(
             DomicilioPdfAnalysis analysis,
             PdfExtractedData extracted,
-            string? expectedReference)
+            string? expectedReference, DomicilioPdfDocumentType type, bool allowTextMatch = true)
         {
             if (string.IsNullOrWhiteSpace(expectedReference))
                 return;
 
-            if (ContainsNormalized(extracted.Text, expectedReference) ||
-                AreEqualOrContained(expectedReference, analysis.ExtractedReference))
+            if (allowTextMatch && (ContainsNormalized(extracted.Text, expectedReference) ||
+                                  AreEqualOrContained(expectedReference, analysis.ExtractedReference)))
+                return;
+            if (!allowTextMatch && (StrictReferenceMatches(expectedReference, analysis.ExtractedReference) ||
+                type == DomicilioPdfDocumentType.Contratto && StrictReferenceMatches(expectedReference,
+                    string.Join(" ", extracted.Series, extracted.Number, extracted.RegistrationYear))))
                 return;
 
             if (string.IsNullOrWhiteSpace(analysis.ExtractedReference))
@@ -477,12 +739,12 @@ namespace ProcedureNet7
         private static void ValidateContractLink(
             DomicilioPdfAnalysis analysis,
             PdfExtractedData extracted,
-            string? contractReference)
+            string? contractReference, bool allowTextMatch = true)
         {
             if (string.IsNullOrWhiteSpace(contractReference))
                 return;
 
-            if (ContractReferenceMatches(extracted, contractReference, out var comparable))
+            if (ContractReferenceMatches(extracted, contractReference, out var comparable, allowTextMatch))
                 return;
 
             if (!comparable)
@@ -505,7 +767,7 @@ namespace ProcedureNet7
         private static bool ContractReferenceMatches(
             PdfExtractedData extracted,
             string? contractReference,
-            out bool comparable)
+            out bool comparable, bool allowTextMatch = true)
         {
             if (string.IsNullOrWhiteSpace(contractReference))
             {
@@ -513,10 +775,23 @@ namespace ProcedureNet7
                 return true;
             }
 
-            if (ContainsNormalized(extracted.Text, contractReference))
+            if (allowTextMatch && ContainsNormalized(extracted.Text, contractReference))
             {
                 comparable = true;
                 return true;
+            }
+            if (!allowTextMatch && !string.IsNullOrWhiteSpace(extracted.ContractIdentifier))
+            {
+                if (NormalizeReference(contractReference) == NormalizeReference(extracted.ContractIdentifier))
+                {
+                    comparable = true;
+                    return true;
+                }
+                if (IsContractIdentifier(contractReference) && IsContractIdentifier(extracted.ContractIdentifier))
+                {
+                    comparable = true;
+                    return false;
+                }
             }
 
             var expected = ParseReferenceComponents(contractReference);
@@ -527,6 +802,12 @@ namespace ProcedureNet7
             comparable = expected.HasComparableNumber && actual.HasComparableNumber;
             if (!comparable)
                 return false;
+            if (!allowTextMatch && (!string.IsNullOrWhiteSpace(expected.Year) && string.IsNullOrWhiteSpace(actual.Year) ||
+                                   !string.IsNullOrWhiteSpace(expected.Series) && string.IsNullOrWhiteSpace(actual.Series)))
+            {
+                comparable = false;
+                return false;
+            }
 
             var numberMatches = string.Equals(expected.Number, actual.Number, StringComparison.OrdinalIgnoreCase);
             var yearMatches = string.IsNullOrWhiteSpace(expected.Year) || string.IsNullOrWhiteSpace(actual.Year) ||
@@ -534,6 +815,27 @@ namespace ProcedureNet7
             var seriesMatches = string.IsNullOrWhiteSpace(expected.Series) || string.IsNullOrWhiteSpace(actual.Series) ||
                                 string.Equals(expected.Series, actual.Series, StringComparison.OrdinalIgnoreCase);
             return numberMatches && yearMatches && seriesMatches;
+        }
+
+        private static bool IsContractIdentifier(string value)
+            => Regex.IsMatch(NormalizeAlphaNumeric(value), @"^[A-Z]{3}\d{2}[A-Z0-9]\d{6}", RegexOptions.CultureInvariant);
+
+        private static bool StrictReferenceMatches(string expected, string actual)
+        {
+            if (string.IsNullOrWhiteSpace(actual)) return false;
+            var expectedProtocol = Regex.Match(expected.Trim(), @"^(?<base>\d{10,25})(?:\s*[-/]\s*(?<sequence>\d{4,8}))?$", RegexOptions.CultureInvariant);
+            var actualProtocol = Regex.Match(actual.Trim(), @"^(?<base>\d{10,25})(?:\s*[-/]\s*(?<sequence>\d{4,8}))?$", RegexOptions.CultureInvariant);
+            if (expectedProtocol.Success && actualProtocol.Success)
+                return expectedProtocol.Groups["base"].Value == actualProtocol.Groups["base"].Value &&
+                       (!expectedProtocol.Groups["sequence"].Success ||
+                        expectedProtocol.Groups["sequence"].Value == actualProtocol.Groups["sequence"].Value);
+            if (NormalizeReference(expected) == NormalizeReference(actual)) return true;
+            if (IsContractIdentifier(expected) && IsContractIdentifier(actual)) return false;
+            var first = ParseReferenceComponents(expected);
+            var second = ParseReferenceComponents(actual);
+            return first.HasComparableNumber && second.HasComparableNumber && first.Number == second.Number &&
+                   (string.IsNullOrWhiteSpace(first.Series) || first.Series == second.Series) &&
+                   (string.IsNullOrWhiteSpace(first.Year) || first.Year == second.Year);
         }
 
         private static void ExtractFields(PdfExtractedData document, DomicilioPdfDocumentType type)
@@ -893,6 +1195,8 @@ namespace ProcedureNet7
         {
             DomicilioPdfDocumentType.Subentro => "documento di subentro",
             DomicilioPdfDocumentType.Proroga => "documento di proroga",
+            DomicilioPdfDocumentType.ContrattoEnte => "contratto con ente",
+            DomicilioPdfDocumentType.LearningAgreement => "Learning Agreement",
             _ => "contratto di locazione"
         };
 
@@ -916,7 +1220,9 @@ namespace ProcedureNet7
             public int PagesRead { get; set; }
             public bool FieldsExtracted { get; set; }
             public List<int> FailedPages { get; } = new();
+            public List<int> TextlessPages { get; } = new();
             public string Text { get; set; } = string.Empty;
+            public string RawText { get; set; } = string.Empty;
             public string ContractIdentifier { get; set; } = string.Empty;
             public string Series { get; set; } = string.Empty;
             public string Number { get; set; } = string.Empty;

@@ -931,31 +931,28 @@ namespace ProcedureNet7
             HashSet<string> listaStudentiDaEliminarePEC = new();
             if (tipoBeneficio == TipoBeneficio.BorsaDiStudio.ToCode())
             {
-                // Check for students with invalid PEC addresses
-                string sqlStudentiPecKiller = $@"
-                        SELECT LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE, Indirizzo_PEC 
-                        FROM LUOGO_REPERIBILITA_STUDENTE
-                        INNER JOIN #CFEstrazione cfe ON LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE = cfe.Cod_fiscale 
-                        LEFT OUTER JOIN vProfilo ON LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE = vProfilo.Cod_Fiscale 
-                        WHERE ANNO_ACCADEMICO = '{selectedAA}' 
-                            AND tipo_bando = 'lz' 
-                            AND TIPO_LUOGO = 'DOL'
-                            AND DATA_FINE_VALIDITA IS NULL
-                            AND (INDIRIZZO = '' OR INDIRIZZO = 'ROMA' OR INDIRIZZO = 'CASSINO' OR INDIRIZZO = 'FROSINONE')
-                            AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vResidenza where ANNO_ACCADEMICO = '{selectedAA}' AND provincia_residenza = 'ee')
-                            AND LUOGO_REPERIBILITA_STUDENTE.COD_FISCALE in (select COD_FISCALE FROM vDomicilio where ANNO_ACCADEMICO = '{selectedAA}' AND (Indirizzo_domicilio = '' or Indirizzo_domicilio = 'ROMA' or Indirizzo_domicilio = 'CASSINO' or Indirizzo_domicilio = 'FROSINONE'  or prov = 'EE'))
-                            AND Indirizzo_PEC IS NULL
-                        ";
-                SqlCommand nonPecCmd = new(sqlStudentiPecKiller, CONNECTION, sqlTransaction)
+                var approvedDomains = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var domainsCommand = new SqlCommand(ControlloPecQueries.ApprovedDomains, CONNECTION, sqlTransaction))
+                using (var domainsReader = domainsCommand.ExecuteReader())
+                {
+                    while (domainsReader.Read())
+                        approvedDomains.Add(Utilities.SafeGetString(domainsReader, "Dominio").Trim());
+                }
+
+                // Stesse regole di ControlloID, limitate all'AA e ai CF dell'estrazione.
+                using SqlCommand nonPecCmd = new(ControlloPecQueries.PaymentCandidates, CONNECTION, sqlTransaction)
                 {
                     CommandTimeout = 9000000
                 };
+                nonPecCmd.Parameters.Add("@AnnoDa", SqlDbType.Char, 8).Value = selectedAA;
                 Logger.LogInfo(12, $"Lavorazione studenti - controllo PEC");
 
                 using (SqlDataReader reader = nonPecCmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
+                        if (ControlloPecAddress.IsValid(Utilities.SafeGetString(reader, "Indirizzo_PEC"), approvedDomains))
+                            continue;
                         string codFiscale = Utilities.RemoveAllSpaces(Utilities.SafeGetString(reader, "Cod_fiscale").ToUpper());
                         studentiDaPagare.TryGetValue(codFiscale, out StudentePagamenti? studente);
                         if (studente != null && !listaStudentiDaEliminarePEC.Contains(studente.InformazioniPersonali.CodFiscale))
@@ -970,7 +967,7 @@ namespace ProcedureNet7
                     string sqlUpdatePec = $@"
                         UPDATE {dbTableName}
                             SET togliere_PEC = 1,
-                                note = 'Studente senza PEC al momento dell''estrazione'
+                                note = 'Studente con PEC mancante o non valida al momento dell''estrazione'
                         WHERE
                             cod_fiscale IN ({listaCFPEC})
                         ";
@@ -985,7 +982,7 @@ namespace ProcedureNet7
             Logger.LogInfo(12, $"Numero studenti da eliminare per IBAN mancante = {listaStudentiDaEliminareIBAN.Count}");
             Logger.LogInfo(12, $"Numero studenti bloccati per IBAN non valido = {listaStudentiDaBloccareIBAN.Count}");
             Logger.LogInfo(12, $"Numero studenti da eliminare perché non più vincitori = {listaStudentiDaEliminareNonVincitori.Count}");
-            Logger.LogInfo(12, $"Numero studenti da eliminare per PEC mancante = {listaStudentiDaEliminarePEC.Count}");
+            Logger.LogInfo(12, $"Numero studenti da eliminare per PEC mancante o non valida = {listaStudentiDaEliminarePEC.Count}");
             ExportStudentiRimossi(
                 motiviBlocchi,
                 "Controllo blocchi");
@@ -1005,8 +1002,8 @@ namespace ProcedureNet7
             ExportStudentiRimossi(
                 listaStudentiDaEliminarePEC,
                 "Studenti rimossi controllo PEC",
-                Esclusione("PEC assente con recapiti non sufficienti",
-                    "Non risulta una PEC per uno studente residente all'estero che presenta anche recapiti di reperibilità e domicilio rientranti nei casi non sufficienti previsti dal controllo."));
+                Esclusione("PEC assente o non valida con recapiti non sufficienti",
+                    "La PEC è mancante o non supera i controlli di sintassi e dominio approvato. Lo studente è residente all'estero e non dispone dei recapiti o del contratto registrato che danno esenzione nell'anno accademico del pagamento."));
 
             foreach (string codFiscale in listaStudentiDaEliminareBlocchi)
             {

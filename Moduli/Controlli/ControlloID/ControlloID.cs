@@ -38,25 +38,16 @@ namespace ProcedureNet7
 
             try
             {
-                // STEP 0: rimozione blocchi PEC per chi ha domicilio con contratto valido
-                Logger.LogInfo(null, "Step 0: rimozione blocchi PEC per studenti con domicilio con contratto (Titolo_oneroso = 1, N_serie_contratto non vuoto).");
+                // STEP 0: contratto registrato corrente o domicilio adeguato nello stesso AA.
+                Logger.LogInfo(null, "Step 0: rimozione blocchi PEC per contratto registrato corrente o domicilio adeguato (nuova gestione dal 20262027).");
 
-                string sqlRemoveBlocks = @"
-                    SELECT DISTINCT
-                        vd.ANNO_ACCADEMICO,
-                        vd.COD_FISCALE
-                    FROM vDomicilio vd
-                    WHERE 
-                        vd.ANNO_ACCADEMICO >= @AnnoDa
-                        AND vd.Titolo_oneroso = 1
-                        AND ISNULL(vd.N_serie_contratto, '') <> ''
-                ";
+                string sqlRemoveBlocks = ControlloPecQueries.RemovalCandidates;
 
                 var cfsPerAnnoDaSbloccare = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
                 using (var cmdRemove = new SqlCommand(sqlRemoveBlocks, CONNECTION, sqlTransaction))
                 {
-                    cmdRemove.Parameters.AddWithValue("@AnnoDa", selectedAA ?? string.Empty);
+                    cmdRemove.Parameters.Add("@AnnoDa", SqlDbType.Char, 8).Value = selectedAA ?? string.Empty;
 
                     using (var reader = cmdRemove.ExecuteReader())
                     {
@@ -82,7 +73,7 @@ namespace ProcedureNet7
                                 cfList.Add(cf);
                         }
 
-                        Logger.LogInfo(null, $"Step 0: trovati {rowCounter} record (CF, AA) con contratto valido in vDomicilio.");
+                        Logger.LogInfo(null, $"Step 0: trovati {rowCounter} record (CF, AA) esenti nella gestione applicabile.");
                         Logger.LogInfo(null, $"Step 0: anni accademici interessati: {cfsPerAnnoDaSbloccare.Count}.");
                     }
                 }
@@ -141,73 +132,20 @@ namespace ProcedureNet7
                     }
                 }
 
-                Logger.LogInfo(null, $"Step 0: totale blocchi {BlockCode} rimossi per domicilio con contratto: {totalBlocksRemoved}.");
+                Logger.LogInfo(null, $"Step 0: totale blocchi {BlockCode} rimossi per esenzione domicilio/contratto: {totalBlocksRemoved}.");
 
                 // STEP 1: estrazione CF + AA che soddisfano le condizioni per l'INSERIMENTO blocco
                 Logger.LogInfo(null, "Step 1: seleziono gli studenti da controllare (CF + AA) per inserimento blocco PEC.");
 
-                string sqlQuery = @"
-                    SELECT DISTINCT
-                        LRS.ANNO_ACCADEMICO,
-                        LRS.COD_FISCALE,
-                        vProfilo.Indirizzo_PEC,
-                        vb.Cod_tipo_esito
-                    FROM LUOGO_REPERIBILITA_STUDENTE LRS
-                    LEFT OUTER JOIN vProfilo 
-                        ON LRS.COD_FISCALE = vProfilo.Cod_Fiscale 
-                    LEFT OUTER JOIN Domini_PEC dp
-                        ON UPPER(dp.Dominio) = UPPER(
-                            CASE 
-                                WHEN vProfilo.Indirizzo_PEC LIKE '%@%'
-                                    THEN SUBSTRING(
-                                        vProfilo.Indirizzo_PEC,
-                                        CHARINDEX('@', vProfilo.Indirizzo_PEC) + 1,
-                                        LEN(vProfilo.Indirizzo_PEC) - CHARINDEX('@', vProfilo.Indirizzo_PEC)
-                                    )
-                            END
-                        )
-                    INNER JOIN Domanda d 
-                        ON LRS.ANNO_ACCADEMICO = d.Anno_accademico 
-                       AND LRS.COD_FISCALE   = d.Cod_fiscale 
-                       AND d.Tipo_bando      = 'lz'
-                    INNER JOIN vEsiti_concorsiBS vb 
-                        ON d.Anno_accademico = vb.Anno_accademico 
-                       AND d.Num_domanda     = vb.Num_domanda 
-                    WHERE 
-                        LRS.ANNO_ACCADEMICO >= @AnnoDa
-                        AND LRS.tipo_bando   = 'lz' 
-                        AND LRS.TIPO_LUOGO   = 'DOL'
-                        AND LRS.DATA_FINE_VALIDITA IS NULL
-                        AND (LRS.INDIRIZZO = '' OR LRS.INDIRIZZO IN ('ROMA', 'CASSINO', 'FROSINONE'))
-                        AND LRS.COD_FISCALE IN (
-                            SELECT COD_FISCALE 
-                            FROM vResidenza vr 
-                            WHERE vr.ANNO_ACCADEMICO = LRS.ANNO_ACCADEMICO 
-                              AND vr.provincia_residenza = 'ee'
-                        )
-                        AND LRS.COD_FISCALE IN (
-                            SELECT COD_FISCALE 
-                            FROM vDomicilio vd
-                            WHERE vd.ANNO_ACCADEMICO = LRS.ANNO_ACCADEMICO
-                              AND (vd.Indirizzo_domicilio = '' 
-                                   OR vd.Indirizzo_domicilio IN ('ROMA','CASSINO','FROSINONE')
-                                   OR vd.prov = 'EE')
-                        )
-                        -- Escludi chi ha un domicilio con contratto valido (Titolo_oneroso = 1 e N_serie_contratto non vuoto)
-                        AND NOT EXISTS (
-                            SELECT 1
-                            FROM vDomicilio vd2
-                            WHERE vd2.ANNO_ACCADEMICO = LRS.ANNO_ACCADEMICO
-                              AND vd2.COD_FISCALE     = LRS.COD_FISCALE
-                              AND vd2.Titolo_oneroso  = 1
-                              AND ISNULL(vd2.N_serie_contratto, '') <> ''
-                        )
-                        -- PEC mancante O PEC con dominio non valido (non presente in Domini_PEC)
-                        AND (vProfilo.Indirizzo_PEC IS NULL OR dp.Dominio IS NULL)
-                        -- Considera solo esiti diversi da 0
-                        AND vb.Cod_tipo_esito <> 0
-                    ORDER BY LRS.COD_FISCALE, LRS.ANNO_ACCADEMICO;
-                ";
+                var approvedDomains = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                using (var domainsCommand = new SqlCommand(ControlloPecQueries.ApprovedDomains, CONNECTION, sqlTransaction))
+                using (var domainsReader = domainsCommand.ExecuteReader())
+                {
+                    while (domainsReader.Read())
+                        approvedDomains.Add(Utilities.SafeGetString(domainsReader, "Dominio").Trim());
+                }
+
+                string sqlQuery = ControlloPecQueries.BlockCandidates;
 
                 Logger.LogInfo(null, $"Eseguo la seguente query per il controllo PEC:\n{sqlQuery}");
 
@@ -216,7 +154,7 @@ namespace ProcedureNet7
 
                 using (var cmd = new SqlCommand(sqlQuery, CONNECTION, sqlTransaction))
                 {
-                    cmd.Parameters.AddWithValue("@AnnoDa", selectedAA ?? string.Empty);
+                    cmd.Parameters.Add("@AnnoDa", SqlDbType.Char, 8).Value = selectedAA ?? string.Empty;
 
                     using (var reader = cmd.ExecuteReader())
                     {
@@ -224,6 +162,8 @@ namespace ProcedureNet7
 
                         while (reader.Read())
                         {
+                            if (ControlloPecAddress.IsValid(Utilities.SafeGetString(reader, "Indirizzo_PEC"), approvedDomains))
+                                continue;
                             rowCounter++;
 
                             string cf = Utilities.SafeGetString(reader, "COD_FISCALE").Trim().ToUpper();
@@ -247,7 +187,9 @@ namespace ProcedureNet7
                     }
                 }
 
-                if (!studAnnoAccademico.Any())
+                // Anche le sole rimozioni devono arrivare alla conferma: un
+                // rollback qui annullerebbe le esenzioni appena riconosciute.
+                if (!studAnnoAccademico.Any() && totalBlocksRemoved == 0)
                 {
                     Logger.LogInfo(null, "Nessuno studente soddisfa le condizioni per l'inserimento di nuovi blocchi PEC. Procedura ControlloPEC terminata.");
                     sqlTransaction?.Rollback();

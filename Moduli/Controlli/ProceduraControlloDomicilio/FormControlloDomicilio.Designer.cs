@@ -45,7 +45,7 @@
             label1.Name = "label1";
             label1.Size = new Size(343, 28);
             label1.TabIndex = 33;
-            label1.Text = "PROCEDURA CONTROLLO DOMICILIO";
+            label1.Text = "CONTROLLO ISTANZE DOMICILIO INVIATE";
             // 
             // button1
             // 

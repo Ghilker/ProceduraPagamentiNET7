@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <DefaultItemExcludes>$(DefaultItemExcludes);Tests\**\*</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Tests\**\*;Tools\**\*;work\**\*;Runtime\**\*</DefaultItemExcludes>
     <Configurations>Debug;Release;PAGAMENTI;VARIE;VERIFICHE</Configurations>
     <SignAssembly>True</SignAssembly>
     <UseWPF>False</UseWPF>
@@ -44,7 +44,16 @@
   <ItemGroup>
     <InternalsVisibleTo Include="ProcedureNet7.Verifica.Tests" />
     <Compile Remove="Tests\**\*.cs" />
+    <Compile Remove="Tools\**\*.cs" />
     <None Remove="Moduli\Varie\ProceduraControlloTicket\ControlloTicketKeywords.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Runtime\DomicilioAutomation\**\*">
+      <Link>DomicilioAutomation\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

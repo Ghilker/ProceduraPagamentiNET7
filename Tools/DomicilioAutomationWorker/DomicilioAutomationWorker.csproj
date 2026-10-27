@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <BackendServiceSource Condition="'$(BackendServiceSource)' == ''">$(DirStudioRoot)\Serbenco\Helpers\DomicilioLavorazioneService.cs</BackendServiceSource>
+  </PropertyGroup>
+  <Target Name="ValidateBackendSources" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(DirStudioRoot)' == ''" Text="Specificare DirStudioRoot con la cartella dei progetti backend." />
+    <Error Condition="!Exists('$(DirStudioRoot)\Dirstudio.Controllers\Dirstudio.Controllers.csproj')" Text="DirStudioRoot non contiene il progetto Dirstudio.Controllers." />
+    <Error Condition="!Exists('$(BackendServiceSource)')" Text="Il sorgente DomicilioLavorazioneService non è disponibile." />
+  </Target>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DomicilioAutomationBackend.Tests" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="$(DirStudioRoot)\Dirstudio.Controllers\Dirstudio.Controllers.csproj" />
+    <Compile Include="$(BackendServiceSource)" Link="Backend/DomicilioLavorazioneService.cs" />
+    <Compile Include="$(DirStudioRoot)\Serbenco\Helpers\DomicilioOperationEditor.cs" Link="Backend/DomicilioOperationEditor.cs" />
+    <Compile Include="$(DirStudioRoot)\Serbenco\Helpers\DomicilioLavorazioneAnteprima.cs" Link="Backend/DomicilioLavorazioneAnteprima.cs" />
+    <Compile Include="$(DirStudioRoot)\Serbenco\Helpers\DomicilioSituazionePresenter.cs" Link="Backend/DomicilioSituazionePresenter.cs" />
+    <Compile Include="$(DirStudioRoot)\Serbenco\Models\InCaricoDomicilioViewModel.cs" Link="Backend/InCaricoDomicilioViewModel.cs" />
+    <Compile Include="$(DirStudioRoot)\DirStudio\Helpers\DomicilioCoperturaCalculator.cs" Link="Backend/DomicilioCoperturaCalculator.cs" />
+    <Compile Include="..\..\Shared\DomicilioAutomationContracts.cs" Link="Shared/DomicilioAutomationContracts.cs" />
+    <Compile Include="..\..\Shared\DomicilioAutomationSnapshot.cs" Link="Shared/DomicilioAutomationSnapshot.cs" />
+  </ItemGroup>
+</Project>

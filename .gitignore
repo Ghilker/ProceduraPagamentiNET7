@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local domicile automation build and runtime output
+Runtime/DomicilioAutomation/
+work/DomicilioAutomationBuild/
+work/DomicilioAutomationPublish/
+work/DomicilioAutomationBackendHarnessBuild/
+work/DomicilioAutomationBackend/
+work/domicilio-*.log

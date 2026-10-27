@@ -27,7 +27,7 @@ namespace ProcedureNet7
                 // 1) Seleziono i dati degli studenti (Cod_fiscale, IBAN) con possibili IBAN errati
                 Logger.LogInfo(null, "Step 1: Seleziono i dati (Cod_fiscale, IBAN) degli studenti con possibili IBAN errati.");
 
-                string sqlQuery = $@"
+                string sqlQuery = @"
                     SELECT DISTINCT
                         Domanda.Cod_fiscale, 
                         vMODALITA_PAGAMENTO.IBAN
@@ -39,7 +39,7 @@ namespace ProcedureNet7
                         vEsiti_concorsi vb ON Domanda.Anno_accademico = vb.Anno_accademico 
                                               AND Domanda.Num_domanda = vb.Num_domanda
                     WHERE 
-                        Domanda.Anno_accademico >= '{selectedAA}' 
+                        Domanda.Anno_accademico >= @aaMinimo
                         AND Domanda.Tipo_bando = 'lz' 
                         AND vb.Cod_tipo_esito <> 0
 						AND vb.Cod_beneficio = 'BS'
@@ -56,6 +56,7 @@ namespace ProcedureNet7
 
                 using (SqlCommand readData = new(sqlQuery, CONNECTION, sqlTransaction))
                 {
+                    readData.Parameters.Add("@aaMinimo", SqlDbType.Char, 8).Value = selectedAA;
                     using (SqlDataReader reader = readData.ExecuteReader())
                     {
                         while (reader.Read())
@@ -102,8 +103,8 @@ namespace ProcedureNet7
                     "Gentile studente, abbiamo riscontrato incongruenze nell''IBAN inserito nella sua area personale.<br>" +
                     "La invitiamo ad aggiornare la modalità prescelta in modo da poter essere inserito in eventuali pagamenti.";
 
-                // 4) Recupero in un'unica query tutti gli anni accademici associati a *tutti* i CF
-                Logger.LogInfo(null, "Step 4: Recupero in un'unica query tutti gli anni accademici per i CF individuati.");
+                // 4) Recupero gli anni dei CF individuati dal limite indicato in poi.
+                Logger.LogInfo(null, $"Step 4: Recupero gli anni accademici da {selectedAA} in poi per i CF individuati.");
                 List<string> distinctCF = studentiDaBloccare.Distinct().ToList();
 
                 // Costruisco una stringa con gli N CF tra apici singoli, es. 'CF1','CF2','CF3'
@@ -115,6 +116,7 @@ namespace ProcedureNet7
                         Anno_accademico
                     FROM Domanda
                     WHERE Cod_fiscale IN ('{cfsJoined}')
+                      AND Anno_accademico >= @aaMinimo
                 ";
 
                 Logger.LogInfo(null, $"Eseguo la query per anni accademici:\n{anniQuery}");
@@ -124,6 +126,7 @@ namespace ProcedureNet7
 
                 using (SqlCommand cmd = new SqlCommand(anniQuery, CONNECTION, sqlTransaction))
                 {
+                    cmd.Parameters.Add("@aaMinimo", SqlDbType.Char, 8).Value = selectedAA;
                     using (SqlDataReader anniReader = cmd.ExecuteReader())
                     {
                         int anniCounter = 0;
@@ -131,9 +134,10 @@ namespace ProcedureNet7
                         {
                             anniCounter++;
                             string cf = Utilities.SafeGetString(anniReader, "Cod_fiscale").ToUpper().Trim();
-                            string aa = Utilities.SafeGetString(anniReader, "Anno_accademico");
+                            string aa = Utilities.SafeGetString(anniReader, "Anno_accademico").Trim();
 
-                            if (!string.IsNullOrWhiteSpace(cf) && !string.IsNullOrWhiteSpace(aa))
+                            if (!string.IsNullOrWhiteSpace(cf) && !string.IsNullOrWhiteSpace(aa) &&
+                                string.CompareOrdinal(aa, selectedAA) >= 0)
                             {
                                 if (!studAnnoAccademico.ContainsKey(cf))
                                 {
@@ -178,6 +182,8 @@ namespace ProcedureNet7
                 foreach (var kvp in cfsPerAnno)
                 {
                     string annoAccademico = kvp.Key;
+                    if (string.CompareOrdinal(annoAccademico, selectedAA) < 0)
+                        continue;
                     List<string> allCfsForThisYear = kvp.Value.Distinct().ToList();
 
                     // 6a) Bulk-check: chi ha già il blocco "BSS" su questo AnnoAccademico?
@@ -265,7 +271,7 @@ namespace ProcedureNet7
 
                 try
                 {
-                    string activeBlocksQuery = $@"
+                    string activeBlocksQuery = @"
                         SELECT
                             bmp.Anno_accademico,
                             bmp.Num_domanda,
@@ -273,14 +279,16 @@ namespace ProcedureNet7
                             d.Cod_fiscale
                         FROM vMotivazioni_blocco_pagamenti bmp
                         INNER JOIN Domanda d ON bmp.num_domanda = d.num_domanda
+                            AND bmp.Anno_accademico = d.Anno_accademico
                         WHERE  bmp.Cod_tipologia_blocco = 'BSS'
-                          AND d.anno_accademico = '{selectedAA}'
+                          AND d.anno_accademico = @aa
                     ";
 
                     List<(string cf, DateTime blockDate, string annoAcc, string numDomanda)> activeBlocks = new();
 
                     using (SqlCommand cmd = new SqlCommand(activeBlocksQuery, CONNECTION, sqlTransaction))
                     {
+                        cmd.Parameters.Add("@aa", SqlDbType.Char, 8).Value = selectedAA;
                         using (var reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())

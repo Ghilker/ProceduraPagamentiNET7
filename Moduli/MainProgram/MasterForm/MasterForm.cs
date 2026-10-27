@@ -20,6 +20,7 @@ namespace ProcedureNet7
     {
         public delegate void RunProcedureDelegate(SqlConnection sqlConnection);
         public SqlConnection? MainConnection { get; private set; }
+        internal string? MainConnectionString { get; private set; }
         private BackgroundWorker? _backgroundWorker = null;
         private Form? currentForm = null;
         Logger? logger;
@@ -139,9 +140,11 @@ namespace ProcedureNet7
             }
         }
 
-        public void SetupConnection(SqlConnection? connection)
+        public void SetupConnection(SqlConnection? connection, string? originalConnectionString = null)
         {
             MainConnection = connection;
+            // Keep the original only in memory: SqlConnection hides its password after Open().
+            MainConnectionString = originalConnectionString;
         }
 
         private void ProcedureSelect_SelectedIndexChanged(object sender, EventArgs e)
@@ -275,6 +278,9 @@ namespace ProcedureNet7
                             FormControlloDomicilio controlloDomicilio = new FormControlloDomicilio(this);
                             ShowFormInPanel(controlloDomicilio);
                             break;
+                        case ProcedureVerifiche.LavorazioneAutomaticaDomicilio:
+                            ShowFormInPanel(new FormLavorazioneAutomaticaDomicilio(this));
+                            break;
                     }
                 }
 #endif
@@ -397,6 +403,8 @@ namespace ProcedureNet7
             ControlloIBAN,
             [ProcedureCategory("Verifiche", "Programmatore")]
             ControlloDomicili,
+            [ProcedureCategory("Verifiche", "Programmatore")]
+            LavorazioneAutomaticaDomicilio,
         }
 
     }
