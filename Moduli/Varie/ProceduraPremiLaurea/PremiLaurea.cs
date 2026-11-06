@@ -3,6 +3,7 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
 using System.IO;
+using ClosedXML.Excel;
 
 namespace ProcedureNet7
 {
@@ -16,15 +17,19 @@ namespace ProcedureNet7
             string inputPath = args.FileExcelInput;
             string outputPath = args.FileExcelOutput;
 
-            AggiungiColonnePremiLaurea(inputPath, outputPath);
+            AggiungiColonnePremiLaurea(inputPath, outputPath, args.AnnoAccademico);
         }
 
-        private void AggiungiColonnePremiLaurea(string inputPath, string outputPath)
+        private void AggiungiColonnePremiLaurea(string inputPath, string outputPath, string annoAccademico)
         {
+            int? annoAccademicoAtteso = ParseAnnoAccademico(annoAccademico);
+
             // --- 1️⃣ Lettura Excel come DataTable ---
             DataTable dt = Utilities.ReadExcelToDataTable(inputPath);
             if (dt == null || dt.Rows.Count == 0)
                 throw new Exception("Il file Excel di input è vuoto o non leggibile.");
+            if (dt.Columns.Count < 21)
+                throw new Exception("Il file Excel deve contenere le 21 colonne del tracciato premi laurea, da A a U.");
 
             // --- 2️⃣ Aggiunge le colonne di verifica ---
             string[] nuoveColonne = new[]
@@ -35,6 +40,8 @@ namespace ProcedureNet7
                 "SE Carriera pregressa",
                 "SE domanda oltre termine",
                 "SE anno di corso coerente",
+                "SE anno di corso effettivo",
+                "SE anno accademico di conseguimento titolo",
                 "SE lavorabile massivamente"
             };
 
@@ -50,6 +57,7 @@ namespace ProcedureNet7
 
             // --- 4️⃣ Indici colonne (zero-based) ---
             int idxDataTrasmissione = 7;
+            int idxInvalido = 8;
             int idxAAImmDich = 9;
             int idxDataDich = 10;
             int idxVotoDich = 11;
@@ -59,8 +67,9 @@ namespace ProcedureNet7
             int idxDataCert = 15;
             int idxVotoCert = 16;
             int idxLodeCert = 17;
-            int idxAnnoCorsoCert = 18;
-            int idxAbbreviazione = 19;
+            int idxAAConseguimentoCert = 18;
+            int idxAnnoCorsoCert = 19;
+            int idxAbbreviazione = 20;
             int idxSede = 4;
 
             // --- 5️⃣ Elaborazione righe ---
@@ -84,6 +93,8 @@ namespace ProcedureNet7
                     int? aaImmCert = ParseAnnoAccademico(aaImmCertStr);
                     int? annoCorsoDich = ParseInt(row[idxAnnoCorsoDich]);
                     int? annoCorsoCert = ParseInt(row[idxAnnoCorsoCert]);
+                    int? invalido = ParseInt(row[idxInvalido]);
+                    int? aaConseguimentoCert = ParseAnnoAccademico(row[idxAAConseguimentoCert]?.ToString());
 
                     // --- Calcolo SE ---
                     string seData = (dataDichiarato.HasValue && dataCertificato.HasValue &&
@@ -95,7 +106,8 @@ namespace ProcedureNet7
                     string seLode = (!string.IsNullOrEmpty(lodeDich) && !string.IsNullOrEmpty(lodeCert) &&
                                      string.Equals(lodeDich, lodeCert, StringComparison.OrdinalIgnoreCase)) ? "OK" : "NO";
 
-                    string seCarrieraPregressa = string.IsNullOrEmpty(abbreviazione) ? "OK" : "NO";
+                    string seCarrieraPregressa = (string.IsNullOrEmpty(abbreviazione) ||
+                                                  ParseDecimale(abbreviazione) == 0) ? "OK" : "NO";
 
                     string seDomandaOltreTermine = "NO";
                     if (dataTrasmissione.HasValue && dataCertificato.HasValue)
@@ -109,11 +121,11 @@ namespace ProcedureNet7
                     // Controlla che i valori necessari siano presenti
                     if (!string.IsNullOrWhiteSpace(aaImmCertStr) &&
                         annoCorsoDich.HasValue &&
-                        row[idxAnnoCorsoCert] != null &&
-                        row[idxAnnoCorsoCert] != DBNull.Value)
+                        row[idxAAConseguimentoCert] != null &&
+                        row[idxAAConseguimentoCert] != DBNull.Value)
                     {
                         // Estrae il valore della cella come stringa e rimuove spazi/slash
-                        string annoRiferimento = row[idxAnnoCorsoCert].ToString()!.Trim();
+                        string annoRiferimento = row[idxAAConseguimentoCert].ToString()!.Trim();
 
                         // Converte l'anno di immatricolazione in formato pulito
                         string aaImmPulito = aaImmCertStr.Replace("/", "").Trim();
@@ -126,12 +138,23 @@ namespace ProcedureNet7
                             seAnnoCorso = "OK";
                     }
 
+                    string seAnnoCorsoEffettivo = (annoCorsoDich.HasValue &&
+                                                  annoCorsoCert.HasValue &&
+                                                  annoCorsoDich.Value == annoCorsoCert.Value &&
+                                                  (annoCorsoCert.Value != -1 || invalido == 1)) ? "OK" : "NO";
+
+                    string seAAConseguimento = (annoAccademicoAtteso.HasValue &&
+                                               aaConseguimentoCert.HasValue &&
+                                               annoAccademicoAtteso.Value == aaConseguimentoCert.Value) ? "OK" : "NO";
+
                     string seLavorabile = (seData == "OK" &&
                                            seVoto == "OK" &&
                                            seLode == "OK" &&
                                            seCarrieraPregressa == "OK" &&
                                            seDomandaOltreTermine == "OK" &&
-                                           seAnnoCorso == "OK") ? "OK" : "NO";
+                                           seAnnoCorso == "OK" &&
+                                           seAnnoCorsoEffettivo == "OK" &&
+                                           seAAConseguimento == "OK") ? "OK" : "NO";
 
                     // --- Scrive valori SE ---
                     row["SE Data"] = seData;
@@ -140,6 +163,8 @@ namespace ProcedureNet7
                     row["SE Carriera pregressa"] = seCarrieraPregressa;
                     row["SE domanda oltre termine"] = seDomandaOltreTermine;
                     row["SE anno di corso coerente"] = seAnnoCorso;
+                    row["SE anno di corso effettivo"] = seAnnoCorsoEffettivo;
+                    row["SE anno accademico di conseguimento titolo"] = seAAConseguimento;
                     row["SE lavorabile massivamente"] = seLavorabile;
 
                     // --- Smista nelle tabelle ---
@@ -160,8 +185,6 @@ namespace ProcedureNet7
             }
 
             // --- 6️⃣ Scrive i due file finali nella cartella indicata da outputPath ---
-            string baseDir = Path.GetDirectoryName(outputPath) ?? Environment.CurrentDirectory;
-
             // Assicurati che la cartella esista
             if (!Directory.Exists(outputPath))
                 Directory.CreateDirectory(outputPath);
@@ -171,13 +194,83 @@ namespace ProcedureNet7
             foreach (var c in Path.GetInvalidFileNameChars())
                 sedeStudi = sedeStudi.Replace(c, '_');
 
-            // Percorsi finali dei file
-            string fileOK = Path.Combine(outputPath, $"PL 2324 {sedeStudi} validati massivamente.xlsx");
-            string fileNO = Path.Combine(outputPath, $"PL 2324 {sedeStudi} validati manualmente.xlsx");
+            string annoFile = annoAccademico.Replace("/", "").Trim();
+            EsportaRisultati(okTable, outputPath, $"PL {annoFile} {sedeStudi} validati massivamente");
+            EsportaRisultati(noTable, outputPath, $"PL {annoFile} {sedeStudi} validati manualmente");
+        }
 
-            // Esporta i DataTable
-            Utilities.ExportDataTableToExcel(okTable, fileOK);
-            Utilities.ExportDataTableToExcel(noTable, fileNO);
+        private static void EsportaRisultati(DataTable dati, string cartella, string nomeFile)
+        {
+            string percorso = Utilities.ExportDataTableToExcel(dati, cartella, fileName: nomeFile);
+            if (string.IsNullOrEmpty(percorso)) return;
+
+            using var workbook = new XLWorkbook(percorso);
+            var sheet = workbook.Worksheet(1);
+            sheet.Row(1).InsertRowsAbove(1);
+            int ultimaRiga = dati.Rows.Count + 2;
+            int ultimaColonna = dati.Columns.Count;
+            var area = sheet.Range(1, 1, ultimaRiga, ultimaColonna);
+            area.Style.Font.FontName = "Arial";
+            area.Style.Font.FontSize = 10;
+            area.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            area.Style.Alignment.WrapText = true;
+            sheet.ShowGridLines = false;
+
+            string[] intestazioni =
+            {
+                "N.", "Codice fiscale", "Cognome", "Nome", "Sede studi", "Facoltà",
+                "Numero domanda PL", "Data trasmissione", "Invalido",
+                "AA prima immatricolazione", "Data conseguimento titolo", "Voto conseguito", "Lode", "Anno effettivo di corso",
+                "AA prima immatricolazione", "Data conseguimento titolo", "Voto conseguito", "Lode",
+                "AA conseguimento titolo", "Anno effettivo di corso", "Abbreviazione carriera / CFU riconosciuti"
+            };
+            double[] larghezze = { 7, 24, 22, 20, 24, 28, 18, 18, 10, 22, 18, 12, 10, 22, 22, 18, 12, 10, 22, 22, 28 };
+            for (int col = 1; col <= ultimaColonna; col++)
+            {
+                sheet.Column(col).Width = col <= larghezze.Length ? larghezze[col - 1] : 23;
+                if (col <= intestazioni.Length) sheet.Cell(2, col).Value = intestazioni[col - 1];
+            }
+
+            var intestazione = sheet.Range(1, 1, 2, ultimaColonna);
+            intestazione.Style.Font.Bold = true;
+            intestazione.Style.Font.FontColor = XLColor.White;
+            intestazione.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            sheet.Row(1).Height = 26;
+            sheet.Row(2).Height = 76;
+            sheet.Rows(3, ultimaRiga).Height = 30;
+
+            foreach (var (inizio, fine, titolo, colore) in new[]
+            {
+                (1, 9, "DATI DOMANDA", "#475569"),
+                (10, 14, "DICHIARATO", "#245A81"),
+                (15, 21, "CERTIFICATO", "#65528A"),
+                (22, ultimaColonna, "CONTROLLI SE", "#7C541A")
+            })
+            {
+                sheet.Range(1, inizio, 1, fine).Merge().Value = titolo;
+                sheet.Range(1, inizio, 2, fine).Style.Fill.BackgroundColor = XLColor.FromHtml(colore);
+                sheet.Range(2, inizio, 2, fine).Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+                sheet.Range(2, inizio, 2, fine).Style.Border.InsideBorderColor = XLColor.White;
+                sheet.Range(1, inizio, ultimaRiga, inizio).Style.Border.LeftBorder = XLBorderStyleValues.Medium;
+                sheet.Range(1, inizio, ultimaRiga, inizio).Style.Border.LeftBorderColor = XLColor.FromHtml(colore);
+            }
+
+            for (int col = 22; col <= ultimaColonna; col++)
+            {
+                if (!dati.Columns[col - 1].ColumnName.StartsWith("SE ", StringComparison.Ordinal)) continue;
+                var esiti = sheet.Range(3, col, ultimaRiga, col);
+                esiti.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                esiti.AddConditionalFormat().WhenEquals("NO")
+                    .Fill.SetBackgroundColor(XLColor.FromHtml("#FDE9E7"))
+                    .Font.SetFontColor(XLColor.FromHtml("#9C2424")).Font.SetBold();
+                esiti.AddConditionalFormat().WhenStartsWith("ERRORE:")
+                    .Fill.SetBackgroundColor(XLColor.FromHtml("#FFF0CC"))
+                    .Font.SetFontColor(XLColor.FromHtml("#7C541A")).Font.SetBold();
+            }
+            sheet.Range(2, 1, ultimaRiga, ultimaColonna).SetAutoFilter();
+            sheet.SheetView.FreezeRows(2);
+            sheet.SheetView.FreezeColumns(4);
+            workbook.Save();
         }
 
         // 🔧 Parser sicuri

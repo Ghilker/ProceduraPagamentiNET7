@@ -10,6 +10,10 @@ namespace ProcedureNet7
 {
     internal class ArgsPremiLaurea : IValidatableObject
     {
+        [Required(ErrorMessage = "Indicare l'anno accademico di conseguimento titolo.")]
+        [ValidAAFormat(ErrorMessage = "L'anno accademico deve essere nel formato xxxxyyyy (es. 20242025).")]
+        public string AnnoAccademico { get; set; } = string.Empty;
+
         [Required(ErrorMessage = "Il percorso del file Excel di input è obbligatorio.")]
         public string FileExcelInput { get; set; } = string.Empty;
 
