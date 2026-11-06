@@ -1,0 +1,103 @@
+{
+  "source": "C:\\Users\\giacomo_pavone\\Desktop\\Lavorazione_Automatica_Domicilio_20262027_LAVORAZIONE_20261103_093012.csv",
+  "simulation": "C:\\Users\\giacomo_pavone\\.codex\\visualizations\\2026\\10\\16\\01a14379-b63b-7371-be9f-aeaef61bb25e\\Domicilio_20261103\\Lavorazione_Automatica_Domicilio_20262027_SIMULAZIONE_20261103_101508.csv",
+  "comparison": "C:\\Users\\giacomo_pavone\\.codex\\visualizations\\2026\\10\\16\\01a14379-b63b-7371-be9f-aeaef61bb25e\\Domicilio_20261103\\Confronto_non_lavorate_20261103.csv",
+  "requests": 1280,
+  "rows": 3025,
+  "outcomes": {
+    "IGNORATA": 1154,
+    "IDONEA_CON_CORREZIONI": 15,
+    "IDONEA": 111
+  },
+  "original_ignored": 1278,
+  "original_ignored_now": {
+    "IGNORATA": 1151,
+    "NON_PRESENTE": 4,
+    "IDONEA_CON_CORREZIONI": 15,
+    "IDONEA": 108
+  },
+  "corrected_ids": [
+    "17594",
+    "17837",
+    "18013",
+    "19018",
+    "19680",
+    "20169",
+    "21559",
+    "21890",
+    "22162",
+    "22470",
+    "22586",
+    "22949",
+    "23035",
+    "23194",
+    "23202"
+  ],
+  "proposals": 15,
+  "examples": {
+    "17616": {
+      "AZIONE_ISTANZA": "IGNORATA",
+      "MOTIVO_AZIONE": "Le pagine 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 non contengono testo estraibile: il documento non può essere verificato integralmente senza lettura manuale. | Il controllo automatico del documento CONTRATTO non è completo.",
+      "CORREZIONI_PROPOSTE": "",
+      "VALORI_ORIGINALI": "",
+      "VALORI_DOCUMENTATI": "",
+      "FONTI_CORREZIONI": ""
+    },
+    "17624": {
+      "AZIONE_ISTANZA": "IGNORATA",
+      "MOTIVO_AZIONE": "Le pagine 2, 3 non contengono testo estraibile: il documento non può essere verificato integralmente senza lettura manuale. | Il controllo automatico del documento CONTRATTO non è completo.",
+      "CORREZIONI_PROPOSTE": "",
+      "VALORI_ORIGINALI": "",
+      "VALORI_DOCUMENTATI": "",
+      "FONTI_CORREZIONI": ""
+    },
+    "17840": {
+      "AZIONE_ISTANZA": "IDONEA",
+      "MOTIVO_AZIONE": "Controlli superati. Simulazione: nessun dato modificato.",
+      "CORREZIONI_PROPOSTE": "",
+      "VALORI_ORIGINALI": "",
+      "VALORI_DOCUMENTATI": "",
+      "FONTI_CORREZIONI": ""
+    },
+    "19018": {
+      "AZIONE_ISTANZA": "IDONEA_CON_CORREZIONI",
+      "MOTIVO_AZIONE": "Proposta documentata rivalidata integralmente. Simulazione: nessun dato modificato.",
+      "CORREZIONI_PROPOSTE": "Op. 1193: Decorrenza contratto",
+      "VALORI_ORIGINALI": "Decorrenza contratto=07/11/2025",
+      "VALORI_DOCUMENTATI": "Decorrenza contratto=01/09/2025",
+      "FONTI_CORREZIONI": "Allegato 2789148, pagina 1: Durata/Periodo dal"
+    },
+    "19267": {
+      "AZIONE_ISTANZA": "IDONEA",
+      "MOTIVO_AZIONE": "Controlli superati. Simulazione: nessun dato modificato.",
+      "CORREZIONI_PROPOSTE": "",
+      "VALORI_ORIGINALI": "",
+      "VALORI_DOCUMENTATI": "",
+      "FONTI_CORREZIONI": ""
+    },
+    "22297": {
+      "AZIONE_ISTANZA": "IGNORATA",
+      "MOTIVO_AZIONE": "Una proroga nel PDF non identifica univocamente lo stesso anno, serie, numero e ufficio del contratto base. | Gli estremi registrati '3T / 4781' sono diversi da quelli letti nel PDF 'TXX22T004252000NE'. | La data di registrazione registrata (01/09/2026) è diversa da quella letta nel PDF (08/09/2022). | La data di decorrenza registrata (07/09/2026) è diversa da quella letta nel PDF (01/09/2022). | La data di scadenza registrata (31/08/2027) è diversa da quella letta nel PDF (31/08/2023).",
+      "CORREZIONI_PROPOSTE": "",
+      "VALORI_ORIGINALI": "",
+      "VALORI_DOCUMENTATI": "",
+      "FONTI_CORREZIONI": ""
+    },
+    "23035": {
+      "AZIONE_ISTANZA": "IDONEA_CON_CORREZIONI",
+      "MOTIVO_AZIONE": "Proposta documentata rivalidata integralmente. Simulazione: nessun dato modificato.",
+      "CORREZIONI_PROPOSTE": "Op. 4546: Scadenza contratto",
+      "VALORI_ORIGINALI": "Scadenza contratto=30/09/2027",
+      "VALORI_DOCUMENTATI": "Scadenza contratto=31/03/2027",
+      "FONTI_CORREZIONI": "Allegato 2794538, pagina 2: Durata/Periodo al"
+    },
+    "23793": {
+      "AZIONE_ISTANZA": "IGNORATA",
+      "MOTIVO_AZIONE": "Gli estremi registrati '26101518522321129' sono diversi da quelli letti nel PDF '2026'.",
+      "CORREZIONI_PROPOSTE": "",
+      "VALORI_ORIGINALI": "",
+      "VALORI_DOCUMENTATI": "",
+      "FONTI_CORREZIONI": ""
+    }
+  }
+}

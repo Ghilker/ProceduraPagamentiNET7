@@ -1,0 +1,134 @@
+/
+FoglioCodice comune I/PT/U
+in via di
+accatastamento
+Tipologia immobile
+Subalterno
+Particella
+Sezione urbana/
+Comune catastale
+,
+Comune
+Categoria catastale Rendita catastale Tipologia (via, piazza, ecc.) Indirizzo N. civico
+NUMERO IMMOBILE
+Provincia (sigla)
+Modulo N.
+QUADRO C - DATI DEGLI IMMOBILI
+Codice fiscale
+/
+FoglioCodice comune I/PT/U
+in via di
+accatastamento
+Subalterno
+Particella
+Sezione urbana/
+Comune catastale
+,
+Comune
+Categoria catastale Rendita catastale Tipologia (via, piazza, ecc.) Indirizzo N. civico
+NUMERO IMMOBILE
+Provincia (sigla)
+/
+FoglioCodice comune I/PT/U
+in via di
+accatastamento
+Subalterno
+Particella
+Sezione urbana/
+Comune catastale
+,
+Comune
+Categoria catastale Rendita catastale Tipologia (via, piazza, ecc.) Indirizzo N. civico
+NUMERO IMMOBILE
+Provincia (sigla)
+/
+FoglioCodice comune I/PT/U
+in via di
+accatastamento
+Subalterno
+Particella
+Sezione urbana/
+Comune catastale
+,
+Comune
+Categoria catastale Rendita catastale Tipologia (via, piazza, ecc.) Indirizzo N. civico
+NUMERO IMMOBILE
+Provincia (sigla)
+DICHIARAZIONE
+DEI LOCATORI
+,
+% Possesso
+1
+N. Immobile N. Locatore
+9
+SI NO
+Cedolare
+,
+% PossessoN. Immobile N. Locatore
+SI NO
+Cedolare
+,
+% Possesso
+2
+N. Immobile N. Locatore
+10
+SI NO
+Cedolare
+,
+% PossessoN. Immobile N. Locatore
+SI NO
+Cedolare
+,
+% Possesso
+3
+N. Immobile N. Locatore
+SI NO
+Cedolare
+,
+% PossessoN. Immobile N. Locatore
+SI NO
+Cedolare
+,
+% Possesso
+4
+N. Immobile N. Locatore
+SI NO
+Cedolare
+,
+% PossessoN. Immobile N. Locatore
+SI NO
+Cedolare
+,
+% Possesso
+5
+N. Immobile N. Locatore
+SI NO
+Cedolare
+,
+% PossessoN. Immobile N. Locatore
+SI NO
+Cedolare
+6
+7
+8
+I SOTTOSCRITTI LOCATORI DICHIARANO DI VOLER OPTARE PER/REVOCARE IL REGIME DELLA “CEDOLARE SECCA” SECONDO QUANTO SOPRA INDICATO
+FirmaCodice fiscale
+FirmaCodice fiscale
+FirmaCodice fiscale
+FirmaCodice fiscale
+QUADRO D - REGIME DI TASSAZIONE
+Tipologia immobile
+Tipologia immobile
+Tipologia immobile
+0 0 1
+1 1 U P
+ROMA RM
+VIALE GUGLIELMO MARCONI 112
+1 1 X
+H 5 0 1 7 9 4 1 0 4
+4 9
+A 3
+N838I86P60SSLZNR
+723 04
+100 00
+R N Z L S S 0 6 P 6 8 I 8 3 8 N

@@ -1,0 +1,21 @@
+SERVIZIO TELEMATICO ENTRATEL DI PRESENTAZIONE DELLE DICHIARAZIONI
+COMUNICAZIONE DI AVVENUTO RICEVIMENTO (art. 3, comma 10, D.P.R. 322/1998)
+ 
+COMUNICAZIONE DI AVVENUTO RICEVIMENTO ADEMPIMENTI SUCCESSIVI                   
+CONTRATTI DI LOCAZIONE E AFFITTO DI IMMOBILI (mod.RLI12)                       
+                                                                               
+In data 14/10/2026 alle ore 10:18 il sistema informativo dell'Agenzia          
+delle Entrate ha acquisito con protocollo 26101410183218128 il file            
+33942000_2_RLI12.rli                                                           
+contenente      1 comunicazione di adempimenti successivi, di cui              
+        acquisite:      1                                                      
+        scartate :      0                                                      
+                                                                               
+Il file e' stato trasmesso da:                                                 
+ codice fiscale : LBRMDA71L24A515O                                             
+ cognome e nome : LIBERATI AMEDEO                                              
+                                                                               
+Si rilascia la presente ricevuta ai sensi dell'art.22, comma 4,                
+del Decreto Dirigenziale 31 luglio 1998 e successive modificazioni.            
+Li, 14/10/2026
+1

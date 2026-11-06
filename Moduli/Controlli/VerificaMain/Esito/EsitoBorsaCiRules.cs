@@ -57,12 +57,23 @@ namespace ProcedureNet7
             if (context.Iscrizione == null || context.Iscrizione.AnnoCorso == 1)
                 return;
 
+            if (!IsAnnoCorsoAmmissibile(context))
+                evaluation.Add("CI003");
+        }
+
+        internal static bool IsAnnoCorsoAmmissibile(EsitoBorsaStudentContext context)
+        {
+            if (context.Iscrizione == null)
+                return false;
+
+            if (context.Iscrizione.AnnoCorso == 1)
+                return true;
+
             int annoCorso = EsitoBorsaSupport.HasRipetenzaDaPassaggio(context)
                 ? context.Iscrizione.AnnoCorso
                 : EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
 
-            if (annoCorso == 0 || annoCorso < GetLimiteAnniFuoriCorso(context))
-                evaluation.Add("CI003");
+            return annoCorso != 0 && annoCorso >= GetLimiteAnniFuoriCorso(context);
         }
 
         private static int GetLimiteAnniFuoriCorso(EsitoBorsaStudentContext context)

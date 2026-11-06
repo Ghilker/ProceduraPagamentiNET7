@@ -14,6 +14,9 @@ namespace ProcedureNet7
             { "0", "Procedura Completa" },
             { "1", "Procedura Senza Creazione Tabella" },
             { "2", "Solo Creazione Tabella D'Appoggio" },
+            { "3", "Simulazione" },
+            { "4", "Simulazione anche senza impegni" },
+            { "5", "Simulazione PA tollerante" },
         };
 
         public static Dictionary<string, string> pagamentiDirect = new()
@@ -332,7 +335,10 @@ namespace ProcedureNet7
     {
         Completa,
         SenzaCreazioneTabella,
-        SoloCreazioneTabella
+        SoloCreazioneTabella,
+        Simulazione,
+        SimulazioneSenzaImpegni,
+        SimulazionePATollerante
     }
     public enum TipoBeneficio
     {
@@ -352,6 +358,9 @@ namespace ProcedureNet7
                 case TipologiaProcedura.Completa: return "0";
                 case TipologiaProcedura.SenzaCreazioneTabella: return "1";
                 case TipologiaProcedura.SoloCreazioneTabella: return "2";
+                case TipologiaProcedura.Simulazione: return "3";
+                case TipologiaProcedura.SimulazioneSenzaImpegni: return "4";
+                case TipologiaProcedura.SimulazionePATollerante: return "5";
                 default: throw new ArgumentOutOfRangeException(nameof(tipologiaProcedura), tipologiaProcedura, null);
             }
         }

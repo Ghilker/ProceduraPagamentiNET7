@@ -2,10 +2,16 @@ namespace ProcedureNet7;
 
 internal static class PagamentoFlussoRules
 {
-    internal static List<string> ImpegniDaElaborare(string selezionato, IEnumerable<string> impegni)
-        => selezionato == "0000"
+    internal static List<string> ImpegniDaElaborare(string selezionato, IEnumerable<string> impegni,
+        bool includiSenzaImpegno = false)
+    {
+        var result = selezionato == "0000"
             ? impegni.Distinct(StringComparer.Ordinal).ToList()
             : new List<string> { selezionato };
+        if (includiSenzaImpegno && !result.Contains(string.Empty))
+            result.Add(string.Empty);
+        return result;
+    }
 
     internal static void RegistraStudentiFlusso(IEnumerable<string> codiciFiscali,
         HashSet<string> studentiElaborati)
@@ -22,9 +28,12 @@ internal static class PagamentoFlussoRules
     }
 
     internal static MotivoEsclusionePagamento? ImpegnoNonElaborato(string? impegno,
-        string impegnoSelezionato, IReadOnlyCollection<string> impegniDaElaborare)
+        string impegnoSelezionato, IReadOnlyCollection<string> impegniDaElaborare,
+        bool includiSenzaImpegno = false)
     {
         // Use the same exact comparison as ProcessImpegno when selecting students.
+        if (includiSenzaImpegno && string.IsNullOrWhiteSpace(impegno) &&
+            impegniDaElaborare.Contains(string.Empty)) return null;
         if (impegniDaElaborare.Contains(impegno, StringComparer.Ordinal)) return null;
         if (string.IsNullOrWhiteSpace(impegno))
             return new("Impegno di spesa non disponibile",

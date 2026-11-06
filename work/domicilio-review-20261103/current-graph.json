@@ -1,0 +1,1501 @@
+{
+  "Domicili": [
+    {
+      "Num_istanza": 17437,
+      "DomicilioId": 71587,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17465,
+      "DomicilioId": 19632,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17522,
+      "DomicilioId": 129481,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17552,
+      "DomicilioId": 90731,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17580,
+      "DomicilioId": 51531,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17594,
+      "DomicilioId": 37224,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17616,
+      "DomicilioId": 22522,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17624,
+      "DomicilioId": 88870,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17677,
+      "DomicilioId": 37622,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17713,
+      "DomicilioId": 7777,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17732,
+      "DomicilioId": 172662,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17763,
+      "DomicilioId": 19709,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17770,
+      "DomicilioId": 25259,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17837,
+      "DomicilioId": 154767,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17838,
+      "DomicilioId": 171807,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17840,
+      "DomicilioId": 19063,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17866,
+      "DomicilioId": 135780,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17892,
+      "DomicilioId": 172204,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17910,
+      "DomicilioId": 21747,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17931,
+      "DomicilioId": 27414,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 17936,
+      "DomicilioId": 24431,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18013,
+      "DomicilioId": 116122,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18027,
+      "DomicilioId": 47151,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18068,
+      "DomicilioId": 71359,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18115,
+      "DomicilioId": 10374,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18119,
+      "DomicilioId": 99008,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18125,
+      "DomicilioId": 40165,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18154,
+      "DomicilioId": 51768,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18196,
+      "DomicilioId": 92315,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18288,
+      "DomicilioId": 87653,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18374,
+      "DomicilioId": 26657,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18534,
+      "DomicilioId": 65468,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18894,
+      "DomicilioId": 9221,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18896,
+      "DomicilioId": 69895,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 18996,
+      "DomicilioId": 114252,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19016,
+      "DomicilioId": 76932,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19018,
+      "DomicilioId": 129575,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19056,
+      "DomicilioId": 75545,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19116,
+      "DomicilioId": 113293,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19117,
+      "DomicilioId": 111789,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19267,
+      "DomicilioId": 83122,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19322,
+      "DomicilioId": 72399,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19346,
+      "DomicilioId": 46908,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19376,
+      "DomicilioId": 97156,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19463,
+      "DomicilioId": 59255,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19526,
+      "DomicilioId": 46543,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19632,
+      "DomicilioId": 20571,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19680,
+      "DomicilioId": 53502,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19760,
+      "DomicilioId": 146597,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19807,
+      "DomicilioId": 85675,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19898,
+      "DomicilioId": 120170,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19903,
+      "DomicilioId": 55461,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19948,
+      "DomicilioId": 64369,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 19996,
+      "DomicilioId": 81779,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20033,
+      "DomicilioId": 20372,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20067,
+      "DomicilioId": 111165,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20081,
+      "DomicilioId": 113754,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20088,
+      "DomicilioId": 111969,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20100,
+      "DomicilioId": 111988,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20160,
+      "DomicilioId": 73476,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20169,
+      "DomicilioId": 116504,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20187,
+      "DomicilioId": 147707,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20227,
+      "DomicilioId": 95476,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20262,
+      "DomicilioId": 169730,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20288,
+      "DomicilioId": 139082,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20317,
+      "DomicilioId": 58600,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20409,
+      "DomicilioId": 46210,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20457,
+      "DomicilioId": 124243,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20483,
+      "DomicilioId": 36673,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20527,
+      "DomicilioId": 94183,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20532,
+      "DomicilioId": 108556,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20551,
+      "DomicilioId": 37434,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20677,
+      "DomicilioId": 4826,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20718,
+      "DomicilioId": 89095,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20808,
+      "DomicilioId": 17864,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20828,
+      "DomicilioId": 9740,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20832,
+      "DomicilioId": 11271,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20841,
+      "DomicilioId": 44267,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20864,
+      "DomicilioId": 119187,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 20874,
+      "DomicilioId": 67016,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21009,
+      "DomicilioId": 114318,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21167,
+      "DomicilioId": 30285,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21191,
+      "DomicilioId": 81355,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21359,
+      "DomicilioId": 76370,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21424,
+      "DomicilioId": 70808,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21439,
+      "DomicilioId": 63107,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21446,
+      "DomicilioId": 83437,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21480,
+      "DomicilioId": 92229,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21506,
+      "DomicilioId": 14541,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21525,
+      "DomicilioId": 95502,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21559,
+      "DomicilioId": 50073,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21618,
+      "DomicilioId": 42023,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21678,
+      "DomicilioId": 44333,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21735,
+      "DomicilioId": 34551,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21735,
+      "DomicilioId": 49719,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21735,
+      "DomicilioId": 49724,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21777,
+      "DomicilioId": 121099,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21802,
+      "DomicilioId": 51368,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21868,
+      "DomicilioId": 22357,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21890,
+      "DomicilioId": 54050,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 21898,
+      "DomicilioId": 94420,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22162,
+      "DomicilioId": 27737,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22297,
+      "DomicilioId": 97880,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22298,
+      "DomicilioId": 107514,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22305,
+      "DomicilioId": 46716,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22355,
+      "DomicilioId": 2338,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22369,
+      "DomicilioId": 14941,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22470,
+      "DomicilioId": 91183,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22552,
+      "DomicilioId": 50636,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22586,
+      "DomicilioId": 124556,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22612,
+      "DomicilioId": 112768,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22634,
+      "DomicilioId": 174278,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22690,
+      "DomicilioId": 17440,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22750,
+      "DomicilioId": 74807,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22759,
+      "DomicilioId": 68773,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22817,
+      "DomicilioId": 119024,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22868,
+      "DomicilioId": 48921,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22942,
+      "DomicilioId": 21341,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22949,
+      "DomicilioId": 62446,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 22997,
+      "DomicilioId": 80266,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23025,
+      "DomicilioId": 115608,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23030,
+      "DomicilioId": 130560,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23035,
+      "DomicilioId": 78007,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23058,
+      "DomicilioId": 89283,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23101,
+      "DomicilioId": 13277,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23194,
+      "DomicilioId": 113791,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23202,
+      "DomicilioId": 110667,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23209,
+      "DomicilioId": 54132,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23224,
+      "DomicilioId": 95632,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23240,
+      "DomicilioId": 42115,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23249,
+      "DomicilioId": 42129,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23321,
+      "DomicilioId": 38523,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23386,
+      "DomicilioId": 85466,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23511,
+      "DomicilioId": 137787,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23560,
+      "DomicilioId": 2137,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23605,
+      "DomicilioId": 152799,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23620,
+      "DomicilioId": 172949,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23706,
+      "DomicilioId": 124473,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23755,
+      "DomicilioId": 6746,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23764,
+      "DomicilioId": 92280,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    },
+    {
+      "Num_istanza": 23793,
+      "DomicilioId": 68362,
+      "DATA_INIZIO": null,
+      "DATA_FINE": null
+    }
+  ],
+  "Contratti": [
+    {
+      "Num_istanza": 17437,
+      "ContrattoId": 3500,
+      "ID_DOMICILIO": 71587,
+      "N_SERIE_CONTRATTO": "TAE25T003636000II",
+      "DATA_REG_CONTRATTO": "2025-11-06T00:00:00",
+      "DATA_INIZIO": "2025-11-01T00:00:00",
+      "DATA_FINE": "2026-10-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17465,
+      "ContrattoId": 854,
+      "ID_DOMICILIO": 19632,
+      "N_SERIE_CONTRATTO": "TJG25T002603000MD",
+      "DATA_REG_CONTRATTO": "2025-09-24T00:00:00",
+      "DATA_INIZIO": "2025-09-15T00:00:00",
+      "DATA_FINE": "2026-09-14T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17522,
+      "ContrattoId": 6620,
+      "ID_DOMICILIO": 129481,
+      "N_SERIE_CONTRATTO": "Anno 2013 serie 3 n. 2060",
+      "DATA_REG_CONTRATTO": "2024-08-21T00:00:00",
+      "DATA_INIZIO": "2024-08-19T00:00:00",
+      "DATA_FINE": "2028-08-21T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17552,
+      "ContrattoId": 5523,
+      "ID_DOMICILIO": 90731,
+      "N_SERIE_CONTRATTO": "3T numero 011136",
+      "DATA_REG_CONTRATTO": "2026-07-16T00:00:00",
+      "DATA_INIZIO": "2026-07-01T00:00:00",
+      "DATA_FINE": "2027-07-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17616,
+      "ContrattoId": 974,
+      "ID_DOMICILIO": 22522,
+      "N_SERIE_CONTRATTO": "n. 001866-serie 3T cod. ident. TDL25T001866000JJ",
+      "DATA_REG_CONTRATTO": "2025-09-26T00:00:00",
+      "DATA_INIZIO": "2025-09-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17677,
+      "ContrattoId": 1662,
+      "ID_DOMICILIO": 37622,
+      "N_SERIE_CONTRATTO": "25101710030817853",
+      "DATA_REG_CONTRATTO": "2025-10-17T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2028-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17713,
+      "ContrattoId": 358,
+      "ID_DOMICILIO": 7777,
+      "N_SERIE_CONTRATTO": "3T TJU25T005658000MD",
+      "DATA_REG_CONTRATTO": "2025-10-24T00:00:00",
+      "DATA_INIZIO": "2025-10-04T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17763,
+      "ContrattoId": 860,
+      "ID_DOMICILIO": 19709,
+      "N_SERIE_CONTRATTO": "25102215462118978",
+      "DATA_REG_CONTRATTO": "2025-10-22T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17770,
+      "ContrattoId": 1103,
+      "ID_DOMICILIO": 25259,
+      "N_SERIE_CONTRATTO": "25101008541420332",
+      "DATA_REG_CONTRATTO": "2025-10-10T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17837,
+      "ContrattoId": 7345,
+      "ID_DOMICILIO": 154767,
+      "N_SERIE_CONTRATTO": "25100547222417986-000001",
+      "DATA_REG_CONTRATTO": "2025-10-25T00:00:00",
+      "DATA_INIZIO": "2024-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17866,
+      "ContrattoId": 6746,
+      "ID_DOMICILIO": 135780,
+      "N_SERIE_CONTRATTO": "26020313325715912-000001",
+      "DATA_REG_CONTRATTO": "2026-02-03T00:00:00",
+      "DATA_INIZIO": "2025-09-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 17931,
+      "ContrattoId": 1201,
+      "ID_DOMICILIO": 27414,
+      "N_SERIE_CONTRATTO": "251105102751100212",
+      "DATA_REG_CONTRATTO": "2025-11-05T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18013,
+      "ContrattoId": 5973,
+      "ID_DOMICILIO": 116122,
+      "N_SERIE_CONTRATTO": "30404357",
+      "DATA_REG_CONTRATTO": "2025-12-27T00:00:00",
+      "DATA_INIZIO": "2026-01-01T00:00:00",
+      "DATA_FINE": "2026-12-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18027,
+      "ContrattoId": 2152,
+      "ID_DOMICILIO": 47151,
+      "N_SERIE_CONTRATTO": null,
+      "DATA_REG_CONTRATTO": null,
+      "DATA_INIZIO": "2025-09-16T00:00:00",
+      "DATA_FINE": "2026-07-25T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18119,
+      "ContrattoId": 4964,
+      "ID_DOMICILIO": 99008,
+      "N_SERIE_CONTRATTO": "25100820173618701 - 000001",
+      "DATA_REG_CONTRATTO": "2025-10-08T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18125,
+      "ContrattoId": 1796,
+      "ID_DOMICILIO": 40165,
+      "N_SERIE_CONTRATTO": "3T11632",
+      "DATA_REG_CONTRATTO": "2025-09-15T00:00:00",
+      "DATA_INIZIO": "2024-09-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18154,
+      "ContrattoId": 2376,
+      "ID_DOMICILIO": 51768,
+      "N_SERIE_CONTRATTO": "3T10855",
+      "DATA_REG_CONTRATTO": "2025-09-15T00:00:00",
+      "DATA_INIZIO": "2025-09-05T00:00:00",
+      "DATA_FINE": "2028-09-04T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18196,
+      "ContrattoId": 4602,
+      "ID_DOMICILIO": 92315,
+      "N_SERIE_CONTRATTO": "25111911111241690",
+      "DATA_REG_CONTRATTO": "2025-11-19T00:00:00",
+      "DATA_INIZIO": "2025-11-01T00:00:00",
+      "DATA_FINE": "2027-10-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18288,
+      "ContrattoId": 4316,
+      "ID_DOMICILIO": 87653,
+      "N_SERIE_CONTRATTO": "3T/TJN25T019552000SJ",
+      "DATA_REG_CONTRATTO": "2025-10-23T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2027-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18374,
+      "ContrattoId": 1169,
+      "ID_DOMICILIO": 26657,
+      "N_SERIE_CONTRATTO": "26040110192010037",
+      "DATA_REG_CONTRATTO": "2026-04-01T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18534,
+      "ContrattoId": 3175,
+      "ID_DOMICILIO": 65468,
+      "N_SERIE_CONTRATTO": "26030641380113011",
+      "DATA_REG_CONTRATTO": "2026-03-06T00:00:00",
+      "DATA_INIZIO": "2026-02-01T00:00:00",
+      "DATA_FINE": "2029-01-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 18896,
+      "ContrattoId": 3408,
+      "ID_DOMICILIO": 69895,
+      "N_SERIE_CONTRATTO": "3T10855",
+      "DATA_REG_CONTRATTO": "2025-09-15T00:00:00",
+      "DATA_INIZIO": "2025-09-05T00:00:00",
+      "DATA_FINE": "2028-09-04T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 19018,
+      "ContrattoId": 6586,
+      "ID_DOMICILIO": 129575,
+      "N_SERIE_CONTRATTO": "TDL25T002170000DD",
+      "DATA_REG_CONTRATTO": "2025-11-07T00:00:00",
+      "DATA_INIZIO": "2025-11-07T00:00:00",
+      "DATA_FINE": "2027-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 19116,
+      "ContrattoId": 5804,
+      "ID_DOMICILIO": 113293,
+      "N_SERIE_CONTRATTO": "TJS25T010987000FF",
+      "DATA_REG_CONTRATTO": "2025-11-26T00:00:00",
+      "DATA_INIZIO": "2025-11-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 19117,
+      "ContrattoId": 5726,
+      "ID_DOMICILIO": 111789,
+      "N_SERIE_CONTRATTO": "RA/2023/0044852",
+      "DATA_REG_CONTRATTO": "2025-11-11T00:00:00",
+      "DATA_INIZIO": "2025-11-15T00:00:00",
+      "DATA_FINE": "2029-11-14T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 19376,
+      "ContrattoId": 7928,
+      "ID_DOMICILIO": 97156,
+      "N_SERIE_CONTRATTO": "26072242381310024-000001",
+      "DATA_REG_CONTRATTO": "2026-07-22T00:00:00",
+      "DATA_INIZIO": "2026-09-01T00:00:00",
+      "DATA_FINE": "2027-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 19526,
+      "ContrattoId": 2116,
+      "ID_DOMICILIO": 46543,
+      "N_SERIE_CONTRATTO": "25072108572417796",
+      "DATA_REG_CONTRATTO": "2025-07-21T00:00:00",
+      "DATA_INIZIO": "2025-09-01T00:00:00",
+      "DATA_FINE": "2027-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 19680,
+      "ContrattoId": 2473,
+      "ID_DOMICILIO": 53502,
+      "N_SERIE_CONTRATTO": "TJJ25T004951000JJ",
+      "DATA_REG_CONTRATTO": "2025-10-16T00:00:00",
+      "DATA_INIZIO": "2025-10-04T00:00:00",
+      "DATA_FINE": "2026-10-03T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 19898,
+      "ContrattoId": 6195,
+      "ID_DOMICILIO": 120170,
+      "N_SERIE_CONTRATTO": "003326-serie 3T",
+      "DATA_REG_CONTRATTO": "2026-02-25T00:00:00",
+      "DATA_INIZIO": "2026-03-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 20227,
+      "ContrattoId": 6170,
+      "ID_DOMICILIO": 95476,
+      "N_SERIE_CONTRATTO": "3T014046",
+      "DATA_REG_CONTRATTO": "2026-07-17T00:00:00",
+      "DATA_INIZIO": "2026-07-01T00:00:00",
+      "DATA_FINE": "2027-06-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 20483,
+      "ContrattoId": 1619,
+      "ID_DOMICILIO": 36673,
+      "N_SERIE_CONTRATTO": "26061843434514432",
+      "DATA_REG_CONTRATTO": "2026-06-18T00:00:00",
+      "DATA_INIZIO": "2026-06-01T00:00:00",
+      "DATA_FINE": "2030-05-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 20532,
+      "ContrattoId": 5564,
+      "ID_DOMICILIO": 108556,
+      "N_SERIE_CONTRATTO": "26020210050211823",
+      "DATA_REG_CONTRATTO": "2026-02-02T00:00:00",
+      "DATA_INIZIO": "2026-01-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": "26052941262118034",
+      "DATA_INIZIO_SUBENTRO": "2026-05-01T00:00:00"
+    },
+    {
+      "Num_istanza": 20677,
+      "ContrattoId": 264,
+      "ID_DOMICILIO": 4826,
+      "N_SERIE_CONTRATTO": "RA/23/44852",
+      "DATA_REG_CONTRATTO": "2025-09-09T00:00:00",
+      "DATA_INIZIO": "2025-09-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 20832,
+      "ContrattoId": 8052,
+      "ID_DOMICILIO": 11271,
+      "N_SERIE_CONTRATTO": "26080334205215620",
+      "DATA_REG_CONTRATTO": "2026-08-03T00:00:00",
+      "DATA_INIZIO": "2026-08-01T00:00:00",
+      "DATA_FINE": "2027-07-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 20841,
+      "ContrattoId": 3919,
+      "ID_DOMICILIO": 44267,
+      "N_SERIE_CONTRATTO": "25122913483911131",
+      "DATA_REG_CONTRATTO": "2025-12-29T00:00:00",
+      "DATA_INIZIO": "2026-01-01T00:00:00",
+      "DATA_FINE": "2029-12-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 20874,
+      "ContrattoId": 3286,
+      "ID_DOMICILIO": 67016,
+      "N_SERIE_CONTRATTO": "25101012425214431",
+      "DATA_REG_CONTRATTO": "2025-10-10T00:00:00",
+      "DATA_INIZIO": "2025-10-06T00:00:00",
+      "DATA_FINE": "2026-10-05T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 21167,
+      "ContrattoId": 1324,
+      "ID_DOMICILIO": 30285,
+      "N_SERIE_CONTRATTO": "25100717310128334",
+      "DATA_REG_CONTRATTO": "2025-10-07T00:00:00",
+      "DATA_INIZIO": "2025-11-01T00:00:00",
+      "DATA_FINE": "2026-10-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 21359,
+      "ContrattoId": 3762,
+      "ID_DOMICILIO": 76370,
+      "N_SERIE_CONTRATTO": "25091644112612446 - 000001",
+      "DATA_REG_CONTRATTO": "2025-09-16T00:00:00",
+      "DATA_INIZIO": "2025-09-15T00:00:00",
+      "DATA_FINE": "2026-09-14T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 21424,
+      "ContrattoId": 3458,
+      "ID_DOMICILIO": 70808,
+      "N_SERIE_CONTRATTO": "25110510365212600",
+      "DATA_REG_CONTRATTO": "2025-11-05T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 21439,
+      "ContrattoId": 3005,
+      "ID_DOMICILIO": 63107,
+      "N_SERIE_CONTRATTO": "25090311115467261",
+      "DATA_REG_CONTRATTO": "2024-09-23T00:00:00",
+      "DATA_INIZIO": "2024-07-02T00:00:00",
+      "DATA_FINE": "2026-09-01T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 21480,
+      "ContrattoId": 4582,
+      "ID_DOMICILIO": 92229,
+      "N_SERIE_CONTRATTO": "3T/TJR25T011657000RI.",
+      "DATA_REG_CONTRATTO": "2025-09-22T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 21559,
+      "ContrattoId": 2283,
+      "ID_DOMICILIO": 50073,
+      "N_SERIE_CONTRATTO": "QC7177",
+      "DATA_REG_CONTRATTO": "2026-02-16T00:00:00",
+      "DATA_INIZIO": "2026-02-01T00:00:00",
+      "DATA_FINE": "2029-01-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 21777,
+      "ContrattoId": 6231,
+      "ID_DOMICILIO": 121099,
+      "N_SERIE_CONTRATTO": "25110716174110411 - 000001",
+      "DATA_REG_CONTRATTO": "2025-11-07T00:00:00",
+      "DATA_INIZIO": "2025-11-01T00:00:00",
+      "DATA_FINE": "2028-10-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 22298,
+      "ContrattoId": 5512,
+      "ID_DOMICILIO": 107514,
+      "N_SERIE_CONTRATTO": "25071508552213411",
+      "DATA_REG_CONTRATTO": "2025-07-15T00:00:00",
+      "DATA_INIZIO": "2025-09-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 22355,
+      "ContrattoId": 159,
+      "ID_DOMICILIO": 2338,
+      "N_SERIE_CONTRATTO": "25102014190516124",
+      "DATA_REG_CONTRATTO": "2025-10-20T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 22552,
+      "ContrattoId": 2302,
+      "ID_DOMICILIO": 50636,
+      "N_SERIE_CONTRATTO": "25101512521014792",
+      "DATA_REG_CONTRATTO": "2025-10-15T00:00:00",
+      "DATA_INIZIO": "2024-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 22759,
+      "ContrattoId": 3490,
+      "ID_DOMICILIO": 68773,
+      "N_SERIE_CONTRATTO": "3T/TJS26T000928000TK",
+      "DATA_REG_CONTRATTO": "2026-02-02T00:00:00",
+      "DATA_INIZIO": "2026-01-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 22868,
+      "ContrattoId": 2220,
+      "ID_DOMICILIO": 48921,
+      "N_SERIE_CONTRATTO": "3T/TJR24T011441000BB",
+      "DATA_REG_CONTRATTO": "2024-09-30T00:00:00",
+      "DATA_INIZIO": "2024-09-30T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 22942,
+      "ContrattoId": 924,
+      "ID_DOMICILIO": 21341,
+      "N_SERIE_CONTRATTO": "3T 006974",
+      "DATA_REG_CONTRATTO": "2025-09-15T00:00:00",
+      "DATA_INIZIO": "2025-09-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 22997,
+      "ContrattoId": 3987,
+      "ID_DOMICILIO": 80266,
+      "N_SERIE_CONTRATTO": "RA/2023/0044852",
+      "DATA_REG_CONTRATTO": "2023-07-27T00:00:00",
+      "DATA_INIZIO": "2025-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 23101,
+      "ContrattoId": 3009,
+      "ID_DOMICILIO": 13277,
+      "N_SERIE_CONTRATTO": "3T-TJN25T014228000BB",
+      "DATA_REG_CONTRATTO": "2025-08-01T00:00:00",
+      "DATA_INIZIO": "2025-08-01T00:00:00",
+      "DATA_FINE": "2026-08-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 23209,
+      "ContrattoId": 2518,
+      "ID_DOMICILIO": 54132,
+      "N_SERIE_CONTRATTO": "26052305223412281",
+      "DATA_REG_CONTRATTO": "2026-05-23T00:00:00",
+      "DATA_INIZIO": "2026-05-01T00:00:00",
+      "DATA_FINE": "2027-10-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 23321,
+      "ContrattoId": 1708,
+      "ID_DOMICILIO": 38523,
+      "N_SERIE_CONTRATTO": "25110615271349338",
+      "DATA_REG_CONTRATTO": "2025-11-06T00:00:00",
+      "DATA_INIZIO": "2025-11-01T00:00:00",
+      "DATA_FINE": "2026-10-31T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    },
+    {
+      "Num_istanza": 23706,
+      "ContrattoId": 7912,
+      "ID_DOMICILIO": 124473,
+      "N_SERIE_CONTRATTO": "23100913162461777",
+      "DATA_REG_CONTRATTO": "2023-10-09T00:00:00",
+      "DATA_INIZIO": "2023-10-01T00:00:00",
+      "DATA_FINE": "2026-09-30T00:00:00",
+      "DATA_CESSAZIONE": null,
+      "N_SERIE_SUBENTRO": null,
+      "DATA_INIZIO_SUBENTRO": null
+    }
+  ],
+  "Proroghe": []
+}

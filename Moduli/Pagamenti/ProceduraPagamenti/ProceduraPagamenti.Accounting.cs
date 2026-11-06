@@ -20,6 +20,8 @@ namespace ProcedureNet7
     {
         private void InsertIntoMovimentazioni(List<StudentePagamenti> studentiDaProcessare, string impegno, string? overrideMandatoCodPagam = null)
         {
+            if (IsSimulazione) return;
+
             List<StudentePagamenti> studentiSenzaImpegno = new();
             foreach (StudentePagamenti studente in studentiDaProcessare)
             {

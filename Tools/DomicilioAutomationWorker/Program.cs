@@ -37,8 +37,11 @@ var requests = new List<DomicilioAutomationRequest>();
 foreach (var request in job.Requests)
 {
     if (request.NumIstanza <= 0 || string.IsNullOrWhiteSpace(request.Fingerprint) ||
-        request.Fingerprint.Length != 64 || !request.Fingerprint.All(Uri.IsHexDigit) || duplicates.Contains(request.NumIstanza))
-        WriteResult(request.NumIstanza, "IGNORATA", "Identificativo o impronta non validi, oppure istanza ripetuta nel lotto.");
+        request.Fingerprint.Length != 64 || !request.Fingerprint.All(Uri.IsHexDigit) || duplicates.Contains(request.NumIstanza) ||
+        request.Corrections == null || request.Corrections.Any(c => c is null || c.OperationId <= 0 ||
+            string.IsNullOrWhiteSpace(c.BeforePayload) || string.IsNullOrWhiteSpace(c.AfterPayload) || c.Fields == null || c.Fields.Count == 0) ||
+        request.Corrections.Select(c => c.OperationId).Distinct().Count() != request.Corrections.Count)
+        WriteResult(request.NumIstanza, "IGNORATA", "Identificativo, impronta o correzioni non validi, oppure istanza ripetuta nel lotto.");
     else
         requests.Add(request);
 }
@@ -94,8 +97,10 @@ foreach (var request in requests)
     {
         using var scope = services.CreateScope();
         var service = scope.ServiceProvider.GetRequiredService<DomicilioLavorazioneService>();
-        await service.AcceptAutomaticallyAsync(request.NumIstanza, request.Fingerprint, DomicilioAutomationSnapshot.Capture);
-        WriteResult(request.NumIstanza, "ACCOLTA", "Istanza accolta con i servizi backend e registrata come AUTO_DOMICILIO.");
+        await service.AcceptAutomaticallyAsync(request.NumIstanza, request.Fingerprint, DomicilioAutomationSnapshot.Capture, request.Corrections);
+        WriteResult(request.NumIstanza, "ACCOLTA", request.Corrections.Count == 0
+            ? "Istanza accolta con i servizi backend e registrata come AUTO_DOMICILIO."
+            : "Dati proposti corretti dalle fonti PDF e istanza accolta nella stessa transazione come AUTO_DOMICILIO.");
     }
     catch (IstanzaLavorazioneException ex)
     {

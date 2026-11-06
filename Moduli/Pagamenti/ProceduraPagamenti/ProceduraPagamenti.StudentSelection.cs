@@ -35,6 +35,12 @@ namespace ProcedureNet7
             selectedDataRiferimento = args._dataRiferimento;
             selectedNumeroMandato = args._numeroMandato;
             selectedTipoProcedura = args._tipoProcedura;
+            if (IsSimulazione)
+            {
+                selectedSaveFolder = Path.Combine(selectedSaveFolder,
+                    SimulazionePATollerante ? "SIMULAZIONE_PA_TOLLERANTE" :
+                    SimulazioneSenzaImpegni ? "SIMULAZIONE_SENZA_IMPEGNI" : "SIMULAZIONE");
+            }
             selectedVecchioMandato = args._vecchioMandato;
             categoriaPagam = "";
             selectedCodEnte = "00";
@@ -125,6 +131,13 @@ namespace ProcedureNet7
 
         private void HandleTableNameSelectionDialog()
         {
+            if (IsSimulazione)
+            {
+                dbTableName = "#PagamentiSimulazione";
+                RiepilogoArguments.Instance.nomeTabella = "Temporanea (simulazione)";
+                return;
+            }
+
             _ = _masterForm.Invoke((MethodInvoker)delegate
             {
                 using SelectTableName selectTableName = new();
@@ -170,6 +183,14 @@ namespace ProcedureNet7
                 return;
             }
 
+            if (IsSimulazione)
+            {
+                dbTableName = "#PagamentiSimulazione";
+                dbTableExists = false;
+                CreateDBTable();
+                return;
+            }
+
             using (SqlCommand command = new($"SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = N'{dbTableName}'", CONNECTION, sqlTransaction)
             {
                 CommandTimeout = 9000000
@@ -205,6 +226,30 @@ namespace ProcedureNet7
         {
             Logger.LogInfo(1, $"Creazione Tabella: {dbTableName}");
             Logger.LogInfo(1, $"-");
+            string sqlQuery = BuildCreateDBTableQuery();
+            try
+            {
+                using SqlCommand cmd = new(sqlQuery, CONNECTION, sqlTransaction)
+                {
+                    CommandTimeout = 90000000
+                };
+                Logger.LogDebug(null, "QUERY SQL CREAZIONE TABELLA:");
+                _ = cmd.ExecuteNonQuery();
+            }
+            finally
+            {
+                Logger.LogInfo(1, "Fine creazione tabella d'appoggio");
+            }
+        }
+
+        private string BuildCreateDBTableQuery()
+        {
+            if (IsSimulazione)
+            {
+                dbTableName = "#PagamentiSimulazione";
+                dbTableExists = false;
+            }
+
             //ProgressUpdater progressUpdater = new(1, LogLevel.INFO);
             //progressUpdater.StartUpdating();
             StringBuilder queryBuilder = new();
@@ -333,29 +378,7 @@ namespace ProcedureNet7
   
             
 
-            string sqlQuery = queryBuilder.ToString();
-            try
-            {
-
-                SqlCommand cmd = new(sqlQuery, CONNECTION, sqlTransaction)
-                {
-                    CommandTimeout = 90000000
-                };
-                Logger.LogDebug(null, "QUERY SQL CREAZIONE TABELLA:");
-                _ = cmd.ExecuteNonQuery();
-            }
-            catch (Exception ex)
-            {
-                //progressUpdater.StopUpdating();
-                throw ex;
-            }
-            finally
-            {
-                //progressUpdater.StopUpdating();
-
-
-                Logger.LogInfo(1, "Fine creazione tabella d'appoggio");
-            }
+            return queryBuilder.ToString();
         }
 
         private void HandleFiltroManuale()
@@ -411,6 +434,18 @@ namespace ProcedureNet7
         }
         private void ClearMovimentiContabili()
         {
+            // In simulazione i lettori riproducono l'effetto del mandato da aggiornare.
+            if (IsSimulazione)
+            {
+                _movimentiSimulati.RemoveAll(m => m.Mandato.StartsWith(selectedVecchioMandato,
+                    StringComparison.OrdinalIgnoreCase));
+                foreach (var detrazione in _detrazioniSimulate.Where(d =>
+                    d.Key.Causale != "01" && d.Key.Causale != "02" &&
+                    d.Value.StartsWith(selectedVecchioMandato, StringComparison.OrdinalIgnoreCase)).ToList())
+                    _detrazioniSimulate.Remove(detrazione.Key);
+                return;
+            }
+
             try
             {
                 Logger.LogInfo(10, "Set in movimenti contabili elementari dello stato a 0 dove era in elaborazione");

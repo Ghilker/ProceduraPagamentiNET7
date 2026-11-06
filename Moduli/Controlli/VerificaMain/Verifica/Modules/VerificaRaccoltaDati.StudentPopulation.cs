@@ -739,7 +739,12 @@ WHERE rn = 1;";
         private void LoadStatusSedeClassificationFlags(VerificaPipelineContext context)
         {
             using var scope = MeasureCollectionStep("VerificaRaccoltaDati.LoadStatusSedeClassificationFlags", $"AA={context.AnnoAccademico}");
+            LoadStatusSedeClassificationFlags(context.Connection, null, context.Students);
+        }
 
+        internal static void LoadStatusSedeClassificationFlags(SqlConnection connection,
+            SqlTransaction? transaction, IReadOnlyDictionary<StudentKey, StudenteInfo> students)
+        {
             const string createSql = @"
 IF OBJECT_ID('tempdb..#StatusSedeClassBase') IS NOT NULL
     DROP TABLE #StatusSedeClassBase;
@@ -755,13 +760,13 @@ CREATE TABLE #StatusSedeClassBase
     PRIMARY KEY CLUSTERED (CodFiscale, NumDomanda)
 );";
 
-            using (var createCommand = new SqlCommand(createSql, context.Connection) { CommandTimeout = 9999999 })
+            using (var createCommand = new SqlCommand(createSql, connection, transaction) { CommandTimeout = 9999999 })
                 createCommand.ExecuteNonQuery();
 
-            var table = BuildStatusSedeClassBaseTable(context);
+            using var table = BuildStatusSedeClassBaseTable(students);
             if (table.Rows.Count > 0)
             {
-                using var bulk = new SqlBulkCopy(context.Connection, SqlBulkCopyOptions.TableLock, null)
+                using var bulk = new SqlBulkCopy(connection, SqlBulkCopyOptions.TableLock, transaction)
                 {
                     DestinationTableName = "#StatusSedeClassBase",
                     BulkCopyTimeout = 9999999,
@@ -779,7 +784,6 @@ CREATE TABLE #StatusSedeClassBase
 
             const string sql = @"
 SET NOCOUNT ON;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 SELECT
     CAST(b.NumDomanda AS INT) AS NumDomanda,
@@ -813,18 +817,21 @@ SELECT
     CAST(10 AS INT) AS MinMesiDomicilioFuoriSede
 FROM #StatusSedeClassBase b;";
 
-            using var cmd = new SqlCommand(sql, context.Connection) { CommandTimeout = 9999999 };
-            ReadAndMergeByStudentKey(cmd, (reader, info) =>
+            using var cmd = new SqlCommand(sql, connection, transaction) { CommandTimeout = 9999999 };
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
             {
+                if (!students.TryGetValue(CreateStudentKey(reader.SafeGetString("CodFiscale"),
+                    reader.SafeGetString("NumDomanda")), out var info)) continue;
                 info.InformazioniSede.AlwaysA = reader.SafeGetBool("AlwaysA");
                 info.InformazioniSede.InSedeList = reader.SafeGetBool("InSedeList");
                 info.InformazioniSede.PendolareList = reader.SafeGetBool("PendolareList");
                 info.InformazioniSede.FuoriSedeList = reader.SafeGetBool("FuoriSedeList");
                 info.InformazioniSede.MinMesiDomicilioFuoriSede = reader.SafeGetInt("MinMesiDomicilioFuoriSede");
-            });
+            }
         }
 
-        private static DataTable BuildStatusSedeClassBaseTable(VerificaPipelineContext context)
+        private static DataTable BuildStatusSedeClassBaseTable(IReadOnlyDictionary<StudentKey, StudenteInfo> students)
         {
             var table = new DataTable();
             table.Columns.Add("CodFiscale", typeof(string));
@@ -834,7 +841,7 @@ FROM #StatusSedeClassBase b;";
             table.Columns.Add("CodSedeDistaccata", typeof(string));
             table.Columns.Add("AlwaysA", typeof(bool));
 
-            foreach (var info in context.Students.Values)
+            foreach (var info in students.Values)
             {
                 string codFiscale = (info.InformazioniPersonali.CodFiscale ?? string.Empty).Trim().ToUpperInvariant();
                 string numDomandaText = (info.InformazioniPersonali.NumDomanda ?? string.Empty).Trim();
@@ -879,16 +886,15 @@ FROM #StatusSedeClassBase b;";
 
             foreach (var pair in context.Students)
             {
-                bool beneficioPaRichiesto = context.TryGetEsitoBorsaFacts(pair.Key, out var facts)
-                                           && facts != null
-                                           && facts.BeneficiRichiesti.Contains("PA");
-
-                bool paAssegnato = context.TryGetEsitiConcorsoByBenefit(pair.Key, out var byBenefit)
-                                   && byBenefit != null
-                                   && byBenefit.TryGetValue("PA", out var pa)
-                                   && ((pa.CodTipoEsito ?? 0) == 1 || (pa.CodTipoEsito ?? 0) == 2);
-
-                pair.Value.InformazioniSede.HasAlloggio12 = beneficioPaRichiesto && paAssegnato;
+                pair.Value.InformazioniSede.HasAlloggio12 =
+                    context.TryGetEsitoBorsaFacts(pair.Key, out var facts)
+                    && facts != null
+                    && context.TryGetEsitiConcorsoByBenefit(pair.Key, out var byBenefit)
+                    && byBenefit != null
+                    && new[] { "PA", "PK" }.Any(beneficio =>
+                        facts.BeneficiRichiesti.Contains(beneficio)
+                        && byBenefit.TryGetValue(beneficio, out var esito)
+                        && esito.CodTipoEsito is 1 or 2);
             }
         }
 

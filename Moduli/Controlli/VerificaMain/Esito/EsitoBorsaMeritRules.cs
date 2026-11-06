@@ -33,6 +33,22 @@ namespace ProcedureNet7
             if (!richiedeMeritoStorico)
                 return;
 
+            bool annoAmmissibile = context.CodBeneficio switch
+            {
+                "BS" => EsitoBorsaBenefitRules.IsAnnoCorsoAmmissibile(context),
+                "PA" or "PK" => EsitoBorsaPaRules.IsAnnoCorsoAmmissibile(context),
+                "CI" => EsitoBorsaCiRules.IsAnnoCorsoAmmissibile(context),
+                _ => true
+            };
+            // I dati studente non classificabili o gli anni già inammissibili
+            // producono le esclusioni previste, senza richiedere soglie CFU inutilizzabili.
+            if (context.Facts.IsAnnoClassificabile == false || !annoAmmissibile)
+                return;
+
+            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
+            decimal creditiRichiesti = GetCreditiMinimiRichiesti(context, iscr, context.Invalido, annoCorsoCalcolato);
+            iscr.CreditiMinimiRichiestiMerito = creditiRichiesti;
+
             if (!HasDatiMeritoCalcolabili(context, usaRegoleCrediti))
             {
                 evaluation.Add("MER001");
@@ -46,7 +62,7 @@ namespace ProcedureNet7
             if (HasTirocinioSuperioreAiCrediti(iscr))
                 evaluation.Add("MER092");
 
-            if (!HaCreditiMinimiPerBorsa(context, iscr, evaluation))
+            if (!HaCreditiMinimiPerBorsa(context, iscr, evaluation, creditiRichiesti))
                 evaluation.Add("MER012");
         }
 
@@ -134,11 +150,8 @@ namespace ProcedureNet7
             return !(riconosciuti > 110m && riconosciuti < 150m);
         }
 
-        private static bool HaCreditiMinimiPerBorsa(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, EsitoBorsaEvaluation evaluation)
+        private static bool HaCreditiMinimiPerBorsa(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, EsitoBorsaEvaluation evaluation, decimal creditiRichiesti)
         {
-            int annoCorsoCalcolato = EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
-            decimal creditiRichiesti = GetCreditiMinimiRichiesti(context, iscr, context.Invalido, annoCorsoCalcolato);
-            iscr.CreditiMinimiRichiestiMerito = creditiRichiesti;
             if (creditiRichiesti <= 0m)
                 return true;
 
@@ -406,9 +419,6 @@ namespace ProcedureNet7
 
         private static decimal GetCreditiMinimiBase(EsitoBorsaStudentContext context, InformazioniIscrizione iscr, bool invalido, int anno)
         {
-            if (context?.Pipeline?.CreditiRichiestiCatalog == null || iscr == null)
-                return 0m;
-
             int annoCatalogo = NormalizeAnnoCorsoCreditiRichiesti(iscr, anno);
 
             iscr.IdCreditiRichiestiSelezionato = null;
@@ -425,7 +435,10 @@ namespace ProcedureNet7
                 iscr.CodSedeStudi);
 
             if (row == null)
-                return 0m;
+                throw new InvalidOperationException(
+                    $"Configurazione merito da sistemare: Crediti_richiesti mancante per AA {context.Pipeline.AnnoAccademico}, " +
+                    $"tipologia {iscr.TipoCorso}, anno {annoCatalogo} (originale {anno}), corso {iscr.CodCorsoLaurea}, " +
+                    $"sede {iscr.CodSedeStudi}, disabile {invalido}. Studente {context.Key.CodFiscale}, domanda {context.Key.NumDomanda}.");
 
             iscr.IdCreditiRichiestiSelezionato = row.IdCreditiRichiesti;
             iscr.AnnoCreditiRichiestiSelezionato = row.AnnoCorso;

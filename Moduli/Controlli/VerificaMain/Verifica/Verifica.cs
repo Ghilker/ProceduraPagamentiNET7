@@ -17,6 +17,7 @@ namespace ProcedureNet7.Verifica
         public IReadOnlyList<StudenteInfo> OutputVerificaList { get; private set; } = Array.Empty<StudenteInfo>();
         public DataTable OutputVerifica { get; private set; } = BuildOutputTable();
         public DataTable OutputDomiciliDiagnostica { get; private set; } = BuildDomiciliDiagnosticTable();
+        public DataTable OutputCatalogoEsclusioni { get; private set; } = BuildCatalogoEsclusioniTable();
 
         public override void RunProcedure(ArgsVerifica args)
         {
@@ -35,6 +36,16 @@ namespace ProcedureNet7.Verifica
                 $"[Verifica] Scrittura risultati sul database: {(context.ScriviSulDatabase ? "ATTIVA" : "DISATTIVA")}");
 
             VerificaExecutionSupport.ExecuteTimed("Verifica.RaccoltaDati", () => raccoltaDati.PopolaContesto(context), () => $"AA={context.AnnoAccademico}");
+
+            OutputCatalogoEsclusioni = BuildCatalogoEsclusioniTable();
+            VerificaExecutionSupport.ExecuteTimed(
+                "Verifica.ExportCatalogoEsclusioni",
+                () => Utilities.ExportDataTableToExcel(
+                    OutputCatalogoEsclusioni,
+                    _folderPath,
+                    includeHeaders: true,
+                    fileName: $"Verifica_CatalogoEsclusioni_{_aa}_{DateTime.Now:yyyyMMdd_HHmmss}"),
+                () => $"rows={OutputCatalogoEsclusioni.Rows.Count}");
 
             if (context.Students.Count == 0)
             {

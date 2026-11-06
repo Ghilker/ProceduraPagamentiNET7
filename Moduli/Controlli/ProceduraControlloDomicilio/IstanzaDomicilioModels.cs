@@ -14,6 +14,8 @@ namespace ProcedureNet7
         public string Operatore { get; init; } = string.Empty;
         public bool ValidazioneCompletata { get; set; }
         public string? ExpectedFingerprint { get; set; }
+        public IstanzaDomicilioRecord? CorrectionCandidate { get; set; }
+        public List<DomicilioAutomation.DomicilioAutomationOperationCorrection> ProposedCorrections { get; } = new();
         public List<IstanzaDomicilioOperation> Operazioni { get; } = new();
         public List<DomicilioControlRecord> DomiciliCorrenti { get; } = new();
         public DomicilioControlState State { get; } = new();

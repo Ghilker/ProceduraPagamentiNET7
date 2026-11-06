@@ -136,7 +136,8 @@ namespace ProcedureNet7
 
             info.HasPrimaRata |= ContainsPaymentType(record.BsPaymentTypes, "BSP0", "BSP1", "BSP2");
             info.HasSaldo |= ContainsPaymentType(record.BsPaymentTypes, "BSS0", "BSS1", "BSS2");
-            info.HasRimborso |= ContainsPaymentType(record.BsPaymentTypes, "BST0", "BST1", "BST2");
+            info.HasRimborso |= (record.TaxRefundPaidAmount > 0m && !string.IsNullOrWhiteSpace(record.TaxRefundMandates)) ||
+                ContainsPaymentType(record.BsPaymentTypes, "BST0", "BST1", "BST2");
         }
 
         private static void AddOutcome(HashSet<string> outcomes, string outcome)

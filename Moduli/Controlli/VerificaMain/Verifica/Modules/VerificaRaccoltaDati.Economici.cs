@@ -425,15 +425,61 @@ WHERE Anno_accademico = @AA;";
             AddDataValiditaMaxParameter(command, aa);
 
             using var reader = command.ExecuteReader();
-            if (reader.Read())
+            var values = ReadCalcParams(reader, aa);
+            _calc.Franchigia = values.Franchigia;
+            _calc.RendPatr = values.RendPatr;
+            _calc.FranchigiaPatMob = values.FranchigiaPatMob;
+            _calc.ImportoBorsaA = values.ImportoBorsaA;
+            _calc.ImportoBorsaB = values.ImportoBorsaB;
+            _calc.ImportoBorsaC = values.ImportoBorsaC;
+            _calc.SogliaIsee = values.SogliaIsee;
+        }
+
+        internal static CalcParams ReadCalcParams(IDataReader reader, string aa)
+        {
+            if (reader == null)
+                throw new ArgumentNullException(nameof(reader));
+
+            string diagnostic = $"Configurazione economica da sistemare per l'anno accademico {aa} in DatiGenerali_con";
+            if (!reader.Read())
+                throw new InvalidOperationException($"{diagnostic}: nessun record presente.");
+
+            var values = new CalcParams
             {
-                _calc.Franchigia = reader.SafeGetDecimal("Franchigia");
-                _calc.RendPatr = reader.SafeGetDecimal("tasso_rendimento_pat_mobiliare");
-                _calc.FranchigiaPatMob = reader.SafeGetDecimal("franchigia_pat_mobiliare");
-                _calc.ImportoBorsaA = reader.SafeGetDecimal("Importo_borsa_A");
-                _calc.ImportoBorsaB = reader.SafeGetDecimal("Importo_borsa_B");
-                _calc.ImportoBorsaC = reader.SafeGetDecimal("Importo_borsa_C");
-                _calc.SogliaIsee = reader.SafeGetDecimal("Soglia_Isee");
+                Franchigia = ReadValue("Franchigia", positive: false),
+                RendPatr = ReadValue("tasso_rendimento_pat_mobiliare", positive: false),
+                FranchigiaPatMob = ReadValue("franchigia_pat_mobiliare", positive: false),
+                ImportoBorsaA = ReadValue("Importo_borsa_A", positive: true),
+                ImportoBorsaB = ReadValue("Importo_borsa_B", positive: true),
+                ImportoBorsaC = ReadValue("Importo_borsa_C", positive: true),
+                SogliaIsee = ReadValue("Soglia_Isee", positive: true)
+            };
+
+            if (reader.Read())
+                throw new InvalidOperationException($"{diagnostic}: più record presenti per lo stesso anno accademico.");
+
+            return values;
+
+            decimal ReadValue(string column, bool positive)
+            {
+                object value = reader[column];
+                if (value == null || value == DBNull.Value)
+                    throw new InvalidOperationException($"{diagnostic}: {column} è NULL.");
+
+                decimal parsed;
+                try
+                {
+                    parsed = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+                }
+                catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is OverflowException)
+                {
+                    throw new InvalidOperationException($"{diagnostic}: {column} non contiene un numero valido.", ex);
+                }
+
+                if (positive ? parsed <= 0m : parsed < 0m)
+                    throw new InvalidOperationException($"{diagnostic}: {column} deve essere {(positive ? "maggiore di zero" : "maggiore o uguale a zero")}.");
+
+                return parsed;
             }
         }
 

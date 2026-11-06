@@ -13,7 +13,10 @@ namespace ProcedureNet7
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-            var calc = context.CalcParams ?? new CalcParams();
+            string diagnostic = $"Configurazione economica da sistemare per l'anno accademico {context.AnnoAccademico}";
+            var calc = context.CalcParams ?? throw new InvalidOperationException($"{diagnostic}: parametri assenti.");
+            if (calc.SogliaIsee <= 0m)
+                throw new InvalidOperationException($"{diagnostic}: Soglia_Isee deve essere maggiore di zero.");
 
             foreach (var info in context.Students.Values)
             {
@@ -21,6 +24,9 @@ namespace ProcedureNet7
                 string status = GetStatusSedeRiferimento(info.InformazioniSede);
 
                 decimal? importoBase = GetImportoBaseByStatus(status, calc);
+                if (importoBase.HasValue && importoBase.Value <= 0m)
+                    throw new InvalidOperationException($"{diagnostic}: l'importo base per lo status {status} deve essere maggiore di zero.");
+
                 decimal? isee = GetIseeRiferimento(info);
                 decimal? importoFinale = null;
 
@@ -62,13 +68,10 @@ namespace ProcedureNet7
 
         private static decimal ApplyIseeRule(decimal importoBase, decimal isee, decimal sogliaIsee)
         {
-            if (importoBase <= 0m || sogliaIsee <= 0m)
-                return RoundMoney(importoBase);
-
             decimal metaSoglia = sogliaIsee / 2m;
             decimal dueTerziSoglia = sogliaIsee * 2m / 3m;
 
-            if (isee >= 0m && isee < metaSoglia)
+            if (isee >= 0m && isee <= metaSoglia)
                 return RoundMoney(importoBase * 1.15m);
 
             if (isee >= sogliaIsee)

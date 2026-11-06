@@ -136,8 +136,10 @@ namespace ProcedureNet7
         public bool RevocatoBandoPK { get; set; }
         public bool RevocatoBandoCI { get; set; }
         public bool RevocatoSedeDistaccata { get; set; }
+        public bool RevocatoSedeDistaccataPK { get; set; }
         public bool RevocatoMancataIscrizione { get; set; }
         public bool RevocatoIscrittoRipetente { get; set; }
+        // Variazione 21: ISEE non presente in INPS in base ai riferimenti dichiarati nella domanda.
         public bool RevocatoISEE { get; set; }
         public bool RevocatoLaureato { get; set; }
         public bool RevocatoPatrimonio { get; set; }
@@ -146,7 +148,7 @@ namespace ProcedureNet7
         public bool RevocatoFuoriTermine { get; set; }
         public bool RevocatoIseeFuoriTermine { get; set; }
         public bool RevocatoIseeNonProdotta { get; set; }
-        public bool RevocatoTrasmissioneIseeFuoriTermine { get; set; }
+        public bool DecadutoMancataComunicazionePagamento { get; set; }
         public bool RevocatoNoContrattoLocazione { get; set; }
 
         public bool DecadutoBS { get; set; }

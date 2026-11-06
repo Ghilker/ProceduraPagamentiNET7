@@ -271,8 +271,15 @@ namespace ProcedureNet7.Verifica
 
         public void Add(int? tipologiaCorso, int? annoCorso, string? codCorsoLaurea, decimal? creditiRichiesti, bool? disabile, int? idCreditiRichiesti)
         {
-            if (!tipologiaCorso.HasValue || !annoCorso.HasValue || !creditiRichiesti.HasValue || !disabile.HasValue)
-                return;
+            if (!tipologiaCorso.HasValue || !annoCorso.HasValue || !creditiRichiesti.HasValue
+                || creditiRichiesti.Value < 0m || !disabile.HasValue)
+            {
+                string campoNonValido = !tipologiaCorso.HasValue ? "Tipologia_corso"
+                    : !annoCorso.HasValue ? "Anno_corso"
+                    : !creditiRichiesti.HasValue || creditiRichiesti.Value < 0m ? "Crediti_richiesti"
+                    : "Disabile";
+                throw new InvalidOperationException($"Configurazione merito da sistemare: Crediti_richiesti, riga {idCreditiRichiesti}, campo {campoNonValido} mancante o non valido.");
+            }
 
             _items.Add(new CreditoRichiestoRow
             {

@@ -8,7 +8,7 @@ namespace ProcedureNet7
 {
     public class ArgsVerifica
     {
-        public string? _selectedAA = "20242025";
+        public string? _selectedAA = "20262027";
         public string? _folderPath = "D://";
         public int _faseElaborativa = 1; // 1 = provvisorie, 2 = definitive
         public bool _scriviSulDatabase;

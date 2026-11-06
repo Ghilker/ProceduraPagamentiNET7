@@ -36,6 +36,8 @@ namespace ProcedureNet7
                 }
 
                 InitializeProcedure(args);
+                if (IsSimulazione)
+                    Logger.LogInfo(null, DescrizioneSimulazione);
                 if (exitProcedureEarly)
                 {
                     Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo InitializeProcedure");
@@ -162,7 +164,7 @@ namespace ProcedureNet7
                             RegisterPaymentCount(codTipoPagamento, categoriaPagam, elaborati, cfg.DescrPagamento);
 
                             // commit dopo OGNI ciclo pagamento
-                            sqlTransaction.Commit();
+                            CompleteTransaction();
                         }
                         catch (Exception ex)
                         {
@@ -219,7 +221,9 @@ namespace ProcedureNet7
 
                         MessageBox.Show(
                             _masterForm,
-                            "Procedura automatica completata.\nVerifica i log per il dettaglio.",
+                            IsSimulazione
+                                ? "Simulazione automatica completata. Nessuna modifica ai dati permanenti.\nVerifica i log per il dettaglio."
+                                : "Procedura automatica completata.\nVerifica i log per il dettaglio.",
                             "Completato",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
@@ -311,7 +315,7 @@ namespace ProcedureNet7
                 {
                     DialogResult result = MessageBox.Show(
                         _masterForm,
-                        "Completare procedura",
+                        IsSimulazione ? "Completare la simulazione (nessuna modifica ai dati permanenti)" : "Completare procedura",
                         "Attenzione",
                         MessageBoxButtons.OKCancel,
                         MessageBoxIcon.Question);
@@ -392,7 +396,7 @@ namespace ProcedureNet7
                         // file di log finale
                         WriteFinalCountsLog(isAutomatic: false);
 
-                        sqlTransaction?.Commit();
+                        CompleteTransaction();
                     }
                     else
                     {
@@ -410,10 +414,25 @@ namespace ProcedureNet7
             }
             finally
             {
+                if (IsSimulazione)
+                {
+                    sqlTransaction?.Dispose();
+                    sqlTransaction = null;
+                }
                 Logger.LogDebug(100, "Fine dell'esecuzione di RunProcedure");
                 FinalizeProcedure();
             }
         }
+        private void CompleteTransaction()
+        {
+            if (IsSimulazione)
+                sqlTransaction?.Rollback();
+            else
+                sqlTransaction?.Commit();
+            sqlTransaction?.Dispose();
+            sqlTransaction = null;
+        }
+
         private void ResetStatoPerCiclo()
         {
             // Collezioni per-studente
@@ -461,6 +480,8 @@ namespace ProcedureNet7
 
         private void ResetCFEstrazione()
         {
+            if (IsSimulazione) return;
+
             if (CONNECTION == null)
                 return;
 
@@ -553,6 +574,8 @@ IF OBJECT_ID('CFEstrazione','U') IS NOT NULL
                 sb.AppendLine($"Anno accademico: {selectedAA}");
                 sb.AppendLine($"Data/ora generazione: {DateTime.Now:dd/MM/yyyy HH:mm:ss}");
                 sb.AppendLine($"Modalità: {(isAutomatic ? "Elaborazione automatica (tutti i tipi di pagamento)" : "Elaborazione singolo pagamento")}");
+                if (IsSimulazione)
+                    sb.AppendLine(DescrizioneSimulazione);
                 sb.AppendLine();
                 sb.AppendLine("CodTipo;Categoria;Descrizione;Studenti");
 

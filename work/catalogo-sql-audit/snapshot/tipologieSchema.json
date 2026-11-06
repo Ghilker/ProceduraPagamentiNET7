@@ -1,0 +1,112 @@
+[
+  {
+    "TABLE_NAME": "Rend_Tipologiastudi",
+    "COLUMN_NAME": "ID_TITOLO",
+    "DATA_TYPE": "float"
+  },
+  {
+    "TABLE_NAME": "Rend_Tipologiastudi",
+    "COLUMN_NAME": "TITOLO DI STUDIO",
+    "DATA_TYPE": "nvarchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_Sede_Studi",
+    "COLUMN_NAME": "Id",
+    "DATA_TYPE": "int"
+  },
+  {
+    "TABLE_NAME": "Tipologie_Sede_Studi",
+    "COLUMN_NAME": "Descrizione",
+    "DATA_TYPE": "nvarchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_Sede_Studi",
+    "COLUMN_NAME": "Ordinamento",
+    "DATA_TYPE": "int"
+  },
+  {
+    "TABLE_NAME": "Tipologie_Sede_Studi",
+    "COLUMN_NAME": "DataCreazione",
+    "DATA_TYPE": "datetime"
+  },
+  {
+    "TABLE_NAME": "Tipologie_Sede_Studi",
+    "COLUMN_NAME": "DataModifica",
+    "DATA_TYPE": "datetime"
+  },
+  {
+    "TABLE_NAME": "Tipologie_Sede_Studi",
+    "COLUMN_NAME": "IsActive",
+    "DATA_TYPE": "bit"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studente",
+    "COLUMN_NAME": "Anno_accademico",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studente",
+    "COLUMN_NAME": "Tipologia_studente",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studente",
+    "COLUMN_NAME": "Descrizione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studente",
+    "COLUMN_NAME": "Data_validita",
+    "DATA_TYPE": "datetime"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studente",
+    "COLUMN_NAME": "Utente",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studente",
+    "COLUMN_NAME": "Id_Tipologie_studente",
+    "DATA_TYPE": "int"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studi",
+    "COLUMN_NAME": "Cod_tipologia_studi",
+    "DATA_TYPE": "smallint"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studi",
+    "COLUMN_NAME": "Descrizione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studi",
+    "COLUMN_NAME": "Data_validita",
+    "DATA_TYPE": "datetime"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studi",
+    "COLUMN_NAME": "Utente",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studi",
+    "COLUMN_NAME": "Id_Tipologie_studi",
+    "DATA_TYPE": "int"
+  },
+  {
+    "TABLE_NAME": "Tipologie_studi",
+    "COLUMN_NAME": "RiferimentoRichiestaRimborso",
+    "DATA_TYPE": "bit"
+  },
+  {
+    "TABLE_NAME": "TipologieCorsoNoTassaRegionale",
+    "COLUMN_NAME": "Codice",
+    "DATA_TYPE": "nvarchar"
+  },
+  {
+    "TABLE_NAME": "TipologieCorsoNoTassaRegionale",
+    "COLUMN_NAME": "Denominazione",
+    "DATA_TYPE": "nvarchar"
+  }
+]

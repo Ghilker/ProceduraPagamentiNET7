@@ -17,8 +17,6 @@ namespace ProcedureNet7
         private bool _isFileWithMessagges = true;
         private bool _sendMail;
 
-        private const int CurrentApplicationAcademicYear = 20262027;
-
         // Anni per cui il riepilogo espone il dettaglio operativo.
         private readonly List<int> _targetYears = new() { 20252026, 20262027 };
 
@@ -43,32 +41,17 @@ namespace ProcedureNet7
                 DataTable tickets = Utilities.CsvToDataTable(ticketFilePath);
                 Logger.LogInfo(null, $"File ticket caricato. Righe lette: {tickets.Rows.Count}");
 
-                Logger.LogInfo(null, "Avvio sincronizzazione iniziale della tabella VALIDAZIONE_TICKET");
-                SyncValidazioneTicket(tickets, CONNECTION);
-                Logger.LogInfo(null, "Sincronizzazione iniziale della tabella VALIDAZIONE_TICKET completata");
-
-                var unwantedCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    "Contributi Alloggio","Posti Alloggio","MENSA","Accettazione Posto Alloggio",
-                    "RIMBORSO DEPOSITO CAUZIONALE","AREA 8","Ufficio Inclusione","URP",
-                    "CERTIFICAZIONE UNICA","Portafuturo","RIMBORSO DEPOSITO CAUZIONALE-Non più attiva"
-                };
-
-                var filteredRows = tickets.AsEnumerable()
-                    .Where(row =>
-                        !EqualsCI(row.Field<string>("STATO"), "CHIUSO") &&
-                        !unwantedCategories.Contains(row.Field<string>("CATEGORIA")) &&
-                        (!_isFileWithMessagges ? !EqualsCI(row.Field<string>("AZIONE"), "PRESA_IN_CARICO") : true) &&
-                        (_isFileWithMessagges
-                            ? string.IsNullOrWhiteSpace(row.Field<string>("PRIMO_MSG_OPERATORE"))
-                            : row.Field<string>("NUM_RICHIESTE_STUDENTE") != "0")
-                    );
-
-                if (!filteredRows.Any())
+                // Solo analisi ed esportazione: nessun aggiornamento di VALIDAZIONE_TICKET.
+                tickets = TicketClosureReview.SelectEligible(tickets);
+                if (tickets.Rows.Count == 0)
                     throw new Exception("Nessun ticket presente nel file che soddisfa i requisiti");
-
-                tickets = filteredRows.CopyToDataTable();
                 Logger.LogInfo(null, $"Filtraggio ticket completato. Ticket da elaborare: {tickets.Rows.Count}");
+
+                // Conserva l'anno dichiarato nell'export prima di calcolare i campi derivati.
+                AddStringCol(tickets, "AA_DICHIARATO_TICKET");
+                foreach (DataRow row in tickets.Rows)
+                    if (string.IsNullOrWhiteSpace(SafeStr(row, "AA_DICHIARATO_TICKET")))
+                        row["AA_DICHIARATO_TICKET"] = SafeStr(row, "ANNO_ACCADEMICO_RICHIESTA");
 
                 // drop colonne non necessarie
                 string[] columnsToRemove = _isFileWithMessagges
@@ -224,27 +207,12 @@ namespace ProcedureNet7
                     null,
                     $"Classificazione completata. Ticket classificati: {classifiedCount}; da verificare: {lowConfidenceCount}");
 
-                Logger.LogInfo(null, "Sincronizzazione degli argomenti nella tabella VALIDAZIONE_TICKET");
-                SyncTopicsToValidazioneTicket(tickets, CONNECTION);
-                Logger.LogInfo(null, "Sincronizzazione degli argomenti completata");
-
                 // export
                 string directoryPath = Path.GetDirectoryName(ticketFilePath) ?? AppDomain.CurrentDomain.BaseDirectory;
-                var sheetContext = new TicketTopicSheetContext(
-                    tickets,
-                    allAcademicYears,
-                    officeRecords,
-                    CONNECTION,
-                    CurrentApplicationAcademicYear);
-
-                ITicketTopicSheet[] topicSheets = TicketTopicModuleRegistry.CreateSheets();
-
-                Logger.LogInfo(null, $"Avvio creazione file Excel multi-foglio nella cartella: {directoryPath}");
-                string excelFile = TicketWorkbookExporter.Export(
-                    tickets,
-                    sheetContext,
-                    topicSheets,
-                    directoryPath);
+                DataTable closureReview = TicketClosureReview.Build(tickets, officeRecords);
+                int closable = closureReview.AsEnumerable().Count(row => SafeStr(row, "AZIONE_PROPOSTA") == "CHIUDERE");
+                Logger.LogInfo(null, $"Valutazione chiusure completata. Chiudibili: {closable}; da verificare: {closureReview.Rows.Count - closable}");
+                string excelFile = TicketClosureWorkbook.Export(closureReview, directoryPath);
                 Logger.LogInfo(null, $"File Excel pronto: {excelFile}");
 
                 if (_sendMail)

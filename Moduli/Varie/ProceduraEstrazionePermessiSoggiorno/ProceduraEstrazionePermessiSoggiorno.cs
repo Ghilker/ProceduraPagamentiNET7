@@ -90,6 +90,7 @@ WITH base AS (
        inner join vesiti_concorsiPA vpa on d.anno_accademico = vpa.anno_accademico and d.num_domanda = vpa.num_domanda and vpa.cod_tipo_esito = 2
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
+    --WHERE vs.Motivazione_permesso = '05'
 	--where d.Num_domanda in (select num_domanda from vMotivazioni_blocco_pagamenti where anno_accademico in (20252026, 20242025) and Cod_tipologia_blocco = 'BPP')
 )
 SELECT DISTINCT Cod_fiscale

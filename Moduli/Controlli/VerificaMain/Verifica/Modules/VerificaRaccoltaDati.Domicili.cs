@@ -1,3 +1,4 @@
+using ProcedureNet7.Verifica;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -8,9 +9,8 @@ namespace ProcedureNet7
 {
     internal sealed partial class VerificaRaccoltaDati
     {
-        private const string DomiciliNuovaGestionePopulationSql = @"
+        internal const string DomiciliNuovaGestionePopulationSql = @"
 SET NOCOUNT ON;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 ;WITH D AS
 (
@@ -56,13 +56,17 @@ JOIN Domicili dom
  AND dom.ANNO_ACCADEMICO = @AA
  AND UPPER(REPLACE(LTRIM(RTRIM(dom.COD_FISCALE)), ' ', '')) = D.CodFiscale
  AND dom.DATA_FINE_VALIDITA IS NULL
+ AND dom.IS_DELETED = 0
+ AND dom.TIPO_LUOGO = 'DOM'
  AND dom.IS_EQUAL_RESIDENZA = 0
 LEFT JOIN Contratti con
   ON con.ID_DOMICILIO = dom.ID
  AND con.DATA_FINE_VALIDITA IS NULL
+ AND con.IS_DELETED = 0
 LEFT JOIN Proroghe pro
   ON pro.ID_CONTRATTO = con.ID
  AND pro.DATA_FINE_VALIDITA IS NULL
+ AND pro.IS_DELETED = 0
 ORDER BY
     D.NumDomanda,
     dom.ID,
@@ -76,7 +80,14 @@ ORDER BY
                 "VerificaRaccoltaDati.LoadDomiciliNuovaGestione",
                 $"AA={context.AnnoAccademico}");
 
-            foreach (var info in context.Students.Values)
+            using var cmd = CreatePopulationCommand(DomiciliNuovaGestionePopulationSql, context);
+            LoadDomiciliNuovaGestione(cmd, context.Students);
+        }
+
+        internal static void LoadDomiciliNuovaGestione(
+            SqlCommand command, IReadOnlyDictionary<StudentKey, StudenteInfo> students)
+        {
+            foreach (var info in students.Values)
             {
                 info.InformazioniSede.UsaNuovaGestioneDomicili = true;
                 info.InformazioniSede.DomiciliNuovaGestione.Clear();
@@ -86,15 +97,11 @@ ORDER BY
                 info.InformazioniSede.HasUltimaIstanzaChiusaDomicilio = false;
             }
 
-            var domiciliByKey =
-                new Dictionary<(StudentKey Studente, long DomicilioId), DomicilioAnalisiInput>();
-            var contrattiByKey =
-                new Dictionary<(StudentKey Studente, long ContrattoId), ContrattoDomicilioAnalisiInput>();
-            var prorogheCaricate =
-                new HashSet<(StudentKey Studente, long ContrattoId, long ProrogaId)>();
+            var domiciliByKey = new Dictionary<(StudentKey Studente, long DomicilioId), DomicilioAnalisiInput>();
+            var contrattiByKey = new Dictionary<(StudentKey Studente, long ContrattoId), ContrattoDomicilioAnalisiInput>();
+            var prorogheCaricate = new HashSet<(StudentKey Studente, long ContrattoId, long ProrogaId)>();
 
-            using var cmd = CreatePopulationCommand(DomiciliNuovaGestionePopulationSql, context);
-            using var reader = cmd.ExecuteReader();
+            using var reader = command.ExecuteReader();
 
             while (reader.Read())
             {
@@ -102,7 +109,7 @@ ORDER BY
                     reader.SafeGetString("CodFiscale"),
                     reader.SafeGetString("NumDomanda"));
 
-                if (!TryGetStudentInfo(studentKey, out var info))
+                if (!students.TryGetValue(studentKey, out var info))
                     continue;
 
                 long domicilioId = GetRequiredInt64(reader, "DomicilioId");
@@ -117,12 +124,10 @@ ORDER BY
                         Indirizzo = reader.SafeGetString("DomicilioIndirizzo").Trim(),
                         NumeroCivico = reader.SafeGetString("DomicilioNumeroCivico").Trim(),
                         Cap = reader.SafeGetString("DomicilioCap").Trim(),
-                        TipoDomicilio =
-                            (TipoDomicilioAnalisi)reader.SafeGetInt("DomicilioTipo"),
+                        TipoDomicilio = (TipoDomicilioAnalisi)reader.SafeGetInt("DomicilioTipo"),
                         DataInizio = GetNullableDateTime(reader, "DomicilioDataInizio"),
                         DataFine = GetNullableDateTime(reader, "DomicilioDataFine"),
-                        InserimentoDatiContratto =
-                            reader.SafeGetBool("DomicilioInserimentoDatiContratto")
+                        InserimentoDatiContratto = reader.SafeGetBool("DomicilioInserimentoDatiContratto")
                     };
 
                     domiciliByKey.Add(domicilioKey, domicilio);
@@ -139,28 +144,17 @@ ORDER BY
                     contratto = new ContrattoDomicilioAnalisiInput
                     {
                         Id = contrattoId.Value,
-                        TipoContratto =
-                            (TipoContrattoDomicilioAnalisi)reader.SafeGetInt("ContrattoTipo"),
-                        NumeroSerieContratto =
-                            reader.SafeGetString("ContrattoNumeroSerie").Trim(),
-                        DataRegistrazioneContratto =
-                            GetNullableDateTime(reader, "ContrattoDataRegistrazione"),
-                        DenominazioneEnte =
-                            reader.SafeGetString("ContrattoDenominazioneEnte").Trim(),
-                        ImportoRata =
-                            GetNullableDecimalValue(reader, "ContrattoImportoRata"),
-                        TipoEnte =
-                            reader.SafeGetString("ContrattoTipoEnte").Trim().ToUpperInvariant(),
-                        NumeroSerieSubentro =
-                            reader.SafeGetString("ContrattoNumeroSerieSubentro").Trim(),
-                        DataInizioSubentro =
-                            GetNullableDateTime(reader, "ContrattoDataInizioSubentro"),
-                        DataCessazione =
-                            GetNullableDateTime(reader, "ContrattoDataCessazione"),
-                        DataInizio =
-                            GetNullableDateTime(reader, "ContrattoDataInizio"),
-                        DataFine =
-                            GetNullableDateTime(reader, "ContrattoDataFine")
+                        TipoContratto = (TipoContrattoDomicilioAnalisi)reader.SafeGetInt("ContrattoTipo"),
+                        NumeroSerieContratto = reader.SafeGetString("ContrattoNumeroSerie").Trim(),
+                        DataRegistrazioneContratto = GetNullableDateTime(reader, "ContrattoDataRegistrazione"),
+                        DenominazioneEnte = reader.SafeGetString("ContrattoDenominazioneEnte").Trim(),
+                        ImportoRata = GetNullableDecimalValue(reader, "ContrattoImportoRata"),
+                        TipoEnte = reader.SafeGetString("ContrattoTipoEnte").Trim().ToUpperInvariant(),
+                        NumeroSerieSubentro = reader.SafeGetString("ContrattoNumeroSerieSubentro").Trim(),
+                        DataInizioSubentro = GetNullableDateTime(reader, "ContrattoDataInizioSubentro"),
+                        DataCessazione = GetNullableDateTime(reader, "ContrattoDataCessazione"),
+                        DataInizio = GetNullableDateTime(reader, "ContrattoDataInizio"),
+                        DataFine = GetNullableDateTime(reader, "ContrattoDataFine")
                     };
 
                     contrattiByKey.Add(contrattoKey, contratto);
@@ -179,12 +173,9 @@ ORDER BY
                     new ProrogaDomicilioAnalisiInput
                     {
                         Id = prorogaId.Value,
-                        NumeroSerieProroga =
-                            reader.SafeGetString("ProrogaNumeroSerie").Trim(),
-                        DataDecorrenza =
-                            GetNullableDateTime(reader, "ProrogaDataDecorrenza"),
-                        DataScadenza =
-                            GetNullableDateTime(reader, "ProrogaDataScadenza")
+                        NumeroSerieProroga = reader.SafeGetString("ProrogaNumeroSerie").Trim(),
+                        DataDecorrenza = GetNullableDateTime(reader, "ProrogaDataDecorrenza"),
+                        DataScadenza = GetNullableDateTime(reader, "ProrogaDataScadenza")
                     });
             }
         }

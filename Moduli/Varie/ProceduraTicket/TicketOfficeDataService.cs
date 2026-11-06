@@ -15,9 +15,7 @@ namespace ProcedureNet7
             Cod_fiscale VARCHAR(16) NOT NULL PRIMARY KEY
         );
 
-        La query mantiene dbo.SlashDescrBlocchi perché il relativo schema sorgente
-        non è disponibile in questo file. Per eliminare anche quell'ultimo costo
-        per-riga, sostituire la funzione con una CTE/inline table-valued function.
+        I blocchi sono letti dalle righe attive, conservandone i codici originali.
     */
 
     internal sealed class TicketOfficeRecord
@@ -34,6 +32,8 @@ namespace ProcedureNet7
         public decimal SpecificheAmount { get; set; }
         // I seguenti valori includono esclusivamente movimenti con Cod_tipo_pagam che inizia con "BS".
         public decimal BsPaidAmount { get; set; }
+        public decimal TaxRefundPaidAmount { get; set; }
+        public string TaxRefundMandates { get; set; } = string.Empty;
         public decimal BsReversalAmount { get; set; }
         public decimal DeductionAmount { get; set; }
         public string BsPaymentTypes { get; set; } = string.Empty;
@@ -74,6 +74,11 @@ namespace ProcedureNet7
         public string Swift { get; set; } = string.Empty;
         public bool ForeignTransfer { get; set; }
         public string Blocks { get; set; } = string.Empty;
+        public string ActiveBlockCodes { get; set; } = string.Empty;
+        public bool HasBlockCodeData { get; set; }
+        public string PaymentEvidence { get; set; } = string.Empty;
+        public string DomicileRequestNumber { get; set; } = string.Empty;
+        public DateTime? DomicileRequestDate { get; set; }
         public int CourseYear { get; set; }
         public string StudyType { get; set; } = string.Empty;
         public string DegreeCourse { get; set; } = string.Empty;
@@ -264,6 +269,8 @@ namespace ProcedureNet7
                 BenefitAmount = ReadDecimal(reader, ordinals, "ImportoBeneficio"),
                 SpecificheAmount = ReadDecimal(reader, ordinals, "ImportoSpecifiche"),
                 BsPaidAmount = ReadDecimal(reader, ordinals, "ImportoPagatoBS"),
+                TaxRefundPaidAmount = ReadDecimal(reader, ordinals, "ImportoRimborsoTassa"),
+                TaxRefundMandates = ReadString(reader, ordinals, "MandatiRimborsoTassa"),
                 BsPaymentTypes = ReadString(reader, ordinals, "TipiPagamentoBS"),
                 BsMandates = ReadString(reader, ordinals, "MandatiBS"),
                 BsFirstInstallmentMandates = ReadString(reader, ordinals, "MandatiPrimaRataBS"),
@@ -294,6 +301,11 @@ namespace ProcedureNet7
                 Swift = ReadString(reader, ordinals, "Swift"),
                 ForeignTransfer = ReadBool(reader, ordinals, "BonificoEstero"),
                 Blocks = ReadString(reader, ordinals, "Blocchi"),
+                ActiveBlockCodes = ReadString(reader, ordinals, "CodiciBlocchiAttivi"),
+                HasBlockCodeData = ReadBool(reader, ordinals, "DatiBlocchiDisponibili"),
+                PaymentEvidence = ReadString(reader, ordinals, "DettaglioPagamenti"),
+                DomicileRequestNumber = ReadString(reader, ordinals, "UltimaIstanzaDomicilio"),
+                DomicileRequestDate = ReadNullableDate(reader, ordinals, "DataUltimaIstanzaDomicilio"),
                 CourseYear = ReadInt(reader, ordinals, "AnnoCorso"),
                 StudyType = ReadString(reader, ordinals, "TipoStudi"),
                 DegreeCourse = ReadString(reader, ordinals, "CorsoLaurea"),
@@ -428,7 +440,7 @@ CREATE UNIQUE CLUSTERED INDEX IX_FiscalCodes
             PARTITION BY d.Cod_fiscale, d.Anno_accademico, d.Num_domanda
             ORDER BY d.Data_validita DESC, d.DataCreazioneRecord DESC
         ) AS rnDomanda
-    FROM Domanda d WITH (READUNCOMMITTED)
+    FROM Domanda d
     INNER JOIN #FiscalCodes f
         ON f.Cod_fiscale = d.Cod_fiscale
 ),
@@ -486,7 +498,7 @@ StatusCompilazione AS
         d.Num_domanda,
         MAX(TRY_CONVERT(INT, v.status_compilazione)) AS StatusCompilazione
     FROM #Domande d
-    INNER JOIN vStatus_compilazione v WITH (READUNCOMMITTED)
+    INNER JOIN vStatus_compilazione v
         ON v.Anno_accademico = d.Anno_accademico
        AND v.Num_domanda = d.Num_domanda
     GROUP BY d.Anno_accademico, d.Num_domanda
@@ -502,9 +514,9 @@ EsitiRanked AS
         ROW_NUMBER() OVER
         (
             PARTITION BY e.Anno_accademico, e.Num_domanda, e.Cod_beneficio
-            ORDER BY e.Data_validita DESC
+            ORDER BY e.Data_validita DESC, e.Id_Esiti_concorsi DESC
         ) AS rn
-    FROM Esiti_concorsi e WITH (READUNCOMMITTED)
+    FROM Esiti_concorsi e
     INNER JOIN #Domande d
         ON d.Anno_accademico = e.Anno_accademico
        AND d.Num_domanda = e.Num_domanda
@@ -537,7 +549,7 @@ SpecificheRanked AS
             PARTITION BY s.Anno_accademico, s.Num_domanda
             ORDER BY s.Data_validita DESC
         ) AS rn
-    FROM Specifiche_impegni s WITH (READUNCOMMITTED)
+    FROM Specifiche_impegni s
     INNER JOIN #Domande d
         ON d.Anno_accademico = s.Anno_accademico
        AND d.Num_domanda = s.Num_domanda
@@ -572,6 +584,10 @@ PagamentiAggregati AS
     SELECT
         p.Anno_accademico,
         p.Num_domanda,
+        SUM(CASE WHEN ISNULL(p.Ritirato_azienda, 0) <> 1 AND p.Cod_tipo_pagam IN ('BST0','BST1','BST2')
+                 THEN TRY_CONVERT(DECIMAL(18, 2), p.Imp_pagato) ELSE 0 END) AS ImportoRimborsoTassa,
+        STRING_AGG(CASE WHEN ISNULL(p.Ritirato_azienda, 0) <> 1 AND p.Cod_tipo_pagam IN ('BST0','BST1','BST2')
+                         THEN CONVERT(NVARCHAR(MAX), p.Cod_mandato) END, ' | ') AS MandatiRimborsoTassa,
         SUM(CASE WHEN ISNULL(p.Ritirato_azienda, 0) <> 1
                       AND p.Cod_tipo_pagam IN ('BSP0','BSP1','BSP2','BSS0','BSS1','BSS2','BSI0','BSI1','BSI2','BSI9','BSIA','BSIB')
                  THEN TRY_CONVERT(DECIMAL(18, 2), p.Imp_pagato) ELSE 0 END) AS ImportoPagatoBS,
@@ -594,7 +610,7 @@ PagamentiAggregati AS
         SUM(CASE WHEN ISNULL(p.Ritirato_azienda, 0) = 1
                  THEN TRY_CONVERT(DECIMAL(18, 2), p.Imp_pagato) ELSE 0 END) AS ImportoPagamentiBSStornati,
         SUM(CASE WHEN ISNULL(p.Ritirato_azienda, 0) <> 1
-                      AND p.Cod_tipo_pagam NOT IN ('BSP0','BSP1','BSP2','BSS0','BSS1','BSS2','BSI0','BSI1','BSI2','BSI9','BSIA','BSIB')
+                      AND p.Cod_tipo_pagam NOT IN ('BSP0','BSP1','BSP2','BSS0','BSS1','BSS2','BSI0','BSI1','BSI2','BSI9','BSIA','BSIB','BST0','BST1','BST2')
                  THEN TRY_CONVERT(DECIMAL(18, 2), p.Imp_pagato) ELSE 0 END) AS ImportoBSNonClassificato,
         STRING_AGG(CASE WHEN ISNULL(p.Ritirato_azienda, 0) <> 1
                               AND p.Cod_tipo_pagam IN ('BSP0','BSP1','BSP2','BSS0','BSS1','BSS2','BSI0','BSI1','BSI2','BSI9','BSIA','BSIB')
@@ -619,13 +635,17 @@ PagamentiAggregati AS
         STRING_AGG(CASE WHEN ISNULL(p.Ritirato_azienda, 0) = 1
                          THEN CONVERT(NVARCHAR(MAX), p.Cod_mandato) END, ' | ') AS MandatiBSStornati,
         STRING_AGG(CASE WHEN ISNULL(p.Ritirato_azienda, 0) <> 1
-                              AND p.Cod_tipo_pagam NOT IN ('BSP0','BSP1','BSP2','BSS0','BSS1','BSS2','BSI0','BSI1','BSI2','BSI9','BSIA','BSIB')
-                         THEN CONVERT(NVARCHAR(MAX), p.Cod_tipo_pagam) END, ' | ') AS TipiPagamentoBSNonClassificati
-    FROM Pagamenti p WITH (READUNCOMMITTED)
+                              AND p.Cod_tipo_pagam NOT IN ('BSP0','BSP1','BSP2','BSS0','BSS1','BSS2','BSI0','BSI1','BSI2','BSI9','BSIA','BSIB','BST0','BST1','BST2')
+                         THEN CONVERT(NVARCHAR(MAX), p.Cod_tipo_pagam) END, ' | ') AS TipiPagamentoBSNonClassificati,
+        STRING_AGG(CONVERT(NVARCHAR(MAX), CONCAT(p.Cod_tipo_pagam, ': mandato ', RTRIM(p.Cod_mandato),
+            ' del ', CONVERT(VARCHAR(10), p.Data_emissione_mandato, 23), '; lordo ', p.Imp_pagato,
+            '; ritirato=', ISNULL(p.Ritirato_azienda, '0'))), ' | ') AS DettaglioPagamenti
+    FROM Pagamenti p
     INNER JOIN #Domande d
         ON d.Anno_accademico = p.Anno_accademico
        AND d.Num_domanda = p.Num_domanda
     WHERE p.Cod_tipo_pagam LIKE 'BS%'
+      AND ISNULL(LTRIM(RTRIM(CONVERT(NVARCHAR(100), p.Cod_mandato))), '') NOT IN ('', '0')
     GROUP BY p.Anno_accademico, p.Num_domanda
 ),
 ReversaliAggregate AS
@@ -636,7 +656,7 @@ ReversaliAggregate AS
         r.Num_domanda,
         SUM(TRY_CONVERT(DECIMAL(18, 2), r.Importo)) AS ImportoReversaliBS,
         STRING_AGG(CONVERT(NVARCHAR(MAX), r.Cod_tipo_pagam), ' | ') AS TipiReversaleBS
-    FROM Reversali r WITH (READUNCOMMITTED)
+    FROM Reversali r
     INNER JOIN #Domande d
         ON d.Anno_accademico = r.Anno_accademico
        AND d.Num_domanda = r.Num_domanda
@@ -651,7 +671,7 @@ Detrazioni AS
         d.Anno_accademico,
         SUM(TRY_CONVERT(DECIMAL(18, 2), m.IMPORTO)) AS ImportoDetrazioni
     FROM #Domande d
-    INNER JOIN MOVIMENTI_CONTABILI_ELEMENTARI m WITH (READUNCOMMITTED)
+    INNER JOIN MOVIMENTI_CONTABILI_ELEMENTARI m
         ON m.ANNO_ACCADEMICO = d.Anno_accademico
        AND m.CODICE_FISCALE = d.Cod_fiscale
     WHERE (m.SEGNO = 0 OR m.SEGNO IS NULL)
@@ -677,7 +697,7 @@ ModalitaPagamentoRanked AS
                 CONVERT(NVARCHAR(100), vmp.modalita_pagamento) ASC,
                 CONVERT(NVARCHAR(100), vmp.Swift) ASC
         ) AS rn
-    FROM vMODALITA_PAGAMENTO vmp WITH (READUNCOMMITTED)
+    FROM vMODALITA_PAGAMENTO vmp
     INNER JOIN Studenti s
         ON s.Cod_fiscale = vmp.Cod_fiscale
     WHERE vmp.Data_fine_validita IS NULL
@@ -703,11 +723,11 @@ IscrizioniRanked AS
             PARTITION BY i.Cod_fiscale, i.Anno_accademico
             ORDER BY i.Data_validita DESC
         ) AS rn
-    FROM Iscrizioni i WITH (READUNCOMMITTED)
+    FROM Iscrizioni i
     INNER JOIN StudentiAnno sa
         ON sa.Cod_fiscale = i.Cod_fiscale
        AND sa.Anno_accademico = i.Anno_accademico
-    LEFT JOIN Sede_studi ss WITH (READUNCOMMITTED)
+    LEFT JOIN Sede_studi ss
         ON ss.Cod_sede_studi = i.Cod_sede_studi
 ),
 Iscrizioni AS
@@ -736,7 +756,7 @@ MeritoRanked AS
             PARTITION BY m.Anno_accademico, m.Num_domanda
             ORDER BY m.Data_validita DESC
         ) AS rn
-    FROM Merito m WITH (READUNCOMMITTED)
+    FROM Merito m
     INNER JOIN #Domande d
         ON d.Anno_accademico = m.Anno_accademico
        AND d.Num_domanda = m.Num_domanda
@@ -766,7 +786,7 @@ CarrieraPregressaRanked AS
             PARTITION BY c.Cod_fiscale, c.Anno_accademico, c.Cod_avvenimento
             ORDER BY c.Data_validita DESC
         ) AS rn
-    FROM Carriera_pregressa c WITH (READUNCOMMITTED)
+    FROM Carriera_pregressa c
     INNER JOIN StudentiAnno sa
         ON sa.Cod_fiscale = c.Cod_fiscale
        AND sa.Anno_accademico = c.Anno_accademico
@@ -800,7 +820,7 @@ ValoriCalcolatiRanked AS
             PARTITION BY v.Anno_accademico, v.Num_domanda
             ORDER BY v.Data_validita DESC
         ) AS rn
-    FROM Valori_calcolati v WITH (READUNCOMMITTED)
+    FROM Valori_calcolati v
     INNER JOIN #Domande d
         ON d.Anno_accademico = v.Anno_accademico
        AND d.Num_domanda = v.Num_domanda
@@ -823,7 +843,7 @@ TipologieRedditiRanked AS
             PARTITION BY t.Anno_accademico, t.Num_domanda
             ORDER BY t.Data_validita DESC
         ) AS rn
-    FROM Tipologie_redditi t WITH (READUNCOMMITTED)
+    FROM Tipologie_redditi t
     INNER JOIN #Domande d
         ON d.Anno_accademico = t.Anno_accademico
        AND d.Num_domanda = t.Num_domanda
@@ -849,7 +869,7 @@ DomiciliRanked AS
             PARTITION BY l.Cod_fiscale, l.Anno_accademico
             ORDER BY l.Data_validita DESC
         ) AS rn
-    FROM Luogo_reperibilita_studente l WITH (READUNCOMMITTED)
+    FROM Luogo_reperibilita_studente l
     INNER JOIN StudentiAnno sa
         ON sa.Cod_fiscale = l.Cod_fiscale
        AND sa.Anno_accademico = l.Anno_accademico
@@ -874,11 +894,11 @@ IstanzeAperte AS
         idg.Cod_fiscale,
         idg.Anno_accademico,
         CAST(1 AS BIT) AS HasOpen
-    FROM Istanza_dati_generali idg WITH (READUNCOMMITTED)
+    FROM Istanza_dati_generali idg
     INNER JOIN StudentiAnno sa
         ON sa.Cod_fiscale = idg.Cod_fiscale
        AND sa.Anno_accademico = idg.Anno_accademico
-    INNER JOIN Istanza_status s WITH (READUNCOMMITTED)
+    INNER JOIN Istanza_status s
         ON s.Num_istanza = idg.Num_istanza
        AND s.Data_fine_validita IS NULL
     WHERE idg.Cod_tipo_istanza = '01'
@@ -896,11 +916,11 @@ IstanzeChiuseRanked AS
             PARTITION BY idg.Cod_fiscale, idg.Anno_accademico
             ORDER BY idg.Data_validita DESC, idg.Num_istanza DESC
         ) AS rn
-    FROM Istanza_dati_generali idg WITH (READUNCOMMITTED)
+    FROM Istanza_dati_generali idg
     INNER JOIN StudentiAnno sa
         ON sa.Cod_fiscale = idg.Cod_fiscale
        AND sa.Anno_accademico = idg.Anno_accademico
-    INNER JOIN Istanza_status s WITH (READUNCOMMITTED)
+    INNER JOIN Istanza_status s
         ON s.Num_istanza = idg.Num_istanza
        AND s.Data_fine_validita IS NOT NULL
     WHERE idg.Cod_tipo_istanza = '01'
@@ -923,7 +943,7 @@ Mensa AS
         m.Anno_accademico,
         m.Num_domanda,
         MAX(CASE WHEN TRY_CONVERT(INT, m.Concessa_monetizzazione) = 1 THEN 1 ELSE 0 END) AS ConcessaMonetizzazione
-    FROM vMonetizzazione_mensa m WITH (READUNCOMMITTED)
+    FROM vMonetizzazione_mensa m
     INNER JOIN #Domande d
         ON d.Anno_accademico = m.Anno_accademico
        AND d.Num_domanda = m.Num_domanda
@@ -933,9 +953,9 @@ AllegatiPermesso AS
 (
     SELECT DISTINCT a.Id_allegato
     FROM #Domande d
-    INNER JOIN Allegati a WITH (READUNCOMMITTED)
+    INNER JOIN Allegati a
         ON a.Cod_fiscale = d.Cod_fiscale
-    INNER JOIN Specifiche_permesso_soggiorno sp WITH (READUNCOMMITTED)
+    INNER JOIN Specifiche_permesso_soggiorno sp
         ON sp.Id_allegato = a.Id_allegato
        AND (sp.Anno_accademico IS NULL OR sp.Anno_accademico = d.Anno_accademico)
     WHERE sp.Tipo_documento IN ('01', '02', '03')
@@ -951,7 +971,7 @@ StatusAllegatiRanked AS
             PARTITION BY s.Id_allegato
             ORDER BY s.Data_validita DESC
         ) AS rn
-    FROM Status_allegati s WITH (READUNCOMMITTED)
+    FROM Status_allegati s
     INNER JOIN AllegatiPermesso ap
         ON ap.Id_allegato = s.Id_allegato
 ),
@@ -968,9 +988,9 @@ PermessiRanked AS
             ORDER BY sp.Data_validita DESC, sa.Data_validita DESC
         ) AS rn
     FROM #Domande d
-    INNER JOIN Allegati a WITH (READUNCOMMITTED)
+    INNER JOIN Allegati a
         ON a.Cod_fiscale = d.Cod_fiscale
-    INNER JOIN Specifiche_permesso_soggiorno sp WITH (READUNCOMMITTED)
+    INNER JOIN Specifiche_permesso_soggiorno sp
         ON sp.Id_allegato = a.Id_allegato
        AND (sp.Anno_accademico IS NULL OR sp.Anno_accademico = d.Anno_accademico)
     LEFT JOIN StatusAllegatiRanked sa
@@ -1002,7 +1022,7 @@ GraduatorieRanked AS
             PARTITION BY g.Anno_accademico, g.Num_domanda, g.Cod_beneficio, g.Cod_tipo_graduat
             ORDER BY g.Data_validita DESC
         ) AS rn
-    FROM Graduatorie g WITH (READUNCOMMITTED)
+    FROM Graduatorie g
     INNER JOIN #Domande d
         ON d.Anno_accademico = g.Anno_accademico
        AND d.Num_domanda = g.Num_domanda
@@ -1018,13 +1038,46 @@ Graduatorie AS
     WHERE rn = 1
     GROUP BY Anno_accademico, Num_domanda
 ),
+BlocchiCorrenti AS
+(
+    SELECT DISTINCT m.Anno_accademico, m.Num_domanda, ISNULL(NULLIF(RTRIM(m.Cod_tipologia_blocco), ''), '?') AS Cod_tipologia_blocco
+    FROM Motivazioni_blocco_pagamenti m
+    INNER JOIN #Domande d ON d.Anno_accademico = m.Anno_accademico AND d.Num_domanda = m.Num_domanda
+    WHERE m.Blocco_pagamento_attivo = '1'
+),
+BlocchiAggregati AS
+(
+    SELECT b.Anno_accademico, b.Num_domanda,
+        STRING_AGG(CONVERT(NVARCHAR(MAX), RTRIM(b.Cod_tipologia_blocco)), ' | ') AS Codici,
+        STRING_AGG(CONVERT(NVARCHAR(MAX), CONCAT(RTRIM(b.Cod_tipologia_blocco), ': ', t.Descrizione)), ' | ') AS Descrizioni
+    FROM BlocchiCorrenti b
+    OUTER APPLY (
+        SELECT TOP (1) x.Descrizione FROM Tipologie_motivazioni_blocco_pag x
+        WHERE x.Cod_tipologia_blocco = b.Cod_tipologia_blocco
+        ORDER BY x.Data_validita DESC, x.Id_Tipologie_motivazioni_blocco_pag DESC
+    ) t
+    GROUP BY b.Anno_accademico, b.Num_domanda
+),
+UltimaIstanzaDomicilio AS
+(
+    SELECT idg.Cod_fiscale, idg.Anno_accademico, idg.Num_istanza, submitted.Data_validita,
+        ROW_NUMBER() OVER (PARTITION BY idg.Cod_fiscale, idg.Anno_accademico ORDER BY submitted.Data_validita DESC, idg.Num_istanza DESC) AS rn
+    FROM Istanza_dati_generali idg
+    INNER JOIN StudentiAnno sa ON sa.Cod_fiscale = idg.Cod_fiscale AND sa.Anno_accademico = idg.Anno_accademico
+    CROSS APPLY (
+        SELECT TOP (1) s.Data_validita FROM Istanza_status s
+        WHERE s.Num_istanza = idg.Num_istanza AND s.Cod_status_istanza = '01'
+        ORDER BY s.Data_validita DESC, s.Id_status_istanza DESC
+    ) submitted
+    WHERE idg.cod_tipo_istanza IN ('01', '04B')
+),
 Mobilita AS
 (
     SELECT
         b.Anno_accademico,
         b.Num_domanda,
         MAX(CASE WHEN b.Cod_beneficio = 'CI' THEN 1 ELSE 0 END) AS MobilitaRichiesta
-    FROM Benefici_richiesti b WITH (READUNCOMMITTED)
+    FROM Benefici_richiesti b
     INNER JOIN #Domande d
         ON d.Anno_accademico = b.Anno_accademico
        AND d.Num_domanda = b.Num_domanda
@@ -1043,6 +1096,8 @@ SELECT
     ISNULL(e.ImportoBeneficio, 0) AS ImportoBeneficio,
     ISNULL(si.ImportoSpecifiche, 0) AS ImportoSpecifiche,
     ISNULL(pag.ImportoPagatoBS, 0) AS ImportoPagatoBS,
+    ISNULL(pag.ImportoRimborsoTassa, 0) AS ImportoRimborsoTassa,
+    ISNULL(pag.MandatiRimborsoTassa, '') AS MandatiRimborsoTassa,
     ISNULL(pag.TipiPagamentoBS, '') AS TipiPagamentoBS,
     ISNULL(pag.MandatiBS, '') AS MandatiBS,
     ISNULL(pag.MandatiPrimaRataBS, '') AS MandatiPrimaRataBS,
@@ -1072,7 +1127,12 @@ SELECT
     mp.IbanDataValidita AS IbanDataValidita,
     ISNULL(mp.Swift, '') AS Swift,
     ISNULL(mp.BonificoEstero, 0) AS BonificoEstero,
-    ISNULL(dbo.SlashDescrBlocchi(d.Num_domanda, d.Anno_accademico, ''), '') AS Blocchi,
+    ISNULL(bl.Descrizioni, '') AS Blocchi,
+    ISNULL(bl.Codici, '') AS CodiciBlocchiAttivi,
+    CAST(1 AS BIT) AS DatiBlocchiDisponibili,
+    ISNULL(pag.DettaglioPagamenti, '') AS DettaglioPagamenti,
+    ISNULL(CONVERT(VARCHAR(20), uid.Num_istanza), '') AS UltimaIstanzaDomicilio,
+    uid.Data_validita AS DataUltimaIstanzaDomicilio,
     ISNULL(isc.AnnoCorso, 0) AS AnnoCorso,
     ISNULL(isc.TipoStudi, '') AS TipoStudi,
     ISNULL(isc.CorsoLaurea, '') AS CorsoLaurea,
@@ -1105,6 +1165,8 @@ SELECT
     ISNULL(gr.GraduatorieDefinitive, '') AS GraduatorieDefinitive,
     ISNULL(mob.MobilitaRichiesta, 0) AS MobilitaRichiesta
 FROM #Domande d
+LEFT JOIN BlocchiAggregati bl ON bl.Anno_accademico = d.Anno_accademico AND bl.Num_domanda = d.Num_domanda
+LEFT JOIN UltimaIstanzaDomicilio uid ON uid.Cod_fiscale = d.Cod_fiscale AND uid.Anno_accademico = d.Anno_accademico AND uid.rn = 1
 LEFT JOIN StatusCompilazione sc
     ON sc.Anno_accademico = d.Anno_accademico
    AND sc.Num_domanda = d.Num_domanda

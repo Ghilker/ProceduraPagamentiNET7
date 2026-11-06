@@ -35,7 +35,7 @@ namespace ProcedureNet7
             }
         }
 
-        private static bool IsAnnoCorsoAmmissibile(EsitoBorsaStudentContext context)
+        internal static bool IsAnnoCorsoAmmissibile(EsitoBorsaStudentContext context)
         {
             var iscr = context.Iscrizione;
             if (iscr == null)

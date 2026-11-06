@@ -118,8 +118,8 @@ namespace ProcedureNet7
             if (info == null)
                 throw new ArgumentNullException(nameof(info));
 
-            // Il vincitore PA ha diritto al fuori sede anche senza domicilio, incluso il saldo.
-            if (IsVincitorePa(info))
+            // Il vincitore PA/PK ha diritto al fuori sede anche senza domicilio, incluso il saldo.
+            if (IsVincitoreAlloggio(info))
                 return false;
 
             string statusAttuale = (info.InformazioniSede.StatusSede ?? "").Trim().ToUpperInvariant();
@@ -228,12 +228,12 @@ WHERE Data_Fine_Validita IS NULL;";
             if (info == null)
                 throw new ArgumentNullException(nameof(info));
 
-            bool vincitorePa = IsVincitorePa(info);
-            string statusCalcolato = vincitorePa
+            bool vincitoreAlloggio = IsVincitoreAlloggio(info);
+            string statusCalcolato = vincitoreAlloggio
                 ? "B"
                 : (info.InformazioniSede.StatusSedeSuggerito ?? "").Trim().ToUpperInvariant();
-            string motivo = vincitorePa
-                ? MotivoFuoriSedeVincitorePa
+            string motivo = vincitoreAlloggio
+                ? MotivoFuoriSedeVincitoreAlloggio
                 : info.InformazioniSede.MotivoStatusSede ?? "Status sede calcolato non valorizzato";
 
             statusSede = new StatusSedeResult(
@@ -241,7 +241,7 @@ WHERE Data_Fine_Validita IS NULL;";
                 motivo,
                 info.InformazioniSede.DomicilioPresente,
                 info.InformazioniSede.DomicilioValido,
-                vincitorePa || (statusCalcolato == "B" && info.InformazioniSede.DomicilioValido));
+                vincitoreAlloggio || (statusCalcolato == "B" && info.InformazioniSede.DomicilioValido));
 
             return DevePagareComePendolarePerPagamentoDaResult(
                 info,
@@ -249,15 +249,17 @@ WHERE Data_Fine_Validita IS NULL;";
                 statusSede);
         }
 
-        private const string MotivoFuoriSedeVincitorePa = "PA: vincitore (2) => fuori sede anche senza domicilio";
+        private const string MotivoFuoriSedeVincitoreAlloggio = "PA/PK: vincitore (2) => fuori sede anche senza domicilio";
 
-        private static bool IsVincitorePa(StudenteInfo info)
+        private static bool IsVincitoreAlloggio(StudenteInfo info)
         {
             var beneficio = info.InformazioniBeneficio;
             return beneficio.VincitorePA
                    || beneficio.EsitoPA == 2
                    || (beneficio.EsitiConcorsoByBenefit.TryGetValue("PA", out var pa)
-                       && pa.CodTipoEsito == 2);
+                        && pa.CodTipoEsito == 2)
+                   || (beneficio.EsitiConcorsoByBenefit.TryGetValue("PK", out var pk)
+                        && pk.CodTipoEsito == 2);
         }
 
         private sealed class StatusSedeEvaluator
@@ -298,8 +300,8 @@ WHERE Data_Fine_Validita IS NULL;";
                         comune => IsComuneCompatibile(comune, comuneSede));
                 }
 
-                if (IsVincitorePa(info))
-                    return StatusSedeDecision.Fixed("B", MotivoFuoriSedeVincitorePa);
+                if (IsVincitoreAlloggio(info))
+                    return StatusSedeDecision.Fixed("B", MotivoFuoriSedeVincitoreAlloggio);
 
                 var forced = (info.InformazioniSede.ForzaturaStatusSede ?? "").Trim().ToUpperInvariant();
                 if (!ignoraForzature && IsValidStatus(forced))
@@ -333,7 +335,7 @@ WHERE Data_Fine_Validita IS NULL;";
                     return StatusSedeDecision.Fixed("A", "Comune residenza = Comune sede studi");
 
                 if (info.InformazioniSede.HasAlloggio12)
-                    return StatusSedeDecision.Fixed("B", "PA: idoneo/vincitore (1/2) => fuori sede");
+                    return StatusSedeDecision.Fixed("B", "PA/PK: idoneo/vincitore (1/2) => fuori sede");
 
                 bool pendolareDefaultSameProvNoLists = false;
 

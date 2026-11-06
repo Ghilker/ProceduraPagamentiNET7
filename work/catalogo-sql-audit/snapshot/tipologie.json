@@ -1,0 +1,46 @@
+[
+  {
+    "Codice": 0,
+    "Descrizione": "<Nessuna tipologia>"
+  },
+  {
+    "Codice": 1,
+    "Descrizione": "Corso di Laurea (Ante D.M. 509/99 vecchio ordinamento)"
+  },
+  {
+    "Codice": 2,
+    "Descrizione": "Corso di Diploma (Ante D.M. 509/99 vecchio ordinamento)"
+  },
+  {
+    "Codice": 3,
+    "Descrizione": "Corso di Laurea triennale"
+  },
+  {
+    "Codice": 4,
+    "Descrizione": "Corso di laurea specialistica a ciclo unico / Magistrale a percorso unitario"
+  },
+  {
+    "Codice": 5,
+    "Descrizione": "Corso di Laurea Specialistica / Magistrale"
+  },
+  {
+    "Codice": 6,
+    "Descrizione": "Dottorato di Ricerca"
+  },
+  {
+    "Codice": 7,
+    "Descrizione": "Scuola di Specializzazione"
+  },
+  {
+    "Codice": 8,
+    "Descrizione": "Corso Post-Laurea  Master"
+  },
+  {
+    "Codice": 9,
+    "Descrizione": "Titolo conseguito all'estero"
+  },
+  {
+    "Codice": 10,
+    "Descrizione": "Corso di aggiornamento/perfezionamento"
+  }
+]

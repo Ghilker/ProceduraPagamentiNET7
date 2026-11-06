@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Shared/DomicilioAutomationContracts.cs" Link="Source/Contracts.cs" />
+    <Compile Include="../../Shared/DomicilioAutomationCorrectionPatch.cs" Link="Source/CorrectionPatch.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraLavorazioneAutomaticaDomicilio/DomicilioAutomaticCorrectionPlanner.cs" Link="Source/Planner.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/ControlloDomicilioModels.cs" Link="Source/Models.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/IstanzaDomicilioModels.cs" Link="Source/IstanzaModels.cs" />
+    <Compile Include="../../Moduli/Controlli/ProceduraControlloDomicilio/IstanzaDomicilioValidator.cs" Link="Source/Validator.cs" />
+  </ItemGroup>
+</Project>

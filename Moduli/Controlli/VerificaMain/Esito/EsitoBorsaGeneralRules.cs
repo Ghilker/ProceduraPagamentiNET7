@@ -78,7 +78,7 @@ namespace ProcedureNet7
                 evaluation.Add("VAR028");
             if (facts.RevocatoIseeNonProdotta)
                 evaluation.Add("VAR029");
-            if (facts.RevocatoTrasmissioneIseeFuoriTermine)
+            if (facts.DecadutoMancataComunicazionePagamento)
                 evaluation.Add("VAR030");
             if (facts.RevocatoNoContrattoLocazione)
                 evaluation.Add("VAR031");

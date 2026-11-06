@@ -92,7 +92,6 @@ WHERE v.DATA_VALIDITA =
     FROM RINUNCE v2
     WHERE v2.ANNO_ACCADEMICO = v.ANNO_ACCADEMICO
       AND v2.NUM_DOMANDA = v.NUM_DOMANDA
-      AND v2.Riga_valida = v.Riga_valida
       AND ISNULL(v2.COD_BENEFICIO,'') = ISNULL(v.COD_BENEFICIO,'')
 );";
 
@@ -401,6 +400,7 @@ WHERE es.rn = 1
                     break;
                 case 18:
                     if (beneficio == "PA") facts.RevocatoSedeDistaccata = true;
+                    if (beneficio == "PK") facts.RevocatoSedeDistaccataPK = true;
                     break;
                 case 19:
                     if (beneficio == "00") facts.RevocatoMancataIscrizione = true;
@@ -436,7 +436,7 @@ WHERE es.rn = 1
                     if (beneficio == "00") facts.RevocatoIseeNonProdotta = true;
                     break;
                 case 30:
-                    if (beneficio == "00") facts.RevocatoTrasmissioneIseeFuoriTermine = true;
+                    if (beneficio == "00") facts.DecadutoMancataComunicazionePagamento = true;
                     break;
                 case 31:
                     if (beneficio == "00") facts.RevocatoNoContrattoLocazione = true;

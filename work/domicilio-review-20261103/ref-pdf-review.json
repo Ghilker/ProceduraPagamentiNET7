@@ -1,0 +1,3859 @@
+{
+  "source": "ref-groups.json + pdf-manifest.json",
+  "scope": "98 sole PDF_017; nessuna modifica applicativa o SQL",
+  "method": "pypdf, tutte le pagine dei documenti associati; verifica visiva di sei pagine rappresentative; nessun OCR eseguito",
+  "counts": {
+    "DICHIARATO_SOLO_SERIE": 1,
+    "EQUIVALENZA_DOCUMENTATA": 90,
+    "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE": 5,
+    "IDENTIFICATIVO_ASSEGNATO_DAL_RICHIEDENTE": 1,
+    "EQUIVALENZA_VISIVA_TESTO_CORROTTO": 1
+  },
+  "items": [
+    {
+      "id": 17594,
+      "subtype_csv": "da_ricostruire_o_discordante",
+      "result": "DICHIARATO_SOLO_SERIE",
+      "before": {
+        "declared_reference": "T3",
+        "parser_reference": "TJS26T009339000KB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "T3",
+        "parser_comparison": "DICHIARATO_SOLO_SERIE",
+        "canonical_contract_id": "TJS26T009339000KB"
+      },
+      "data_change_required_for_parser_recovery": null,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "La sola serie non identifica un contratto: sostituirla con l'identificativo sarebbe correzione dati.",
+      "all_contract_ids": [
+        "TJS26T009339000KB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2787981,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2787981_1944005.pdf",
+          "page": 2,
+          "kind": "ESTREMI_DOCUMENTALI_DA_CONFRONTARE",
+          "contract_ids": [
+            "TJS26T009339000KB"
+          ],
+          "registrations": [
+            {
+              "number": "009339",
+              "series": "3T",
+              "raw": "registrato il 07/10/2026 al n. 009339-serie 3T"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 17677,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "25101710030817853",
+        "parser_reference": "TJJ25T004958000QH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "25101710030817853",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJJ25T004958000QH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJJ25T004958000QH"
+      ],
+      "visual_review_page": 2,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788048,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788048_1944072.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "25101710030817853",
+          "pdf_protocol": "25101710030817853 - 000001",
+          "contract_id": "TJJ25T004958000QH",
+          "receipt_protocols_on_page": 1,
+          "context": "5 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 25101710030817853 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da MRSLSN73L26H901W e trasmessa da CASAITALIA S.R.L. Il contratto e' stato registrato il 1"
+        }
+      ]
+    },
+    {
+      "id": 17732,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092519385915605",
+        "parser_reference": "TJN26T018628000RI",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092519385915605",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T018628000RI"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T018628000RI"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788094,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788094_1944118.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092519385915605",
+          "pdf_protocol": "26092519385915605 - 000001",
+          "contract_id": "TJN26T018628000RI",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092519385915605 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da DLCLLD63D56B990O e trasmessa da RAFFAELE ROSALIA ANNA Il contratto e' stato registrato "
+        }
+      ]
+    },
+    {
+      "id": 17837,
+      "subtype_csv": "da_ricostruire_o_discordante",
+      "result": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+      "before": {
+        "declared_reference": "02058",
+        "parser_reference": "TJN26T020580000FF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "02058",
+        "parser_comparison": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+        "canonical_contract_id": "TJN26T020580000FF"
+      },
+      "data_change_required_for_parser_recovery": null,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "L'equivalenza non e' stata verificata automaticamente sul documento.",
+      "all_contract_ids": [
+        "TJN26T020580000FF"
+      ],
+      "visual_review_page": 1,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788177,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788177_1944201.pdf",
+          "page": 1,
+          "kind": "ESTREMI_DOCUMENTALI_DA_CONFRONTARE",
+          "contract_ids": [
+            "TJN26T020580000FF"
+          ],
+          "registrations": [
+            {
+              "number": "020580",
+              "series": "3T",
+              "raw": "registrato il 10/10/2026 al n. 020580-serie 3T"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 17838,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100318571119647",
+        "parser_reference": "TJN26T019764000AA",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100318571119647",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T019764000AA"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T019764000AA"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788186,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788186_1944210.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100318571119647",
+          "pdf_protocol": "26100318571119647 - 000001",
+          "contract_id": "TJN26T019764000AA",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100318571119647 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da GTTFNC66R47H501P e trasmessa da PANZARINI FRANCESCO Il contratto e' stato registrato il"
+        }
+      ]
+    },
+    {
+      "id": 17866,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092909541518578 - 000001",
+        "parser_reference": "TJR26T013371000VD",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092909541518578 - 000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T013371000VD"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T013371000VD"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788209,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788209_1944233.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092909541518578 - 000001",
+          "pdf_protocol": "26092909541518578 - 000001",
+          "contract_id": "TJR26T013371000VD",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092909541518578 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CRSMRC77L17H501S e trasmessa da TORRESAN CLAUDIA Il contratto e' stato registrato il 29"
+        }
+      ]
+    },
+    {
+      "id": 17892,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101917125316673",
+        "parser_reference": "TJR26T015511000MD",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101917125316673",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015511000MD"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T015511000MD"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791243,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791243_1947266.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101917125316673",
+          "pdf_protocol": "26101917125316673 - 000001",
+          "contract_id": "TJR26T015511000MD",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101917125316673 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da PSTLCN59P15H501T e trasmessa da ESIGENZA CASA S.R.L. SEMPLIFICATA Il contratto e' stato"
+        }
+      ]
+    },
+    {
+      "id": 17910,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100516401025720",
+        "parser_reference": "TJS26T009154000JJ",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100516401025720",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJS26T009154000JJ"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJS26T009154000JJ"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788231,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788231_1944255.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100516401025720",
+          "pdf_protocol": "26100516401025720 - 000001",
+          "contract_id": "TJS26T009154000JJ",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100516401025720 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da 07605420962 Il contratto e' stato registrato il 05/10/2026 al n. 009154-serie 3T e codi"
+        }
+      ]
+    },
+    {
+      "id": 17931,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26093012432516856",
+        "parser_reference": "TRF26T001682000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26093012432516856",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TRF26T001682000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TRF26T001682000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788254,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788254_1944278.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26093012432516856",
+          "pdf_protocol": "26093012432516856 - 000001",
+          "contract_id": "TRF26T001682000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26093012432516856 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da DRSNMR89D66E335L e trasmessa da DE ROSA ROBERTO Il contratto e' stato registrato il 30/"
+        }
+      ]
+    },
+    {
+      "id": 17936,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26081712010514738",
+        "parser_reference": "TJQ26T013138000OF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26081712010514738",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T013138000OF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T013138000OF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788265,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788265_1944289.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26081712010514738",
+          "pdf_protocol": "26081712010514738 - 000001",
+          "contract_id": "TJQ26T013138000OF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26081712010514738 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da BGNVTR02S05H501W e trasmessa da SERVIZIO TELEMATICO SRL Il contratto e' stato registrat"
+        }
+      ]
+    },
+    {
+      "id": 18013,
+      "subtype_csv": "da_ricostruire_o_discordante",
+      "result": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+      "before": {
+        "declared_reference": "30404357",
+        "parser_reference": "TJR25T018705000XF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "30404357",
+        "parser_comparison": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+        "canonical_contract_id": "TJR25T018705000XF"
+      },
+      "data_change_required_for_parser_recovery": null,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "L'equivalenza non e' stata verificata automaticamente sul documento.",
+      "all_contract_ids": [
+        "TJR25T018705000XF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788305,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788305_1944329.pdf",
+          "page": 2,
+          "kind": "ESTREMI_DOCUMENTALI_DA_CONFRONTARE",
+          "contract_ids": [
+            "TJR25T018705000XF"
+          ],
+          "registrations": [
+            {
+              "number": "018705",
+              "series": "3T",
+              "raw": "registrato il 27/12/2025 al n. 018705-serie 3T"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 18068,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26091710222315540",
+        "parser_reference": "TJR26T012264000TK",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26091710222315540",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T012264000TK"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T012264000TK"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788352,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788352_1944376.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26091710222315540",
+          "pdf_protocol": "26091710222315540 - 000001",
+          "contract_id": "TJR26T012264000TK",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26091710222315540 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da 17834491007 e trasmessa da TORRESAN CLAUDIA Il contratto e' stato registrato il 17/09/2"
+        }
+      ]
+    },
+    {
+      "id": 18119,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100718360213947",
+        "parser_reference": "TJS26T009379000UC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100718360213947",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJS26T009379000UC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJS26T009379000UC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788374,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788374_1944398.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100718360213947",
+          "pdf_protocol": "26100718360213947 - 000001",
+          "contract_id": "TJS26T009379000UC",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100718360213947 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da FRCGPP71C07D184P e trasmessa da SGARAMELLA SAVERIO Il contratto e' stato registrato il "
+        }
+      ]
+    },
+    {
+      "id": 18125,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0170183T",
+        "parser_reference": "TJN26T017018000EE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0170183T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T017018000EE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T017018000EE"
+      ],
+      "visual_review_page": 2,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788381,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788381_1944405.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJN26T017018000EE",
+          "number": "017018",
+          "series": "3T",
+          "raw": "registrato il 08/09/2026 al n. 017018-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 18154,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T10855",
+        "parser_reference": "TJP25T010855000NE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T10855",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJP25T010855000NE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJP25T010855000NE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 2,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788408,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788408_1944432.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJP25T010855000NE",
+          "number": "010855",
+          "series": "3T",
+          "raw": "registrato il 15/09/2025 al n. 010855-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 18196,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "25111911111241690",
+        "parser_reference": "TJU25T006188000PG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "25111911111241690",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJU25T006188000PG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJU25T006188000PG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788440,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788440_1944464.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "25111911111241690",
+          "pdf_protocol": "25111911111241690 - 000001",
+          "contract_id": "TJU25T006188000PG",
+          "receipt_protocols_on_page": 1,
+          "context": "5 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 25111911111241690 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da BRNNMR59B67H501U e trasmessa da A.S.P.P.I. ROMA Il contratto e' stato registrato il 19/"
+        }
+      ]
+    },
+    {
+      "id": 18288,
+      "subtype_csv": "id_contratto_prefissato_3t",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T/TJN26T020774000JJ",
+        "parser_reference": "TJN26T020774000JJ",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T/TJN26T020774000JJ",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T020774000JJ"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il dichiarato contiene l'intero identificativo univoco con il solo prefisso 3T e punteggiatura.",
+      "all_contract_ids": [
+        "TJN26T020774000JJ"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 10,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788530,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788530_1944553.pdf",
+          "page": 2,
+          "kind": "IDENTIFICATIVO_COMPLETO_CON_PREFISSO",
+          "label": "Codice Identificativo del contratto",
+          "value": "TJN26T020774000JJ"
+        }
+      ]
+    },
+    {
+      "id": 18374,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100511322313799",
+        "parser_reference": "TJR26T014109000NE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100511322313799",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T014109000NE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T014109000NE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788594,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788594_1944617.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100511322313799",
+          "pdf_protocol": "26100511322313799 - 000001",
+          "contract_id": "TJR26T014109000NE",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100511322313799 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da PGNDNL66C62A345U e trasmessa da UNIVERSO AFFITTI - S.R.L. SEMPLIFICATA Il contratto e' "
+        }
+      ]
+    },
+    {
+      "id": 18534,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26030641380113011",
+        "parser_reference": "TRF26T000441000UC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26030641380113011",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TRF26T000441000UC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TRF26T000441000UC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2788709,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788709_1944732.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26030641380113011",
+          "pdf_protocol": "26030641380113011 - 000001",
+          "contract_id": "TRF26T000441000UC",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26030641380113011 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da RZZRKE04E47A717T Il contratto e' stato registrato il 06/03/2026 al n. 000441-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 18894,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26091609325319391",
+        "parser_reference": "TJQ26T014448000VD",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26091609325319391",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T014448000VD"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T014448000VD"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789012,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789012_1945035.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26091609325319391",
+          "pdf_protocol": "26091609325319391 - 000001",
+          "contract_id": "TJQ26T014448000VD",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26091609325319391 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da TSCDNA63R57Z326B e trasmessa da CETORELLI GABRIELE Il contratto e' stato registrato il "
+        }
+      ]
+    },
+    {
+      "id": 18896,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T10855",
+        "parser_reference": "TJP25T010855000NE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T10855",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJP25T010855000NE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJP25T010855000NE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 2,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789014,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789014_1945037.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJP25T010855000NE",
+          "number": "010855",
+          "series": "3T",
+          "raw": "registrato il 15/09/2025 al n. 010855-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 18996,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26090833574719663-000001",
+        "parser_reference": "TJR26T011608000II",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26090833574719663-000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T011608000II"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T011608000II"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789110,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789110_1945133.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26090833574719663-000001",
+          "pdf_protocol": "26090833574719663 - 000001",
+          "contract_id": "TJR26T011608000II",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26090833574719663 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da PLRMRZ72S18H501I Il contratto e' stato registrato il 08/09/2026 al n. 011608-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 19056,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092139532910448 - 000001",
+        "parser_reference": "TJS26T008132000ZH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092139532910448 - 000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJS26T008132000ZH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJS26T008132000ZH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789188,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789188_1945211.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092139532910448 - 000001",
+          "pdf_protocol": "26092139532910448 - 000001",
+          "contract_id": "TJS26T008132000ZH",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092139532910448 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CNAFRC78R25A345C Il contratto e' stato registrato il 21/09/2026 al n. 008132-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 19116,
+      "subtype_csv": "id_contratto_prefissato_3t",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T-TJS26T007514000WE.",
+        "parser_reference": "TJS26T007514000WE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T-TJS26T007514000WE.",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJS26T007514000WE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il dichiarato contiene l'intero identificativo univoco con il solo prefisso 3T e punteggiatura.",
+      "all_contract_ids": [
+        "TJS26T007514000WE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789238,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789238_1945261.pdf",
+          "page": 1,
+          "kind": "IDENTIFICATIVO_COMPLETO_CON_PREFISSO",
+          "label": "Codice Identificativo del contratto",
+          "value": "TJS26T007514000WE"
+        }
+      ]
+    },
+    {
+      "id": 19117,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "25111112222428113",
+        "parser_reference": "TJU25T006012000PG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "25111112222428113",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJU25T006012000PG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJU25T006012000PG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789249,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789249_1945272.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "25111112222428113",
+          "pdf_protocol": "25111112222428113 - 000001",
+          "contract_id": "TJU25T006012000PG",
+          "receipt_protocols_on_page": 1,
+          "context": "5 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 25111112222428113 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CCCSRN79D68H501Z e trasmessa da A.S.P.P.I. ROMA Il contratto e' stato registrato il 11/"
+        }
+      ]
+    },
+    {
+      "id": 19322,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100110435611098",
+        "parser_reference": "TJR26T013781000BB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100110435611098",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T013781000BB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T013781000BB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789496,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789496_1945519.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100110435611098",
+          "pdf_protocol": "26100110435611098 - 000001",
+          "contract_id": "TJR26T013781000BB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100110435611098 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da GNVSVT87D22F839R e trasmessa da SERVIZIO TELEMATICO SRL Il contratto e' stato registrat"
+        }
+      ]
+    },
+    {
+      "id": 19376,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26072242381310024-000001",
+        "parser_reference": "TJN26T014397000TK",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26072242381310024-000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T014397000TK"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T014397000TK"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789526,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789526_1945549.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26072242381310024-000001",
+          "pdf_protocol": "26072242381310024 - 000001",
+          "contract_id": "TJN26T014397000TK",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26072242381310024 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da MRTMSM36T14H501M Il contratto e' stato registrato il 22/07/2026 al n. 014397-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 19526,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100822051641633",
+        "parser_reference": "TJT26T007655000NE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100822051641633",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJT26T007655000NE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJT26T007655000NE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789717,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789717_1945740.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100822051641633",
+          "pdf_protocol": "26100822051641633 - 000001",
+          "contract_id": "TJT26T007655000NE",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100822051641633 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da FRTFNC67S66H501Q e trasmessa da CENTRO DI ASSISTENZA FISCALE PER DIPENDENTI E PENSIONAT"
+        }
+      ]
+    },
+    {
+      "id": 19632,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092610270313595",
+        "parser_reference": "TQL26T006928000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092610270313595",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TQL26T006928000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TQL26T006928000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789860,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789860_1945883.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092610270313595",
+          "pdf_protocol": "26092610270313595 - 000001",
+          "contract_id": "TQL26T006928000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092610270313595 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da VRGVLR68C55H501U e trasmessa da S.I.A. - SERVIZI INTEGRATI ALLE AZIENDE SOCIETA' COOPER"
+        }
+      ]
+    },
+    {
+      "id": 19680,
+      "subtype_csv": "da_ricostruire_o_discordante",
+      "result": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+      "before": {
+        "declared_reference": "004301-serie T",
+        "parser_reference": "TJJ26T004301000TK",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "004301-serie T",
+        "parser_comparison": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+        "canonical_contract_id": "TJJ26T004301000TK"
+      },
+      "data_change_required_for_parser_recovery": null,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "L'equivalenza non e' stata verificata automaticamente sul documento.",
+      "all_contract_ids": [
+        "TJJ26T004301000TK"
+      ],
+      "visual_review_page": 8,
+      "files_read": 1,
+      "pages_read": 9,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2789919,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789919_1945942.pdf",
+          "page": 8,
+          "kind": "ESTREMI_DOCUMENTALI_DA_CONFRONTARE",
+          "contract_ids": [
+            "TJJ26T004301000TK"
+          ],
+          "registrations": [
+            {
+              "number": "004301",
+              "series": "3T",
+              "raw": "registrato il 23/09/2026 al n. 004301-serie 3T"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 19760,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100135583517183 - 000001",
+        "parser_reference": "TJJ26T004436000FF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100135583517183 - 000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJJ26T004436000FF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJJ26T004436000FF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790010,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790010_1946033.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100135583517183 - 000001",
+          "pdf_protocol": "26100135583517183 - 000001",
+          "contract_id": "TJJ26T004436000FF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100135583517183 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da PRRGDU80T03G674I Il contratto e' stato registrato il 01/10/2026 al n. 004436-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 19898,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26081115394714776",
+        "parser_reference": "TJQ26T013043000KB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26081115394714776",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T013043000KB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T013043000KB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790211,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790211_1946234.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26081115394714776",
+          "pdf_protocol": "26081115394714776 - 000001",
+          "contract_id": "TJQ26T013043000KB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26081115394714776 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CVGCRL73E64H501W e trasmessa da CETORELLI GABRIELE Il contratto e' stato registrato il "
+        }
+      ]
+    },
+    {
+      "id": 19948,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101310171216944",
+        "parser_reference": "TJN26T020774000JJ",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101310171216944",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T020774000JJ"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T020774000JJ"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790261,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790261_1946284.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101310171216944",
+          "pdf_protocol": "26101310171216944 - 000001",
+          "contract_id": "TJN26T020774000JJ",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101310171216944 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da BSNBBR51R54L780Z e trasmessa da ASSOCIAZIONE UNIONCASA REGIONE LAZIO Il contratto e' st"
+        }
+      ]
+    },
+    {
+      "id": 19996,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26090111330617501 - 000001",
+        "parser_reference": "T3J26T001184000XF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26090111330617501 - 000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "T3J26T001184000XF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "T3J26T001184000XF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790318,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790318_1946341.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26090111330617501 - 000001",
+          "pdf_protocol": "26090111330617501 - 000001",
+          "contract_id": "T3J26T001184000XF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26090111330617501 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CRMFRN67L69B948I e trasmessa da BRANDIMARTE ALBERICO Il contratto e' stato registrato i"
+        }
+      ]
+    },
+    {
+      "id": 20033,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100212115512263",
+        "parser_reference": "TJN26T019653000WE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100212115512263",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T019653000WE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T019653000WE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790368,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790368_1946391.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100212115512263",
+          "pdf_protocol": "26100212115512263 - 000001",
+          "contract_id": "TJN26T019653000WE",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100212115512263 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da LTRLNR85R54H501P e trasmessa da SCARSO FRANCESCA Il contratto e' stato registrato il 02"
+        }
+      ]
+    },
+    {
+      "id": 20067,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100610584213054",
+        "parser_reference": "TJQ26T016473000EE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100610584213054",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T016473000EE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T016473000EE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790398,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790398_1946421.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100610584213054",
+          "pdf_protocol": "26100610584213054 - 000001",
+          "contract_id": "TJQ26T016473000EE",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100610584213054 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da DNLLNZ94E09H501Z e trasmessa da CETORELLI GABRIELE Il contratto e' stato registrato il "
+        }
+      ]
+    },
+    {
+      "id": 20081,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26080409245316646",
+        "parser_reference": "TJN26T015508000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26080409245316646",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T015508000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T015508000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790415,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790415_1946438.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26080409245316646",
+          "pdf_protocol": "26080409245316646 - 000001",
+          "contract_id": "TJN26T015508000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26080409245316646 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da MNCLNZ53S20H501N e trasmessa da ARPESERVIZI SRL Il contratto e' stato registrato il 04/"
+        }
+      ]
+    },
+    {
+      "id": 20088,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092515450210136",
+        "parser_reference": "TJQ26T015398000KB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092515450210136",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T015398000KB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T015398000KB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790427,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790427_1946450.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092515450210136",
+          "pdf_protocol": "26092515450210136 - 000001",
+          "contract_id": "TJQ26T015398000KB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092515450210136 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da SRTNNL38R57H501W e trasmessa da AEMME REAL ESTATE S.R.L. Il contratto e' stato registra"
+        }
+      ]
+    },
+    {
+      "id": 20100,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26091109164013123",
+        "parser_reference": "TJM26T003175000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26091109164013123",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJM26T003175000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJM26T003175000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790442,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790442_1946465.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26091109164013123",
+          "pdf_protocol": "26091109164013123 - 000001",
+          "contract_id": "TJM26T003175000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26091109164013123 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CGLMRA53A60B627Q e trasmessa da REGOLD S.R.L. Il contratto e' stato registrato il 11/09"
+        }
+      ]
+    },
+    {
+      "id": 20160,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26102110175214112",
+        "parser_reference": "TJQ26T017890000LC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26102110175214112",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T017890000LC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T017890000LC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791792,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791792_1947815.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26102110175214112",
+          "pdf_protocol": "26102110175214112 - 000001",
+          "contract_id": "TJQ26T017890000LC",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26102110175214112 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da DRKRSI54E57Z326E e trasmessa da CETORELLI GABRIELE Il contratto e' stato registrato il "
+        }
+      ]
+    },
+    {
+      "id": 20169,
+      "subtype_csv": "da_ricostruire_o_discordante",
+      "result": "IDENTIFICATIVO_ASSEGNATO_DAL_RICHIEDENTE",
+      "before": {
+        "declared_reference": "RM36313",
+        "parser_reference": "TJS26T006988000VD",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "RM36313",
+        "parser_comparison": "IDENTIFICATIVO_ASSEGNATO_DAL_RICHIEDENTE",
+        "canonical_contract_id": "TJS26T006988000VD"
+      },
+      "data_change_required_for_parser_recovery": null,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il dichiarato e' presente nell'omonima etichetta della ricevuta, ma non e' un estremo ufficiale di registrazione: occorre una decisione sulla sua ammissibilita'.",
+      "all_contract_ids": [
+        "TJS26T006988000VD"
+      ],
+      "visual_review_page": 2,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790520,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790520_1946543.pdf",
+          "page": 2,
+          "kind": "ESTREMI_DOCUMENTALI_DA_CONFRONTARE",
+          "contract_ids": [
+            "TJS26T006988000VD"
+          ],
+          "registrations": [
+            {
+              "number": "006988",
+              "series": "3T",
+              "raw": "registrato il 20/08/2026 al n. 006988-serie 3T"
+            }
+          ]
+        },
+        {
+          "attachment_id": 2790520,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790520_1946543.pdf",
+          "page": 2,
+          "kind": "IDENTIFICATIVO_RICHIEDENTE_ETICHETTATO",
+          "label": "Identificativo assegnato dal richiedente",
+          "value": "RM36313"
+        }
+      ]
+    },
+    {
+      "id": 20187,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092116432115731",
+        "parser_reference": "TJR26T012633000OF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092116432115731",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T012633000OF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T012633000OF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790549,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790549_1946572.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092116432115731",
+          "pdf_protocol": "26092116432115731 - 000001",
+          "contract_id": "TJR26T012633000OF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092116432115731 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da PMRLVI75E52H501J e trasmessa da UNIVERSO AFFITTI - S.R.L. SEMPLIFICATA Il contratto e' "
+        }
+      ]
+    },
+    {
+      "id": 20227,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T020212",
+        "parser_reference": "TJN26T020212000LC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T020212",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T020212000LC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T020212000LC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2792210,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792210_1948233.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJN26T020212000LC",
+          "number": "020212",
+          "series": "3T",
+          "raw": "registrato il 07/10/2026 al n. 020212-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 20262,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26090216184262051",
+        "parser_reference": "TJN26T016616000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26090216184262051",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T016616000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T016616000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790619,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790619_1946642.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26090216184262051",
+          "pdf_protocol": "26090216184262051 - 000001",
+          "contract_id": "TJN26T016616000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26090216184262051 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da NCLTRS62B49H501D e trasmessa da LILA CONSULTING SRLS Il contratto e' stato registrato i"
+        }
+      ]
+    },
+    {
+      "id": 20288,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100812574418627",
+        "parser_reference": "TJR26T014594000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100812574418627",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T014594000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T014594000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2793973,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793973_1949996.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100812574418627",
+          "pdf_protocol": "26100812574418627 - 000001",
+          "contract_id": "TJR26T014594000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100812574418627 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CPNPLA35E26H501N e trasmessa da GESTIONE PATRIMONI IMMOBILIARI SRL Il contratto e' stat"
+        }
+      ]
+    },
+    {
+      "id": 20317,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092417552534389",
+        "parser_reference": "TJU26T005304000VD",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092417552534389",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJU26T005304000VD"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJU26T005304000VD"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790670,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790670_1946693.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092417552534389",
+          "pdf_protocol": "26092417552534389 - 000001",
+          "contract_id": "TJU26T005304000VD",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092417552534389 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da FRNTTV85A26E409Y e trasmessa da CENTRO DI ASSISTENZA FISCALE PER DIPENDENTI E PENSIONAT"
+        }
+      ]
+    },
+    {
+      "id": 20409,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092922092910976",
+        "parser_reference": "TJN26T019148000SJ",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092922092910976",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T019148000SJ"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T019148000SJ"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790771,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790771_1946794.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092922092910976",
+          "pdf_protocol": "26092922092910976 - 000001",
+          "contract_id": "TJN26T019148000SJ",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092922092910976 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da RSPLRT69S29H501Q e trasmessa da ANGELUCCI FRANCESCO Il contratto e' stato registrato il"
+        }
+      ]
+    },
+    {
+      "id": 20457,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101515180148609",
+        "parser_reference": "TJR26T015222000PG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101515180148609",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015222000PG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T015222000PG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790829,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790829_1946852.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101515180148609",
+          "pdf_protocol": "26101515180148609 - 000001",
+          "contract_id": "TJR26T015222000PG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101515180148609 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CSLRHL65C52H501X e trasmessa da A.S.P.P.I. ROMA Il contratto e' stato registrato il 15/"
+        }
+      ]
+    },
+    {
+      "id": 20483,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26061843434514432",
+        "parser_reference": "TJT26T004363000CC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26061843434514432",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJT26T004363000CC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJT26T004363000CC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790873,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790873_1946896.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26061843434514432",
+          "pdf_protocol": "26061843434514432 - 000001",
+          "contract_id": "TJT26T004363000CC",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26061843434514432 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da PNTDMR93E13H501Z Il contratto e' stato registrato il 18/06/2026 al n. 004363-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 20527,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101912162211126",
+        "parser_reference": "TJR26T015462000BB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101912162211126",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015462000BB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T015462000BB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790905,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790905_1946928.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101912162211126",
+          "pdf_protocol": "26101912162211126 - 000001",
+          "contract_id": "TJR26T015462000BB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101912162211126 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da DFLLRI76H52H501J e trasmessa da REGOLD S.R.L. Il contratto e' stato registrato il 19/10"
+        }
+      ]
+    },
+    {
+      "id": 20532,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101334155616229",
+        "parser_reference": "TJR26T014937000ZH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101334155616229",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T014937000ZH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T014937000ZH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2790912,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790912_1946935.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101334155616229",
+          "pdf_protocol": "26101334155616229 - 000001",
+          "contract_id": "TJR26T014937000ZH",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101334155616229 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da FRNGDI06M48I838M Il contratto e' stato registrato il 13/10/2026 al n. 014937-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 20718,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "25091016540616359",
+        "parser_reference": "TJQ25T013875000AA",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "25091016540616359",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ25T013875000AA"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ25T013875000AA"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791197,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791197_1947220.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "25091016540616359",
+          "pdf_protocol": "25091016540616359 - 000001",
+          "contract_id": "TJQ25T013875000AA",
+          "receipt_protocols_on_page": 1,
+          "context": "5 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 25091016540616359 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da VTIFNC02D11D542H e trasmessa da STUDIO BOLOGNA SRLS Il contratto e' stato registrato il"
+        }
+      ]
+    },
+    {
+      "id": 20828,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T013065",
+        "parser_reference": "TJR26T013065000UC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T013065",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T013065000UC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T013065000UC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 4,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791248,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791248_1947271.pdf",
+          "page": 3,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJR26T013065000UC",
+          "number": "013065",
+          "series": "3T",
+          "raw": "registrato il 25/09/2026 al n. 013065-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 20832,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26080334205215620",
+        "parser_reference": "TJN26T015389000XF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26080334205215620",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T015389000XF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T015389000XF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791252,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791252_1947275.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26080334205215620",
+          "pdf_protocol": "26080334205215620 - 000001",
+          "contract_id": "TJN26T015389000XF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26080334205215620 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da FRNDRD92E14H501W Il contratto e' stato registrato il 03/08/2026 al n. 015389-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 20841,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "25122913483911131",
+        "parser_reference": "TJT25T010096000ZH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "25122913483911131",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJT25T010096000ZH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJT25T010096000ZH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791275,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791275_1947298.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "25122913483911131",
+          "pdf_protocol": "25122913483911131 - 000001",
+          "contract_id": "TJT25T010096000ZH",
+          "receipt_protocols_on_page": 1,
+          "context": "5 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 25122913483911131 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CRRSFO72H53D612R e trasmessa da FILIPPELLI MIZAR Il contratto e' stato registrato il 29"
+        }
+      ]
+    },
+    {
+      "id": 20864,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101516334717454",
+        "parser_reference": "TJ326T002569000ZH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101516334717454",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJ326T002569000ZH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJ326T002569000ZH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791299,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791299_1947322.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101516334717454",
+          "pdf_protocol": "26101516334717454 - 000001",
+          "contract_id": "TJ326T002569000ZH",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101516334717454 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CRLNDR71M03C619P e trasmessa da MEDAINO ENZO Il contratto e' stato registrato il 15/10/"
+        }
+      ]
+    },
+    {
+      "id": 20874,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101711144715245",
+        "parser_reference": "TJR26T015392000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101711144715245",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015392000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T015392000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791300,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791300_1947323.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101711144715245",
+          "pdf_protocol": "26101711144715245 - 000001",
+          "contract_id": "TJR26T015392000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101711144715245 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da SGRNMR47L55B383F e trasmessa da SERVIZIO TELEMATICO SRL Il contratto e' stato registrat"
+        }
+      ]
+    },
+    {
+      "id": 21009,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26072016135212043",
+        "parser_reference": "TJP26T009275000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26072016135212043",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJP26T009275000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJP26T009275000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791455,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791455_1947478.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26072016135212043",
+          "pdf_protocol": "26072016135212043 - 000001",
+          "contract_id": "TJP26T009275000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26072016135212043 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da PZZGCR66S29H501Z e trasmessa da D'AMICO MARIACARLA Il contratto e' stato registrato il "
+        }
+      ]
+    },
+    {
+      "id": 21167,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26100910084611508",
+        "parser_reference": "TJQ26T016891000KB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26100910084611508",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T016891000KB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T016891000KB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791671,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791671_1947694.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26100910084611508",
+          "pdf_protocol": "26100910084611508 - 000001",
+          "contract_id": "TJQ26T016891000KB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26100910084611508 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da TRCGDU71R06F205D e trasmessa da COGLITORE FABIO Il contratto e' stato registrato il 09/"
+        }
+      ]
+    },
+    {
+      "id": 21191,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0152683T",
+        "parser_reference": "TJR26T015268000FF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0152683T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015268000FF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T015268000FF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791663,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791663_1947686.pdf",
+          "page": 1,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJR26T015268000FF",
+          "number": "015268",
+          "series": "3T",
+          "raw": "registrato il 15/10/2026 al n. 015268-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 21359,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092146340217746 - 000001",
+        "parser_reference": "T3G26T000913000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092146340217746 - 000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "T3G26T000913000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "T3G26T000913000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791844,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791844_1947867.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092146340217746 - 000001",
+          "pdf_protocol": "26092146340217746 - 000001",
+          "contract_id": "T3G26T000913000GG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092146340217746 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CBRSRG63L28H501F Il contratto e' stato registrato il 21/09/2026 al n. 000913-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 21424,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26093012482719228",
+        "parser_reference": "TRF26T001683000HH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26093012482719228",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TRF26T001683000HH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TRF26T001683000HH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791935,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791935_1947958.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26093012482719228",
+          "pdf_protocol": "26093012482719228 - 000001",
+          "contract_id": "TRF26T001683000HH",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26093012482719228 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da DRSNMR89D66E335L e trasmessa da DE ROSA ROBERTO Il contratto e' stato registrato il 30/"
+        }
+      ]
+    },
+    {
+      "id": 21439,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101616590349043",
+        "parser_reference": "TJR26T015357000DD",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101616590349043",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015357000DD"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T015357000DD"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791949,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791949_1947972.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101616590349043",
+          "pdf_protocol": "26101616590349043 - 000001",
+          "contract_id": "TJR26T015357000DD",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101616590349043 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da NNSCNZ66B47A252T e trasmessa da A.S.P.P.I. ROMA Il contratto e' stato registrato il 16/"
+        }
+      ]
+    },
+    {
+      "id": 21446,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0152693T",
+        "parser_reference": "TJR26T015269000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0152693T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015269000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T015269000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2791958,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791958_1947981.pdf",
+          "page": 1,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJR26T015269000GG",
+          "number": "015269",
+          "series": "3T",
+          "raw": "registrato il 15/10/2026 al n. 015269-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 21480,
+      "subtype_csv": "id_contratto_prefissato_3t",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T/TJR26T015699000QH.",
+        "parser_reference": "TJR26T015699000QH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T/TJR26T015699000QH.",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015699000QH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il dichiarato contiene l'intero identificativo univoco con il solo prefisso 3T e punteggiatura.",
+      "all_contract_ids": [
+        "TJR26T015699000QH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2792002,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792002_1948025.pdf",
+          "page": 1,
+          "kind": "IDENTIFICATIVO_COMPLETO_CON_PREFISSO",
+          "label": "Codice Identificativo del contratto",
+          "value": "TJR26T015699000QH"
+        }
+      ]
+    },
+    {
+      "id": 21559,
+      "subtype_csv": "da_ricostruire_o_discordante",
+      "result": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+      "before": {
+        "declared_reference": "QC7177",
+        "parser_reference": "TAS26T000588000UC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "QC7177",
+        "parser_comparison": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+        "canonical_contract_id": "TAS26T000588000UC"
+      },
+      "data_change_required_for_parser_recovery": null,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "L'equivalenza non e' stata verificata automaticamente sul documento.",
+      "all_contract_ids": [
+        "TAS26T000588000UC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2792119,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792119_1948142.pdf",
+          "page": 2,
+          "kind": "ESTREMI_DOCUMENTALI_DA_CONFRONTARE",
+          "contract_ids": [
+            "TAS26T000588000UC"
+          ],
+          "registrations": [
+            {
+              "number": "000588",
+              "series": "3T",
+              "raw": "registrato il 16/02/2026 al n. 000588-serie 3T"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 21618,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101311245250400-000001",
+        "parser_reference": "TJP26T013841000NE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101311245250400-000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJP26T013841000NE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJP26T013841000NE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 10,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2792643,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792643_1948666.pdf",
+          "page": 9,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101311245250400-000001",
+          "pdf_protocol": "26101311245250400 - 000001",
+          "contract_id": "TJP26T013841000NE",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101311245250400 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da VLNGLI91A52H501I e trasmessa da CAF MCL SRL Il contratto e' stato registrato il 13/10/2"
+        }
+      ]
+    },
+    {
+      "id": 21678,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0160923T",
+        "parser_reference": "TJN26T016092000RI",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0160923T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T016092000RI"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T016092000RI"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2792318,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792318_1948341.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJN26T016092000RI",
+          "number": "016092",
+          "series": "3T",
+          "raw": "registrato il 19/08/2026 al n. 016092-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 21777,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "25110716174110411 - 000001",
+        "parser_reference": "TJS25T010206000FF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "25110716174110411 - 000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJS25T010206000FF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJS25T010206000FF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2792449,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792449_1948472.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "25110716174110411 - 000001",
+          "pdf_protocol": "25110716174110411 - 000001",
+          "contract_id": "TJS25T010206000FF",
+          "receipt_protocols_on_page": 1,
+          "context": "5 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 25110716174110411 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da FRRNNN59P01H224C e trasmessa da SERVIZI DIRETTI SRLS Il contratto e' stato registrato i"
+        }
+      ]
+    },
+    {
+      "id": 21802,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0115513T",
+        "parser_reference": "TJP26T011551000HH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0115513T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJP26T011551000HH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJP26T011551000HH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2792492,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792492_1948515.pdf",
+          "page": 1,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJP26T011551000HH",
+          "number": "011551",
+          "series": "3T",
+          "raw": "registrato il 15/09/2026 al n. 011551-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 21898,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26073018240711295",
+        "parser_reference": "TJN26T015198000WE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26073018240711295",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T015198000WE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T015198000WE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2792649,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792649_1948672.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26073018240711295",
+          "pdf_protocol": "26073018240711295 - 000001",
+          "contract_id": "TJN26T015198000WE",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26073018240711295 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da TRNNDR74T06L120W e trasmessa da ANIAC SEDE ZONALE DI ROMA Il contratto e' stato registr"
+        }
+      ]
+    },
+    {
+      "id": 22298,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26090412033016024-000001",
+        "parser_reference": "TCJ26T001468000ZH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26090412033016024-000001",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TCJ26T001468000ZH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TCJ26T001468000ZH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2793254,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793254_1949277.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26090412033016024-000001",
+          "pdf_protocol": "26090412033016024 - 000001",
+          "contract_id": "TCJ26T001468000ZH",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26090412033016024 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da BTTNNL76S61L049Z Il contratto e' stato registrato il 04/09/2026 al n. 001468-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 22305,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26091018314813931",
+        "parser_reference": "TJU26T004977000QH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26091018314813931",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJU26T004977000QH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJU26T004977000QH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2793270,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793270_1949293.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26091018314813931",
+          "pdf_protocol": "26091018314813931 - 000001",
+          "contract_id": "TJU26T004977000QH",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26091018314813931 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da SSTVNT88B64F104E e trasmessa da ALA ANNALISA Il contratto e' stato registrato il 10/09/"
+        }
+      ]
+    },
+    {
+      "id": 22355,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26102119573017889",
+        "parser_reference": "TJR26T015774000II",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26102119573017889",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T015774000II"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T015774000II"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 4,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2793357,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793357_1949380.pdf",
+          "page": 3,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26102119573017889",
+          "pdf_protocol": "26102119573017889 - 000001",
+          "contract_id": "TJR26T015774000II",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26102119573017889 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da MLNKDN83M05Z100C e trasmessa da BBSPRATICHE&SERVIZI SOCIETA' A RESPONSABILITA' LIMITATA"
+        }
+      ]
+    },
+    {
+      "id": 22369,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26102110453119931",
+        "parser_reference": "TJN26T021587000LC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26102110453119931",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T021587000LC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T021587000LC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2793383,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793383_1949406.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26102110453119931",
+          "pdf_protocol": "26102110453119931 - 000001",
+          "contract_id": "TJN26T021587000LC",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26102110453119931 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da CNCSLL62D69H501X e trasmessa da CAF CISL SRL Il contratto e' stato registrato il 21/10/"
+        }
+      ]
+    },
+    {
+      "id": 22552,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26102709402218844",
+        "parser_reference": "TJQ26T018424000XF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26102709402218844",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T018424000XF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T018424000XF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2793701,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793701_1949724.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26102709402218844",
+          "pdf_protocol": "26102709402218844 - 000001",
+          "contract_id": "TJQ26T018424000XF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26102709402218844 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da TDDRRT62A21H501E e trasmessa da LOCARE S.R.L. Il contratto e' stato registrato il 27/10"
+        }
+      ]
+    },
+    {
+      "id": 22586,
+      "subtype_csv": "da_ricostruire_o_discordante",
+      "result": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+      "before": {
+        "declared_reference": "33891966 0 RLI12",
+        "parser_reference": "TJR26T014733000TK",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "33891966 0 RLI12",
+        "parser_comparison": "DICHIARATO_DA_RICOSTRUIRE_O_DISCORDANTE",
+        "canonical_contract_id": "TJR26T014733000TK"
+      },
+      "data_change_required_for_parser_recovery": null,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "L'equivalenza non e' stata verificata automaticamente sul documento.",
+      "all_contract_ids": [
+        "TJR26T014733000TK"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2793812,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793812_1949835.pdf",
+          "page": 2,
+          "kind": "ESTREMI_DOCUMENTALI_DA_CONFRONTARE",
+          "contract_ids": [
+            "TJR26T014733000TK"
+          ],
+          "registrations": [
+            {
+              "number": "014733",
+              "series": "3T",
+              "raw": "registrato il 09/10/2026 al n. 014733-serie 3T"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 22690,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0062463T",
+        "parser_reference": "TJU26T006246000GG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0062463T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJU26T006246000GG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJU26T006246000GG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2793955,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793955_1949978.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJU26T006246000GG",
+          "number": "006246",
+          "series": "3T",
+          "raw": "registrato il 26/10/2026 al n. 006246-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 22750,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26102013071865505",
+        "parser_reference": "TJS26T010101000BB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26102013071865505",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJS26T010101000BB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJS26T010101000BB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794087,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794087_1950110.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26102013071865505",
+          "pdf_protocol": "26102013071865505 - 000001",
+          "contract_id": "TJS26T010101000BB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26102013071865505 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da 07605420962 Il contratto e' stato registrato il 20/10/2026 al n. 010101-serie 3T e codi"
+        }
+      ]
+    },
+    {
+      "id": 22759,
+      "subtype_csv": "id_contratto_prefissato_3t",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T/TJR26T014937000ZH",
+        "parser_reference": "TJR26T014937000ZH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T/TJR26T014937000ZH",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T014937000ZH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il dichiarato contiene l'intero identificativo univoco con il solo prefisso 3T e punteggiatura.",
+      "all_contract_ids": [
+        "TJR26T014937000ZH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794111,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794111_1950134.pdf",
+          "page": 1,
+          "kind": "IDENTIFICATIVO_COMPLETO_CON_PREFISSO",
+          "label": "Codice Identificativo del contratto",
+          "value": "TJR26T014937000ZH"
+        }
+      ]
+    },
+    {
+      "id": 22817,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26091119102815793",
+        "parser_reference": "TJR26T011923000KB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26091119102815793",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T011923000KB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T011923000KB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794199,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794199_1950222.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26091119102815793",
+          "pdf_protocol": "26091119102815793 - 000001",
+          "contract_id": "TJR26T011923000KB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26091119102815793 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da PLCLCU83C10H501A e trasmessa da SCIGLIANO LAURA Il contratto e' stato registrato il 11/"
+        }
+      ]
+    },
+    {
+      "id": 22868,
+      "subtype_csv": "id_contratto_prefissato_3t",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T/TJR26T013514000JJ",
+        "parser_reference": "TJR26T013514000JJ",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T/TJR26T013514000JJ",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T013514000JJ"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il dichiarato contiene l'intero identificativo univoco con il solo prefisso 3T e punteggiatura.",
+      "all_contract_ids": [
+        "TJR26T013514000JJ"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794281,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794281_1950304.pdf",
+          "page": 2,
+          "kind": "IDENTIFICATIVO_COMPLETO_CON_PREFISSO",
+          "label": "Codice Identificativo del contratto",
+          "value": "TJR26T013514000JJ"
+        }
+      ]
+    },
+    {
+      "id": 22942,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "001 882",
+        "parser_reference": "TDG26T001882000WE",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "001 882",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TDG26T001882000WE"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TDG26T001882000WE"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794403,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794403_1950426.pdf",
+          "page": 1,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TDG26T001882000WE",
+          "number": "001882",
+          "series": "3T",
+          "raw": "registrato il 17/09/2026 al n. 001882-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 22997,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26102641035412543",
+        "parser_reference": "TUR26T001027000PG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26102641035412543",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TUR26T001027000PG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TUR26T001027000PG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794492,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794492_1950515.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26102641035412543",
+          "pdf_protocol": "26102641035412543 - 000001",
+          "contract_id": "TUR26T001027000PG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26102641035412543 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da BCCFLV95A44D643C Il contratto e' stato registrato il 26/10/2026 al n. 001027-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 23025,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26102641153310603",
+        "parser_reference": "TUR26T001028000QH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26102641153310603",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TUR26T001028000QH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TUR26T001028000QH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794530,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794530_1950553.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26102641153310603",
+          "pdf_protocol": "26102641153310603 - 000001",
+          "contract_id": "TUR26T001028000QH",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26102641153310603 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da BCCFLV95A44D643C Il contratto e' stato registrato il 26/10/2026 al n. 001028-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 23030,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26102641334213272",
+        "parser_reference": "TUR26T001030000KB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26102641334213272",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TUR26T001030000KB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TUR26T001030000KB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794529,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794529_1950552.pdf",
+          "page": 1,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26102641334213272",
+          "pdf_protocol": "26102641334213272 - 000001",
+          "contract_id": "TUR26T001030000KB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26102641334213272 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da BCCFLV95A44D643C Il contratto e' stato registrato il 26/10/2026 al n. 001030-serie 3T e"
+        }
+      ]
+    },
+    {
+      "id": 23058,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101608530614472",
+        "parser_reference": "TJQ26T017434000XF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101608530614472",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T017434000XF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T017434000XF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794577,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794577_1950600.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101608530614472",
+          "pdf_protocol": "26101608530614472 - 000001",
+          "contract_id": "TJQ26T017434000XF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101608530614472 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da BRTMLC30D67F257O e trasmessa da SERVIZIO TELEMATICO SRL Il contratto e' stato registrat"
+        }
+      ]
+    },
+    {
+      "id": 23101,
+      "subtype_csv": "id_contratto_prefissato_3t",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "3T-TJN26T016435000KB",
+        "parser_reference": "TJN26T016435000KB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "3T-TJN26T016435000KB",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T016435000KB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il dichiarato contiene l'intero identificativo univoco con il solo prefisso 3T e punteggiatura.",
+      "all_contract_ids": [
+        "TJN26T016435000KB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794679,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794679_1950702.pdf",
+          "page": 2,
+          "kind": "IDENTIFICATIVO_COMPLETO_CON_PREFISSO",
+          "label": "Codice Identificativo del contratto",
+          "value": "TJN26T016435000KB"
+        }
+      ]
+    },
+    {
+      "id": 23209,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26052305223412281",
+        "parser_reference": "TJS26T004521000QH",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26052305223412281",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJS26T004521000QH"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJS26T004521000QH"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794862,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794862_1950885.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26052305223412281",
+          "pdf_protocol": "26052305223412281 - 000001",
+          "contract_id": "TJS26T004521000QH",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26052305223412281 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da MSTSVT57R14A638Q e trasmessa da FEDER.CASA Il contratto e' stato registrato il 23/05/20"
+        }
+      ]
+    },
+    {
+      "id": 23240,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0226163T",
+        "parser_reference": "TJN26T022616000XF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0226163T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T022616000XF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T022616000XF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794907,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794907_1950930.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJN26T022616000XF",
+          "number": "022616",
+          "series": "3T",
+          "raw": "registrato il 29/10/2026 al n. 022616-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 23249,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0226213T",
+        "parser_reference": "TJN26T022621000XF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0226213T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T022621000XF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T022621000XF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2794908,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794908_1950931.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJN26T022621000XF",
+          "number": "022621",
+          "series": "3T",
+          "raw": "registrato il 29/10/2026 al n. 022621-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 23321,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26101312414718679",
+        "parser_reference": "TJQ26T017155000BB",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101312414718679",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJQ26T017155000BB"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJQ26T017155000BB"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2795026,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2795026_1951049.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26101312414718679",
+          "pdf_protocol": "26101312414718679 - 000001",
+          "contract_id": "TJQ26T017155000BB",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26101312414718679 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da MCRMLN72C53C286T e trasmessa da IF SOCIETA' A RESPONSABILITA' LIMITATA SEMPLIFICATA Il "
+        }
+      ]
+    },
+    {
+      "id": 23386,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "0094943T",
+        "parser_reference": "TJS26T009494000UC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "0094943T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJS26T009494000UC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJS26T009494000UC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2795165,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2795165_1951188.pdf",
+          "page": 2,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJS26T009494000UC",
+          "number": "009494",
+          "series": "3T",
+          "raw": "registrato il 09/10/2026 al n. 009494-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 23560,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092415524716699",
+        "parser_reference": "TJE26T002413000FF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092415524716699",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJE26T002413000FF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJE26T002413000FF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2796141,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796141_1952164.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092415524716699",
+          "pdf_protocol": "26092415524716699 - 000001",
+          "contract_id": "TJE26T002413000FF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092415524716699 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da DGNMRA00M44C034W e trasmessa da ZAPPULLA GIUSEPPE Il contratto e' stato registrato il 2"
+        }
+      ]
+    },
+    {
+      "id": 23620,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26072806505913506",
+        "parser_reference": "TJN26T014765000PG",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26072806505913506",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJN26T014765000PG"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJN26T014765000PG"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2796405,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796405_1952428.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26072806505913506",
+          "pdf_protocol": "26072806505913506 - 000001",
+          "contract_id": "TJN26T014765000PG",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26072806505913506 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da NDRLDA65A14H501W e trasmessa da REGOLD S.R.L. Il contratto e' stato registrato il 28/07"
+        }
+      ]
+    },
+    {
+      "id": 23706,
+      "subtype_csv": "protocollo_numerico_vs_id_contratto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "26092912514718062",
+        "parser_reference": "TJP26T012621000FF",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26092912514718062",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJP26T012621000FF"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Il protocollo dichiarato e' etichettato come richiesta di registrazione nella stessa pagina dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJP26T012621000FF"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2796785,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796785_1952808.pdf",
+          "page": 2,
+          "kind": "PROTOCOLLO_REGISTRAZIONE_E_ID_STESSA_PAGINA",
+          "declared_protocol": "26092912514718062",
+          "pdf_protocol": "26092912514718062 - 000001",
+          "contract_id": "TJP26T012621000FF",
+          "receipt_protocols_on_page": 1,
+          "context": "6 il sistema informativo dell'Agenzia delle Entrate ha acquisito con protocollo 26092912514718062 - 000001 la richiesta di registrazione telematica del contratto di locazione presentata da SCRGPP39P50H501N e trasmessa da UNIONE PICCOLI PROPRIETARI IMMOBILIARI Il contratto e' "
+        }
+      ]
+    },
+    {
+      "id": 23764,
+      "subtype_csv": "numero_serie_formato_compatto",
+      "result": "EQUIVALENZA_DOCUMENTATA",
+      "before": {
+        "declared_reference": "n. 016651-3T",
+        "parser_reference": "TJR26T016651000CC",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "n. 016651-3T",
+        "parser_comparison": "EQUIVALENZA_DOCUMENTATA",
+        "canonical_contract_id": "TJR26T016651000CC"
+      },
+      "data_change_required_for_parser_recovery": false,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "Numero e serie del formato dichiarato coincidono con gli estremi espliciti della stessa ricevuta e dell'identificativo univoco.",
+      "all_contract_ids": [
+        "TJR26T016651000CC"
+      ],
+      "visual_review_page": null,
+      "files_read": 1,
+      "pages_read": 1,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2796985,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796985_1953008.pdf",
+          "page": 1,
+          "kind": "NUMERO_SERIE_ETICHETTATI_E_ID_STESSA_PAGINA",
+          "contract_id": "TJR26T016651000CC",
+          "number": "016651",
+          "series": "3T",
+          "raw": "registrato il 30/10/2026 al n. 016651-serie 3T",
+          "registration_pairs_on_page": 1
+        }
+      ]
+    },
+    {
+      "id": 23793,
+      "subtype_csv": "da_ricostruire_o_discordante",
+      "result": "EQUIVALENZA_VISIVA_TESTO_CORROTTO",
+      "before": {
+        "declared_reference": "26101518522321129",
+        "parser_reference": "2026",
+        "finding": "PDF_017"
+      },
+      "after": {
+        "declared_reference": "26101518522321129",
+        "parser_comparison": "EQUIVALENZA_VISIVA_TESTO_CORROTTO",
+        "canonical_contract_id": "TJK26T009266000EE"
+      },
+      "data_change_required_for_parser_recovery": null,
+      "data_changes_applied": false,
+      "whole_instance_eligibility_assessed": false,
+      "detail": "La scansione e' leggibile visivamente; il testo incorporato omette parti delle etichette e altera l'identificativo. Nessuna promozione automatica e nessun nuovo OCR eseguito.",
+      "all_contract_ids": [],
+      "visual_review_page": 2,
+      "files_read": 1,
+      "pages_read": 3,
+      "pages_without_text": [],
+      "provenance": [
+        {
+          "attachment_id": 2797155,
+          "path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2797155_1953178.pdf",
+          "page": 2,
+          "kind": "VERIFICA_VISIVA_SCANSIONE",
+          "contract_id_visual": "TJK26T009266000EE",
+          "protocol_visual": "26101518522321129 - 000001",
+          "registration_number_visual": "009266",
+          "series_visual": "3T",
+          "render_path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\ref-renders\\23793-p2.png"
+        }
+      ]
+    }
+  ]
+}

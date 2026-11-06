@@ -1,0 +1,146 @@
+[
+  {
+    "Codice": "01",
+    "Descrizione": "Variazione generica"
+  },
+  {
+    "Codice": "02",
+    "Descrizione": "Rinuncia"
+  },
+  {
+    "Codice": "03",
+    "Descrizione": "Revoca"
+  },
+  {
+    "Codice": "04",
+    "Descrizione": "Decadenza"
+  },
+  {
+    "Codice": "05",
+    "Descrizione": "Riammissione come idoneo"
+  },
+  {
+    "Codice": "06",
+    "Descrizione": "Riammissione come vincitore"
+  },
+  {
+    "Codice": "07",
+    "Descrizione": "Da idoneo a vincitore"
+  },
+  {
+    "Codice": "08",
+    "Descrizione": "Da vincitore a idoneo"
+  },
+  {
+    "Codice": "09",
+    "Descrizione": "Rinuncia idoneità"
+  },
+  {
+    "Codice": "10",
+    "Descrizione": "Rinuncia vincitore"
+  },
+  {
+    "Codice": "11",
+    "Descrizione": "Revoca per incompatibilità col bando"
+  },
+  {
+    "Codice": "12",
+    "Descrizione": "Da PENDOLARE a IN SEDE"
+  },
+  {
+    "Codice": "13",
+    "Descrizione": "Da PENDOLARE a FUORI SEDE"
+  },
+  {
+    "Codice": "14",
+    "Descrizione": "Da FUORI SEDE a PENDOLARE"
+  },
+  {
+    "Codice": "15",
+    "Descrizione": "Da FUORI SEDE a IN SEDE"
+  },
+  {
+    "Codice": "16",
+    "Descrizione": "Da IN SEDE a FUORI SEDE"
+  },
+  {
+    "Codice": "17",
+    "Descrizione": "Da IN SEDE a PENDOLARE"
+  },
+  {
+    "Codice": "18",
+    "Descrizione": "Revoca per sede distaccata"
+  },
+  {
+    "Codice": "19",
+    "Descrizione": "Revoca per mancata iscrizione"
+  },
+  {
+    "Codice": "20",
+    "Descrizione": "Revoca per studente iscritto ripetente"
+  },
+  {
+    "Codice": "21",
+    "Descrizione": "Revoca per ISEE non presente in banca dati INPS in base ai rif. dichiarati nella domanda"
+  },
+  {
+    "Codice": "22",
+    "Descrizione": "Revoca per studente già laureato"
+  },
+  {
+    "Codice": "23",
+    "Descrizione": "Revoca per patrimonio oltre il limite"
+  },
+  {
+    "Codice": "24",
+    "Descrizione": "Revoca per reddito oltre il limite"
+  },
+  {
+    "Codice": "25",
+    "Descrizione": "Revoca per mancanza esami o crediti"
+  },
+  {
+    "Codice": "26",
+    "Descrizione": "Rinuncia a tutti i benefici"
+  },
+  {
+    "Codice": "27",
+    "Descrizione": "Revoca per iscrizione fuori temine"
+  },
+  {
+    "Codice": "28",
+    "Descrizione": "Revoca per ISEE fuori termine"
+  },
+  {
+    "Codice": "29",
+    "Descrizione": "Revoca per ISEE non prodotta"
+  },
+  {
+    "Codice": "30",
+    "Descrizione": "Decadenza per mancata comunicazione modalità di pagamento"
+  },
+  {
+    "Codice": "31",
+    "Descrizione": "Revoca per mancanza contratto di affitto"
+  },
+  {
+    "Codice": "32",
+    "Descrizione": "Variazione I.S.E.E."
+  },
+  {
+    "Codice": "33",
+    "Descrizione": "Revoca premio di laurea"
+  },
+  {
+    "Codice": "34",
+    "Descrizione": "Rinuncia premio di laurea"
+  },
+  {
+    "Codice": "35",
+    "Descrizione": "Riammissione come idoneo premio di laurea"
+  },
+  {
+    "Codice": "36",
+    "Descrizione": "Riammisione come vincitore premio di laurea"
+  }
+]

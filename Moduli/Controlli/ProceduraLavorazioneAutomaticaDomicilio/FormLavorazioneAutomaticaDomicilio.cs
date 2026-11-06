@@ -29,7 +29,7 @@ namespace ProcedureNet7
             layout.Controls.Add(_simulation);
             layout.Controls.Add(new Label
             {
-                Text = "Solo le istanze inviate, libere e interamente verificabili vengono accolte.\nLe altre restano invariate. Il risultato viene salvato in CSV.",
+                Text = "La simulazione mostra gli accoglimenti e le correzioni documentate proposte.\nIn lavorazione, le correzioni idonee vengono applicate insieme all'accoglimento.\nSolo le istanze libere e interamente verificabili vengono lavorate. Risultati in CSV.",
                 AutoSize = true, Margin = new Padding(0, 0, 0, 20)
             });
             var run = new Button { Text = "Avvia", Width = 180, Height = 42 };

@@ -1,0 +1,93 @@
+Modulo N.
+SEZIONE II
+Dati
+del conduttore Cognome o Denominazione o Ragione sociale Nome
+mese annogiorno
+Comune (o Stato estero) di nascitaData di nascita Sesso
+(M/F)
+Codice fiscale
+Cognome o Denominazione o Ragione sociale Nome
+mese annogiorno
+Comune (o Stato estero) di nascitaData di nascita Sesso
+(M/F)
+Codice fiscale
+NUMERO CONDUTTORE
+NUMERO CONDUTTORE
+Provincia (sigla)
+Provincia (sigla)
+Cognome o Denominazione o Ragione sociale Nome
+mese annogiorno
+Comune (o Stato estero) di nascitaData di nascita Sesso
+(M/F)
+Codice fiscale
+NUMERO CONDUTTORE
+Provincia (sigla)
+Cognome o Denominazione o Ragione sociale Nome
+mese annogiorno
+Comune (o Stato estero) di nascitaData di nascita Sesso
+(M/F)
+Codice fiscale
+NUMERO CONDUTTORE
+Provincia (sigla)
+Codice fiscale
+QUADRO B - SOGGETTI
+Cognome o Denominazione o Ragione sociale
+SEZIONE I
+Dati del locatore
+Nome
+mese annogiorno
+Comune (o Stato estero) di nascitaData di nascita Sesso
+(M/F)
+Cognome o Denominazione o Ragione sociale Nome
+mese annogiorno
+Comune (o Stato estero) di nascitaData di nascita Sesso
+(M/F)
+Codice fiscale
+Cognome o Denominazione o Ragione sociale Nome
+mese annogiorno
+Comune (o Stato estero) di nascitaData di nascita Sesso
+(M/F)
+Codice fiscale
+Codice fiscale
+NUMERO LOCATORE
+NUMERO LOCATORE
+NUMERO LOCATORE
+CedenteLocatore Soggettività IVA Cessionario/subentrante
+CedenteLocatore Soggettività IVA Cessionario/subentrante
+CedenteLocatore Soggettività IVA Cessionario/subentrante
+CedenteLocatore Soggettività IVA Cessionario/subentrante
+CedenteTipologia
+conduttore
+Tipologia
+conduttore
+Tipologia
+conduttore
+Tipologia
+conduttore
+Soggettività IVA Cessionario/subentrante
+CedenteSoggettività IVA Cessionario/subentrante
+CedenteSoggettività IVA Cessionario/subentrante
+CedenteSoggettività IVA Cessionario/subentrante
+Provincia (sigla)
+Provincia (sigla)
+Provincia (sigla)
+Cognome o Denominazione o Ragione sociale Nome
+mese annogiorno
+Comune (o Stato estero) di nascitaData di nascita Sesso
+(M/F)
+Codice fiscale
+NUMERO LOCATORE
+Provincia (sigla)
+0
+1
+RENZI ALESSIA
+F SORA FR
+1
+STELLATO GIADA
+F CAPUA CE
+2 8 0 9 2 0 0 6
+0 1
+1 4 1 1 2 0 0 6
+N838I86P60SSLZNR
+R N Z L S S 0 6 P 6 8 I 8 3 8 N
+S T L G D I 0 6 S 5 4 B 7 1 5 R 3

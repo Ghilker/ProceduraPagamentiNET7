@@ -28,15 +28,24 @@ namespace ProcedureNet7
                     ignored = "Istanza non libera all'inizio del controllo o dati iniziali non verificabili.";
                 else
                 {
-                    var decision = IstanzaDomicilioReport.Decide(request);
-                    if (decision.Azione != IstanzaDomicilioReport.Accettabile) ignored = decision.Motivazione;
-                    else if (request.Operazioni.SelectMany(x => x.Documenti).Any(x => !DocumentComplete(x)))
+                    var reviewed = request.CorrectionCandidate ?? request;
+                    if (!ValidCorrectionPlan(request))
+                        ignored = "La proposta di correzione non corrisponde ai dati originali dell'istanza.";
+                    var decision = IstanzaDomicilioReport.Decide(reviewed);
+                    if (ignored == null && decision.Azione != IstanzaDomicilioReport.Accettabile)
+                        ignored = request.CorrectionCandidate == null ? decision.Motivazione : "Proposta non accoglibile: " + decision.Motivazione;
+                    else if (ignored == null && reviewed.Operazioni.SelectMany(x => x.Documenti).Any(x => !DocumentComplete(x)))
                         ignored = "Non tutti i documenti necessari sono stati letti integralmente e verificati in ogni campo richiesto.";
                 }
 
                 if (ignored != null) results[request.NumIstanza] = new(request.NumIstanza, "IGNORATA", ignored);
-                else if (simulation) results[request.NumIstanza] = new(request.NumIstanza, "IDONEA", "Controlli superati. Simulazione: nessun dato modificato.");
-                else eligible.Add(new(request.NumIstanza, request.ExpectedFingerprint!));
+                else if (simulation) results[request.NumIstanza] = request.ProposedCorrections.Count == 0
+                    ? new(request.NumIstanza, "IDONEA", "Controlli superati. Simulazione: nessun dato modificato.")
+                    : new(request.NumIstanza, "IDONEA_CON_CORREZIONI", "Proposta documentata rivalidata integralmente. Simulazione: nessun dato modificato.");
+                else eligible.Add(new(request.NumIstanza, request.ExpectedFingerprint!)
+                {
+                    Corrections = request.ProposedCorrections.ToList()
+                });
             }
 
             if (eligible.Count > 0)
@@ -60,6 +69,33 @@ namespace ProcedureNet7
                     results[id] = new(id, "ERRORE", "Accoglimento non confermato: verificare lo stato prima di riprovare.");
             }
             return results.Values.OrderBy(x => x.NumIstanza).ToList();
+        }
+
+        private static bool ValidCorrectionPlan(IstanzaDomicilioRecord request)
+        {
+            if (request.CorrectionCandidate == null) return request.ProposedCorrections.Count == 0;
+            var candidate = request.CorrectionCandidate;
+            if (request.ProposedCorrections.Count == 0 || candidate.NumIstanza != request.NumIstanza ||
+                candidate.ExpectedFingerprint != request.ExpectedFingerprint || candidate.PresaCarico ||
+                candidate.Operazioni.Count != request.Operazioni.Count ||
+                request.ProposedCorrections.Select(x => x.OperationId).Distinct().Count() != request.ProposedCorrections.Count)
+                return false;
+            try
+            {
+                foreach (var correction in request.ProposedCorrections)
+                {
+                    var before = request.Operazioni.Single(x => x.Id == correction.OperationId);
+                    var after = candidate.Operazioni.Single(x => x.Id == correction.OperationId);
+                    if (DomicilioAutomationCorrectionPatch.Apply(before.PayloadJson, correction, before.Entita, before.Operazione) != after.PayloadJson)
+                        return false;
+                }
+                return request.Operazioni.Where(x => request.ProposedCorrections.All(c => c.OperationId != x.Id))
+                    .All(op => candidate.Operazioni.Single(x => x.Id == op.Id).PayloadJson == op.PayloadJson);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or System.Text.Json.JsonException)
+            {
+                return false;
+            }
         }
 
         private static bool DocumentComplete(IstanzaDomicilioDocument document)

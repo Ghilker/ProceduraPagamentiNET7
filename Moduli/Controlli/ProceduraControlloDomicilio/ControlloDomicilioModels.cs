@@ -215,6 +215,8 @@ namespace ProcedureNet7
         string TipoEnte = "", string DenominazioneEnte = "", decimal? ImportoMensileRata = null,
         bool ReadAllPages = false);
 
+    internal sealed record DomicilioPdfFieldEvidence(string Field, string Value, int Page, string Label);
+
     internal sealed class DomicilioPdfAnalysis
     {
         public bool FileAvailable { get; set; }
@@ -234,6 +236,8 @@ namespace ProcedureNet7
         public string ExtractedEnteName { get; set; } = string.Empty;
         public decimal? ExtractedMonthlyAmount { get; set; }
         public string ExtractedMunicipality { get; set; } = string.Empty;
+        public List<DomicilioPdfFieldEvidence> DocumentedCorrections { get; } = new();
+        public bool CanProposeCorrections { get; set; }
         public DomicilioControlState State { get; } = new();
 
         public string ExtractedData => string.Join("; ", new[]

@@ -12,83 +12,6 @@ namespace ProcedureNet7
     {
         public static readonly IReadOnlyList<string> SupportedBenefitCodes = new[] { "BS", "PA", "PK", "CI" };
 
-        private static readonly Dictionary<string, string> MotiviEsclusione = new(StringComparer.OrdinalIgnoreCase)
-        {
-            { "GEN000", "Domanda non completa" },
-            { "GEN001", "Domanda completa ma non trasmessa" },
-            { "GEN003", "Domanda presentata oltre il termine previsto dal bando" },
-            { "GEN004", "Documentazione consolare mancante" },
-            { "GEN005", "Permesso di soggiorno mancante" },
-            { "GEN006", "Tipologia studi incompatibile con il titolo accademico già conseguito" },
-            { "GEN007", "Rinuncia a tutti i benefici" },
-            { "ISC001", "Anno di immatricolazione mancante o non valido" },
-            { "ISC004", "Interruzione carriera dichiarata senza numero anni valido" },
-            { "ISC006", "Corso di laurea mancante per studente anni successivi" },
-            { "ISC008", "Anno di corso non classificabile" },
-            { "GEN093", "Iscrizione fuori termine" },
-            { "GEN094", "Domanda non trasmessa" },
-            { "GENDOC", "Documento di riconoscimento mancante" },
-            { "RED011", "Valore ISEE assente o non valido" },
-            { "RED012", "Valore ISP oltre la soglia ammessa" },
-            { "RED013", "Valore ISEE oltre la soglia ammessa" },
-            { "RED086", "Stato ISEE non ammesso" },
-            { "RED087", "Codice fiscale dello studente indipendente presente nell'attestazione ISEE della famiglia di origine" },
-            { "RED031", "Attestazione ISEE origine non adeguata: manca CO universitaria/ridotta/corrente; se l'ultima importata è ordinaria, il termine di regolarizzazione è il 10 dicembre" },
-            { "RED033", "Termine scaduto: integrazione ISEE universitaria/corrente del nucleo di origine non importata entro il 31 dicembre dell'anno di avvio" },
-            { "MER001", "Dati di merito assenti o non sufficienti per il calcolo" },
-            { "MER088", "Studente già in possesso di altra borsa" },
-            { "MER005", "Crediti dichiarati incongruenti con il corso di studi" },
-            { "MER071", "Esame complementare non valido per il merito AFAM" },
-            { "MER072", "Anno di corso incongruente con l'anno accademico di immatricolazione" },
-            { "MER074", "Crediti riconosciuti insufficienti per il primo anno di specialistica" },
-            { "MER085", "Utilizzo del bonus non ammesso per il titolo di accesso dichiarato" },
-            { "MER086", "Utilizzo del bonus non ammesso in presenza di crediti riconosciuti non derivanti da trasferimento TS o con ripetenza" },
-            { "MER087", "Utilizzo del bonus non ammesso per carriera pregressa CD/AT con tipologia corso 9 o sede istituzione universitaria 2" },
-            { "MER012", "Merito insufficiente per la borsa" },
-            { "MER092", "Crediti di tirocinio superiori ai crediti dichiarati" },
-            { "MER089", "Titolo di accesso non ammesso per immatricolazione alla specialistica" },
-            { "MER090", "Titolo di accesso in attesa di conseguimento non valido dopo il 10/02" },
-            { "MER091", "Titolo di accesso mancante per immatricolazione alla magistrale/specialistica" },
-            { "MER093", "Iscrizione magistrale biennale non ammissibile: presente titolo triennale già conseguito e ulteriore titolo di ciclo unico/magistrale biennale in attesa" },
-            { "MER170", "Iscrizione non ammessa per Sapienza in vecchio ordinamento" },
-            { "BS001", "Anno di corso oltre il limite ammesso per la borsa" },
-            { "BS002", "Beneficio borsa già fruito e non restituito" },
-            { "BS003", "Rinuncia pregressa alla borsa di studio" },
-            { "BS004", "Borsa già assegnata per lo stesso anno di corso equivalente" },
-            { "PA001", "Requisiti di status sede non ammessi per il posto alloggio: richiesto status B o D" },
-            { "PA002", "Comune della sede di studi non presente tra i pensionati attivi" },
-            { "PA003", "Anno di corso oltre il limite ammesso per il posto alloggio" },
-            { "PA004", "Beneficio già fruito e non restituito per il posto alloggio" },
-            { "PA005", "Rinuncia pregressa o corrente al posto alloggio" },
-            { "PA006", "Decadenza dal posto alloggio" },
-            { "PA007", "Revoca del posto alloggio per incompatibilità con il bando" },
-            { "CI001", "Primo anno non ammesso al contributo integrativo salvo tipologia corso 5" },
-            { "CI002", "Corso specialistico di tipologia 7 non ammesso al contributo integrativo" },
-            { "CI003", "Anno di corso oltre il limite ammesso per il contributo integrativo" },
-            { "CI004", "Beneficio già fruito e non restituito per il contributo integrativo" },
-            { "CI005", "Rinuncia pregressa o corrente al contributo integrativo" },
-            { "CI006", "Studente non selezionato per il contributo integrativo" },
-            { "CI007", "Decadenza dal contributo integrativo" },
-            { "CI008", "Revoca del contributo integrativo per incompatibilità con il bando" },
-            { "ISC009", "Comune della sede di studi mancante o non classificabile" },
-            { "ISC010", "Comune di residenza mancante o non classificabile" },
-            { "VAR003", "Revoca di tutti i benefici da variazione" },
-            { "VAR004", "Decadenza della borsa di studio da variazione" },
-            { "VAR011", "Revoca della borsa per incompatibilità con il bando" },
-            { "VAR019", "Revoca per mancata iscrizione" },
-            { "VAR020", "Revoca per iscrizione come ripetente" },
-            { "VAR021", "Revoca per ISEE o anni di fuori corso inammissibili" },
-            { "VAR022", "Revoca per studente già laureato" },
-            { "VAR023", "Revoca per patrimonio oltre il limite" },
-            { "VAR024", "Revoca per reddito oltre il limite" },
-            { "VAR025", "Revoca per mancanza esami o crediti" },
-            { "VAR027", "Revoca per iscrizione fuori termine" },
-            { "VAR028", "Revoca per ISEE fuori termine" },
-            { "VAR029", "Revoca per ISEE non prodotta" },
-            { "VAR030", "Revoca per trasmissione ISEE CAF fuori termine" },
-            { "VAR031", "Revoca per mancanza contratto di locazione" }
-        };
-
         public const string MotivoAdeguatezzaOrigineCoUniversitario = "CO_UNIVERSITARIO";
         public const string MotivoAdeguatezzaOrigineCoOrdinarioConIntegrazioneEsteri = "CO_ORDINARIO_CON_INTEGRAZIONE_ESTERI";
         public const string MotivoAdeguatezzaOrigineCoOrdinarioSemestreFiltro = "CO_ORDINARIO_SEMESTRE_FILTRO";
@@ -372,7 +295,7 @@ namespace ProcedureNet7
             if (facts.RevocatoFuoriTermine) items.Add("REVOCA_FUORI_TERMINE");
             if (facts.RevocatoIseeFuoriTermine) items.Add("REVOCA_ISEE_FUORI_TERMINE");
             if (facts.RevocatoIseeNonProdotta) items.Add("REVOCA_ISEE_NON_PRODOTTA");
-            if (facts.RevocatoTrasmissioneIseeFuoriTermine) items.Add("REVOCA_TRASMISSIONE_ISEE_FUORI_TERMINE");
+            if (facts.DecadutoMancataComunicazionePagamento) items.Add("DECADENZA_MANCATA_COMUNICAZIONE_PAGAMENTO");
             if (facts.RevocatoNoContrattoLocazione) items.Add("REVOCA_NO_CONTRATTO");
             return string.Join(";", items);
         }
@@ -542,15 +465,7 @@ namespace ProcedureNet7
         }
 
         public static string GetMotivoEsclusione(string codice)
-        {
-            if (MotiviEsclusione.TryGetValue(codice, out var motivo))
-                return motivo;
-
-            if (!string.IsNullOrWhiteSpace(codice) && codice.StartsWith("GENF", StringComparison.OrdinalIgnoreCase))
-                return $"Forzatura generale attiva {codice.Substring(4)}";
-
-            return codice;
-        }
+            => EsitoBorsaMotiviCatalog.GetDescrizione(codice);
 
         public static IReadOnlyList<string> GetRequestedBenefitCodes(EsitoBorsaFacts? facts)
         {
@@ -668,7 +583,7 @@ namespace ProcedureNet7
             if (facts.RevocatoFuoriTermine) items.Add("REVOCA_FUORI_TERMINE");
             if (facts.RevocatoIseeFuoriTermine) items.Add("REVOCA_ISEE_FUORI_TERMINE");
             if (facts.RevocatoIseeNonProdotta) items.Add("REVOCA_ISEE_NON_PRODOTTA");
-            if (facts.RevocatoTrasmissioneIseeFuoriTermine) items.Add("REVOCA_TRASMISSIONE_ISEE_FUORI_TERMINE");
+            if (facts.DecadutoMancataComunicazionePagamento) items.Add("DECADENZA_MANCATA_COMUNICAZIONE_PAGAMENTO");
             if (facts.RevocatoNoContrattoLocazione) items.Add("REVOCA_NO_CONTRATTO");
             return string.Join(";", items);
         }
@@ -681,19 +596,17 @@ namespace ProcedureNet7
                 SogliaIsp = 0m
             };
 
-            config.SogliaIsp = TryLoadDatiGeneraliConValue(
+            config.SogliaIsp = LoadDatiGeneraliConValue(
                 context.Connection,
                 context.AnnoAccademico,
                 new[] { "Soglia_Ispe", "Soglia_ISP", "Soglia_isp", "Soglia_patrimonio", "Soglia_Patrimonio" });
 
+            config.Validate(context.AnnoAccademico);
             return config;
         }
 
-        private static decimal TryLoadDatiGeneraliConValue(SqlConnection connection, string annoAccademico, IReadOnlyList<string> candidateColumns)
+        private static decimal LoadDatiGeneraliConValue(SqlConnection connection, string annoAccademico, IReadOnlyList<string> candidateColumns)
         {
-            if (connection == null || candidateColumns == null || candidateColumns.Count == 0)
-                return 0m;
-
             string? selectedColumn = null;
 
             const string columnsSql = @"
@@ -721,7 +634,7 @@ WHERE o.type = 'U'
             }
 
             if (string.IsNullOrWhiteSpace(selectedColumn))
-                return 0m;
+                throw new InvalidOperationException($"Configurazione economica da sistemare per AA {annoAccademico}: colonna Soglia_ISPE mancante in DatiGenerali_con.");
 
             string sql = $@"
 SELECT TOP (1) TRY_CONVERT(DECIMAL(18,2), [{selectedColumn}])
@@ -732,7 +645,9 @@ WHERE Anno_accademico = @AA;";
             cmd.Parameters.Add("@AA", SqlDbType.Char, 8).Value = (annoAccademico ?? string.Empty).Trim();
 
             object? value = cmd.ExecuteScalar();
-            return TryReadDecimal(value, out var parsed) ? parsed : 0m;
+            if (!TryReadDecimal(value, out var parsed) || parsed <= 0m)
+                throw new InvalidOperationException($"Configurazione economica da sistemare per AA {annoAccademico}: DatiGenerali_con.{selectedColumn} mancante o non maggiore di zero.");
+            return parsed;
         }
     }
 }

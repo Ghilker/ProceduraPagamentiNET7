@@ -107,6 +107,26 @@ namespace ProcedureNet7
             Logger.LogInfo(35, $"Individuati {pdfWork.Count} documenti PDF da controllare.");
             AnalyzePdfDocuments(pdfWork);
 
+            if (forAutomation)
+            {
+                // Work on detached proposed payloads. The original request remains the CSV evidence.
+                var plans = candidates.Select(request => (Request: request,
+                        Plan: DomicilioAutomaticCorrectionPlanner.Plan(request, data.Comuni, today)))
+                    .Where(x => x.Plan != null).ToList();
+                if (plans.Count > 0)
+                {
+                    var corrected = plans.Select(x => x.Plan!.Candidate).ToList();
+                    data.BindAttachments(corrected);
+                    Logger.LogInfo(80, $"Rivalutazione di {plans.Count} proposte di correzione documentate, senza modifiche al database.");
+                    AnalyzePdfDocuments(BuildInstancePdfWork(corrected, readAllPages: true));
+                    foreach (var item in plans)
+                    {
+                        item.Request.CorrectionCandidate = item.Plan!.Candidate;
+                        item.Request.ProposedCorrections.AddRange(item.Plan.Corrections);
+                    }
+                }
+            }
+
             return requests;
         }
 

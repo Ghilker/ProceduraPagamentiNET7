@@ -1,0 +1,384 @@
+#nullable enable
+using DirStudio.Data.Models;
+using DirStudio.Data.Files.Models;
+using DirStudio.Data.Enums;
+using DirStudio.Data.Validation;
+using DirStudio.Core.IManager;
+using DirStudio.DataHelper.GenericControllers;
+using DirStudio.DataHelper.Helpers;
+using Dirstudio.Controllers.GenericControllers;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Serbenco.Models;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
+#if DOMICILIO_AUTOMATION
+using System.Data.Common;
+using Microsoft.EntityFrameworkCore.Storage;
+using DomicilioAutomation;
+#endif
+
+namespace Serbenco.Helpers
+{
+    public sealed class IstanzaLavorazioneException : Exception
+    {
+        public int StatusCode { get; }
+        public IReadOnlyList<string> Errors { get; }
+        public IstanzaLavorazioneException(string message, int statusCode = 400) : this(new[] { message }, statusCode) { }
+        public IstanzaLavorazioneException(IEnumerable<string> errors, int statusCode = 400) : base(string.Join(" ", errors))
+        { Errors = errors.ToList(); StatusCode = statusCode; }
+    }
+
+    public interface IDomicilioIstanzaApplier
+    {
+        Task ApplyAsync(IstanzaDatiGenerali istanza, Domandum domanda, IReadOnlyList<IstanzaDomicilioOperazione> operations, string username);
+    }
+
+    public sealed class DomicilioIstanzaApplier : IDomicilioIstanzaApplier
+    {
+        private readonly ADISU_SVILUPPOContext db;
+        private readonly ADISU_SVILUPPO_FILESContext files;
+        private readonly IMemoryCacheManager cache;
+        private readonly ILogger<GenericBandoController> logger;
+        public DomicilioIstanzaApplier(ADISU_SVILUPPOContext db, ADISU_SVILUPPO_FILESContext files, IMemoryCacheManager cache, ILogger<GenericBandoController> logger)
+        { this.db = db; this.files = files; this.cache = cache; this.logger = logger; }
+        public async Task ApplyAsync(IstanzaDatiGenerali istanza, Domandum domanda, IReadOnlyList<IstanzaDomicilioOperazione> operations, string username)
+        {
+            if (!Enum.TryParse<TipoBandoEnum>(domanda.TipoBando, true, out var tipoBando)) throw new IstanzaLavorazioneException("Tipo bando non valido.");
+            var parameters = new GenericControllerParams
+            {
+                IsStudente = false, DbContext = db, AllegatiDbContext = files,
+                CodiceFiscaleStudente = istanza.CodFiscale, UsernameStudente = username,
+                AnnoAccademicoRiferimento = istanza.AnnoAccademico, NumeroDomanda = istanza.NumDomanda,
+                IdDomanda = domanda.IdDomanda, TipoBandoEnum = tipoBando, TipoLuogoEnum = TipoLuogoEnum.DOM, Logger = logger
+            };
+            // Managers version the registered data and expect tracked queries. Limit this to this call.
+            var oldTracking = db.ChangeTracker.QueryTrackingBehavior;
+            db.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.TrackAll;
+            try { await new IstanzaDomicilioManager(parameters, cache).ApplyAllAsync(operations); }
+            finally { db.ChangeTracker.QueryTrackingBehavior = oldTracking; }
+        }
+    }
+
+    public sealed class DomicilioLavorazioneService
+    {
+        private readonly ADISU_SVILUPPOContext db;
+        private readonly ADISU_SVILUPPO_FILESContext files;
+        private readonly IDomicilioIstanzaApplier applier;
+        public DomicilioLavorazioneService(ADISU_SVILUPPOContext db, ADISU_SVILUPPO_FILESContext files, IDomicilioIstanzaApplier applier)
+        { this.db = db; this.files = files; this.applier = applier; }
+        public static bool IsDomicilio(string? code) => code == "01" || code == "04B";
+        private static IstanzaDatiGenerali NormalizeRequest(IstanzaDatiGenerali header)
+        {
+            if (header.NumDomanda <= 0 || header.NumDomanda > 9999999 || header.NumDomanda != decimal.Truncate(header.NumDomanda))
+                throw new IstanzaLavorazioneException("Numero domanda non valido nell'istanza.");
+            // The header maps decimal(18,2), while application tables use numeric(7,0).
+            // Remove the decimal scale before SqlClient binds parameters for the latter.
+            header.NumDomanda = (decimal)decimal.ToInt32(header.NumDomanda);
+            return header;
+        }
+        private static void CheckUsername(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username)) throw new IstanzaLavorazioneException("Sessione operatore non valida.", 401);
+            if (username.Length > 20) throw new IstanzaLavorazioneException("L'identificativo operatore supera i 20 caratteri consentiti dallo storico. Contattare l'assistenza.");
+        }
+        private IQueryable<IstanzaDatiGenerali> OpenRequests(int id) => db.IstanzaDatiGenerali.Where(x => x.NumIstanza == id &&
+            (x.CodTipoIstanza == "01" || x.CodTipoIstanza == "04B") && x.DataFineValidita == null && x.EsitoIstanza == null);
+        private IQueryable<IstanzaDatiGenerali> OwnedRequests(int id, string username) => OpenRequests(id).Where(x => db.IstanzaStatus.Any(s =>
+            s.NumIstanza == x.NumIstanza && s.DataFineValidita == null && s.CodStatusIstanza == IstanzaDomicilioStatus.Inviata && s.PresaCarico == 1 && s.UtentePresaCarico == username));
+
+        public async Task TakeAsync(int id, string username)
+        {
+            CheckUsername(username);
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
+            {
+                if (await OpenRequests(id).ExecuteUpdateAsync(u => u.SetProperty(x => x.Utente, x => x.Utente)) != 1)
+                    throw new IstanzaLavorazioneException("Istanza non disponibile.", 409);
+                if (await db.IstanzaStatus.CountAsync(s => s.NumIstanza == id && s.DataFineValidita == null) != 1)
+                    throw new IstanzaLavorazioneException("Lo stato dell'istanza non è univoco. Aggiorna l'elenco e contatta l'assistenza se il problema persiste.", 409);
+                var rows = await db.IstanzaStatus.Where(s => s.NumIstanza == id && s.DataFineValidita == null &&
+                    s.CodStatusIstanza == IstanzaDomicilioStatus.Inviata && s.PresaCarico == 0 &&
+                    db.IstanzaDomicilioOperazioni.Any(o => o.NumIstanza == id && o.DataFineValidita == null))
+                    .ExecuteUpdateAsync(u => u.SetProperty(s => s.PresaCarico, 1).SetProperty(s => s.UtentePresaCarico, username).SetProperty(s => s.UtenteModifica, username));
+                if (rows != 1) throw new IstanzaLavorazioneException("Istanza già in carico, non inviata oppure priva di operazioni. Aggiorna l'elenco.", 409);
+                await tx.CommitAsync();
+            }
+            catch { await tx.RollbackAsync(); throw; }
+        }
+
+        public async Task<IstanzaDomicilioViewModel> GetAsync(int id, string username)
+        {
+            CheckUsername(username);
+            var header = await OwnedRequests(id, username).AsNoTracking().SingleOrDefaultAsync()
+                ?? throw new IstanzaLavorazioneException("Istanza non disponibile o non in carico all'operatore.", 404);
+            var operations = await Operations(id).AsNoTracking().ToListAsync();
+            NormalizeRequest(header);
+            var domicili = await CurrentDomicili(header);
+            var comuni = await db.Comunis.AsNoTracking().ToListAsync();
+            var validation = IstanzaDomicilioLavorazioneRules.Validate(operations, domicili, comuni, DateTime.Today);
+            var student = await db.Studentes.AsNoTracking().FirstOrDefaultAsync(x => x.CodFiscale == header.CodFiscale);
+            var model = new IstanzaDomicilioViewModel
+            {
+                NumIstanza = id, AnnoAccademico = header.AnnoAccademico, NumDomanda = header.NumDomanda,
+                CodFiscale = header.CodFiscale, DataValidita = header.DataValidita,
+                StudenteNome = student?.Nome ?? "", StudenteCognome = student?.Cognome ?? "", CodiceStudente = student?.CodiceStudente ?? "",
+                DomiciliAttuali = domicili, Errori = validation.Errors, Avvisi = validation.Warnings,
+                Operazioni = operations.Select(o => DomicilioOperationEditor.Present(o, operations, domicili, comuni)).ToList()
+            };
+            model.Errori.AddRange(await ValidateAttachments(header, operations));
+            model.TipoBando = await db.Domanda.AsNoTracking().Where(d => d.CodFiscale == header.CodFiscale && d.AnnoAccademico == header.AnnoAccademico && d.NumDomanda == header.NumDomanda).Select(d => d.TipoBando).SingleOrDefaultAsync() ?? "";
+            model.Situazione = DomicilioSituazionePresenter.Build(id, domicili, comuni, operations, model.Operazioni);
+            var activeBlocks = await db.MotivazioniBloccoPagamentis.AsNoTracking()
+                .Where(b => b.NumDomanda == header.NumDomanda && b.AnnoAccademico == header.AnnoAccademico && b.DataFineValidita == null)
+                .Select(b => b.CodTipologiaBlocco).ToListAsync();
+            model.BloccoDomicilioAttivo = activeBlocks.Contains("VVC");
+            model.AltriBlocchiPagamentoAttivi = activeBlocks.Any(b => b != "VVC");
+            var notePrefix = $"[Istanza domicilio {id}] ";
+            var notes = await db.Documentaziones.AsNoTracking()
+                .Where(n => n.AnnoAccademico == header.AnnoAccademico && n.NumDomanda == header.NumDomanda && n.Nota.StartsWith(notePrefix))
+                .OrderByDescending(n => n.DataValidita).ToListAsync();
+            model.StoricoCorrezioni = DomicilioLavorazioneAnteprima.ReadHistory(id, notes, operations, domicili, comuni);
+            DomicilioLavorazioneAnteprima.Populate(model, operations);
+            return model;
+        }
+
+        private IOrderedQueryable<IstanzaDomicilioOperazione> Operations(int id) => db.IstanzaDomicilioOperazioni
+            .Where(o => o.NumIstanza == id && o.DataFineValidita == null).OrderBy(o => o.Ordine);
+        private Task<List<Domicilio>> CurrentDomicili(IstanzaDatiGenerali h) => db.Domicili.AsNoTracking()
+            .Where(d => d.CodFiscale == h.CodFiscale && d.AnnoAccademico == h.AnnoAccademico && d.NumDomanda == h.NumDomanda && d.TipoLuogo == "DOM" && d.DataFineValidita == null && !d.IsDeleted)
+            .Include(d => d.Contratti.Where(c => c.DataFineValidita == null && !c.IsDeleted)).ThenInclude(c => c.Allegati.Where(a => a.DataFineValidita == null)).ThenInclude(a => a.StatusAllegatis.Where(s => s.DataFineValidita == null))
+            .Include(d => d.Contratti.Where(c => c.DataFineValidita == null && !c.IsDeleted)).ThenInclude(c => c.Proroghe.Where(p => p.DataFineValidita == null && !p.IsDeleted)).ThenInclude(p => p.Allegati.Where(a => a.DataFineValidita == null))
+            .ToListAsync();
+
+        // A no-op UPDATE takes a row write lock, held until commit. All mutations use this gate.
+        private async Task<IstanzaDatiGenerali> LockOwned(int id, string username)
+        {
+            CheckUsername(username);
+            if (await OwnedRequests(id, username).ExecuteUpdateAsync(u => u.SetProperty(x => x.Utente, x => x.Utente)) != 1)
+                throw new IstanzaLavorazioneException("La richiesta è già stata lavorata o non è in carico a questo operatore. Ricarica l'elenco.", 409);
+            return NormalizeRequest(await OpenRequests(id).AsTracking().SingleAsync());
+        }
+
+        public async Task CorrectAsync(DomicilioCorrezioneRequest request, string username)
+        {
+            if (string.IsNullOrWhiteSpace(request.Motivazione) || request.Motivazione.Length > 1000) throw new IstanzaLavorazioneException("Inserisci il motivo della correzione (massimo 1000 caratteri).");
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
+            {
+                var h = await LockOwned(request.NumIstanza, username);
+                var ops = await Operations(h.NumIstanza).AsTracking().ToListAsync();
+                var op = ops.SingleOrDefault(x => x.Id == request.IdOperazione) ?? throw new IstanzaLavorazioneException("Operazione non appartenente alla richiesta.", 404);
+                var before = op.PayloadJson;
+                op.PayloadJson = DomicilioOperationEditor.Correct(op, request);
+                var validation = IstanzaDomicilioLavorazioneRules.Validate(ops, await CurrentDomicili(h), await db.Comunis.AsNoTracking().ToListAsync(), DateTime.Today, op.Id);
+                if (validation.Errors.Count > 0) throw new IstanzaLavorazioneException(validation.Errors);
+                Audit(h, username, $"Correzione operazione {op.Ordine} (ID {op.Id}). Motivo: {request.Motivazione.Trim()}\nPrima: {before}\nDopo: {op.PayloadJson}");
+                await db.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch { await tx.RollbackAsync(); db.ChangeTracker.Clear(); throw; }
+        }
+
+        public async Task AcceptAsync(int id, string username)
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
+            {
+                var h = await LockOwned(id, username);
+                await ApplyAcceptanceAsync(h, username, rejectWarnings: false);
+                await tx.CommitAsync();
+            }
+            catch { await tx.RollbackAsync(); db.ChangeTracker.Clear(); throw; }
+        }
+
+#if DOMICILIO_AUTOMATION
+        // The audit identity is not a login. Corrections and acceptance share the
+        // same transaction; any changed source or failed validation rolls back both.
+        public async Task AcceptAutomaticallyAsync(int id, string expectedFingerprint,
+            Func<DbConnection, DbTransaction?, int, string> captureSnapshot,
+            IReadOnlyList<DomicilioAutomationOperationCorrection>? corrections = null)
+        {
+            const string username = "AUTO_DOMICILIO";
+            if (id <= 0 || expectedFingerprint == null || expectedFingerprint.Length != 64 || !expectedFingerprint.All(Uri.IsHexDigit))
+                throw new IstanzaLavorazioneException("Identificativo o impronta dell'istanza non validi.");
+            ArgumentNullException.ThrowIfNull(captureSnapshot);
+            corrections ??= Array.Empty<DomicilioAutomationOperationCorrection>();
+            if (corrections.Any(c => c == null || c.OperationId <= 0 || string.IsNullOrWhiteSpace(c.BeforePayload) ||
+                string.IsNullOrWhiteSpace(c.AfterPayload) || c.Fields == null || c.Fields.Count == 0) ||
+                corrections.Select(c => c.OperationId).Distinct().Count() != corrections.Count)
+                throw new IstanzaLavorazioneException("Elenco di correzioni automatiche non valido.");
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
+            {
+                if (await OpenRequests(id).ExecuteUpdateAsync(u => u.SetProperty(x => x.Utente, x => x.Utente)) != 1)
+                    throw new IstanzaLavorazioneException("Istanza non disponibile o già lavorata.", 409);
+                var states = await db.IstanzaStatus.AsNoTracking().Where(s => s.NumIstanza == id && s.DataFineValidita == null).ToListAsync();
+                if (states.Count != 1 || states[0].CodStatusIstanza != IstanzaDomicilioStatus.Inviata || states[0].PresaCarico != 0)
+                    throw new IstanzaLavorazioneException("Istanza non inviata, già in carico o con stato non univoco.", 409);
+                var actualFingerprint = captureSnapshot(db.Database.GetDbConnection(), tx.GetDbTransaction(), id);
+                if (!string.Equals(actualFingerprint, expectedFingerprint, StringComparison.Ordinal))
+                    throw new IstanzaLavorazioneException("I dati dell'istanza sono cambiati dopo il controllo: accoglimento automatico ignorato.", 409);
+                var h = NormalizeRequest(await OpenRequests(id).AsTracking().SingleAsync());
+                var operations = await Operations(id).AsTracking().ToListAsync();
+                foreach (var correction in corrections)
+                {
+                    var op = operations.SingleOrDefault(o => o.Id == correction.OperationId);
+                    if (op == null) throw new IstanzaLavorazioneException("L'operazione da correggere non è attiva nell'istanza.", 409);
+                    string payload;
+                    try { payload = DomicilioAutomationCorrectionPatch.Apply(op.PayloadJson, correction, (int)op.Entita, (int)op.Operazione); }
+                    catch (ArgumentException) { throw new IstanzaLavorazioneException("La correzione proposta non è limitata ai campi autorizzati o ai dati originari.", 409); }
+                    foreach (var field in correction.Fields)
+                    {
+                        var proposedAttachment = op.Entita == IstanzaDomicilioEntita.Proroga ? op.IdAllegatoProroga
+                            : field.Field.IndexOf("Subentro", StringComparison.OrdinalIgnoreCase) >= 0 ? op.IdAllegatoSubentro : op.IdAllegatoContratto;
+                        if (!proposedAttachment.HasValue || proposedAttachment.Value != field.AttachmentId)
+                            throw new IstanzaLavorazioneException("La fonte della correzione non è il PDF proposto per quel campo dell'operazione.", 409);
+                    }
+                    op.PayloadJson = payload;
+                    var sources = string.Join("; ", correction.Fields.Select(f => $"{f.Field}: allegato {f.AttachmentId}, pagina {f.Page}, etichetta {f.Label}"));
+                    Audit(h, username, $"Correzione operazione {op.Ordine} (ID {op.Id}). Motivo: Congruenza con dati espliciti del PDF. Fonti: {sources}\nPrima: {correction.BeforePayload}\nDopo: {payload}");
+                }
+                var claimed = await db.IstanzaStatus.Where(s => s.NumIstanza == id && s.DataFineValidita == null &&
+                    s.CodStatusIstanza == IstanzaDomicilioStatus.Inviata && s.PresaCarico == 0)
+                    .ExecuteUpdateAsync(u => u.SetProperty(s => s.PresaCarico, 1).SetProperty(s => s.UtentePresaCarico, username).SetProperty(s => s.UtenteModifica, username));
+                if (claimed != 1) throw new IstanzaLavorazioneException("Istanza non più disponibile per l'accoglimento automatico.", 409);
+                await ApplyAcceptanceAsync(h, username, rejectWarnings: true);
+                await tx.CommitAsync();
+            }
+            catch { await tx.RollbackAsync(); db.ChangeTracker.Clear(); throw; }
+        }
+
+#endif
+        private async Task ApplyAcceptanceAsync(IstanzaDatiGenerali h, string username, bool rejectWarnings)
+        {
+            var ops = await Operations(h.NumIstanza).AsTracking().ToListAsync();
+            var validation = IstanzaDomicilioLavorazioneRules.Validate(ops, await CurrentDomicili(h), await db.Comunis.AsNoTracking().ToListAsync(), DateTime.Today);
+            validation.Errors.AddRange(await ValidateAttachments(h, ops));
+            if (validation.Errors.Count > 0 || rejectWarnings && validation.Warnings.Count > 0)
+                throw new IstanzaLavorazioneException(validation.Errors.Concat(rejectWarnings ? validation.Warnings : Enumerable.Empty<string>()));
+            var domanda = await db.Domanda.AsNoTracking().SingleOrDefaultAsync(d => d.CodFiscale == h.CodFiscale && d.AnnoAccademico == h.AnnoAccademico && d.NumDomanda == h.NumDomanda)
+                ?? throw new IstanzaLavorazioneException("Domanda non trovata.");
+            var copies = ops.Select(CloneOperation).ToList();
+            await applier.ApplyAsync(h, domanda, copies, username);
+            await CloseRequest(h, ops, username, true, null);
+            await RemoveDomicilioBlock(h, domanda.IdDomanda, username);
+            await db.SaveChangesAsync();
+        }
+
+        public async Task RejectAsync(int id, string username, string? reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason) || reason.Length > 2000) throw new IstanzaLavorazioneException("Inserisci una motivazione del rifiuto (massimo 2000 caratteri).");
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
+            {
+                var h = await LockOwned(id, username);
+                var ops = await Operations(id).AsTracking().ToListAsync();
+                if (ops.Count == 0) throw new IstanzaLavorazioneException("L'istanza non contiene operazioni e non può essere lavorata.");
+                var ids = AttachmentIds(ops);
+                // Metadata in the main database controls validity. Binary files remain immutable archive evidence.
+                var proposed = db.Allegatis.Where(a => ids.Contains(a.IdAllegato) && a.CodFiscale == h.CodFiscale &&
+                    a.AnnoAccademico == h.AnnoAccademico && a.NumDomanda == h.NumDomanda && a.IdContratto == null && a.IdProroga == null);
+                var ownIds = await proposed.Select(a => a.IdAllegato).ToListAsync();
+                var now = DateTime.Now;
+                await proposed.Where(a => a.DataFineValidita == null).ExecuteUpdateAsync(u => u.SetProperty(a => a.DataFineValidita, now));
+                await db.StatusAllegatis.Where(a => ownIds.Contains(a.IdAllegato) && a.DataFineValidita == null).ExecuteUpdateAsync(u => u.SetProperty(a => a.DataFineValidita, now));
+                await db.SubAllegatis.Where(a => ownIds.Contains(a.IdAllegato) && a.DataFineValidita == null).ExecuteUpdateAsync(u => u.SetProperty(a => a.DataFineValidita, now));
+                await CloseRequest(h, ops, username, false, reason.Trim());
+                await db.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch { await tx.RollbackAsync(); db.ChangeTracker.Clear(); throw; }
+        }
+
+        private async Task CloseRequest(IstanzaDatiGenerali h, List<IstanzaDomicilioOperazione> ops, string username, bool accepted, string? reason)
+        {
+            var now = DateTime.Now;
+            h.EsitoIstanza = accepted ? 1 : 0; h.DataFineValidita = now; h.Utente = username;
+            foreach (var op in ops) op.DataFineValidita = now;
+            await db.IstanzaStatus.Where(s => s.NumIstanza == h.NumIstanza && s.DataFineValidita == null)
+                .ExecuteUpdateAsync(u => u.SetProperty(s => s.DataFineValidita, now).SetProperty(s => s.UtenteModifica, username));
+            var message = DomicilioLavorazioneAnteprima.Message(h.NumIstanza, ops.Count, accepted, reason);
+            Audit(h, username, message);
+            db.MessaggiStudentes.Add(new MessaggiStudente { CodFiscale = h.CodFiscale, DataInserimentoMessaggio = now, Messaggio = message, Letto = "0", Utente = username });
+        }
+        private void Audit(IstanzaDatiGenerali h, string username, string message) => db.Documentaziones.Add(new Documentazione
+        { AnnoAccademico = h.AnnoAccademico, NumDomanda = h.NumDomanda, DataValidita = DateTime.Now, Utente = username, RigaValida = "1", Nota = $"[Istanza domicilio {h.NumIstanza}] Operatore: {username}. {message}" });
+
+        private async Task RemoveDomicilioBlock(IstanzaDatiGenerali h, int idDomanda, string username)
+        {
+            var now = DateTime.Now;
+            var closed = await db.MotivazioniBloccoPagamentis.Where(b => b.NumDomanda == h.NumDomanda && b.AnnoAccademico == h.AnnoAccademico && b.CodTipologiaBlocco == "VVC" && b.DataFineValidita == null)
+                .ExecuteUpdateAsync(u => u.SetProperty(b => b.DataFineValidita, now).SetProperty(b => b.UtenteSblocco, username));
+            if (closed == 0) return;
+            var last = await db.DatiGeneraliDoms.AsNoTracking().Where(x => x.NumDomanda == h.NumDomanda && x.AnnoAccademico == h.AnnoAccademico).OrderByDescending(x => x.DataValidita).FirstOrDefaultAsync()
+                ?? throw new IstanzaLavorazioneException("Dati generali della domanda non disponibili per aggiornare il blocco.");
+            var copy = (DatiGeneraliDom)db.Entry(last).CurrentValues.ToObject();
+            // Reset generated keys before inserting a new historical row.
+            foreach (var property in db.Entry(copy).Properties.Where(p => p.Metadata.ValueGenerated == Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.OnAdd)) property.CurrentValue = property.Metadata.ClrType.IsValueType ? Activator.CreateInstance(property.Metadata.ClrType) : null;
+            copy.IdDomanda = idDomanda;
+            copy.DataValidita = now; copy.Utente = username;
+            copy.BloccoPagamento = await db.MotivazioniBloccoPagamentis.AnyAsync(b => b.NumDomanda == h.NumDomanda && b.AnnoAccademico == h.AnnoAccademico && b.DataFineValidita == null) ? "1" : "0";
+            db.DatiGeneraliDoms.Add(copy);
+        }
+
+        private static List<decimal> AttachmentIds(IEnumerable<IstanzaDomicilioOperazione> ops) => ops.SelectMany(o => new[] { o.IdAllegatoContratto, o.IdAllegatoSubentro, o.IdAllegatoProroga, o.IdAllegatoLearningAgreement }).Where(x => x.HasValue).Select(x => x!.Value).Distinct().ToList();
+        private static IstanzaDomicilioOperazione CloneOperation(IstanzaDomicilioOperazione o) => new()
+        {
+            Id = o.Id, NumIstanza = o.NumIstanza, Ordine = o.Ordine, IdOperazionePadre = o.IdOperazionePadre,
+            Entita = o.Entita, Operazione = o.Operazione, IdDomicilio = o.IdDomicilio, IdContratto = o.IdContratto,
+            IdProroga = o.IdProroga, IdAllegatoContratto = o.IdAllegatoContratto, IdAllegatoSubentro = o.IdAllegatoSubentro,
+            IdAllegatoProroga = o.IdAllegatoProroga, DataValiditaOrigine = o.DataValiditaOrigine,
+            IdAllegatoLearningAgreement = o.IdAllegatoLearningAgreement,
+            DataModificaOrigine = o.DataModificaOrigine, PayloadJson = o.PayloadJson, DataValidita = o.DataValidita,
+            Utente = o.Utente, DataFineValidita = o.DataFineValidita
+        };
+        private async Task<List<string>> ValidateAttachments(IstanzaDatiGenerali h, List<IstanzaDomicilioOperazione> ops)
+        {
+            var errors = new List<string>();
+            var ids = AttachmentIds(ops);
+            if (ids.Count == 0) return errors;
+            var valid = await db.Allegatis.AsNoTracking().Where(a => ids.Contains(a.IdAllegato) && a.DataFineValidita == null && a.CodFiscale == h.CodFiscale &&
+                a.AnnoAccademico == h.AnnoAccademico && a.NumDomanda == h.NumDomanda && a.IdContratto == null && a.IdProroga == null)
+                .Select(a => new { a.IdAllegato, CodStatus = db.StatusAllegatis.Where(s => s.IdAllegato == a.IdAllegato && s.DataFineValidita == null)
+                    .OrderByDescending(s => s.DataValidita).ThenByDescending(s => s.IdStatusAllegati).Select(s => s.CodStatus).FirstOrDefault() })
+                .Where(a => a.CodStatus != null && a.CodStatus != "04").Select(a => a.IdAllegato).ToListAsync();
+            var binaries = await files.Allegatis.AsNoTracking().Where(a => ids.Contains(a.IdAllegatoAdisu) && a.DataFineValidita == null && a.File != null && a.File.Length > 0).Select(a => a.IdAllegatoAdisu).ToListAsync();
+            foreach (var id in ids.Where(id => !valid.Contains(id) || !binaries.Contains(id))) errors.Add($"L'allegato {id} è mancante o non più valido. Non è possibile accettare la richiesta.");
+            var types = await db.Allegatis.AsNoTracking().Where(a => valid.Contains(a.IdAllegato)).ToDictionaryAsync(a => a.IdAllegato, a => a.CodTipoAllegato);
+            var roles = ops.SelectMany(o => new[] {
+                (Id: o.IdAllegatoContratto, Type: TipologiaAllegatoEnum.ContrattoDiLocazione.ToCodice(), Order: o.Ordine),
+                (Id: o.IdAllegatoSubentro, Type: TipologiaAllegatoEnum.ContrattoSubentroLocazione.ToCodice(), Order: o.Ordine),
+                (Id: o.IdAllegatoLearningAgreement, Type: TipologiaAllegatoEnum.LearningAgreement.ToCodice(), Order: o.Ordine),
+                (Id: o.IdAllegatoProroga, Type: TipologiaAllegatoEnum.ProrogaContrattoAffitto.ToCodice(), Order: o.Ordine)
+            }).Where(x => x.Id.HasValue).ToList();
+            foreach (var role in roles)
+                if (types.TryGetValue(role.Id!.Value, out var type) && type != role.Type)
+                    errors.Add($"Operazione {role.Order}: la tipologia dell'allegato {role.Id} non corrisponde al documento richiesto.");
+            if (roles.GroupBy(x => x.Id).Any(g => g.Count() > 1)) errors.Add("Uno stesso allegato non può essere utilizzato da più operazioni o per documenti diversi.");
+            return errors;
+        }
+
+        public async Task<DirStudio.Data.Files.Models.Allegati> AttachmentAsync(int id, decimal attachmentId, string username)
+        {
+            CheckUsername(username);
+            var h = await OwnedRequests(id, username).AsNoTracking().SingleOrDefaultAsync() ?? throw new IstanzaLavorazioneException("Istanza non disponibile.", 404);
+            NormalizeRequest(h);
+            var ops = await Operations(id).AsNoTracking().ToListAsync();
+            var proposed = AttachmentIds(ops).Contains(attachmentId);
+            var source = await CurrentDomicili(h);
+            // The left column exposes the complete current hierarchy of this student's application.
+            var currentIds = source.SelectMany(d => d.Contratti).SelectMany(c => c.AllegatiAttivi).Select(a => a.IdAllegato)
+                .Concat(source.SelectMany(d => d.Contratti).SelectMany(c => c.Proroghe).Where(p => p.AllegatoAttivo != null).Select(p => p.AllegatoAttivo.IdAllegato));
+            if (!proposed && !currentIds.Contains(attachmentId)) throw new IstanzaLavorazioneException("Allegato non disponibile per questa richiesta.", 404);
+            if (!await db.Allegatis.AnyAsync(a => a.IdAllegato == attachmentId && a.DataFineValidita == null && a.CodFiscale == h.CodFiscale && a.AnnoAccademico == h.AnnoAccademico && a.NumDomanda == h.NumDomanda))
+                throw new IstanzaLavorazioneException("Allegato non disponibile.", 404);
+            return await files.Allegatis.AsNoTracking().FirstOrDefaultAsync(a => a.IdAllegatoAdisu == attachmentId && a.DataFineValidita == null)
+                ?? throw new IstanzaLavorazioneException("Il documento non è disponibile nell'archivio allegati.", 404);
+        }
+    }
+}

@@ -1,4 +1,4 @@
-# Piano di pairing codici di segnalazione / motivi di esclusione
+# Piano di pairing codici di segnalazione / motivi di esclusione (proposta storica)
 
 ## Criteri
 
@@ -108,3 +108,15 @@
    - ISEE fuori termine → segnalazione 112.
 4. Uniformare le descrizioni dei pairing marcati `COMPATIBILE` prima di rendere il mapping vincolante.
 5. Conservare il mapping in un unico catalogo applicativo e aggiungere una validazione automatica di unicità su entrambi i lati.
+
+## Stato dell'implementazione
+
+Questo documento conserva il piano originario. La mappatura applicativa corrente è in `Moduli/Controlli/VerificaMain/Esito/EsitoBorsaMotiviCatalog.cs` e sostituisce le ipotesi della tabella sopra.
+
+Il 2 novembre 2026 è stato letto in sola lettura il catalogo ADISU: 203 causali in `dbo.Decod_segnalazioni` per il 20262027 e 237 codici distinti nell'intero storico. Tutte le 74 regole C# hanno ora un codice distinto: 52 causali esistenti e 22 nuove, assegnate nell'intervallo 225-246, libero nello storico consultato. Non sono stati eseguiti inserimenti o aggiornamenti sul database.
+
+Correzioni rilevanti: BS004→222; PA001→054; MER170→239 perché il 201 attuale riguarda il semestre filtro; ISC008→227 perché 008 indica invece anno calcolato minore del dichiarato. MER072 mantiene 103 con descrizione calcolato/dichiarato. La causale di variazione 30 è decadenza per modalità di pagamento mancanti e usa correttamente 114; la precedente descrizione ISEE CAF era errata. La variazione 21 riguarda ISEE assente in INPS, non anni fuori corso, e riceve 244. I precedenti candidati 223 e 224 sono già occupati da altre causali.
+
+Il catalogo e l'export distinguono `Verificata` da `DaRegistrare`: anche i nuovi numeri vengono esportati, con stato `DA REGISTRARE`, senza modificare gli esiti di idoneità. I codici sconosciuti rimangono `DA VERIFICARE`. Le forzature GENF conservano il numero solo se presente nel catalogo 20262027 o tra quelli appena assegnati; GENF201 non è un alias di MER170. Dopo la registrazione occorre aggiornare lo stato del catalogo sulla base di una nuova lettura DB.
+
+Il file `outputs/01a19b29-4e8a-73e1-b852-eb1941fe1c1e/Catalogo_motivi_Verifica_20262027_DB.xlsx` documenta decisioni, descrizioni DB e motivazioni. Lo script SQL nella stessa cartella registra le sole 22 nuove decodifiche, preserva lo storico, accetta solo anni dal 20262027 e blocca collisioni di significato; è stato preparato ma non eseguito.

@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <DefineConstants>$(DefineConstants);DOMICILIO_AUTOMATION</DefineConstants>
     <BackendServiceSource Condition="'$(BackendServiceSource)' == ''">$(DirStudioRoot)\Serbenco\Helpers\DomicilioLavorazioneService.cs</BackendServiceSource>
   </PropertyGroup>
   <Target Name="ValidateBackendSources" BeforeTargets="PrepareForBuild">
@@ -23,5 +24,6 @@
     <Compile Include="$(DirStudioRoot)\DirStudio\Helpers\DomicilioCoperturaCalculator.cs" Link="Backend/DomicilioCoperturaCalculator.cs" />
     <Compile Include="..\..\Shared\DomicilioAutomationContracts.cs" Link="Shared/DomicilioAutomationContracts.cs" />
     <Compile Include="..\..\Shared\DomicilioAutomationSnapshot.cs" Link="Shared/DomicilioAutomationSnapshot.cs" />
+    <Compile Include="..\..\Shared\DomicilioAutomationCorrectionPatch.cs" Link="Shared/DomicilioAutomationCorrectionPatch.cs" />
   </ItemGroup>
 </Project>

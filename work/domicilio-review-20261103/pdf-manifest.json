@@ -1,0 +1,3448 @@
+{
+  "Requests": [
+    {
+      "Id": 17594,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2787981
+      ]
+    },
+    {
+      "Id": 17677,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788048
+      ]
+    },
+    {
+      "Id": 17840,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2788184
+      ]
+    },
+    {
+      "Id": 19267,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2789765
+      ]
+    },
+    {
+      "Id": 17437,
+      "Category": "Piu dati o ricevute nel PDF",
+      "Codes": [
+        "PDF_014N",
+        "PDF_015N",
+        "PDF_017",
+        "PDF_AMBIGUOUS_FIELDS",
+        "PDF_TENANT_ROLE_MISSING"
+      ],
+      "Attachments": [
+        2787881
+      ]
+    },
+    {
+      "Id": 17465,
+      "Category": "Lettura campi identita e collegamenti",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_007",
+        "PDF_010N",
+        "PDF_011N",
+        "PDF_012N",
+        "PDF_016",
+        "PDF_024",
+        "PDF_TENANT_ROLE_MISSING"
+      ],
+      "Attachments": [
+        2787892
+      ]
+    },
+    {
+      "Id": 17522,
+      "Category": "Lettura campi identita e collegamenti",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_007",
+        "PDF_011N",
+        "PDF_012N",
+        "PDF_017",
+        "PDF_024",
+        "PDF_TENANT_ROLE_INCOMPATIBLE"
+      ],
+      "Attachments": [
+        2787933
+      ]
+    },
+    {
+      "Id": 17552,
+      "Category": "Lettura campi identita e collegamenti",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_007",
+        "PDF_010N",
+        "PDF_011N",
+        "PDF_012N",
+        "PDF_016",
+        "PDF_024",
+        "PDF_TENANT_ROLE_MISSING"
+      ],
+      "Attachments": [
+        2788357
+      ]
+    },
+    {
+      "Id": 17580,
+      "Category": "Ente o Learning Agreement",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_007",
+        "PDF_ENTE_CF",
+        "PDF_ENTE_COMUNE",
+        "PDF_ENTE_ENTE",
+        "PDF_ENTE_FINE",
+        "PDF_ENTE_INIZIO",
+        "PDF_ENTE_RATA",
+        "PDF_ENTE_TIPO_ENTE"
+      ],
+      "Attachments": [
+        2788943
+      ]
+    },
+    {
+      "Id": 17616,
+      "Category": "PDF parzialmente leggibili",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_TEXT_INCOMPLETE"
+      ],
+      "Attachments": [
+        2787999
+      ]
+    },
+    {
+      "Id": 17624,
+      "Category": "PDF parzialmente leggibili",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_TEXT_INCOMPLETE"
+      ],
+      "Attachments": [
+        2788014
+      ]
+    },
+    {
+      "Id": 17713,
+      "Category": "PDF parzialmente leggibili",
+      "Codes": [
+        "PDF_017",
+        "PDF_TEXT_INCOMPLETE"
+      ],
+      "Attachments": [
+        2788100
+      ]
+    },
+    {
+      "Id": 17732,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788094
+      ]
+    },
+    {
+      "Id": 17763,
+      "Category": "Piu dati o ricevute nel PDF",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_014N",
+        "PDF_015N",
+        "PDF_018",
+        "PDF_AMBIGUOUS_FIELDS",
+        "PDF_TENANT_ROLE_MISSING"
+      ],
+      "Attachments": [
+        2788125
+      ]
+    },
+    {
+      "Id": 17770,
+      "Category": "Piu dati o ricevute nel PDF",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_014N",
+        "PDF_015N",
+        "PDF_018",
+        "PDF_AMBIGUOUS_FIELDS",
+        "PDF_TENANT_ROLE_MISSING"
+      ],
+      "Attachments": [
+        2788131
+      ]
+    },
+    {
+      "Id": 17837,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788177
+      ]
+    },
+    {
+      "Id": 17838,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788186
+      ]
+    },
+    {
+      "Id": 17866,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788209
+      ]
+    },
+    {
+      "Id": 17892,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791243
+      ]
+    },
+    {
+      "Id": 17910,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788231
+      ]
+    },
+    {
+      "Id": 17931,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788254
+      ]
+    },
+    {
+      "Id": 17936,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788265
+      ]
+    },
+    {
+      "Id": 18013,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788305
+      ]
+    },
+    {
+      "Id": 18027,
+      "Category": "Ente o Learning Agreement",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_007",
+        "PDF_ENTE_CF",
+        "PDF_ENTE_COMUNE",
+        "PDF_ENTE_ENTE",
+        "PDF_ENTE_FINE",
+        "PDF_ENTE_INIZIO",
+        "PDF_ENTE_RATA",
+        "PDF_ENTE_TIPO_ENTE"
+      ],
+      "Attachments": [
+        2788319
+      ]
+    },
+    {
+      "Id": 18068,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788352
+      ]
+    },
+    {
+      "Id": 18115,
+      "Category": "Ente o Learning Agreement",
+      "Codes": [
+        "DOC_DA_VALIDARE",
+        "PDF_007",
+        "PDF_ENTE_CF",
+        "PDF_ENTE_COMUNE",
+        "PDF_ENTE_ENTE",
+        "PDF_ENTE_FINE",
+        "PDF_ENTE_INIZIO",
+        "PDF_ENTE_RATA",
+        "PDF_ENTE_TIPO_ENTE"
+      ],
+      "Attachments": [
+        2788371
+      ]
+    },
+    {
+      "Id": 18119,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788374
+      ]
+    },
+    {
+      "Id": 18125,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788381
+      ]
+    },
+    {
+      "Id": 18154,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788408
+      ]
+    },
+    {
+      "Id": 18196,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788440
+      ]
+    },
+    {
+      "Id": 18288,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788530
+      ]
+    },
+    {
+      "Id": 18374,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788594
+      ]
+    },
+    {
+      "Id": 18534,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2788709
+      ]
+    },
+    {
+      "Id": 18894,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789012
+      ]
+    },
+    {
+      "Id": 18896,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789014
+      ]
+    },
+    {
+      "Id": 18996,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789110
+      ]
+    },
+    {
+      "Id": 19016,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2789141
+      ]
+    },
+    {
+      "Id": 19018,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_011"
+      ],
+      "Attachments": [
+        2789148
+      ]
+    },
+    {
+      "Id": 19056,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789188
+      ]
+    },
+    {
+      "Id": 19116,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789238
+      ]
+    },
+    {
+      "Id": 19117,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789249
+      ]
+    },
+    {
+      "Id": 19322,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789496
+      ]
+    },
+    {
+      "Id": 19346,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2789478
+      ]
+    },
+    {
+      "Id": 19376,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789526
+      ]
+    },
+    {
+      "Id": 19463,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2791641
+      ]
+    },
+    {
+      "Id": 19526,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789717
+      ]
+    },
+    {
+      "Id": 19632,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789860
+      ]
+    },
+    {
+      "Id": 19680,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2789919
+      ]
+    },
+    {
+      "Id": 19760,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790010
+      ]
+    },
+    {
+      "Id": 19807,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2790106,
+        2790107
+      ]
+    },
+    {
+      "Id": 19898,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790211
+      ]
+    },
+    {
+      "Id": 19903,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2790213
+      ]
+    },
+    {
+      "Id": 19948,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790261
+      ]
+    },
+    {
+      "Id": 19996,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790318
+      ]
+    },
+    {
+      "Id": 20033,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790368
+      ]
+    },
+    {
+      "Id": 20067,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790398
+      ]
+    },
+    {
+      "Id": 20081,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790415
+      ]
+    },
+    {
+      "Id": 20088,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790427
+      ]
+    },
+    {
+      "Id": 20100,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790442
+      ]
+    },
+    {
+      "Id": 20160,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791792
+      ]
+    },
+    {
+      "Id": 20169,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790520
+      ]
+    },
+    {
+      "Id": 20187,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790549
+      ]
+    },
+    {
+      "Id": 20227,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2792210
+      ]
+    },
+    {
+      "Id": 20262,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790619
+      ]
+    },
+    {
+      "Id": 20288,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793973
+      ]
+    },
+    {
+      "Id": 20317,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790670
+      ]
+    },
+    {
+      "Id": 20409,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790771
+      ]
+    },
+    {
+      "Id": 20457,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790829
+      ]
+    },
+    {
+      "Id": 20483,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790873
+      ]
+    },
+    {
+      "Id": 20527,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790905
+      ]
+    },
+    {
+      "Id": 20532,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2790912
+      ]
+    },
+    {
+      "Id": 20551,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2790935
+      ]
+    },
+    {
+      "Id": 20677,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_010",
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791105
+      ]
+    },
+    {
+      "Id": 20718,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791197
+      ]
+    },
+    {
+      "Id": 20808,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2791232
+      ]
+    },
+    {
+      "Id": 20828,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791248
+      ]
+    },
+    {
+      "Id": 20832,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791252
+      ]
+    },
+    {
+      "Id": 20841,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791275
+      ]
+    },
+    {
+      "Id": 20864,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791299
+      ]
+    },
+    {
+      "Id": 20874,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791300
+      ]
+    },
+    {
+      "Id": 21009,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791455
+      ]
+    },
+    {
+      "Id": 21167,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791671
+      ]
+    },
+    {
+      "Id": 21191,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791663
+      ]
+    },
+    {
+      "Id": 21359,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791844
+      ]
+    },
+    {
+      "Id": 21424,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791935
+      ]
+    },
+    {
+      "Id": 21439,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791949
+      ]
+    },
+    {
+      "Id": 21446,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2791958
+      ]
+    },
+    {
+      "Id": 21480,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2792002
+      ]
+    },
+    {
+      "Id": 21506,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2792045
+      ]
+    },
+    {
+      "Id": 21525,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2792070
+      ]
+    },
+    {
+      "Id": 21559,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2792119
+      ]
+    },
+    {
+      "Id": 21618,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2792643
+      ]
+    },
+    {
+      "Id": 21678,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2792318
+      ]
+    },
+    {
+      "Id": 21735,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2792388
+      ]
+    },
+    {
+      "Id": 21777,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2792449
+      ]
+    },
+    {
+      "Id": 21802,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2792492
+      ]
+    },
+    {
+      "Id": 21868,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2792599
+      ]
+    },
+    {
+      "Id": 21890,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_011",
+        "PDF_012"
+      ],
+      "Attachments": [
+        2792629
+      ]
+    },
+    {
+      "Id": 21898,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2792649
+      ]
+    },
+    {
+      "Id": 22162,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_010",
+        "PDF_011",
+        "PDF_012"
+      ],
+      "Attachments": [
+        2793992
+      ]
+    },
+    {
+      "Id": 22297,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_010",
+        "PDF_011",
+        "PDF_012",
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793252
+      ]
+    },
+    {
+      "Id": 22298,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793254
+      ]
+    },
+    {
+      "Id": 22305,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793270
+      ]
+    },
+    {
+      "Id": 22355,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793357
+      ]
+    },
+    {
+      "Id": 22369,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793383
+      ]
+    },
+    {
+      "Id": 22470,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_010",
+        "PDF_011",
+        "PDF_012"
+      ],
+      "Attachments": [
+        2793562
+      ]
+    },
+    {
+      "Id": 22552,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793701
+      ]
+    },
+    {
+      "Id": 22586,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793812
+      ]
+    },
+    {
+      "Id": 22612,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2793899
+      ]
+    },
+    {
+      "Id": 22634,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012",
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793858,
+        2793859
+      ]
+    },
+    {
+      "Id": 22690,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2793955
+      ]
+    },
+    {
+      "Id": 22750,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794087
+      ]
+    },
+    {
+      "Id": 22759,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794111
+      ]
+    },
+    {
+      "Id": 22817,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794199
+      ]
+    },
+    {
+      "Id": 22868,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794281
+      ]
+    },
+    {
+      "Id": 22942,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794403
+      ]
+    },
+    {
+      "Id": 22949,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_010",
+        "PDF_011",
+        "PDF_012"
+      ],
+      "Attachments": [
+        2794412
+      ]
+    },
+    {
+      "Id": 22997,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794492
+      ]
+    },
+    {
+      "Id": 23025,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794530
+      ]
+    },
+    {
+      "Id": 23030,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794529
+      ]
+    },
+    {
+      "Id": 23035,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2794538
+      ]
+    },
+    {
+      "Id": 23058,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794577
+      ]
+    },
+    {
+      "Id": 23101,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794679
+      ]
+    },
+    {
+      "Id": 23194,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_010",
+        "PDF_012"
+      ],
+      "Attachments": [
+        2794830
+      ]
+    },
+    {
+      "Id": 23202,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_010",
+        "PDF_012"
+      ],
+      "Attachments": [
+        2794852
+      ]
+    },
+    {
+      "Id": 23209,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794862
+      ]
+    },
+    {
+      "Id": 23224,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2794885
+      ]
+    },
+    {
+      "Id": 23240,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794907
+      ]
+    },
+    {
+      "Id": 23249,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2794908
+      ]
+    },
+    {
+      "Id": 23321,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2795026
+      ]
+    },
+    {
+      "Id": 23386,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2795165
+      ]
+    },
+    {
+      "Id": 23511,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2795803
+      ]
+    },
+    {
+      "Id": 23560,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2796141
+      ]
+    },
+    {
+      "Id": 23605,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2796348
+      ]
+    },
+    {
+      "Id": 23620,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2796405
+      ]
+    },
+    {
+      "Id": 23706,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2796785
+      ]
+    },
+    {
+      "Id": 23755,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_012"
+      ],
+      "Attachments": [
+        2796944
+      ]
+    },
+    {
+      "Id": 23764,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2796985
+      ]
+    },
+    {
+      "Id": 23793,
+      "Category": "Solo date o estremi discordanti",
+      "Codes": [
+        "PDF_017"
+      ],
+      "Attachments": [
+        2797155
+      ]
+    }
+  ],
+  "Files": [
+    {
+      "AttachmentId": 2787981,
+      "PhysicalId": 1944005,
+      "Bytes": 15237,
+      "OriginalName": "ricevuta_prenotazione_19841.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T11:52:15.613",
+      "RequestIds": [
+        17594
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2787981_1944005.pdf",
+      "Sha256": "5B2ACA2637C3DD5F81C73BF8CF1FE8FC0A5B4AB22523A52571EAB4DFC0838BE7"
+    },
+    {
+      "AttachmentId": 2788048,
+      "PhysicalId": 1944072,
+      "Bytes": 18591,
+      "OriginalName": "MARSILI - STUDENTI 2025 REGISTRAZIONE_261014_184543.PDF",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T12:33:05.593",
+      "RequestIds": [
+        17677
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788048_1944072.pdf",
+      "Sha256": "7818027B2F0EDB5850EBDA06B17B02AA973997703C9DA19E1C238E6D2222F180"
+    },
+    {
+      "AttachmentId": 2788184,
+      "PhysicalId": 1944208,
+      "Bytes": 783919,
+      "OriginalName": "contratto di locazione Roma e proroga fino al 31-08-2027.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T13:58:32.047",
+      "RequestIds": [
+        17840
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788184_1944208.pdf",
+      "Sha256": "149ECEACD89B23455922753290ABDAFCCBD658A4124D2BF4D27D144BB71BC29F"
+    },
+    {
+      "AttachmentId": 2789765,
+      "PhysicalId": 1945788,
+      "Bytes": 32278,
+      "OriginalName": "registrazioni_contratto_e_proroghe.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-17T13:09:50.783",
+      "RequestIds": [
+        19267
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789765_1945788.pdf",
+      "Sha256": "7D767D8B1D931AEA8D74CE0065C93D4453230DDA553DFC77A6C09BC05DD184CC"
+    },
+    {
+      "AttachmentId": 2787881,
+      "PhysicalId": 1943905,
+      "Bytes": 17260,
+      "OriginalName": "Proroga Ag.E. Stati-Ciaccio, Nuziale al 31.10.2027.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T10:48:19.803",
+      "RequestIds": [
+        17437
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2787881_1943905.pdf",
+      "Sha256": "4C53D616A04E5C7C0FFCA6D4248D70497EC1C357A66A08DC6EB1433B983A845C"
+    },
+    {
+      "AttachmentId": 2787892,
+      "PhysicalId": 1943916,
+      "Bytes": 26974,
+      "OriginalName": "Registrazione contratto locazione 26_27_CRDGPP99C26D708O.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T11:00:47.637",
+      "RequestIds": [
+        17465
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2787892_1943916.pdf",
+      "Sha256": "364D247802E5829CD200AEF7A58133F747B4A8DAC98EC6DBDE027E26D7E49B74"
+    },
+    {
+      "AttachmentId": 2787933,
+      "PhysicalId": 1943957,
+      "Bytes": 8430,
+      "OriginalName": "24612544_3_RLI12.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T11:27:14.55",
+      "RequestIds": [
+        17522
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2787933_1943957.pdf",
+      "Sha256": "F836857DB53B16EC0709719B7B469DB9BC3682FB3671171462DC45BFB25E8C63"
+    },
+    {
+      "AttachmentId": 2787999,
+      "PhysicalId": 1944023,
+      "Bytes": 2750248,
+      "OriginalName": "TDL26T001437000AA_BL_Contratto_RicevuteAE.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T12:05:18.857",
+      "RequestIds": [
+        17616
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2787999_1944023.pdf",
+      "Sha256": "6F4CD241EF4F91316C3DC763A3E34441808A2D554ED85CB87605ACC7C0B6D71C"
+    },
+    {
+      "AttachmentId": 2788014,
+      "PhysicalId": 1944038,
+      "Bytes": 1588714,
+      "OriginalName": "registrazione poggioli 850.doppia. 2026. giugno-possenti..pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T12:12:46.04",
+      "RequestIds": [
+        17624
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788014_1944038.pdf",
+      "Sha256": "33FDF8A67A1451076C80C7D23BF7F20B4B604A06547FDD87F8EDA3F8BD7C8447"
+    },
+    {
+      "AttachmentId": 2788094,
+      "PhysicalId": 1944118,
+      "Bytes": 21017,
+      "OriginalName": "RICEVUTA DI REGISTRAZIONE 4.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T12:59:42.967",
+      "RequestIds": [
+        17732
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788094_1944118.pdf",
+      "Sha256": "884475B2FD2C57102ECE9C4466714DF00CA155826DA5E2C26B7E391DCB1FCCBE"
+    },
+    {
+      "AttachmentId": 2788100,
+      "PhysicalId": 1944124,
+      "Bytes": 2205008,
+      "OriginalName": "contratto locazione 2026-2027.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T13:03:15.33",
+      "RequestIds": [
+        17713
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788100_1944124.pdf",
+      "Sha256": "B1629DFB6EFBC619789800E08BE8A6798EE051C0B1782B3DF1BB30F822FE817E"
+    },
+    {
+      "AttachmentId": 2788125,
+      "PhysicalId": 1944149,
+      "Bytes": 20568,
+      "OriginalName": "RICEVUTA PROROGA.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T13:18:23.627",
+      "RequestIds": [
+        17763
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788125_1944149.pdf",
+      "Sha256": "EF861ABDAAB21B38E15B1DA77C60229471D3E6520B41F9096A29594F66EABCEC"
+    },
+    {
+      "AttachmentId": 2788131,
+      "PhysicalId": 1944155,
+      "Bytes": 20549,
+      "OriginalName": "RICEVUTA AAEE RLI PROROGA PASSIATORE al 30 09 27 temp_404087989356517206.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T13:21:20.34",
+      "RequestIds": [
+        17770
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788131_1944155.pdf",
+      "Sha256": "8A6CBCBBEB593E44DD70483A969E986E1A767E206D423FEF1A9BABB6911D125B"
+    },
+    {
+      "AttachmentId": 2788177,
+      "PhysicalId": 1944201,
+      "Bytes": 8727,
+      "OriginalName": "G. AMOROSO 33898870_0_RLI12.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T13:56:57.87",
+      "RequestIds": [
+        17837
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788177_1944201.pdf",
+      "Sha256": "6171FF331B20B53276F6AE7E00A4DE6221D0BF93801A83AEC711AD5BEC609BB7"
+    },
+    {
+      "AttachmentId": 2788186,
+      "PhysicalId": 1944210,
+      "Bytes": 21019,
+      "OriginalName": "registrazione affitto.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T14:00:07.407",
+      "RequestIds": [
+        17838
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788186_1944210.pdf",
+      "Sha256": "B0E9AED1BFF03967F3C6241596A3A1DF3DE62D05FF2FF274E337A3DC27956ECE"
+    },
+    {
+      "AttachmentId": 2788209,
+      "PhysicalId": 1944233,
+      "Bytes": 12422,
+      "OriginalName": "Crispi.CDMCD.ric.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T14:13:27.36",
+      "RequestIds": [
+        17866
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788209_1944233.pdf",
+      "Sha256": "A6D2E9B578CFDE182006C76BE49F705F3A18CC3768A481563D75B64AA968C617"
+    },
+    {
+      "AttachmentId": 2788231,
+      "PhysicalId": 1944255,
+      "Bytes": 15232,
+      "OriginalName": "CONTRATTO AGENZIA.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T14:39:50.07",
+      "RequestIds": [
+        17910
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788231_1944255.pdf",
+      "Sha256": "C6CA07E0D4D5F38FCADA2C43E2074B7ACEE274D2A3D5B6FAB2D1FA21370903ED"
+    },
+    {
+      "AttachmentId": 2788254,
+      "PhysicalId": 1944278,
+      "Bytes": 12344,
+      "OriginalName": "noemi.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T14:51:59.463",
+      "RequestIds": [
+        17931
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788254_1944278.pdf",
+      "Sha256": "23A74FF54A2C3B9C9F6AECDB4F389749A1B48C57E11912297D4CEFBCA6564DC0"
+    },
+    {
+      "AttachmentId": 2788265,
+      "PhysicalId": 1944289,
+      "Bytes": 17188,
+      "OriginalName": "RICEVUTA REGISTRAZIONE BAGNARA - DI GIROLAMO.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T15:03:14.15",
+      "RequestIds": [
+        17936
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788265_1944289.pdf",
+      "Sha256": "C90034807D4E0F5E26F74C0BE2DD3906689A380EDFB3A80D544B43A98420BC1A"
+    },
+    {
+      "AttachmentId": 2788305,
+      "PhysicalId": 1944329,
+      "Bytes": 17222,
+      "OriginalName": "PITRECOCIMANO.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T15:34:04.003",
+      "RequestIds": [
+        18013
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788305_1944329.pdf",
+      "Sha256": "89AA29E5A092068BC9FE0D0EA2292EB9A94732550F73475759D7B3FA2E80723A"
+    },
+    {
+      "AttachmentId": 2788319,
+      "PhysicalId": 1944343,
+      "Bytes": 463067,
+      "OriginalName": "Contratto Camplus 2026 2027.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T15:44:04.143",
+      "RequestIds": [
+        18027
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788319_1944343.pdf",
+      "Sha256": "97CF4616B0323EC68DE26AA72E627AFC804924EA24B645603D62BA0A59A0F483"
+    },
+    {
+      "AttachmentId": 2788352,
+      "PhysicalId": 1944376,
+      "Bytes": 12540,
+      "OriginalName": "INSTA CRESTI.ric.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T16:16:03.65",
+      "RequestIds": [
+        18068
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788352_1944376.pdf",
+      "Sha256": "56FDF239FD4038F5F64706F09050C902E7046770A7037E74C8D5B9779E711F71"
+    },
+    {
+      "AttachmentId": 2788357,
+      "PhysicalId": 1944381,
+      "Bytes": 27228,
+      "OriginalName": "Agenzia entrate.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T16:20:27.303",
+      "RequestIds": [
+        17552
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788357_1944381.pdf",
+      "Sha256": "1E5732965736C2134F0D0C9A6DB034EF804257BE960A41CCBBB7F0BE6302EE77"
+    },
+    {
+      "AttachmentId": 2788371,
+      "PhysicalId": 1944395,
+      "Bytes": 255055,
+      "OriginalName": "PutzuChiara_PNE_2026-2027 (1).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T16:34:01.267",
+      "RequestIds": [
+        18115
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788371_1944395.pdf",
+      "Sha256": "C9FE34B091CF3E36BA861330FD1FF392A67C3824295A500B8E8ECB0BE1C61262"
+    },
+    {
+      "AttachmentId": 2788374,
+      "PhysicalId": 1944398,
+      "Bytes": 21039,
+      "OriginalName": "temp_4295252511499733615 casetta.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T16:34:48.08",
+      "RequestIds": [
+        18119
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788374_1944398.pdf",
+      "Sha256": "9F175A36C928F4E0C1ED4AF45B3F7A14B0832126DA6A1675E910E84EFC0FB784"
+    },
+    {
+      "AttachmentId": 2788381,
+      "PhysicalId": 1944405,
+      "Bytes": 17485,
+      "OriginalName": "REGISTRAZIONE_2627_ROMA_AGE.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T16:38:20.647",
+      "RequestIds": [
+        18125
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788381_1944405.pdf",
+      "Sha256": "3C4F3E73D51C66CB2242230490980763B6A169BA6B0BA6FC94B208E40E61DB6E"
+    },
+    {
+      "AttachmentId": 2788408,
+      "PhysicalId": 1944432,
+      "Bytes": 901531,
+      "OriginalName": "Ricevuta_registrazione_AdE_3T10855.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T16:57:46.167",
+      "RequestIds": [
+        18154
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788408_1944432.pdf",
+      "Sha256": "B6F9648CC0F7203C034C6A6B70075AF56AB118CE711039325718ADBC134E4CD1"
+    },
+    {
+      "AttachmentId": 2788440,
+      "PhysicalId": 1944464,
+      "Bytes": 17237,
+      "OriginalName": "BARONEBRIENZAREGMAR.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T17:20:10.897",
+      "RequestIds": [
+        18196
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788440_1944464.pdf",
+      "Sha256": "CEF21C466115894A92FCD0F45D532EAD9BA79DC71D2543564A36A851509BD19C"
+    },
+    {
+      "AttachmentId": 2788530,
+      "PhysicalId": 1944553,
+      "Bytes": 494585,
+      "OriginalName": "ilovepdf_merged (1).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T18:09:54.33",
+      "RequestIds": [
+        18288
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788530_1944553.pdf",
+      "Sha256": "240C8C00C4BF61D4E5C5A50C52610C9751DE741C2F038197B1BE1B365B3DBBA9"
+    },
+    {
+      "AttachmentId": 2788594,
+      "PhysicalId": 1944617,
+      "Bytes": 17239,
+      "OriginalName": "Registrazione contratto 26:27.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T18:56:49.373",
+      "RequestIds": [
+        18374
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788594_1944617.pdf",
+      "Sha256": "6C61560F6E8130770EE3582AADFDF5BA07E5DAAC20B57EF3CDCC1E17294FE1A1"
+    },
+    {
+      "AttachmentId": 2788709,
+      "PhysicalId": 1944732,
+      "Bytes": 8776,
+      "OriginalName": "31219813_0_RLI12 (3).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-15T20:52:29.203",
+      "RequestIds": [
+        18534
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788709_1944732.pdf",
+      "Sha256": "414CED62FF900C9F57CB69D02BA4E69A81DDFAC5C4E60FA84C673BCD322BEF1F"
+    },
+    {
+      "AttachmentId": 2788943,
+      "PhysicalId": 1944966,
+      "Bytes": 328419,
+      "OriginalName": "ContrattoOnboarding_CNTOB_1340859_108074.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T10:33:01.843",
+      "RequestIds": [
+        17580
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2788943_1944966.pdf",
+      "Sha256": "5B2427BABDED5BCB52D5373FC3BE87171000DC3E2D417F7285692BD628C6B3B8"
+    },
+    {
+      "AttachmentId": 2789012,
+      "PhysicalId": 1945035,
+      "Bytes": 17221,
+      "OriginalName": "CASALBRUCIATO GRECOSETT26.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T11:39:59.797",
+      "RequestIds": [
+        18894
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789012_1945035.pdf",
+      "Sha256": "445F70A18E04B5C9DC3D4FB27BF12D350B76905E55AEF7B07AEEE2EB1CC7BC51"
+    },
+    {
+      "AttachmentId": 2789014,
+      "PhysicalId": 1945037,
+      "Bytes": 901531,
+      "OriginalName": "Ricevuta_registrazione_AdE_3T10855.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T11:40:42.063",
+      "RequestIds": [
+        18896
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789014_1945037.pdf",
+      "Sha256": "B6F9648CC0F7203C034C6A6B70075AF56AB118CE711039325718ADBC134E4CD1"
+    },
+    {
+      "AttachmentId": 2789110,
+      "PhysicalId": 1945133,
+      "Bytes": 8718,
+      "OriginalName": "RICEVUTA REGISTRAZIONE COZZA 33349048_0_RLI12.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T13:20:01.58",
+      "RequestIds": [
+        18996
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789110_1945133.pdf",
+      "Sha256": "85318BF808E2F941D24751463152F0A14FD18F631B333717024759116E2B5131"
+    },
+    {
+      "AttachmentId": 2789141,
+      "PhysicalId": 1945164,
+      "Bytes": 230793,
+      "OriginalName": "RLI CONTRATTO \u002B PROROGA.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T13:45:36.583",
+      "RequestIds": [
+        19016
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789141_1945164.pdf",
+      "Sha256": "F4294D81FC98554DE8D42BA6282D5100FA7D451AA2BC7DD53A90FFC78AFBC8E8"
+    },
+    {
+      "AttachmentId": 2789148,
+      "PhysicalId": 1945171,
+      "Bytes": 14073,
+      "OriginalName": "Ricevuta - La Gatta.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T13:49:13.713",
+      "RequestIds": [
+        19018
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789148_1945171.pdf",
+      "Sha256": "ABE348587594AA1769621AA303D88DA8DBCD6DDA7CF55F2102F0FE3D86126343"
+    },
+    {
+      "AttachmentId": 2789188,
+      "PhysicalId": 1945211,
+      "Bytes": 8688,
+      "OriginalName": "contratto 2026:2027.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T14:40:49.353",
+      "RequestIds": [
+        19056
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789188_1945211.pdf",
+      "Sha256": "1D3EE7D40EDBC11276BEF1B6E6CAAB4E6DFED2CCBAE20C4290B084D7399745DF"
+    },
+    {
+      "AttachmentId": 2789238,
+      "PhysicalId": 1945261,
+      "Bytes": 8748,
+      "OriginalName": "33385608_0_RLI12.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T15:30:31.947",
+      "RequestIds": [
+        19116
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789238_1945261.pdf",
+      "Sha256": "1E553BFF551A792BB423B8C55A26BD8B814295FD2B1F1214A24863756CBFFC65"
+    },
+    {
+      "AttachmentId": 2789249,
+      "PhysicalId": 1945272,
+      "Bytes": 17235,
+      "OriginalName": "registrazione contratto rachele casula.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T15:42:08.727",
+      "RequestIds": [
+        19117
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789249_1945272.pdf",
+      "Sha256": "DF150FE3A8200B6315CF891B6A2E8CD0241766D8012A95DE23FFC0CCA0F4D25C"
+    },
+    {
+      "AttachmentId": 2789478,
+      "PhysicalId": 1945501,
+      "Bytes": 33828,
+      "OriginalName": "REGISTRAZIONE E PROROGA CONTRATTO .pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T20:12:34.587",
+      "RequestIds": [
+        19346
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789478_1945501.pdf",
+      "Sha256": "A3441B2079F8C3A8A5FA628B81D490479E03B3F56675604E6DCEB5D8A57DEF51"
+    },
+    {
+      "AttachmentId": 2789496,
+      "PhysicalId": 1945519,
+      "Bytes": 17200,
+      "OriginalName": "Atc_6YW3i2JslZhELOm3ldd5TVnMN2trmKl_RICEVUTA_REGISTRAZIONE_GINEVRA_MANCO.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T20:24:50.543",
+      "RequestIds": [
+        19322
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789496_1945519.pdf",
+      "Sha256": "B9BD1FC43A706D1BF238BD3FE932B0E4519EB79425AB56F175EAA1EEBF4C8DBB"
+    },
+    {
+      "AttachmentId": 2789526,
+      "PhysicalId": 1945549,
+      "Bytes": 8698,
+      "OriginalName": "Registrazione contratto INT 4.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-16T21:33:37.19",
+      "RequestIds": [
+        19376
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789526_1945549.pdf",
+      "Sha256": "1B85A1C29FC7143BE1CAB24FA33A9C7A90EE79DFE3C349CFA4B5464036AA6398"
+    },
+    {
+      "AttachmentId": 2789717,
+      "PhysicalId": 1945740,
+      "Bytes": 17264,
+      "OriginalName": "Via Emo.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-17T12:30:54.94",
+      "RequestIds": [
+        19526
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789717_1945740.pdf",
+      "Sha256": "28444229AEA29EBDC93014756412ABAA31B617BAEC5C369B0D76EF78BB563FD5"
+    },
+    {
+      "AttachmentId": 2789860,
+      "PhysicalId": 1945883,
+      "Bytes": 21059,
+      "OriginalName": "contratto firmato\u002Bregistrazione.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-17T16:01:11.447",
+      "RequestIds": [
+        19632
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789860_1945883.pdf",
+      "Sha256": "6CAAD63C534D087057B799989F205FC56F634AEA935F84778919BADBDD6A6260"
+    },
+    {
+      "AttachmentId": 2789919,
+      "PhysicalId": 1945942,
+      "Bytes": 250840,
+      "OriginalName": "Nuovo contratto disco .pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-17T17:48:55.87",
+      "RequestIds": [
+        19680
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2789919_1945942.pdf",
+      "Sha256": "59F17540DCC66C9197F3F5922AD234D54B9955FEE206725CCE8A23FFCED80C1E"
+    },
+    {
+      "AttachmentId": 2790010,
+      "PhysicalId": 1946033,
+      "Bytes": 8724,
+      "OriginalName": "ricevuta avvenuta registrazione mastropietro 2026.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-17T21:47:31.32",
+      "RequestIds": [
+        19760
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790010_1946033.pdf",
+      "Sha256": "4B89C3F7F70F9318C050350B8BAE1C629FD9BD4278FD9E70969C6906CB7293BF"
+    },
+    {
+      "AttachmentId": 2790106,
+      "PhysicalId": 1946129,
+      "Bytes": 12288,
+      "OriginalName": "contratto di locazione con proroga.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T11:00:55.34",
+      "RequestIds": [
+        19807
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790106_1946129.pdf",
+      "Sha256": "2802448F8217186F69641E7C874FC87F3D5D692B3874808CDC3684162FCDD7BE"
+    },
+    {
+      "AttachmentId": 2790107,
+      "PhysicalId": 1946130,
+      "Bytes": 10187,
+      "OriginalName": "Subentro locazione Mustone.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T11:00:55.34",
+      "RequestIds": [
+        19807
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790107_1946130.pdf",
+      "Sha256": "C9A67B59D8F03B6367F7ABE6E01229A80A97A4F1828E802B4D244835B77800E9"
+    },
+    {
+      "AttachmentId": 2790211,
+      "PhysicalId": 1946234,
+      "Bytes": 17225,
+      "OriginalName": "LIBIA 76.16 NARDIELLO SETT 26.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T14:59:49",
+      "RequestIds": [
+        19898
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790211_1946234.pdf",
+      "Sha256": "FE8677AF23250303293FB02F8536D7194F0F6E87AB852350EF6BBF711858C565"
+    },
+    {
+      "AttachmentId": 2790213,
+      "PhysicalId": 1946236,
+      "Bytes": 24478,
+      "OriginalName": "Contratto locazione Via Novara 25.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T15:04:20.647",
+      "RequestIds": [
+        19903
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790213_1946236.pdf",
+      "Sha256": "A663AF20FBAE9FD83E3D8BF38A8487956BC74E2F967B5D5E0D5E1E82CD629F7F"
+    },
+    {
+      "AttachmentId": 2790261,
+      "PhysicalId": 1946284,
+      "Bytes": 17367,
+      "OriginalName": "BIASINICALICCHIARICREG_261013_150529.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T16:40:41.36",
+      "RequestIds": [
+        19948
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790261_1946284.pdf",
+      "Sha256": "5E13F616F52C05B636A7D63DBB3FC320CEDB8A76E4AD63FC72DC73597646E269"
+    },
+    {
+      "AttachmentId": 2790318,
+      "PhysicalId": 1946341,
+      "Bytes": 12804,
+      "OriginalName": "REGISTRAZIONE.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T19:02:01.94",
+      "RequestIds": [
+        19996
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790318_1946341.pdf",
+      "Sha256": "12D1988111513C2B6DF1F95736CB015E1E1509D857235E17A7F9EF5C89FBD86F"
+    },
+    {
+      "AttachmentId": 2790368,
+      "PhysicalId": 1946391,
+      "Bytes": 17214,
+      "OriginalName": "ricevuta lotorto nuova.pdf 3.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T20:30:45.913",
+      "RequestIds": [
+        20033
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790368_1946391.pdf",
+      "Sha256": "3D810F13027D8946A88B1429F38136CB52343DC9F63605AA41D911C97BC2E518"
+    },
+    {
+      "AttachmentId": 2790398,
+      "PhysicalId": 1946421,
+      "Bytes": 17215,
+      "OriginalName": "agenzia delle entrate Jovana Brajovic.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T21:54:34.577",
+      "RequestIds": [
+        20067
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790398_1946421.pdf",
+      "Sha256": "6774F925B5E9EA452BE666CB1A81C982BB2EA8AA1410B287B8594CB9BF1F2596"
+    },
+    {
+      "AttachmentId": 2790415,
+      "PhysicalId": 1946438,
+      "Bytes": 17202,
+      "OriginalName": "Agenzia delle entrate contratto Lana Ra\u017Enatovic.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T22:49:03.353",
+      "RequestIds": [
+        20081
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790415_1946438.pdf",
+      "Sha256": "FE4A55F53B78CADC6C402CF34B0AC6406829C466F380D81E3170DCB7D2B4D79E"
+    },
+    {
+      "AttachmentId": 2790427,
+      "PhysicalId": 1946450,
+      "Bytes": 17199,
+      "OriginalName": "agenzia delle entrate Andela \u0160evin.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-18T23:35:44.097",
+      "RequestIds": [
+        20088
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790427_1946450.pdf",
+      "Sha256": "5865D3C8F875A91A0003EE1CDDA27B7FA31A7EBEAD4909CEB5B7C86A46A4BF86"
+    },
+    {
+      "AttachmentId": 2790442,
+      "PhysicalId": 1946465,
+      "Bytes": 23136,
+      "OriginalName": "9. agenzia delle entrate Lea Petrovic.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T00:14:06.68",
+      "RequestIds": [
+        20100
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790442_1946465.pdf",
+      "Sha256": "21924A18DB666EE5F135BC91B66B833F3D1FAA4E086CA47547769BAE32648135"
+    },
+    {
+      "AttachmentId": 2790520,
+      "PhysicalId": 1946543,
+      "Bytes": 15234,
+      "OriginalName": "ricevuta_prenotazione_62320 4.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T10:35:17.243",
+      "RequestIds": [
+        20169
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790520_1946543.pdf",
+      "Sha256": "C724183724E8AA74DCBA9CCA541E32FAB97F3517EE5C8699CF132C872C2D4810"
+    },
+    {
+      "AttachmentId": 2790549,
+      "PhysicalId": 1946572,
+      "Bytes": 17214,
+      "OriginalName": "2026 - CORSO TRIESTE 95 POMARANZI TORINO CAMERA SINGOLA L2 12 MESI \u002B12.pdf REG. TELEMATICA.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T11:14:35.617",
+      "RequestIds": [
+        20187
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790549_1946572.pdf",
+      "Sha256": "A064BFE7676810CE21ABEFD0E42C412728219090182CFBA88F721EB10D8F5A65"
+    },
+    {
+      "AttachmentId": 2790619,
+      "PhysicalId": 1946642,
+      "Bytes": 21040,
+      "OriginalName": "Ricevuta registrazione contratto di locazione.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T12:34:57.493",
+      "RequestIds": [
+        20262
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790619_1946642.pdf",
+      "Sha256": "43F71A745E0950CED094F5FDCC3D937617BE2A1BB8C78C89B98B498DF7234D8A"
+    },
+    {
+      "AttachmentId": 2790670,
+      "PhysicalId": 1946693,
+      "Bytes": 21054,
+      "OriginalName": "ROMA_4876_26758_1J9_FORNINO2_20260925014209.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T13:52:52.197",
+      "RequestIds": [
+        20317
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790670_1946693.pdf",
+      "Sha256": "9BA28883EB3C6EBC64016062DBBA31DAE229D39C786FDFB9AE9DD2181BD604E4"
+    },
+    {
+      "AttachmentId": 2790771,
+      "PhysicalId": 1946794,
+      "Bytes": 17205,
+      "OriginalName": "006_2026_RICEVUTA_VIA PASSALACQUA_RASPA_CARMELO.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T16:02:20.007",
+      "RequestIds": [
+        20409
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790771_1946794.pdf",
+      "Sha256": "878771C0F1340466F917740FC92BD3FB13CAC222D1861065A356225A8A3ED90F"
+    },
+    {
+      "AttachmentId": 2790829,
+      "PhysicalId": 1946852,
+      "Bytes": 1921834,
+      "OriginalName": "contrattoAgenzia.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T17:26:56.42",
+      "RequestIds": [
+        20457
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790829_1946852.pdf",
+      "Sha256": "70A2F7794A3F2103BAC1040267A29C807AA941BC1DD04E8D2474EC504F06B40D"
+    },
+    {
+      "AttachmentId": 2790873,
+      "PhysicalId": 1946896,
+      "Bytes": 8957,
+      "OriginalName": "Ricevuta registrazione AGE contratto di locazione _260918_163332.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T18:07:59.14",
+      "RequestIds": [
+        20483
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790873_1946896.pdf",
+      "Sha256": "4EE9E6C160740A4D39F2FD317CEAED5AA38AF5E6DD560F42CFDA10DF5239FB6A"
+    },
+    {
+      "AttachmentId": 2790905,
+      "PhysicalId": 1946928,
+      "Bytes": 23172,
+      "OriginalName": "ricevuta.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T19:16:45.3",
+      "RequestIds": [
+        20527
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790905_1946928.pdf",
+      "Sha256": "249B4354A69F52108E07F7A88F69262AABE8682592903F7323E3E6AE6A9DBCFC"
+    },
+    {
+      "AttachmentId": 2790912,
+      "PhysicalId": 1946935,
+      "Bytes": 8777,
+      "OriginalName": "CONTRATTO Viale Delle Provincie 01.10.26-30.09.27.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T19:24:44.533",
+      "RequestIds": [
+        20532
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790912_1946935.pdf",
+      "Sha256": "1379ED75F6C68053F019AA0BAA5558B3C8D55196282A03D04E833DBE57CDF666"
+    },
+    {
+      "AttachmentId": 2790935,
+      "PhysicalId": 1946958,
+      "Bytes": 934362,
+      "OriginalName": "Ricevute_DiSCo_2026-2027_testo_ricercabile.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-19T19:59:19.343",
+      "RequestIds": [
+        20551
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2790935_1946958.pdf",
+      "Sha256": "C424B2519396A5561194B06E6913D9C523C8D5456F077BBB32494ABD046D6A32"
+    },
+    {
+      "AttachmentId": 2791105,
+      "PhysicalId": 1947128,
+      "Bytes": 8814,
+      "OriginalName": "29038714_0_RLI12.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T09:03:09.293",
+      "RequestIds": [
+        20677
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791105_1947128.pdf",
+      "Sha256": "2D3BA81C34F6F7C96E591B5037F28DC2CB86B03DAEF8ED4897CCEE168CD5F651"
+    },
+    {
+      "AttachmentId": 2791197,
+      "PhysicalId": 1947220,
+      "Bytes": 17218,
+      "OriginalName": "RICEVUTA REGISTRAZIONE CONTRATTO AFFITTO VIA LUCCA - ROMA.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T11:53:42.687",
+      "RequestIds": [
+        20718
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791197_1947220.pdf",
+      "Sha256": "00EF04A5917A27233E67720702AAB7CE6FF1582B9E24418238035E4DE7D20090"
+    },
+    {
+      "AttachmentId": 2791232,
+      "PhysicalId": 1947255,
+      "Bytes": 43376,
+      "OriginalName": "registrazioneprorogapecoraro.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T12:44:27.187",
+      "RequestIds": [
+        20808
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791232_1947255.pdf",
+      "Sha256": "FADA0994EE8A217D3CF2A78C3982F458E3C753B8DD16CC3D954AE40C4EDB78D4"
+    },
+    {
+      "AttachmentId": 2791243,
+      "PhysicalId": 1947266,
+      "Bytes": 17210,
+      "OriginalName": "Via Pavia -Di Micco (Piastra Luciano).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T12:56:02.213",
+      "RequestIds": [
+        17892
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791243_1947266.pdf",
+      "Sha256": "D44C5A33927C20213209184AA280FADD8A58EC42644CE25B9265DBA9C83638A9"
+    },
+    {
+      "AttachmentId": 2791248,
+      "PhysicalId": 1947271,
+      "Bytes": 35541,
+      "OriginalName": "QUARGNAL GIORGIA registrazione contratto AdE DiscoLazio.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T13:05:23.707",
+      "RequestIds": [
+        20828
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791248_1947271.pdf",
+      "Sha256": "A875E271156B5F5035FCCE0762028B96E59D9C55FA1E5D4DF25362FADFE659EE"
+    },
+    {
+      "AttachmentId": 2791252,
+      "PhysicalId": 1947275,
+      "Bytes": 8848,
+      "OriginalName": "ricevuta registrazione ade 26.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T13:17:55.18",
+      "RequestIds": [
+        20832
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791252_1947275.pdf",
+      "Sha256": "8641A398B75B67FD96D6A9854C68E9D9783760A5F5610C8151319625B76D97F6"
+    },
+    {
+      "AttachmentId": 2791275,
+      "PhysicalId": 1947298,
+      "Bytes": 17280,
+      "OriginalName": "temp_1293014316877092127 (1) (1).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T13:51:12.83",
+      "RequestIds": [
+        20841
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791275_1947298.pdf",
+      "Sha256": "BD822C22D36659833CC1F6E1E2223F8199172D0EFBB03594E347F0D77D3EE280"
+    },
+    {
+      "AttachmentId": 2791299,
+      "PhysicalId": 1947322,
+      "Bytes": 20989,
+      "OriginalName": "RICEVUTA REGISTRAZIONE COLUCCI.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T15:00:13.507",
+      "RequestIds": [
+        20864
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791299_1947322.pdf",
+      "Sha256": "03D193C8C3ADDC870BBAD5CF8CA65DC5DB82840DFCDC2B96648C4225CC9DA164"
+    },
+    {
+      "AttachmentId": 2791300,
+      "PhysicalId": 1947323,
+      "Bytes": 17180,
+      "OriginalName": "_RICEVUTA_REGISTRAZIONE_SGRO_CIRINO.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T15:00:46.597",
+      "RequestIds": [
+        20874
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791300_1947323.pdf",
+      "Sha256": "E5E90401BF490C7AB4E3DBD559378E3F8B46DAD36F2C74A9EBF526B1F18007EC"
+    },
+    {
+      "AttachmentId": 2791455,
+      "PhysicalId": 1947478,
+      "Bytes": 12348,
+      "OriginalName": "temp_843319198822258706.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-20T19:17:18.387",
+      "RequestIds": [
+        21009
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791455_1947478.pdf",
+      "Sha256": "68BCCF94E28961E6FDE1270799074371402A9B7A081927FE057ABEDC7765BAD5"
+    },
+    {
+      "AttachmentId": 2791641,
+      "PhysicalId": 1947664,
+      "Bytes": 16559,
+      "OriginalName": "doc locazione (2).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T10:38:22.517",
+      "RequestIds": [
+        19463
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791641_1947664.pdf",
+      "Sha256": "B48B694189A95015B696A5C3733A7F2762E3E01D6947DC3BC8090E4B72EDD2D8"
+    },
+    {
+      "AttachmentId": 2791663,
+      "PhysicalId": 1947686,
+      "Bytes": 8762,
+      "OriginalName": "33972509_0_RLI12.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T11:06:01.72",
+      "RequestIds": [
+        21191
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791663_1947686.pdf",
+      "Sha256": "8530C245901E98368595027CC3424943D6AF372C5B90B48BDD4D1A71B53DEE1D"
+    },
+    {
+      "AttachmentId": 2791671,
+      "PhysicalId": 1947694,
+      "Bytes": 21043,
+      "OriginalName": "registrazione_contratto via Gentiloni.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T11:21:56.697",
+      "RequestIds": [
+        21167
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791671_1947694.pdf",
+      "Sha256": "ECA5A5F63DAB7858D26407BF39C3BDBAFC8B8B3284DC55D6F1809E070D6B85D6"
+    },
+    {
+      "AttachmentId": 2791792,
+      "PhysicalId": 1947815,
+      "Bytes": 17219,
+      "OriginalName": "UMANESIMO 37 ULERI SETT 26.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T14:56:26.57",
+      "RequestIds": [
+        20160
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791792_1947815.pdf",
+      "Sha256": "95E593A9B588A239DC9ADF3CC33A262BD421957F77A2F1926E22C2F9647CAB85"
+    },
+    {
+      "AttachmentId": 2791844,
+      "PhysicalId": 1947867,
+      "Bytes": 8724,
+      "OriginalName": "Registrazione2026.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T16:11:26.453",
+      "RequestIds": [
+        21359
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791844_1947867.pdf",
+      "Sha256": "4B027210F38D4D92F6949DAC1E87E13701549461A767B03A67A6AF4951C12BF0"
+    },
+    {
+      "AttachmentId": 2791935,
+      "PhysicalId": 1947958,
+      "Bytes": 12343,
+      "OriginalName": "giada contratto nuovo .pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T18:53:00.573",
+      "RequestIds": [
+        21424
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791935_1947958.pdf",
+      "Sha256": "5B4A41205B20E31A82309A6B9FBB5B7C2FCDBB25B80F46B92FF40622F481BA32"
+    },
+    {
+      "AttachmentId": 2791949,
+      "PhysicalId": 1947972,
+      "Bytes": 17696,
+      "OriginalName": "ANNESSIPITRELLI26.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T19:19:25.147",
+      "RequestIds": [
+        21439
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791949_1947972.pdf",
+      "Sha256": "82285509CFC7D939F18404E1BE6CC3BDD94DBDAB42A5544B10715E22F291E336"
+    },
+    {
+      "AttachmentId": 2791958,
+      "PhysicalId": 1947981,
+      "Bytes": 8763,
+      "OriginalName": "33972573_0_RLI12.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T19:31:22.643",
+      "RequestIds": [
+        21446
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2791958_1947981.pdf",
+      "Sha256": "ABAF44FAD24CF3F343CA7194F09F73C1463AC76BB15C4FD77271D85F81AF485B"
+    },
+    {
+      "AttachmentId": 2792002,
+      "PhysicalId": 1948025,
+      "Bytes": 8761,
+      "OriginalName": "2027.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T21:04:34.04",
+      "RequestIds": [
+        21480
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792002_1948025.pdf",
+      "Sha256": "A8E3177F4909A07208197FA0BDD2BD3549FDA1AC5D66F441D23ED39339E51AD3"
+    },
+    {
+      "AttachmentId": 2792045,
+      "PhysicalId": 1948068,
+      "Bytes": 201871,
+      "OriginalName": "contratto e proroga di affitto.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-21T22:36:12.193",
+      "RequestIds": [
+        21506
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792045_1948068.pdf",
+      "Sha256": "4BA6BFA8616E95C05AC49E0E351BD2AE022B001940422FC75A12A38D376B1860"
+    },
+    {
+      "AttachmentId": 2792070,
+      "PhysicalId": 1948093,
+      "Bytes": 206133,
+      "OriginalName": "ilovepdf_merged (19).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-22T00:22:35.81",
+      "RequestIds": [
+        21525
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792070_1948093.pdf",
+      "Sha256": "A14CF92F7F106102F9677E15FC3983C562963CB3DDC0A6C03AA8F76E960473AB"
+    },
+    {
+      "AttachmentId": 2792119,
+      "PhysicalId": 1948142,
+      "Bytes": 17195,
+      "OriginalName": "temp_6052747386086427235.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-22T10:26:15.07",
+      "RequestIds": [
+        21559
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792119_1948142.pdf",
+      "Sha256": "F8928DE9522D6E7EA0B616E3196FE328CECB301287895A1520F1149064FF8D31"
+    },
+    {
+      "AttachmentId": 2792210,
+      "PhysicalId": 1948233,
+      "Bytes": 21145,
+      "OriginalName": "201_2026_RICEVUTA_IMMUNI_TAMALIO_CARAVAGGIO 2.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-22T13:09:08.617",
+      "RequestIds": [
+        20227
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792210_1948233.pdf",
+      "Sha256": "A93EC3F8AF6AC11383A4B96991734076CF74A7338946FEF371D7DAE2EF52C72B"
+    },
+    {
+      "AttachmentId": 2792318,
+      "PhysicalId": 1948341,
+      "Bytes": 17387,
+      "OriginalName": "RICEVUTA REGISTRAZIONE AIRI SRL - PRUITI CIARELLO.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-22T17:04:29.16",
+      "RequestIds": [
+        21678
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792318_1948341.pdf",
+      "Sha256": "B96BCE5DD89F8463CB14AE639344FC687CBA348A3129FBCC7A1976FC6CBB43A4"
+    },
+    {
+      "AttachmentId": 2792388,
+      "PhysicalId": 1948411,
+      "Bytes": 25234,
+      "OriginalName": "ilovepdf_merged.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-22T18:34:48.787",
+      "RequestIds": [
+        21735
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792388_1948411.pdf",
+      "Sha256": "A6959D2FF8E243F83EE343E7BBEA85BCDF9BC6E9DF5B1D79C383704CB1FB15AC"
+    },
+    {
+      "AttachmentId": 2792449,
+      "PhysicalId": 1948472,
+      "Bytes": 6654,
+      "OriginalName": "FERRANTE_RODIA 2.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-22T20:10:40.327",
+      "RequestIds": [
+        21777
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792449_1948472.pdf",
+      "Sha256": "F77495295A09140A8D3DAB245A80095C635A8F32D45E2857F1F9B8C8B8313B5A"
+    },
+    {
+      "AttachmentId": 2792492,
+      "PhysicalId": 1948515,
+      "Bytes": 8731,
+      "OriginalName": "33495258_0_RLI12-2.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-22T21:23:19.273",
+      "RequestIds": [
+        21802
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792492_1948515.pdf",
+      "Sha256": "073C8EDA7AFB5790380FBF64BEF7133AEDCD68E7CF6DAEF0CDD49916A3A25310"
+    },
+    {
+      "AttachmentId": 2792599,
+      "PhysicalId": 1948622,
+      "Bytes": 33956,
+      "OriginalName": "contratto e proroga.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-23T10:16:30.623",
+      "RequestIds": [
+        21868
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792599_1948622.pdf",
+      "Sha256": "81B4288ADF176A7761111403BD4245CF098DB8B8E0A715C931212349DD3720C2"
+    },
+    {
+      "AttachmentId": 2792629,
+      "PhysicalId": 1948652,
+      "Bytes": 16476,
+      "OriginalName": "Annarumma_Sara_contratto_e_proroga.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-23T11:07:15.6",
+      "RequestIds": [
+        21890
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792629_1948652.pdf",
+      "Sha256": "815BD86DA41861B84F3BBFA12F172F782183A5979232348C6FA8065978E0B8B2"
+    },
+    {
+      "AttachmentId": 2792643,
+      "PhysicalId": 1948666,
+      "Bytes": 1770758,
+      "OriginalName": "cONTRATTO DI LOCAZIONE CON RICEVUTA AGENZIA DELLE ENTRATE-compresso.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-23T11:23:09.627",
+      "RequestIds": [
+        21618
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792643_1948666.pdf",
+      "Sha256": "565948FB1075E03241455C7DDED8450E16BE1EC4CBEED8F5E8BD515FF8B7C49F"
+    },
+    {
+      "AttachmentId": 2792649,
+      "PhysicalId": 1948672,
+      "Bytes": 20665,
+      "OriginalName": "Belen-kira-tescil.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-23T11:30:50.423",
+      "RequestIds": [
+        21898
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2792649_1948672.pdf",
+      "Sha256": "AADBB22E270CBA958D31D36CC8451A494F86B55F9AB3374F0F93F07A7DB274FC"
+    },
+    {
+      "AttachmentId": 2793252,
+      "PhysicalId": 1949275,
+      "Bytes": 16560,
+      "OriginalName": "CONTRATTO DI LOCAZIONE - PRIMA E ULTIMA REGISTRAZIONE .pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-24T21:13:10.07",
+      "RequestIds": [
+        22297
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793252_1949275.pdf",
+      "Sha256": "3CE4BF08B009A0825C0004636C1896ADA64ECB169C99E17CE3B05D6DB8C7CD7C"
+    },
+    {
+      "AttachmentId": 2793254,
+      "PhysicalId": 1949277,
+      "Bytes": 22161,
+      "OriginalName": "RIC REG IANNE 2026.2027.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-24T21:17:28.767",
+      "RequestIds": [
+        22298
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793254_1949277.pdf",
+      "Sha256": "5BD337679714B8E788CCF454143D4466035B0707AF852671D7DDE5122D3B2E2D"
+    },
+    {
+      "AttachmentId": 2793270,
+      "PhysicalId": 1949293,
+      "Bytes": 17190,
+      "OriginalName": "ricevuta registrazione contratto Tizzetti.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-24T22:37:45.423",
+      "RequestIds": [
+        22305
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793270_1949293.pdf",
+      "Sha256": "156E3C656F45872E0D14CF83161241B16F3CC0D485BD3CD4D7EAE0A0D9A94ABB"
+    },
+    {
+      "AttachmentId": 2793357,
+      "PhysicalId": 1949380,
+      "Bytes": 326289,
+      "OriginalName": "REGISTRAZIONE CONTRATTO 2026 KLODIAN BAKIRI- ANIA.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-25T12:54:59.833",
+      "RequestIds": [
+        22355
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793357_1949380.pdf",
+      "Sha256": "C2A342ECE629C888A95452E6E879C204D429D6C478310312AFCB57C261A954A1"
+    },
+    {
+      "AttachmentId": 2793383,
+      "PhysicalId": 1949406,
+      "Bytes": 12367,
+      "OriginalName": "Ciancaglioni Isabella con Miceli ricevuta registrazione.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-25T14:43:46.937",
+      "RequestIds": [
+        22369
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793383_1949406.pdf",
+      "Sha256": "3053FC6BF016400858F7B792D0F27658125670FF26E94C5D2B2AF1EB02ECF38A"
+    },
+    {
+      "AttachmentId": 2793562,
+      "PhysicalId": 1949585,
+      "Bytes": 16582,
+      "OriginalName": "Contratto agenzia entrate.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T14:36:34.923",
+      "RequestIds": [
+        22470
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793562_1949585.pdf",
+      "Sha256": "F0DFD8BA0C2AE704D5950934AD03FEA4F122DCF82FBE84FA5636A67BA3E9DD50"
+    },
+    {
+      "AttachmentId": 2793701,
+      "PhysicalId": 1949724,
+      "Bytes": 17821,
+      "OriginalName": "RICEVUTA MARRONE TADDIA NUOVA REGISTRAZIONE_261029_111352.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T16:15:12.467",
+      "RequestIds": [
+        22552
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793701_1949724.pdf",
+      "Sha256": "50A2D40030FE5E594A64E3635CA5961B1A7D54C7E37294963BF25247CCC138C3"
+    },
+    {
+      "AttachmentId": 2793812,
+      "PhysicalId": 1949835,
+      "Bytes": 17373,
+      "OriginalName": "Via di Santa Costanza 16. iint 8- Desiderio Chiara (2).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T17:29:42.883",
+      "RequestIds": [
+        22586
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793812_1949835.pdf",
+      "Sha256": "C0BC56FF6B0B5CD187B2AE07E3DD87892E129C9E0F874BEAFE9E429665CC6E30"
+    },
+    {
+      "AttachmentId": 2793858,
+      "PhysicalId": 1949881,
+      "Bytes": 988269,
+      "OriginalName": "contratto laureti  (1)_compressed.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T18:05:12.863",
+      "RequestIds": [
+        22634
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793858_1949881.pdf",
+      "Sha256": "2E8B738CE0E9273719D67A62BCBA3F4C3E904DDEB6D3140A7B3472F42795FAF6"
+    },
+    {
+      "AttachmentId": 2793859,
+      "PhysicalId": 1949882,
+      "Bytes": 6358,
+      "OriginalName": "SUBENTRO 2026 LAURETI BRBMTT04M21M082J (1).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T18:05:12.863",
+      "RequestIds": [
+        22634
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793859_1949882.pdf",
+      "Sha256": "FA443B120B60BD9C6B6185D17C96DE671AF5D2BE5D538A69009A443370E49B36"
+    },
+    {
+      "AttachmentId": 2793899,
+      "PhysicalId": 1949922,
+      "Bytes": 61462,
+      "OriginalName": "FILE-FINALE.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T18:47:45.437",
+      "RequestIds": [
+        22612
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793899_1949922.pdf",
+      "Sha256": "6FFF1EC09F9039D9483453ABF4EAB3C2FEC9618D5C0498E5703D9537C31C4D63"
+    },
+    {
+      "AttachmentId": 2793955,
+      "PhysicalId": 1949978,
+      "Bytes": 21027,
+      "OriginalName": "ricevuta contratto lepanto.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T20:04:25.023",
+      "RequestIds": [
+        22690
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793955_1949978.pdf",
+      "Sha256": "ABC8168587921F1FD008D02405770C4AC063FD2D8FD0E3B5A36C4D130CC26181"
+    },
+    {
+      "AttachmentId": 2793973,
+      "PhysicalId": 1949996,
+      "Bytes": 18022,
+      "OriginalName": "registrazione.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T20:17:25.2",
+      "RequestIds": [
+        20288
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793973_1949996.pdf",
+      "Sha256": "0B67FAFAD849D70D94A7F5A8C042B5B025B97D85A052BCCBCA0D02A3F36716FA"
+    },
+    {
+      "AttachmentId": 2793992,
+      "PhysicalId": 1950015,
+      "Bytes": 16634,
+      "OriginalName": "contratto_unito.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T20:34:08.7",
+      "RequestIds": [
+        22162
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2793992_1950015.pdf",
+      "Sha256": "E900CBA747CA53AA3564ACC5DA97AB2C3E3C174EDEB35D29BF48CE03FCC3A6F0"
+    },
+    {
+      "AttachmentId": 2794087,
+      "PhysicalId": 1950110,
+      "Bytes": 18055,
+      "OriginalName": "ricevuta_prenotazione_75503 CONTRATTO.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-30T23:40:22.183",
+      "RequestIds": [
+        22750
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794087_1950110.pdf",
+      "Sha256": "5AAE8D4CC82BF776110692D10A65ED148E5C2F4474E15384DA92A2456BAAEC94"
+    },
+    {
+      "AttachmentId": 2794111,
+      "PhysicalId": 1950134,
+      "Bytes": 8777,
+      "OriginalName": "Registrazione contratto Agenzia delle Entrate.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T00:24:43.523",
+      "RequestIds": [
+        22759
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794111_1950134.pdf",
+      "Sha256": "1379ED75F6C68053F019AA0BAA5558B3C8D55196282A03D04E833DBE57CDF666"
+    },
+    {
+      "AttachmentId": 2794199,
+      "PhysicalId": 1950222,
+      "Bytes": 12342,
+      "OriginalName": "167_2026 ADE Contratto Passiflore_REMAX.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T10:24:10.847",
+      "RequestIds": [
+        22817
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794199_1950222.pdf",
+      "Sha256": "7EC0F4F7A4441997829FB84EB261407BA7EEB2808545827400E17F10CD688411"
+    },
+    {
+      "AttachmentId": 2794281,
+      "PhysicalId": 1950304,
+      "Bytes": 17784,
+      "OriginalName": "Nuova ricevuta registrazione contratto.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T12:04:02.943",
+      "RequestIds": [
+        22868
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794281_1950304.pdf",
+      "Sha256": "5810E7B76FA5243C369A216772A6051DD0444E92B919C88C6B39AEB7EA2F0143"
+    },
+    {
+      "AttachmentId": 2794403,
+      "PhysicalId": 1950426,
+      "Bytes": 6642,
+      "OriginalName": "REG DE BIASI-FANELLA.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T14:56:20.983",
+      "RequestIds": [
+        22942
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794403_1950426.pdf",
+      "Sha256": "9F0361E8E64EAABD1E685AD956ED3DB4277323162534BAF77890B4CBE0C2826B"
+    },
+    {
+      "AttachmentId": 2794412,
+      "PhysicalId": 1950435,
+      "Bytes": 25226,
+      "OriginalName": "contratto locazione.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T15:08:24.963",
+      "RequestIds": [
+        22949
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794412_1950435.pdf",
+      "Sha256": "CFA3798FF98E8F0A793B84942F3B9D7FDA32B604A6E52F81E1B852C5A2AE8A80"
+    },
+    {
+      "AttachmentId": 2794492,
+      "PhysicalId": 1950515,
+      "Bytes": 8693,
+      "OriginalName": "ricevuta Urso.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T17:14:24.57",
+      "RequestIds": [
+        22997
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794492_1950515.pdf",
+      "Sha256": "AC597360D1A9F24660156F59FF3B2275DE1DE88E5515516B7DBE4B69E4D4269F"
+    },
+    {
+      "AttachmentId": 2794529,
+      "PhysicalId": 1950552,
+      "Bytes": 8696,
+      "OriginalName": "ricevuta Cerone.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T18:58:29.327",
+      "RequestIds": [
+        23030
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794529_1950552.pdf",
+      "Sha256": "8FFE3B765EE323DD8985D2DE1D6BBA37B40A1A71DAA3D414795A0B93354E4320"
+    },
+    {
+      "AttachmentId": 2794530,
+      "PhysicalId": 1950553,
+      "Bytes": 8693,
+      "OriginalName": "ricevuta Diomaiuto.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T18:58:30.007",
+      "RequestIds": [
+        23025
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794530_1950553.pdf",
+      "Sha256": "EEA8E960C21D4830BF8DD226130A7FB963FAA2669CF94A71EC86BA7CF95048D4"
+    },
+    {
+      "AttachmentId": 2794538,
+      "PhysicalId": 1950561,
+      "Bytes": 12392,
+      "OriginalName": "Ricevuta Registrazione Contratto Coletta-Zanzur 20.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T19:19:14.14",
+      "RequestIds": [
+        23035
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794538_1950561.pdf",
+      "Sha256": "4E78E1A03DDA890E5CA9880E37877477F9D336AECCBF2F53FA38038D78B38ABB"
+    },
+    {
+      "AttachmentId": 2794577,
+      "PhysicalId": 1950600,
+      "Bytes": 20979,
+      "OriginalName": "RICEVUTA REGISTRAZIONE BERTANI MONTAGNA.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-10-31T20:27:45.027",
+      "RequestIds": [
+        23058
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794577_1950600.pdf",
+      "Sha256": "55C477930E12F00D806AF5BBB16D1C106D8651AE32A48CA9D207B3AAD61B4B85"
+    },
+    {
+      "AttachmentId": 2794679,
+      "PhysicalId": 1950702,
+      "Bytes": 17584,
+      "OriginalName": "LOCANDA - MASTROIANNI (1).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-01T11:23:22.593",
+      "RequestIds": [
+        23101
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794679_1950702.pdf",
+      "Sha256": "08ADC336633246AD77A95A3BB1DA57A54661F4042BD53B1F520D229D931C3A0D"
+    },
+    {
+      "AttachmentId": 2794830,
+      "PhysicalId": 1950853,
+      "Bytes": 25346,
+      "OriginalName": "pdf24_unito (1).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-01T17:08:13.327",
+      "RequestIds": [
+        23194
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794830_1950853.pdf",
+      "Sha256": "65D5AE0618A78FADD537EDF8EDEE95D60991CB8F4926F937AE7E172F19ECA6AD"
+    },
+    {
+      "AttachmentId": 2794852,
+      "PhysicalId": 1950875,
+      "Bytes": 53144,
+      "OriginalName": "Documenti_affitto_DiSCo.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-01T17:37:46.373",
+      "RequestIds": [
+        23202
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794852_1950875.pdf",
+      "Sha256": "E5D089064974312C0B3F05AA2D042F042A5CBD3E1DC7252C9BCB19995BD8801D"
+    },
+    {
+      "AttachmentId": 2794862,
+      "PhysicalId": 1950885,
+      "Bytes": 17237,
+      "OriginalName": "MASTROENI Vs DE INNOCENTI - temp_5189187738913072542.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-01T18:01:02.197",
+      "RequestIds": [
+        23209
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794862_1950885.pdf",
+      "Sha256": "CF4D3BD62B2E59B47E53A75F2754C90E1E5E0A7FBF7E836D2A049C1AE152EFDD"
+    },
+    {
+      "AttachmentId": 2794885,
+      "PhysicalId": 1950908,
+      "Bytes": 38730,
+      "OriginalName": "Contratto dal 2023 al 2027.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-01T18:39:24.207",
+      "RequestIds": [
+        23224
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794885_1950908.pdf",
+      "Sha256": "FCC87A2B9C863DDE42DD9415A017974EB5D1AD87B07D3B40B23A3AFEFBFB02B6"
+    },
+    {
+      "AttachmentId": 2794907,
+      "PhysicalId": 1950930,
+      "Bytes": 17236,
+      "OriginalName": "SARTORINABILERICREG (1).pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-01T19:14:59.89",
+      "RequestIds": [
+        23240
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794907_1950930.pdf",
+      "Sha256": "7004A02E79737A50E977766A34305F65A93E0C72A87E274A1D34BD547F2C6E09"
+    },
+    {
+      "AttachmentId": 2794908,
+      "PhysicalId": 1950931,
+      "Bytes": 17232,
+      "OriginalName": "SARTORIEZZATIRICREG.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-01T19:15:13.94",
+      "RequestIds": [
+        23249
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2794908_1950931.pdf",
+      "Sha256": "46CFDACC851A1238C20FC9015C8CCFB0C75EEABE4C30DD5A873B95C3B3D3B490"
+    },
+    {
+      "AttachmentId": 2795026,
+      "PhysicalId": 1951049,
+      "Bytes": 17593,
+      "OriginalName": "1R_MAUCERI_BENEDETTI.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-01T23:27:58.863",
+      "RequestIds": [
+        23321
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2795026_1951049.pdf",
+      "Sha256": "1AB6CFD7CEB3E0AB6906CACB542D3E9518B84ABB9508169332A27B4B32287317"
+    },
+    {
+      "AttachmentId": 2795165,
+      "PhysicalId": 1951188,
+      "Bytes": 21039,
+      "OriginalName": "Ricevuta telematica_contratto GRANDIS_TUCCI_2026.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T10:31:21.173",
+      "RequestIds": [
+        23386
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2795165_1951188.pdf",
+      "Sha256": "D9DA3AE5AB9A46162ABF6114466C43D518507C5FBD29F5827C8261E4D9AA670B"
+    },
+    {
+      "AttachmentId": 2795803,
+      "PhysicalId": 1951826,
+      "Bytes": 33659,
+      "OriginalName": "contratto originario e proroga.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T12:35:21.137",
+      "RequestIds": [
+        23511
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2795803_1951826.pdf",
+      "Sha256": "E80F7585C5B8202C080664204E6E483D96F142036E58B5E130EAD74CFA485A16"
+    },
+    {
+      "AttachmentId": 2796141,
+      "PhysicalId": 1952164,
+      "Bytes": 39031,
+      "OriginalName": "temp_6098910107623630975.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T14:10:59.473",
+      "RequestIds": [
+        23560
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796141_1952164.pdf",
+      "Sha256": "1C74A2BB8B978A0F910E6A1AE9EC1E50289EDB7D1E5F62C3CF076F6456387C3B"
+    },
+    {
+      "AttachmentId": 2796348,
+      "PhysicalId": 1952371,
+      "Bytes": 33881,
+      "OriginalName": "IacovinoDomenicoPio.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T15:35:55.833",
+      "RequestIds": [
+        23605
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796348_1952371.pdf",
+      "Sha256": "FD8CCD78C116491B8A83F24A2DC4C2FE8E43683E49F6F07D542BDDEA23E32358"
+    },
+    {
+      "AttachmentId": 2796405,
+      "PhysicalId": 1952428,
+      "Bytes": 23137,
+      "OriginalName": "registraz. contratto di locazione Roma.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T16:03:10.327",
+      "RequestIds": [
+        23620
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796405_1952428.pdf",
+      "Sha256": "2636D695E45C56066224F04BC621CA1048876EBCE1EF331163D15ED3CAAC7ACD"
+    },
+    {
+      "AttachmentId": 2796785,
+      "PhysicalId": 1952808,
+      "Bytes": 17244,
+      "OriginalName": "RICEVUTA AG. ENTRATE DEL 29.09.2026 - CONTRATTO LOC. MARTA PULITO.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T18:32:45.917",
+      "RequestIds": [
+        23706
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796785_1952808.pdf",
+      "Sha256": "95C16AAE1B7DEC54EE8E7B2461D4F893ECDBE8B8D16BCBCBD84AAFFC2529E17D"
+    },
+    {
+      "AttachmentId": 2796944,
+      "PhysicalId": 1952967,
+      "Bytes": 16572,
+      "OriginalName": "Contratto e Proroga .pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T19:52:30.61",
+      "RequestIds": [
+        23755
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796944_1952967.pdf",
+      "Sha256": "F1B7205B844913920BBBF9E68003E9306C4DEA296D5494F3028DB75D8DB1734C"
+    },
+    {
+      "AttachmentId": 2796985,
+      "PhysicalId": 1953008,
+      "Bytes": 8643,
+      "OriginalName": "martinaregistrazione.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T20:09:39.443",
+      "RequestIds": [
+        23764
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2796985_1953008.pdf",
+      "Sha256": "64BC92CFB04330BD91556360AA22FD28E921F5E047803C0E996150B716CF7FCA"
+    },
+    {
+      "AttachmentId": 2797155,
+      "PhysicalId": 1953178,
+      "Bytes": 1096567,
+      "OriginalName": "CONTRATTO 26-27.pdf",
+      "ContentType": "application/pdf",
+      "ValidFrom": "2026-11-02T21:39:45.873",
+      "RequestIds": [
+        23793
+      ],
+      "State": "DOWNLOADED",
+      "Path": "D:\\source\\repos\\ProcedureNet7\\work\\domicilio-review-20261103\\pdfs\\2797155_1953178.pdf",
+      "Sha256": "D35296FC61D45A28C0020FC9B766ADBECB2D8351B2F9F3F603B4F3DE173BC9E1"
+    }
+  ],
+  "MissingAttachmentIds": []
+}

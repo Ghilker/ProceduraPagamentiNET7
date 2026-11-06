@@ -1,0 +1,217 @@
+[
+  {
+    "TABLE_NAME": "LUOGO_REPERIBILITA_VARIAZIONI_CONTRATTO",
+    "COLUMN_NAME": "COD_TIPO_VARIAZIONE_CONTRATTO",
+    "DATA_TYPE": "int"
+  },
+  {
+    "TABLE_NAME": "Tipologie_variaz",
+    "COLUMN_NAME": "Cod_tipo_variaz",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "Tipologie_variaz",
+    "COLUMN_NAME": "Descrizione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_variaz",
+    "COLUMN_NAME": "Id_Tipologie_variaz",
+    "DATA_TYPE": "int"
+  },
+  {
+    "TABLE_NAME": "TIPOLOGIE_VARIAZIONE_CONTRATTO",
+    "COLUMN_NAME": "COD_TIPO_VARIAZIONE_CONTRATTO",
+    "DATA_TYPE": "int"
+  },
+  {
+    "TABLE_NAME": "TIPOLOGIE_VARIAZIONE_CONTRATTO",
+    "COLUMN_NAME": "descrizione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_variazioni_domanda",
+    "COLUMN_NAME": "cod_variaz_domanda",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "Tipologie_variazioni_domanda",
+    "COLUMN_NAME": "descrizione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_variazioni_domanda",
+    "COLUMN_NAME": "tipo_variazione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_variazioni_esposti",
+    "COLUMN_NAME": "Tipologia_variazione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Tipologie_variazioni_esposti",
+    "COLUMN_NAME": "Descrizione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "Variazioni",
+    "COLUMN_NAME": "Cod_tipo_variaz",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "Variazioni",
+    "COLUMN_NAME": "Cod_beneficio",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "Variazioni_benefici",
+    "COLUMN_NAME": "Cod_tipo_variaz",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "Variazioni_benefici",
+    "COLUMN_NAME": "Cod_beneficio",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "Variazioni_benefici",
+    "COLUMN_NAME": "Id_Tipologie_variazioni_domanda",
+    "DATA_TYPE": "int"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni",
+    "COLUMN_NAME": "Cod_fiscale",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni",
+    "COLUMN_NAME": "Cod_tipo_variaz",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni",
+    "COLUMN_NAME": "DESCR_VAR",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni",
+    "COLUMN_NAME": "DESCR_BEN",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni",
+    "COLUMN_NAME": "codice_ente",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni",
+    "COLUMN_NAME": "Descrizione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vexport_variazioni_nuova_ma_sbagliata",
+    "COLUMN_NAME": "Cod_fiscale",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "vexport_variazioni_nuova_ma_sbagliata",
+    "COLUMN_NAME": "Cod_tipo_variaz",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "vexport_variazioni_nuova_ma_sbagliata",
+    "COLUMN_NAME": "DESCR_VAR",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vexport_variazioni_nuova_ma_sbagliata",
+    "COLUMN_NAME": "DESCR_BEN",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vexport_variazioni_nuova_ma_sbagliata",
+    "COLUMN_NAME": "codice_ente",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vexport_variazioni_nuova_ma_sbagliata",
+    "COLUMN_NAME": "Descrizione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vexport_variazioni_nuova_ma_sbagliata",
+    "COLUMN_NAME": "tipo_provvedimento",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni_old2",
+    "COLUMN_NAME": "Cod_fiscale",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni_old2",
+    "COLUMN_NAME": "codice_ente",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni_old2",
+    "COLUMN_NAME": "Cod_tipo_variaz",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni_old2",
+    "COLUMN_NAME": "cod_beneficio",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni_old2",
+    "COLUMN_NAME": "tipo_variazione",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "vExport_variazioni_old2",
+    "COLUMN_NAME": "tipologia_studi",
+    "DATA_TYPE": "smallint"
+  },
+  {
+    "TABLE_NAME": "VVARIAZIONI",
+    "COLUMN_NAME": "Cod_tipo_variaz",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "VVARIAZIONI",
+    "COLUMN_NAME": "DESCR_VAR",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "VVARIAZIONI",
+    "COLUMN_NAME": "Cod_beneficio",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "VVARIAZIONI",
+    "COLUMN_NAME": "DESCR_BEN",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "VVARIAZIONIEFF",
+    "COLUMN_NAME": "Cod_beneficio",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "VVARIAZIONIEFF",
+    "COLUMN_NAME": "Cod_tipo_variaz",
+    "DATA_TYPE": "char"
+  },
+  {
+    "TABLE_NAME": "VVARIAZIONIEFF",
+    "COLUMN_NAME": "DESCR_VAR",
+    "DATA_TYPE": "varchar"
+  },
+  {
+    "TABLE_NAME": "VVARIAZIONIEFF",
+    "COLUMN_NAME": "DESCR_BEN",
+    "DATA_TYPE": "varchar"
+  }
+]

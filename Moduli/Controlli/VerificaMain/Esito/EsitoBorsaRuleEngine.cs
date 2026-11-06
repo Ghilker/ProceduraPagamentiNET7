@@ -15,7 +15,8 @@ namespace ProcedureNet7
         {
             var evaluation = new EsitoBorsaEvaluation();
 
-            if (string.Equals(context.CodBeneficio, "PA", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(context.CodBeneficio, "PA", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(context.CodBeneficio, "PK", StringComparison.OrdinalIgnoreCase))
             {
                 _generalRules.Apply(context, evaluation);
                 _incomeRules.Apply(context, evaluation);

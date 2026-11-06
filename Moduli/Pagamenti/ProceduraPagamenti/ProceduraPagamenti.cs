@@ -62,6 +62,19 @@ namespace ProcedureNet7
         bool isTR = false;
         bool insertInDatabase = false;
 
+        private bool IsSimulazione => selectedTipoProcedura == TipologiaProcedura.Simulazione.ToCode()
+            || SimulazioneSenzaImpegni;
+        private bool SimulazioneSenzaImpegni => selectedTipoProcedura == TipologiaProcedura.SimulazioneSenzaImpegni.ToCode()
+            || SimulazionePATollerante;
+        private bool SimulazionePATollerante => selectedTipoProcedura == TipologiaProcedura.SimulazionePATollerante.ToCode();
+        private string DescrizioneSimulazione => SimulazionePATollerante
+            ? "SIMULAZIONE PA tollerante, anche senza impegni: nessuna modifica ai dati permanenti."
+            : SimulazioneSenzaImpegni
+                ? "SIMULAZIONE anche senza impegni: nessuna modifica ai dati permanenti."
+                : "SIMULAZIONE: controlli ordinari, nessuna modifica ai dati permanenti.";
+        private readonly List<(string CodFiscale, string Mandato)> _movimentiSimulati = new();
+        private readonly Dictionary<(string CodFiscale, string Causale), string> _detrazioniSimulate = new();
+
         SqlTransaction? sqlTransaction = null;
         bool exitProcedureEarly = false;
 

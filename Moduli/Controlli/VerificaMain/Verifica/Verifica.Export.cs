@@ -11,7 +11,7 @@ namespace ProcedureNet7.Verifica
     {
         private const decimal IseeMinimoResidentiEsteroPerCoefficiente = 7000m;
         private static readonly IReadOnlyList<string> OutputBenefitCodes = EsitoBorsaSupport.SupportedBenefitCodes;
-        private static readonly IReadOnlyList<string> OutputExclusionReasonBenefitCodes = new[] { "BS", "PA", "CI" };
+        private static readonly IReadOnlyList<string> OutputExclusionReasonBenefitCodes = new[] { "BS", "PA", "PK", "CI" };
 
         private static DataTable BuildOutputTable()
         {
@@ -36,6 +36,9 @@ namespace ProcedureNet7.Verifica
                 {
                     dt.Columns.Add($"CodiciEsclusioneCalcolata_{codBeneficio}", typeof(string));
                     dt.Columns.Add($"DescrizioneEsclusioneCalcolata_{codBeneficio}", typeof(string));
+                    dt.Columns.Add($"CodiciSegnalazioneCalcolati_{codBeneficio}", typeof(string));
+                    dt.Columns.Add($"StatoMappaturaSegnalazioni_{codBeneficio}", typeof(string));
+                    dt.Columns.Add($"DettaglioMappaturaSegnalazioni_{codBeneficio}", typeof(string));
                 }
             }
 
@@ -381,7 +384,7 @@ namespace ProcedureNet7.Verifica
             row["VariazioniEscludentiBS"] = EsitoBorsaSupport.GetVariazioniEscludentiBsSummary(facts);
             row["RinunciaBSDaVariazioni"] = facts?.RinunciaBS == true;
             row["DecadutoBSDaVariazioni"] = facts?.DecadutoBS == true;
-            row["RevocatoDaVariazioni"] = facts != null && (facts.Revocato || facts.RevocatoMancataIscrizione || facts.RevocatoIscrittoRipetente || facts.RevocatoISEE || facts.RevocatoLaureato || facts.RevocatoPatrimonio || facts.RevocatoReddito || facts.RevocatoEsami || facts.RevocatoFuoriTermine || facts.RevocatoIseeFuoriTermine || facts.RevocatoIseeNonProdotta || facts.RevocatoTrasmissioneIseeFuoriTermine || facts.RevocatoNoContrattoLocazione);
+            row["RevocatoDaVariazioni"] = facts != null && (facts.Revocato || facts.RevocatoMancataIscrizione || facts.RevocatoIscrittoRipetente || facts.RevocatoISEE || facts.RevocatoLaureato || facts.RevocatoPatrimonio || facts.RevocatoReddito || facts.RevocatoEsami || facts.RevocatoFuoriTermine || facts.RevocatoIseeFuoriTermine || facts.RevocatoIseeNonProdotta || facts.DecadutoMancataComunicazionePagamento || facts.RevocatoNoContrattoLocazione);
             row["RevocatoBandoBSDaVariazioni"] = facts?.RevocatoBandoBS == true;
 
             SetIfPositiveInt(row, "NumeroEventiCarrieraPregressa", iscr.NumeroEventiCarrieraPregressa);
@@ -559,6 +562,9 @@ namespace ProcedureNet7.Verifica
             {
                 row[$"CodiciEsclusioneCalcolata_{codBeneficio}"] = string.Empty;
                 row[$"DescrizioneEsclusioneCalcolata_{codBeneficio}"] = string.Empty;
+                row[$"CodiciSegnalazioneCalcolati_{codBeneficio}"] = string.Empty;
+                row[$"StatoMappaturaSegnalazioni_{codBeneficio}"] = string.Empty;
+                row[$"DettaglioMappaturaSegnalazioni_{codBeneficio}"] = string.Empty;
             }
 
             foreach (var codBeneficio in OutputBenefitCodes)
@@ -599,6 +605,24 @@ namespace ProcedureNet7.Verifica
                     {
                         row[$"CodiciEsclusioneCalcolata_{codBeneficio}"] = calcolato.CodiciMotivo ?? string.Empty;
                         row[$"DescrizioneEsclusioneCalcolata_{codBeneficio}"] = calcolato.Motivi ?? string.Empty;
+                        if (calcolato.EsitoCalcolato != 0)
+                        {
+                            row[$"StatoMappaturaSegnalazioni_{codBeneficio}"] = "NON APPLICABILE";
+                        }
+                        else if (string.IsNullOrWhiteSpace(calcolato.CodiciMotivo)
+                            || !calcolato.CodiciMotivo.Split(';').Any(code => !string.IsNullOrWhiteSpace(code)))
+                        {
+                            row[$"StatoMappaturaSegnalazioni_{codBeneficio}"] = "DA VERIFICARE";
+                            row[$"DettaglioMappaturaSegnalazioni_{codBeneficio}"] = "Esito escluso senza motivi di esclusione disponibili.";
+                        }
+                        else
+                        {
+                            var mappatura = EsitoBorsaMotiviCatalog.Mappa(calcolato.CodiciMotivo, codBeneficio);
+                            row[$"CodiciSegnalazioneCalcolati_{codBeneficio}"] = mappatura.CodiciSegnalazione;
+                            row[$"StatoMappaturaSegnalazioni_{codBeneficio}"] = !mappatura.Completa ? "DA VERIFICARE"
+                                : mappatura.RichiedeRegistrazione ? "DA REGISTRARE" : "COMPLETA";
+                            row[$"DettaglioMappaturaSegnalazioni_{codBeneficio}"] = mappatura.Diagnostica;
+                        }
                     }
                 }
 

@@ -7,7 +7,7 @@ using iText.Kernel.Pdf.Canvas.Parser.Listener;
 
 namespace ProcedureNet7
 {
-    internal static class ControlloDomicilioPdfAnalyzer
+    internal static partial class ControlloDomicilioPdfAnalyzer
     {
         internal const int MaxPdfBytes = 20 * 1024 * 1024;
 
@@ -112,6 +112,7 @@ namespace ProcedureNet7
             }
 
             ExtractFields(extracted, expectation.Type);
+            ReadOfficialReceiptEvidence(extracted, expectation, analysis);
             analysis.ExtractedReference = BestReference(extracted, expectation.Type);
             analysis.ExtractedRegistrationDate = ParseDate(extracted.RegistrationDate);
             analysis.ExtractedStartDate = ParseDate(expectation.Type == DomicilioPdfDocumentType.Subentro
@@ -143,6 +144,7 @@ namespace ProcedureNet7
                 ValidateContractLink(analysis, extracted, expectation.ContractReference, allowTextMatch: !expectation.ReadAllPages);
             }
 
+            PopulateDocumentedCorrections(analysis, extracted, expectation);
             SetDataCoherence(analysis);
             return analysis;
         }
@@ -377,6 +379,7 @@ namespace ProcedureNet7
 
                     var strategy = new SimpleTextExtractionStrategy();
                     var pageText = PdfTextExtractor.GetTextFromPage(pdfPage, strategy) ?? string.Empty;
+                    extracted.PageTexts.Add(new PdfPageText(page, pageText));
                     if (string.IsNullOrWhiteSpace(pageText)) extracted.TextlessPages.Add(page);
                     text.AppendLine(pageText);
 
@@ -390,6 +393,8 @@ namespace ProcedureNet7
                         completedExtraction.PageCount = extracted.PageCount;
                         completedExtraction.PagesRead = extracted.PagesRead;
                         completedExtraction.FailedPages.AddRange(extracted.FailedPages);
+                        completedExtraction.PageTexts.AddRange(extracted.PageTexts);
+                        completedExtraction.TextlessPages.AddRange(extracted.TextlessPages);
                         extracted = completedExtraction;
                         break;
                     }
@@ -681,6 +686,9 @@ namespace ProcedureNet7
             if (string.IsNullOrWhiteSpace(expectedReference))
                 return;
 
+            if (OfficialReferenceMatches(extracted.OfficialEvidence?.Primary, expectedReference))
+                return;
+
             if (allowTextMatch && (ContainsNormalized(extracted.Text, expectedReference) ||
                                   AreEqualOrContained(expectedReference, analysis.ExtractedReference)))
                 return;
@@ -818,11 +826,13 @@ namespace ProcedureNet7
         }
 
         private static bool IsContractIdentifier(string value)
-            => Regex.IsMatch(NormalizeAlphaNumeric(value), @"^[A-Z]{3}\d{2}[A-Z0-9]\d{6}", RegexOptions.CultureInvariant);
+            => Regex.IsMatch(NormalizeAlphaNumeric(value), @"^[A-Z][A-Z0-9]{2}\d{2}[A-Z0-9]\d{6}[A-Z0-9]*$", RegexOptions.CultureInvariant);
 
         private static bool StrictReferenceMatches(string expected, string actual)
         {
             if (string.IsNullOrWhiteSpace(actual)) return false;
+            if (Regex.IsMatch(expected, @"^[\d\s/-]{10,35}$") && Regex.IsMatch(actual, @"^[\d\s/-]{10,35}$") &&
+                Regex.Replace(expected, @"\D", "") == Regex.Replace(actual, @"\D", "")) return true;
             var expectedProtocol = Regex.Match(expected.Trim(), @"^(?<base>\d{10,25})(?:\s*[-/]\s*(?<sequence>\d{4,8}))?$", RegexOptions.CultureInvariant);
             var actualProtocol = Regex.Match(actual.Trim(), @"^(?<base>\d{10,25})(?:\s*[-/]\s*(?<sequence>\d{4,8}))?$", RegexOptions.CultureInvariant);
             if (expectedProtocol.Success && actualProtocol.Success)
@@ -1045,7 +1055,7 @@ namespace ProcedureNet7
             var normalized = NormalizeAlphaNumeric(value);
             var identifier = Regex.Match(
                 normalized,
-                @"^[A-Z]{3}(?<year>\d{2})[A-Z0-9](?<number>\d{6})",
+                @"^[A-Z][A-Z0-9]{2}(?<year>\d{2})[A-Z0-9](?<number>\d{6})",
                 RegexOptions.CultureInvariant);
             if (identifier.Success)
             {
@@ -1216,6 +1226,8 @@ namespace ProcedureNet7
 
         private sealed class PdfExtractedData
         {
+            public List<PdfPageText> PageTexts { get; } = new();
+            public OfficialReceiptEvidence? OfficialEvidence { get; set; }
             public int PageCount { get; set; }
             public int PagesRead { get; set; }
             public bool FieldsExtracted { get; set; }

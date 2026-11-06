@@ -55,8 +55,8 @@ namespace ProcedureNet7
 
     /// <summary>
     /// Rappresenta una riga attiva di Contratti e le relative proroghe.
-    /// Le date di subentro, quando valorizzate, sostituiscono singolarmente
-    /// DATA_INIZIO e DATA_FINE.
+    /// Subentro e cessazione limitano la copertura del contratto e di tutte
+    /// le sue proroghe, senza modificare le interruzioni dei periodi originali.
     /// </summary>
     public sealed class ContrattoDomicilioAnalisiInput
     {
@@ -381,24 +381,29 @@ namespace ProcedureNet7
             ICollection<IntervalloCopertura> destinazione,
             ICollection<string> anomalie)
         {
-            DateTime? dataInizio = contratto.DataInizioSubentro ?? contratto.DataInizio;
-            DateTime? dataFine = contratto.DataCessazione ?? contratto.DataFine;
+            DateTime? dataInizio = contratto.DataInizio;
+            DateTime? dataFine = contratto.DataFine;
+            DateTime? dataSubentro = contratto.DataInizioSubentro ?? dataInizio;
+            DateTime? dataCessazione = contratto.DataCessazione;
 
-            if (!DataValida(dataInizio) || !DataValida(dataFine))
+            if (!DataValida(dataInizio) || !DataValida(dataFine)
+                || !DataValida(dataSubentro)
+                || (dataCessazione.HasValue && !DataValida(dataCessazione)))
             {
                 anomalie.Add(
                     $"Contratto {contratto.Id}, domicilio {domicilio.Id}: DATA_INIZIO/DATA_FINE mancanti o non valide.");
                 return;
             }
 
-            if (dataFine!.Value.Date < dataInizio!.Value.Date)
+            if (dataFine!.Value.Date < dataInizio!.Value.Date
+                || (dataCessazione.HasValue && dataCessazione.Value.Date < dataSubentro!.Value.Date))
             {
                 anomalie.Add(
                     $"Contratto {contratto.Id}, domicilio {domicilio.Id}: DATA_FINE precedente a DATA_INIZIO.");
                 return;
             }
 
-            if (!FormalmenteValido(contratto, dataFine.Value, domicilio.Id, anomalie))
+            if (!FormalmenteValido(contratto, dataCessazione ?? dataFine.Value, domicilio.Id, anomalie))
                 return;
 
             bool contrattoErasmus =
@@ -413,18 +418,8 @@ namespace ProcedureNet7
                 return;
             }
 
-            var intervalliContratto = new List<IntervalloCopertura>
-            {
-                CreaIntervallo(
-                    domicilio,
-                    contratto,
-                    proroga: null,
-                    comune,
-                    dataInizio.Value.Date,
-                    dataFine.Value.Date,
-                    inizioAa,
-                    fineAa)
-            };
+            var intervalliContratto = new List<IntervalloCopertura>();
+            AggiungiPeriodo(dataInizio.Value.Date, dataFine.Value.Date, proroga: null);
 
             DateTime fineCatenaContratto = dataFine.Value.Date;
             foreach (var proroga in contratto.Proroghe
@@ -446,16 +441,7 @@ namespace ProcedureNet7
                     continue;
                 }
 
-                intervalliContratto.Add(
-                    CreaIntervallo(
-                        domicilio,
-                        contratto,
-                        proroga,
-                        comune,
-                        decorrenza,
-                        scadenza,
-                        inizioAa,
-                        fineAa));
+                AggiungiPeriodo(decorrenza, scadenza, proroga);
 
                 if (scadenza > fineCatenaContratto)
                     fineCatenaContratto = scadenza;
@@ -463,6 +449,19 @@ namespace ProcedureNet7
 
             foreach (var intervallo in intervalliContratto.Where(x => x.IntersecaAnnoAccademico))
                 destinazione.Add(intervallo);
+
+            void AggiungiPeriodo(DateTime inizio, DateTime fine, ProrogaDomicilioAnalisiInput? proroga)
+            {
+                if (inizio < dataSubentro!.Value.Date)
+                    inizio = dataSubentro.Value.Date;
+                if (dataCessazione.HasValue && fine > dataCessazione.Value.Date)
+                    fine = dataCessazione.Value.Date;
+                if (inizio > fine)
+                    return;
+
+                intervalliContratto.Add(
+                    CreaIntervallo(domicilio, contratto, proroga, comune, inizio, fine, inizioAa, fineAa));
+            }
         }
 
         private static bool FormalmenteValido(

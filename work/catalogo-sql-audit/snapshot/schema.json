@@ -1,0 +1,82 @@
+[
+  {
+    "Colonna": "Cod_segnalazione",
+    "Tipo": "char",
+    "Lunghezza": 5,
+    "Nullable": false,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "Anno_accademico",
+    "Tipo": "char",
+    "Lunghezza": 8,
+    "Nullable": false,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "Tipo_segnalazione",
+    "Tipo": "char",
+    "Lunghezza": 1,
+    "Nullable": false,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "Descrizione",
+    "Tipo": "varchar",
+    "Lunghezza": 255,
+    "Nullable": false,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "Iter_elaborativo",
+    "Tipo": "char",
+    "Lunghezza": 1,
+    "Nullable": false,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "Data_validita",
+    "Tipo": "datetime",
+    "Lunghezza": 8,
+    "Nullable": false,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "DescrizioneGrad",
+    "Tipo": "varchar",
+    "Lunghezza": 255,
+    "Nullable": true,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "Utente",
+    "Tipo": "varchar",
+    "Lunghezza": 20,
+    "Nullable": true,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "categoria",
+    "Tipo": "char",
+    "Lunghezza": 1,
+    "Nullable": true,
+    "Identita": false,
+    "DefaultSQL": null
+  },
+  {
+    "Colonna": "Id_Decod_segnalazioni",
+    "Tipo": "int",
+    "Lunghezza": 4,
+    "Nullable": false,
+    "Identita": true,
+    "DefaultSQL": null
+  }
+]

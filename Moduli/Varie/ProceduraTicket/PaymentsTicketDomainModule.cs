@@ -207,12 +207,11 @@ namespace ProcedureNet7
             if (record == null)
                 throw new ArgumentNullException(nameof(record));
 
-            decimal assignedAmount = record.SpecificheAmount > 0m
-                ? record.SpecificheAmount
-                : record.BenefitAmount;
+            // La chiusura confronta il lordo dell'esito con il lordo dei pagamenti validi.
+            decimal assignedAmount = record.BenefitAmount;
             decimal residual = Math.Max(
                 0m,
-                assignedAmount - record.BsPaidAmount + record.BsReversalAmount - record.DeductionAmount);
+                assignedAmount - record.BsPaidAmount);
 
             return new PaymentOperationalData
             {

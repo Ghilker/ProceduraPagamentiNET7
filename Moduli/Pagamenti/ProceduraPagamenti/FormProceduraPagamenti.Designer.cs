@@ -73,6 +73,7 @@ namespace ProcedureNet7
             // pagamentiTipoProceduraCombo
             // 
             pagamentiTipoProceduraCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            pagamentiTipoProceduraCombo.DropDownWidth = 300;
             pagamentiTipoProceduraCombo.FormattingEnabled = true;
             pagamentiTipoProceduraCombo.Location = new Point(235, 72);
             pagamentiTipoProceduraCombo.Name = "pagamentiTipoProceduraCombo";

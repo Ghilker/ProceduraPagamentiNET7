@@ -71,12 +71,20 @@ namespace ProcedureNet7
             if (context.Iscrizione == null)
                 return;
 
+            if (!IsAnnoCorsoAmmissibile(context))
+                evaluation.Add("PA003");
+        }
+
+        internal static bool IsAnnoCorsoAmmissibile(EsitoBorsaStudentContext context)
+        {
+            if (context.Iscrizione == null)
+                return false;
+
             int annoCorso = EsitoBorsaSupport.HasRipetenzaDaPassaggio(context)
                 ? context.Iscrizione.AnnoCorso
                 : EsitoBorsaSupport.GetAnnoCorsoCalcolato(context);
 
-            if (annoCorso == 0 || annoCorso < GetLimiteAnniFuoriCorso(context))
-                evaluation.Add("PA003");
+            return annoCorso != 0 && annoCorso >= GetLimiteAnniFuoriCorso(context);
         }
 
         private static int GetLimiteAnniFuoriCorso(EsitoBorsaStudentContext context)
@@ -113,7 +121,8 @@ namespace ProcedureNet7
                 return;
 
             if (context.Facts.UsufruitoBeneficioBorsaNonRestituito
-                || context.Facts.BeneficiPregressiNonRestituiti.Contains("PA"))
+                || context.Facts.BeneficiPregressiNonRestituiti.Contains(context.CodBeneficio)
+                || (IsPk(context) && context.Facts.BeneficiPregressiNonRestituiti.Contains("PA")))
             {
                 evaluation.Add("PA004");
             }
@@ -122,16 +131,28 @@ namespace ProcedureNet7
         private static void ApplyVariazioniSpecifiche(EsitoBorsaStudentContext context, EsitoBorsaEvaluation evaluation)
         {
             bool rinunciaPregressa = !context.ForzaturaRinunciaNoEsclusione
-                && context.Facts.BeneficiRinunciaPregressa.Contains("PA");
+                && (context.Facts.BeneficiRinunciaPregressa.Contains(context.CodBeneficio)
+                    || (IsPk(context) && context.Facts.BeneficiRinunciaPregressa.Contains("PA")));
 
-            if (rinunciaPregressa || EsitoBorsaSupport.HasRinunciaVariazione(context.Facts, "PA"))
+            if (rinunciaPregressa
+                || EsitoBorsaSupport.HasRinunciaVariazione(context.Facts, context.CodBeneficio)
+                || (IsPk(context) && EsitoBorsaSupport.HasRinunciaVariazione(context.Facts, "PA")))
                 evaluation.Add("PA005");
 
-            if (EsitoBorsaSupport.HasDecadenzaVariazione(context.Facts, "PA"))
+            if (EsitoBorsaSupport.HasDecadenzaVariazione(context.Facts, context.CodBeneficio)
+                || (IsPk(context) && EsitoBorsaSupport.HasDecadenzaVariazione(context.Facts, "PA")))
                 evaluation.Add("PA006");
 
-            if (EsitoBorsaSupport.HasRevocaBandoVariazione(context.Facts, "PA"))
+            if (EsitoBorsaSupport.HasRevocaBandoVariazione(context.Facts, context.CodBeneficio)
+                || (IsPk(context) && EsitoBorsaSupport.HasRevocaBandoVariazione(context.Facts, "PA")))
                 evaluation.Add("PA007");
+
+            if (context.Facts.RevocatoSedeDistaccata
+                || (IsPk(context) && context.Facts.RevocatoSedeDistaccataPK))
+                evaluation.Add("PA008");
         }
+
+        private static bool IsPk(EsitoBorsaStudentContext context)
+            => string.Equals(context.CodBeneficio, "PK", StringComparison.OrdinalIgnoreCase);
     }
 }

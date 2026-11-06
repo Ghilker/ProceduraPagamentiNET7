@@ -92,6 +92,9 @@ ISCR AS
       ON cl.COD_CORSO_LAUREA = i.COD_CORSO_LAUREA
      AND cl.COD_TIPO_ORDINAMENTO = i.COD_TIPO_ORDINAMENTO
      AND cl.COD_FACOLTA = i.COD_FACOLTA
+     AND cl.ANNO_ACCAD_INIZIO = i.ANNO_ACCAD_INIZIO
+     AND cl.COD_SEDE_STUDI = i.COD_SEDE_STUDI
+     AND cl.COD_TIPOLOGIA_STUDI = i.COD_TIPOLOGIA_STUDI
      AND (cl.ANNO_ACCAD_FINE >= CONVERT(NVARCHAR(20), ISNULL(m.Anno_immatricolaz,0)) OR cl.ANNO_ACCAD_FINE IS NULL)
     LEFT JOIN SEDE_STUDI ss
       ON ss.COD_SEDE_STUDI = i.COD_SEDE_STUDI
@@ -525,7 +528,7 @@ SELECT
     TRY_CONVERT(INT, cr.Anno_corso) AS Anno_corso,
     CONVERT(NVARCHAR(50), ISNULL(cr.Cod_corso_laurea, '')) AS Cod_corso_laurea,
     TRY_CONVERT(DECIMAL(18,2), cr.Crediti_richiesti) AS Crediti_richiesti,
-    CAST(CASE WHEN TRY_CONVERT(INT, cr.Disabile) = 1 THEN 1 ELSE 0 END AS BIT) AS Disabile,
+    TRY_CONVERT(BIT, cr.Disabile) AS Disabile,
     TRY_CONVERT(INT, cr.Id_Crediti_richiesti) AS Id_Crediti_richiesti
 FROM Crediti_richiesti cr
 WHERE cr.Anno_accademico = @AA;";
@@ -563,7 +566,7 @@ WHERE cr.Anno_accademico = @AA;";
             context.CreditiRichiestiCatalog.Clear();
 
             if (!ObjectExists(context.Connection, "Crediti_richiesti"))
-                return;
+                throw new InvalidOperationException($"Configurazione merito da sistemare per AA {context.AnnoAccademico}: tabella Crediti_richiesti mancante.");
 
             using var cmd = new SqlCommand(CreditiRichiestiCatalogSql, context.Connection)
             {
@@ -576,11 +579,11 @@ WHERE cr.Anno_accademico = @AA;";
             while (reader.Read())
             {
                 context.CreditiRichiestiCatalog.Add(
-                    reader.SafeGetInt("Tipologia_corso"),
-                    reader.SafeGetInt("Anno_corso"),
+                    GetNullableInt(reader, "Tipologia_corso"),
+                    GetNullableInt(reader, "Anno_corso"),
                     reader.SafeGetString("Cod_corso_laurea"),
-                    reader.SafeGetDecimal("Crediti_richiesti"),
-                    reader.SafeGetBool("Disabile"),
+                    ReadNullableDecimal(reader, "Crediti_richiesti"),
+                    GetNullableBool(reader, "Disabile"),
                     reader.SafeGetInt("Id_Crediti_richiesti"));
             }
         }

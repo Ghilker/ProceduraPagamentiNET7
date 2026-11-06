@@ -93,12 +93,14 @@ namespace ProcedureNet7
 
             string beneficioFolderPath = GetCurrentPagamentoFolder();
 
-            var impegnoList = PagamentoFlussoRules.ImpegniDaElaborare(selectedImpegno, impegniList);
+            var impegnoList = PagamentoFlussoRules.ImpegniDaElaborare(selectedImpegno, impegniList,
+                includiSenzaImpegno: SimulazioneSenzaImpegni);
 
             foreach (var studente in studentiDaPagare.Values)
             {
                 var motivo = PagamentoFlussoRules.ImpegnoNonElaborato(
-                    studente.InformazioniPagamento.NumeroImpegno, selectedImpegno, impegnoList);
+                    studente.InformazioniPagamento.NumeroImpegno, selectedImpegno, impegnoList,
+                    includiSenzaImpegno: SimulazioneSenzaImpegni);
                 if (motivo != null)
                     _motiviNonFlusso[studente.InformazioniPersonali.CodFiscale] = motivo;
             }
@@ -118,7 +120,7 @@ namespace ProcedureNet7
 
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Completato");
 
-            if (!insertInDatabase) return;
+            if (IsSimulazione || !insertInDatabase) return;
 
             Logger.LogInfo(10, "Starting index optimization");
 
@@ -158,7 +160,9 @@ namespace ProcedureNet7
         private void ProcessImpegno(string impegno, string beneficioFolderPath)
         {
             var allStudentsInImpegno = studentiDaPagare.Values
-                .Where(s => s.InformazioniPagamento.NumeroImpegno == impegno)
+                .Where(s => s.InformazioniPagamento.NumeroImpegno == impegno ||
+                    (SimulazioneSenzaImpegni && impegno == string.Empty &&
+                     string.IsNullOrWhiteSpace(s.InformazioniPagamento.NumeroImpegno)))
                 .ToList();
 
             if (!allStudentsInImpegno.Any())
@@ -172,12 +176,12 @@ namespace ProcedureNet7
                 CommandTimeout = 9000000
             };
 
-            string impegnoDescrizione = Convert.ToString(cmdImpegno.ExecuteScalar());
+            string impegnoDescrizione = impegno == string.Empty ? "Senza impegno" : Convert.ToString(cmdImpegno.ExecuteScalar());
 
-            string fondoFolderName = GetFondoFolderName(impegno);
+            string fondoFolderName = impegno == string.Empty ? "SenzaFondo" : GetFondoFolderName(impegno);
             string fondoFolder = Utilities.EnsureDirectory(Path.Combine(beneficioFolderPath, fondoFolderName));
             string impegnoFolder = Utilities.EnsureDirectory(
-                Path.Combine(fondoFolder, $"imp-{impegno}-{impegnoDescrizione}"));
+                Path.Combine(fondoFolder, impegno == string.Empty ? "SenzaImpegno" : $"imp-{impegno}-{impegnoDescrizione}"));
 
             Logger.LogInfo(60,
                 $"Lavorazione studenti - Generazione files - Fondo {fondoFolderName} - Impegno n°{impegno}");
@@ -462,13 +466,29 @@ namespace ProcedureNet7
                         }
                     }
 
-                    if (insertInDatabase)
+                    if (!IsSimulazione && insertInDatabase)
                     {
                         InsertIntoMovimentazioni(students, impegnoFlusso);
+                    }
+                    else if (IsSimulazione)
+                    {
+                        RegisterSimulatedMovements(students);
                     }
 
                     studentiProcessatiAmount += students.Count;
                 }
+            }
+        }
+
+        private void RegisterSimulatedMovements(IEnumerable<StudentePagamenti> students)
+        {
+            foreach (var student in students)
+            {
+                string cf = student.InformazioniPersonali.CodFiscale;
+                string mandato = student.InformazioniPagamento.MandatoProvvisorio;
+                _movimentiSimulati.Add((cf, mandato));
+                foreach (var detrazione in student.InformazioniPagamento.Detrazioni.Where(d => d.needUpdate))
+                    _detrazioniSimulate[(cf, detrazione.codReversale.Trim())] = mandato;
             }
         }
 

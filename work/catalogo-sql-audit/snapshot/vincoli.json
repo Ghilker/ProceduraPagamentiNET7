@@ -1,0 +1,16 @@
+[
+  {
+    "Indice": "XPKDecod_segnalazioni",
+    "Univoco": true,
+    "PK": true,
+    "Colonna": "Cod_segnalazione",
+    "Posizione": 1
+  },
+  {
+    "Indice": "XPKDecod_segnalazioni",
+    "Univoco": true,
+    "PK": true,
+    "Colonna": "Anno_accademico",
+    "Posizione": 2
+  }
+]

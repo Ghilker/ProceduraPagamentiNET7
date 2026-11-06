@@ -10,6 +10,8 @@ namespace ProcedureNet7
             if (info == null)
                 return;
 
+            context.Config.Validate(context.Pipeline.AnnoAccademico);
+
             ApplyAttestazioneEconomicaObbligatoriaRules(context, evaluation);
             ApplyStatusIseeRules(context, evaluation);
 
@@ -19,10 +21,10 @@ namespace ProcedureNet7
             if (!isee.HasValue)
                 evaluation.Add("RED011");
 
-            if (context.Config.SogliaIsp > 0m && isp.HasValue && isp.Value > context.Config.SogliaIsp)
+            if (isp.HasValue && isp.Value > context.Config.SogliaIsp)
                 evaluation.Add("RED012");
 
-            if (context.Config.SogliaIsee > 0m && isee.HasValue && isee.Value > context.Config.SogliaIsee)
+            if (isee.HasValue && isee.Value > context.Config.SogliaIsee)
                 evaluation.Add("RED013");
         }
 
