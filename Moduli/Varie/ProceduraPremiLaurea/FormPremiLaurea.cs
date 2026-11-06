@@ -30,10 +30,11 @@ namespace ProcedureNet7
                 return;
             }
 
-            _masterForm.RunBackgroundWorker(RunPremiLaurea);
+            string annoAccademico = PremiLaureaAABox.Text.Trim();
+            _masterForm.RunBackgroundWorker(connection => RunPremiLaurea(connection, annoAccademico));
         }
 
-        private void RunPremiLaurea(SqlConnection mainConnection)
+        private void RunPremiLaurea(SqlConnection mainConnection, string annoAccademico)
         {
             try
             {
@@ -44,6 +45,7 @@ namespace ProcedureNet7
                 ArgsValidation argsValidation = new ArgsValidation();
                 ArgsPremiLaurea _argsPremiLaurea = new ArgsPremiLaurea
                 {
+                    AnnoAccademico = annoAccademico,
                     FileExcelInput = selectedFilePath, FileExcelOutput = selectedFolderPath,
                 };
                 argsValidation.Validate(_argsPremiLaurea);

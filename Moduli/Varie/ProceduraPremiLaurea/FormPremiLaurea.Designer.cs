@@ -34,6 +34,8 @@
             PremiLaureaSavebtn = new Button();
             PremiLaureaFilelbl = new Label();
             PremiLaureaFilebtn = new Button();
+            PremiLaureaAAlbl = new Label();
+            PremiLaureaAABox = new TextBox();
             openFileDialog = new OpenFileDialog();
             saveFolderDialog = new FolderBrowserDialog();
             SuspendLayout();
@@ -98,6 +100,22 @@
             PremiLaureaFilebtn.Text = "Seleziona file excel";
             PremiLaureaFilebtn.UseVisualStyleBackColor = true;
             PremiLaureaFilebtn.Click += PremiLaureaFilebtn_Click;
+            //
+            // PremiLaureaAAlbl
+            //
+            PremiLaureaAAlbl.AutoSize = true;
+            PremiLaureaAAlbl.Location = new Point(29, 137);
+            PremiLaureaAAlbl.Name = "PremiLaureaAAlbl";
+            PremiLaureaAAlbl.Size = new Size(206, 15);
+            PremiLaureaAAlbl.TabIndex = 44;
+            PremiLaureaAAlbl.Text = "Anno accademico (es. 20242025)";
+            //
+            // PremiLaureaAABox
+            //
+            PremiLaureaAABox.Location = new Point(304, 129);
+            PremiLaureaAABox.Name = "PremiLaureaAABox";
+            PremiLaureaAABox.Size = new Size(128, 23);
+            PremiLaureaAABox.TabIndex = 45;
             // 
             // openFileDialog
             // 
@@ -109,6 +127,8 @@
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(224, 224, 224);
             ClientSize = new Size(800, 350);
+            Controls.Add(PremiLaureaAAlbl);
+            Controls.Add(PremiLaureaAABox);
             Controls.Add(PremiLaureaSavelbl);
             Controls.Add(PremiLaureaSavebtn);
             Controls.Add(PremiLaureaFilelbl);
@@ -130,6 +150,8 @@
         private Button PremiLaureaSavebtn;
         private Label PremiLaureaFilelbl;
         private Button PremiLaureaFilebtn;
+        private Label PremiLaureaAAlbl;
+        private TextBox PremiLaureaAABox;
         private OpenFileDialog openFileDialog;
         private FolderBrowserDialog saveFolderDialog;
     }
