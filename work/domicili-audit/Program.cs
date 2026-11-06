@@ -1,1 +1,0 @@
-DomiciliRegressionTests.Run();

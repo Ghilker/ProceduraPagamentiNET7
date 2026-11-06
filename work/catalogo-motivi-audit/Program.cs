@@ -1,1 +1,0 @@
-CatalogoMotiviRegressionTests.Run();
