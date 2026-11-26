@@ -119,42 +119,6 @@ namespace ProcedureNet7
             }
 
             Logger.LogInfo(60, $"Lavorazione studenti - Generazione files - Completato");
-
-            if (IsSimulazione || !insertInDatabase) return;
-
-            Logger.LogInfo(10, "Starting index optimization");
-
-            string rebuildIndexesSQL = @"
-        DECLARE @TableName NVARCHAR(255);
-        DECLARE IndexCursor CURSOR FOR
-        SELECT DISTINCT t.name 
-        FROM sys.indexes i 
-        INNER JOIN sys.tables t ON i.object_id = t.object_id 
-        WHERE t.name IN ('MOVIMENTI_CONTABILI_ELEMENTARI', 'MOVIMENTI_CONTABILI_GENERALI', 'STATI_DEL_MOVIMENTO_CONTABILE');
-
-        OPEN IndexCursor;
-        FETCH NEXT FROM IndexCursor INTO @TableName;
-
-        WHILE @@FETCH_STATUS = 0
-        BEGIN
-            EXEC ('ALTER INDEX ALL ON ' + @TableName + ' REORGANIZE;');
-            FETCH NEXT FROM IndexCursor INTO @TableName;
-        END;
-
-        CLOSE IndexCursor;
-        DEALLOCATE IndexCursor;";
-            SqlCommand rebuildIndexesCmd = new(rebuildIndexesSQL, CONNECTION, sqlTransaction) { CommandTimeout = 9000000 };
-            _ = rebuildIndexesCmd.ExecuteNonQuery();
-
-            Logger.LogInfo(10, "Updating statistics");
-            string updateStatisticsSQL = @"
-        UPDATE STATISTICS [MOVIMENTI_CONTABILI_ELEMENTARI];
-        UPDATE STATISTICS [MOVIMENTI_CONTABILI_GENERALI];
-        UPDATE STATISTICS [STATI_DEL_MOVIMENTO_CONTABILE];";
-            SqlCommand updateStatisticsCmd = new(updateStatisticsSQL, CONNECTION, sqlTransaction) { CommandTimeout = 9000000 };
-            _ = updateStatisticsCmd.ExecuteNonQuery();
-
-            Logger.LogInfo(10, "Index and statistics optimization complete.");
         }
 
         private void ProcessImpegno(string impegno, string beneficioFolderPath)

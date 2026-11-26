@@ -41,10 +41,26 @@ namespace ProcedureNet7
                 DataTable tickets = Utilities.CsvToDataTable(ticketFilePath);
                 Logger.LogInfo(null, $"File ticket caricato. Righe lette: {tickets.Rows.Count}");
 
+                if (tickets.Rows.Count == 0)
+                    throw new Exception("Nessun ticket presente nel file");
+
+                // Controllo indipendente su tutti i ticket, prima dei filtri ordinari.
+                DataTable violenceReview = TicketViolenceCheck.Build(tickets);
+                string directoryPath = Path.GetDirectoryName(ticketFilePath) ?? AppDomain.CurrentDomain.BaseDirectory;
+                if (violenceReview.Rows.Count > 0)
+                {
+                    string violenceFile = TicketViolenceWorkbook.Export(violenceReview, directoryPath);
+                    Logger.LogInfo(null, $"Ticket con segnalazione violenza: {violenceReview.Rows.Count}. File separato, escluso dalla mail: {violenceFile}");
+                }
+                tickets = TicketViolenceCheck.SelectUnflagged(tickets);
+
                 // Solo analisi ed esportazione: nessun aggiornamento di VALIDAZIONE_TICKET.
                 tickets = TicketClosureReview.SelectEligible(tickets);
                 if (tickets.Rows.Count == 0)
-                    throw new Exception("Nessun ticket presente nel file che soddisfa i requisiti");
+                {
+                    Logger.LogInfo(null, "Nessun ticket da elaborare nella lavorazione principale. Nessuna email da inviare.");
+                    return;
+                }
                 Logger.LogInfo(null, $"Filtraggio ticket completato. Ticket da elaborare: {tickets.Rows.Count}");
 
                 // Conserva l'anno dichiarato nell'export prima di calcolare i campi derivati.
@@ -208,7 +224,6 @@ namespace ProcedureNet7
                     $"Classificazione completata. Ticket classificati: {classifiedCount}; da verificare: {lowConfidenceCount}");
 
                 // export
-                string directoryPath = Path.GetDirectoryName(ticketFilePath) ?? AppDomain.CurrentDomain.BaseDirectory;
                 DataTable closureReview = TicketClosureReview.Build(tickets, officeRecords);
                 int closable = closureReview.AsEnumerable().Count(row => SafeStr(row, "AZIONE_PROPOSTA") == "CHIUDERE");
                 Logger.LogInfo(null, $"Valutazione chiusure completata. Chiudibili: {closable}; da verificare: {closureReview.Rows.Count - closable}");

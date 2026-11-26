@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace ProcedureNet7
 {
@@ -26,7 +25,9 @@ namespace ProcedureNet7
         public static IstanzaDomicilioDecision Decide(IstanzaDomicilioRecord request)
         {
             var state = RequestState(request);
-            return Decide(state, request.Operazioni.SelectMany(x => x.Documenti).ToList(), request.CodFiscale);
+            return state.Severity == DomicilioControlSeverity.Conforme
+                ? new(Accettabile, "Controlli superati: operazioni coerenti e documenti richiesti leggibili e congruenti.")
+                : new(DaValidare, state.Descriptions);
         }
 
         private static DomicilioControlState RequestState(IstanzaDomicilioRecord request)
@@ -58,48 +59,6 @@ namespace ProcedureNet7
             return state;
         }
 
-        private static IstanzaDomicilioDecision Decide(
-            DomicilioControlState state, IReadOnlyCollection<IstanzaDomicilioDocument> documents, string fiscalCode)
-        {
-            if (state.Severity == DomicilioControlSeverity.Conforme)
-                return new(Accettabile, "Controlli superati: operazioni coerenti e documenti richiesti leggibili e congruenti.");
-
-            // Un errore correggibile non equivale a un motivo di rifiuto. Anche
-            // l'identità richiede tutti i documenti leggibili e un contesto certo.
-            var contextCertain = documents.Count > 0 &&
-                state.Findings.All(x => x.Code.StartsWith("PDF_", StringComparison.Ordinal) &&
-                    x.Severity != DomicilioControlSeverity.VerificaManuale) &&
-                documents.All(x => x.Expectation != null && x.Attachment?.Analysis is
-                    { PdfValid: true, Readable: true, TypeRecognized: true, DataCoherent: not null } analysis &&
-                    analysis.State.Findings.All(f => f.Severity != DomicilioControlSeverity.VerificaManuale));
-            if (contextCertain)
-            {
-                foreach (var document in documents)
-                {
-                    var analysis = document.Attachment!.Analysis!;
-                    var wrongRole = analysis.State.Findings.Any(x => x.Code == "PDF_020");
-                    var missingExpectedIdentity = analysis.State.Findings.Any(x => x.Code is "PDF_009" or "PDF_022");
-                    // Un CF diverso potrebbe appartenere al locatore. Serve
-                    // identificare esplicitamente un altro conduttore/cessionario.
-                    var otherTenant = Regex.Matches(analysis.ExtractedFiscalCodes,
-                            @"\b(?<cf>[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z])\s*\((?<ruolo>[^)]+)\)", RegexOptions.IgnoreCase)
-                        .Cast<Match>().Any(x =>
-                            !string.Equals(x.Groups["cf"].Value, fiscalCode.Trim(), StringComparison.OrdinalIgnoreCase) &&
-                            (document.Expectation!.Type == DomicilioPdfDocumentType.Contratto &&
-                                 x.Groups["ruolo"].Value == "locatore cessionario/conduttore" ||
-                             document.Expectation.Type == DomicilioPdfDocumentType.Subentro &&
-                                 x.Groups["ruolo"].Value == "conduttore cessionario"));
-                    var differentIdentity = missingExpectedIdentity && otherTenant;
-                    if (wrongRole || differentIdentity)
-                        return new(Rifiutare, wrongRole
-                            ? "Documento leggibile: lo studente risulta in un ruolo incompatibile con il subentro richiesto."
-                            : "Documento leggibile: il codice fiscale dello studente è assente ed è identificato un altro conduttore.");
-                }
-            }
-
-            return new(DaValidare, state.Descriptions);
-        }
-
         public static IEnumerable<string[]> BuildRows(IEnumerable<IstanzaDomicilioRecord> requests)
         {
             foreach (var request in requests.OrderBy(x => x.NumIstanza))
@@ -117,11 +76,9 @@ namespace ProcedureNet7
             var documents = operation?.Documenti ?? request.Operazioni.SelectMany(x => x.Documenti).ToList();
             string DocumentValues(Func<IstanzaDomicilioDocument, string?> value)
                 => string.Join(" | ", documents.Select(x => $"{x.Tipo} [{Number(x.IdAllegato)}]: {value(x)}"));
-            var officeAction = decision.Azione == Rifiutare
-                ? "Proposta di rifiuto per identità/ruolo incompatibili. " + state.OfficeActions
-                : decision.Azione == Accettabile
-                    ? "Accettabile nel backoffice dopo verifica che l'istanza e i dati correnti non siano cambiati."
-                    : state.OfficeActions;
+            var officeAction = decision.Azione == Accettabile
+                ? "Accettabile nel backoffice dopo verifica che l'istanza e i dati correnti non siano cambiati."
+                : state.OfficeActions;
             return new[]
             {
                 operation == null ? "ISTANZA" : "OPERAZIONE", Number(request.NumIstanza), decision.Azione,

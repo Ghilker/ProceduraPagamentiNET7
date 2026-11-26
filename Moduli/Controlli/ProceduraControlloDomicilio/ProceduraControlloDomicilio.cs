@@ -15,37 +15,26 @@ namespace ProcedureNet7
     internal sealed class ControlloDomicilio : BaseProcedure<ArgsControlloDomicilio>
     {
         private const int MinAcademicYear = 20262027;
-        private const int PdfProgressInterval = 160;
+        private const int PdfProgressInterval = 25;
         private const int PdfMaxParallelism = 16;
-        private const int PdfQueueCapacityPerWorker = 1;
         private const int PdfSqlDownloadMaxParallelism = 4;
         private const string AllegatiDatabase = "ADISU_ALLEGATI";
 
         public string selectedAA = string.Empty;
 
         private sealed record PdfWorkItem(
+            int NumIstanza,
             DomicilioAttachmentRecord Attachment,
             DomicilioPdfExpectation Expectation,
             DomicilioControlState DestinationState);
-
-        private sealed record LoadedPdf(
-            decimal IdAllegato,
-            byte[]? Content,
-            string FileName,
-            string ContentType,
-            string? SkipReason = null);
 
         private sealed record PdfDescriptor(
             decimal IdAllegato,
             decimal? PhysicalFileId,
             long ContentLength,
             string FileName,
-            string ContentType);
-
-        private sealed record PdfStreamMetrics(
-            int Documents,
-            long Bytes,
-            long QueueWaitTicks);
+            string ContentType,
+            long ActiveFileCount);
 
         private sealed record CompletedPdfAnalysis(
             PdfWorkItem WorkItem,
@@ -70,7 +59,8 @@ namespace ProcedureNet7
                 $"proposte di rifiuto: {decisions.Count(x => x.Azione == IstanzaDomicilioReport.Rifiutare)}.");
         }
 
-        internal List<IstanzaDomicilioRecord> Analyze(ArgsControlloDomicilio args, bool forAutomation = false)
+        internal List<IstanzaDomicilioRecord> Analyze(ArgsControlloDomicilio args, bool forAutomation = false, bool useOcr = true,
+            string? unlimitedOcrUrl = null)
         {
             ValidateArguments(args);
             selectedAA = args._selectedAA.Trim();
@@ -105,7 +95,12 @@ namespace ProcedureNet7
 
             var pdfWork = BuildInstancePdfWork(candidates, forAutomation);
             Logger.LogInfo(35, $"Individuati {pdfWork.Count} documenti PDF da controllare.");
-            AnalyzePdfDocuments(pdfWork);
+            if (pdfWork.Count == 0)
+                return requests;
+
+            var attachmentIds = pdfWork.Select(x => x.Attachment.IdAllegato).Distinct().OrderBy(x => x).ToList();
+            using var pdfBatch = DownloadPdfDocuments(attachmentIds);
+            AnalyzePdfDocuments(pdfWork, pdfBatch, useOcr, unlimitedOcrUrl, startProgress: 55, endProgress: 80);
 
             if (forAutomation)
             {
@@ -118,7 +113,8 @@ namespace ProcedureNet7
                     var corrected = plans.Select(x => x.Plan!.Candidate).ToList();
                     data.BindAttachments(corrected);
                     Logger.LogInfo(80, $"Rivalutazione di {plans.Count} proposte di correzione documentate, senza modifiche al database.");
-                    AnalyzePdfDocuments(BuildInstancePdfWork(corrected, readAllPages: true));
+                    AnalyzePdfDocuments(BuildInstancePdfWork(corrected, readAllPages: true), pdfBatch, useOcr, unlimitedOcrUrl,
+                        startProgress: 80, endProgress: 90);
                     foreach (var item in plans)
                     {
                         item.Request.CorrectionCandidate = item.Plan!.Candidate;
@@ -133,7 +129,8 @@ namespace ProcedureNet7
         private static List<PdfWorkItem> BuildInstancePdfWork(IEnumerable<IstanzaDomicilioRecord> requests, bool readAllPages)
         {
             var work = new List<PdfWorkItem>();
-            foreach (var operation in requests.SelectMany(x => x.Operazioni))
+            foreach (var request in requests)
+            foreach (var operation in request.Operazioni)
             foreach (var document in operation.Documenti)
             {
                 if (document.Expectation == null || document.Attachment == null)
@@ -150,7 +147,7 @@ namespace ProcedureNet7
                     NumDomanda = source.NumDomanda
                 };
                 document.Attachment = attachment;
-                work.Add(new PdfWorkItem(attachment,
+                work.Add(new PdfWorkItem(request.NumIstanza, attachment,
                     readAllPages ? document.Expectation with { ReadAllPages = true } : document.Expectation,
                     operation.State));
             }
@@ -183,7 +180,8 @@ namespace ProcedureNet7
                 CONNECTION.Open();
         }
 
-        private void AnalyzePdfDocuments(List<PdfWorkItem> work)
+        private static void AnalyzePdfDocuments(List<PdfWorkItem> work, DomicilioPdfBatch pdfBatch,
+            bool useOcr, string? unlimitedOcrUrl, int startProgress, int endProgress)
         {
             if (work.Count == 0)
                 return;
@@ -191,39 +189,68 @@ namespace ProcedureNet7
             var byAttachment = work
                 .GroupBy(x => x.Attachment.IdAllegato)
                 .ToDictionary(x => x.Key, x => x.ToList());
-            var ids = byAttachment.Keys.OrderBy(x => x).ToList();
+            var files = byAttachment.Keys.OrderBy(x => x).Select(id => (Id: id, Pdf: pdfBatch.Find(id))).ToList();
+            foreach (var (id, file) in files)
+            {
+                var activeCount = file?.ActiveFileCount ?? 0;
+                if (activeCount > 1)
+                    foreach (var item in byAttachment[id])
+                        AddManual(item.DestinationState, "DOC_007",
+                            $"In ADISU_ALLEGATI esistono {activeCount} file attivi per l'allegato {id:0}.",
+                            "Verificare quale file sia valido.");
+            }
+            var pdfCount = files.Count(x => x.Pdf?.FilePath != null);
             var parallelism = Math.Max(1, Math.Min(Environment.ProcessorCount, PdfMaxParallelism));
-            var queueCapacity = Math.Max(parallelism, parallelism * PdfQueueCapacityPerWorker);
-            Logger.LogInfo(35,
-                $"Letture SQL per gruppi di allegati; download BLOB fino a {PdfSqlDownloadMaxParallelism} connessioni e " +
-                $"analisi iText con {parallelism} processi paralleli (coda massima {queueCapacity} PDF).");
-
-
-            using var queue = new BlockingCollection<LoadedPdf>(queueCapacity);
+            var ocrStatus = useOcr
+                ? $"OCR {(unlimitedOcrUrl == null ? "Tesseract" : "Unlimited-OCR 2")} su un massimo di " +
+                    $"{Math.Min(parallelism, DomicilioPdfOcr.MaxParallelDocuments)} PDF contemporaneamente."
+                : "OCR disattivato.";
+            Logger.LogInfo(startProgress,
+                $"Avvio analisi: {pdfCount} PDF scaricati su {files.Count} allegati da verificare, " +
+                $"fino a {parallelism} analisi parallele. {ocrStatus}");
             var completed = new ConcurrentBag<CompletedPdfAnalysis>();
             var elapsed = Stopwatch.StartNew();
             var progressLock = new object();
             var processedAttachments = 0;
-            var lastLogged = 0;
+            var analyzedPdfs = 0;
+            var lastReport = TimeSpan.Zero;
             long analyzedDocuments = 0;
             long totalPagesRead = 0;
             long totalPages = 0;
 
-            void AnalyzeLoadedPdf(LoadedPdf file)
+            void AnalyzeLoadedPdf(decimal id, DomicilioPdfBatch.FileRecord? file)
             {
-                foreach (var workItem in byAttachment[file.IdAllegato])
+                byte[]? content = null;
+                var localReadFailed = false;
+                if (file?.FilePath is string filePath)
+                {
+                    try { content = File.ReadAllBytes(filePath); }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        localReadFailed = true;
+                    }
+                }
+
+                foreach (var workItem in byAttachment[id])
                 {
                     DomicilioPdfAnalysis analysis;
                     try
                     {
-                        if (file.SkipReason != null)
+                        if (file?.TooLarge == true)
                         {
                             analysis = new DomicilioPdfAnalysis { FileAvailable = true };
                             analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_002",
-                                file.SkipReason, "Aprire e verificare manualmente il documento.");
+                                "Il documento supera il limite operativo di 20 MB e non è stato scaricato né analizzato automaticamente.",
+                                "Aprire e verificare manualmente il documento.");
+                        }
+                        else if (localReadFailed)
+                        {
+                            analysis = new DomicilioPdfAnalysis { FileAvailable = true };
+                            AddManual(analysis.State, "PDF_099", "Impossibile rileggere il PDF scaricato dalla cartella temporanea.",
+                                "Aprire e verificare manualmente il documento.");
                         }
                         else
-                            analysis = ControlloDomicilioPdfAnalyzer.Analyze(file.Content, workItem.Expectation);
+                            analysis = ControlloDomicilioPdfAnalyzer.Analyze(content, workItem.Expectation, useOcr, unlimitedOcrUrl);
                     }
                     catch (Exception)
                     {
@@ -238,58 +265,41 @@ namespace ProcedureNet7
                     completed.Add(new CompletedPdfAnalysis(
                         workItem,
                         analysis,
-                        file.FileName,
-                        file.ContentType));
+                        file?.FileName ?? string.Empty,
+                        file?.ContentType ?? string.Empty));
                     Interlocked.Increment(ref analyzedDocuments);
                     Interlocked.Add(ref totalPagesRead, analysis.PagesRead);
                     Interlocked.Add(ref totalPages, analysis.PageCount);
                 }
 
-                var processed = Interlocked.Increment(ref processedAttachments);
-                if (processed % PdfProgressInterval != 0 && processed != ids.Count)
-                    return;
-
                 lock (progressLock)
                 {
-                    if (processed <= lastLogged)
+                    var processed = ++processedAttachments;
+                    if (content is { Length: > 0 }) analyzedPdfs++;
+                    var now = elapsed.Elapsed;
+                    if (processed != 1 && processed != files.Count && processed % PdfProgressInterval != 0 &&
+                        now - lastReport < TimeSpan.FromSeconds(10))
                         return;
-                    lastLogged = processed;
-                    var rate = processed / Math.Max(0.001d, elapsed.Elapsed.TotalSeconds);
-                    var remainingSeconds = rate <= 0d ? 0d : (ids.Count - processed) / rate;
-                    var progress = 35 + (int)(45d * processed / ids.Count);
-                    var documentCount = Math.Max(1L, Interlocked.Read(ref analyzedDocuments));
-                    var averagePages = (double)Interlocked.Read(ref totalPagesRead) / documentCount;
+                    lastReport = now;
+                    var rate = processed / Math.Max(0.001d, now.TotalSeconds);
+                    var remainingSeconds = (files.Count - processed) / rate;
+                    var progress = startProgress + (int)((endProgress - startProgress) * (double)processed / files.Count);
                     Logger.LogInfo(progress,
-                        $"Analizzati {processed} di {ids.Count} allegati ({rate:F1} PDF/s; " +
-                        $"{averagePages:F1} pagine lette/PDF; coda {queue.Count}/{queueCapacity}; " +
+                        $"Analizzati {analyzedPdfs}/{pdfCount} PDF, verificati {processed}/{files.Count} allegati " +
+                        $"({rate:F1} allegati/s; " +
                         $"tempo residuo stimato {FormatDuration(remainingSeconds)}).");
                 }
             }
 
-            var workers = Enumerable.Range(0, parallelism)
-                .Select(_ => Task.Factory.StartNew(
-                    () =>
-                    {
-                        foreach (var file in queue.GetConsumingEnumerable())
-                            AnalyzeLoadedPdf(file);
-                    },
-                    CancellationToken.None,
-                    TaskCreationOptions.LongRunning,
-                    TaskScheduler.Default))
-                .ToArray();
-
-            try
-            {
-                StreamPdfDocuments(byAttachment, queue);
-            }
-            finally
-            {
-                queue.CompleteAdding();
-                Task.WaitAll(workers);
-            }
+            Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = parallelism },
+                file => AnalyzeLoadedPdf(file.Id, file.Pdf));
 
             // Il merge è sequenziale e ordinato: nessuna struttura di esito viene
             // modificata dai worker e il CSV rimane deterministico.
+            ControlloDomicilioPdfAnalyzer.ApplyLinkedMunicipalities(completed
+                .Where(r => r.WorkItem.Expectation.ReadAllPages &&
+                    !r.WorkItem.DestinationState.Findings.Any(f => f.Code is "DOC_007" or "IST_DOC_06"))
+                .Select(r => (r.WorkItem.NumIstanza, r.WorkItem.Attachment.IdAllegato, r.WorkItem.Expectation, r.Analysis)));
             foreach (var result in completed
                          .OrderBy(x => x.WorkItem.Attachment.IdAllegato)
                          .ThenBy(x => x.WorkItem.Expectation.Type))
@@ -301,38 +311,45 @@ namespace ProcedureNet7
             }
 
             var finalDocumentCount = Math.Max(1L, analyzedDocuments);
-            Logger.LogInfo(80,
-                $"Analisi PDF completata in {FormatDuration(elapsed.Elapsed.TotalSeconds)}: {ids.Count} allegati, " +
-                $"media {(ids.Count / Math.Max(0.001d, elapsed.Elapsed.TotalSeconds)):F1} PDF/s; " +
+            var cacheSummary = useOcr && unlimitedOcrUrl != null
+                ? $" Verifiche con trascrizione OCR riutilizzata: {completed.Count(r => r.Analysis.UsedCachedTranscription)}."
+                : string.Empty;
+            Logger.LogInfo(endProgress,
+                $"Analisi PDF completata in {FormatDuration(elapsed.Elapsed.TotalSeconds)}: {analyzedPdfs}/{pdfCount} PDF analizzati, " +
+                $"{files.Count} allegati verificati; " +
                 $"lette {(double)totalPagesRead / finalDocumentCount:F1} pagine/PDF su " +
-                $"{(double)totalPages / finalDocumentCount:F1} presenti.");
+                $"{(double)totalPages / finalDocumentCount:F1} presenti.{cacheSummary}");
         }
 
-        private void StreamPdfDocuments(
-            IReadOnlyDictionary<decimal, List<PdfWorkItem>> byAttachment,
-            BlockingCollection<LoadedPdf> destination)
+        private DomicilioPdfBatch DownloadPdfDocuments(IReadOnlyList<decimal> ids)
         {
-            var streamElapsed = Stopwatch.StartNew();
-            var descriptors = LoadPdfDescriptors(byAttachment);
-            var downloadable = descriptors.Where(x => x.PhysicalFileId.HasValue &&
-                x.ContentLength <= ControlloDomicilioPdfAnalyzer.MaxPdfBytes).ToList();
-            long missingQueueWaitTicks = 0;
-
-            foreach (var descriptor in descriptors.Where(x => !x.PhysicalFileId.HasValue ||
-                         x.ContentLength > ControlloDomicilioPdfAnalyzer.MaxPdfBytes))
+            var elapsed = Stopwatch.StartNew();
+            Logger.LogInfo(35, $"Avvio download PDF: {ids.Count} allegati da verificare, fino a {PdfSqlDownloadMaxParallelism} connessioni SQL parallele.");
+            var descriptors = LoadPdfDescriptors(ids);
+            var batch = DomicilioPdfBatch.Download(ids.Count, staged =>
             {
-                var queueWaitStart = Stopwatch.GetTimestamp();
-                destination.Add(new LoadedPdf(
-                    descriptor.IdAllegato,
-                    null,
-                    descriptor.FileName,
-                    descriptor.ContentType,
-                    descriptor.ContentLength > ControlloDomicilioPdfAnalyzer.MaxPdfBytes
-                        ? "Il documento supera il limite operativo di 20 MB e non è stato scaricato né analizzato automaticamente."
-                        : null));
-                missingQueueWaitTicks += Stopwatch.GetTimestamp() - queueWaitStart;
-            }
+                var downloadable = new List<PdfDescriptor>();
+                foreach (var descriptor in descriptors)
+                {
+                    var tooLarge = descriptor.ContentLength > ControlloDomicilioPdfAnalyzer.MaxPdfBytes;
+                    if (!descriptor.PhysicalFileId.HasValue || tooLarge)
+                        staged.Add(descriptor.IdAllegato, null, descriptor.FileName, descriptor.ContentType, descriptor.ActiveFileCount, tooLarge);
+                    else
+                        downloadable.Add(descriptor);
+                }
+                DownloadPdfFiles(downloadable, staged);
+            }, progress => Logger.LogInfo(35 + (int)(20d * progress.Resolved / progress.Total),
+                $"Scaricati {progress.Downloaded}/{progress.Total} PDF ({progress.Bytes / (double)(1024 * 1024):F1} MB), " +
+                $"mancanti o vuoti {progress.Missing}, oltre il limite {progress.TooLarge}."));
 
+            var summary = batch.Summary;
+            Logger.LogInfo(55, $"Download PDF completato in {FormatDuration(elapsed.Elapsed.TotalSeconds)}: " +
+                $"{summary.Downloaded}/{summary.Total} PDF salvati, mancanti o vuoti {summary.Missing}, oltre il limite {summary.TooLarge}.");
+            return batch;
+        }
+
+        private void DownloadPdfFiles(List<PdfDescriptor> downloadable, DomicilioPdfBatch destination)
+        {
             if (downloadable.Count == 0)
                 return;
 
@@ -340,15 +357,13 @@ namespace ProcedureNet7
                 1,
                 Math.Min(PdfSqlDownloadMaxParallelism, downloadable.Count));
             var connections = new List<SqlConnection>(requestedConnections);
-            var metrics = new List<PdfStreamMetrics>();
-
             try
             {
                 for (var index = 0; index < requestedConnections; index++)
                 {
                     var clonedConnection = (SqlConnection)((ICloneable)CONNECTION!).Clone();
-                    clonedConnection.Open();
                     connections.Add(clonedConnection);
+                    clonedConnection.Open();
                 }
             }
             catch (Exception ex)
@@ -364,7 +379,7 @@ namespace ProcedureNet7
 
             if (connections.Count == 0)
             {
-                metrics.Add(StreamPdfShard(CONNECTION!, downloadable, destination));
+                DownloadPdfShard(CONNECTION!, downloadable, destination);
             }
             else
             {
@@ -376,10 +391,9 @@ namespace ProcedureNet7
                 {
                     var downloadTasks = connections
                         .Select((connection, index) => Task.Run(() =>
-                            StreamPdfShard(connection, shards[index], destination)))
+                            DownloadPdfShard(connection, shards[index], destination)))
                         .ToArray();
                     Task.WaitAll(downloadTasks);
-                    metrics.AddRange(downloadTasks.Select(x => x.Result));
                 }
                 finally
                 {
@@ -387,24 +401,12 @@ namespace ProcedureNet7
                         connection.Dispose();
                 }
             }
-
-            var streamedDocuments = metrics.Sum(x => x.Documents) + descriptors.Count(x => !x.PhysicalFileId.HasValue);
-            var totalBytes = metrics.Sum(x => x.Bytes);
-            var queueWaitTicks = metrics.Sum(x => x.QueueWaitTicks) + missingQueueWaitTicks;
-            var queueWait = TimeSpan.FromSeconds((double)queueWaitTicks / Stopwatch.Frequency);
-            var effectiveReadSeconds = Math.Max(0.001d, streamElapsed.Elapsed.TotalSeconds);
-            var megabytes = totalBytes / 1024d / 1024d;
-            Logger.LogInfo(null,
-                $"Flusso SQL completato: {streamedDocuments} allegati, {megabytes:F1} MB; " +
-                $"tempo totale {FormatDuration(effectiveReadSeconds)} ({megabytes / effectiveReadSeconds:F1} MB/s), " +
-                $"attesa cumulativa della coda iText {FormatDuration(queueWait.TotalSeconds)}.");
         }
 
-        private List<PdfDescriptor> LoadPdfDescriptors(
-            IReadOnlyDictionary<decimal, List<PdfWorkItem>> byAttachment)
+        private List<PdfDescriptor> LoadPdfDescriptors(IReadOnlyList<decimal> ids)
         {
-            var descriptors = new List<PdfDescriptor>(byAttachment.Count);
-            foreach (var batch in byAttachment.Keys.OrderBy(x => x).Chunk(500))
+            var descriptors = new List<PdfDescriptor>(ids.Count);
+            foreach (var batch in ids.Chunk(500))
             {
                 using var command = CONNECTION!.CreateCommand();
                 command.CommandTimeout = 3600;
@@ -433,15 +435,10 @@ ORDER BY r.ID_ALLEGATO OPTION (RECOMPILE);";
                 while (reader.Read())
                 {
                     var id = ReadDecimal(reader, "Id_Allegato_Adisu");
-                    var activeCount = Convert.ToInt64(reader["ACTIVE_COUNT"], CultureInfo.InvariantCulture);
-                    if (activeCount > 1)
-                        foreach (var item in byAttachment[id])
-                            AddManual(item.DestinationState, "DOC_007",
-                                $"In ADISU_ALLEGATI esistono {activeCount} file attivi per l'allegato {id:0}.",
-                                "Verificare quale file sia valido.");
                     descriptors.Add(new PdfDescriptor(id, ReadNullableDecimal(reader, "ID_FILE"),
                         Convert.ToInt64(reader["CONTENT_LENGTH"], CultureInfo.InvariantCulture),
-                        ReadString(reader, "doc_name"), ReadString(reader, "doc_type")));
+                        ReadString(reader, "doc_name"), ReadString(reader, "doc_type"),
+                        Convert.ToInt64(reader["ACTIVE_COUNT"], CultureInfo.InvariantCulture)));
                 }
             }
             return descriptors;
@@ -486,14 +483,11 @@ ORDER BY r.ID_ALLEGATO OPTION (RECOMPILE);";
             return partitions;
         }
 
-        private static PdfStreamMetrics StreamPdfShard(
+        private static void DownloadPdfShard(
             SqlConnection connection,
             IReadOnlyCollection<PdfDescriptor> descriptors,
-            BlockingCollection<LoadedPdf> destination)
+            DomicilioPdfBatch destination)
         {
-            long queueWaitTicks = 0;
-            long totalBytes = 0;
-            var documents = 0;
             foreach (var batch in descriptors.Chunk(500))
             {
                 using var command = connection.CreateCommand();
@@ -517,24 +511,12 @@ ORDER BY a.id_allegato;";
                         var length = Convert.ToInt64(reader["CONTENT_LENGTH"], CultureInfo.InvariantCulture);
                         var tooLarge = length > ControlloDomicilioPdfAnalyzer.MaxPdfBytes;
                         var content = tooLarge ? null : ReadBytes(reader, "file");
-                        totalBytes += content?.LongLength ?? 0L;
-                        Enqueue(descriptor, content, tooLarge
-                            ? "Il documento supera il limite operativo di 20 MB e non è stato analizzato automaticamente."
-                            : null);
+                        destination.Add(descriptor.IdAllegato, content, descriptor.FileName, descriptor.ContentType,
+                            descriptor.ActiveFileCount, tooLarge);
                     }
                 }
                 foreach (var missing in batch.Where(x => !received.Contains(x.PhysicalFileId!.Value)))
-                    Enqueue(missing, null, null);
-            }
-            return new PdfStreamMetrics(documents, totalBytes, queueWaitTicks);
-
-            void Enqueue(PdfDescriptor descriptor, byte[]? content, string? skipReason)
-            {
-                var queueWaitStart = Stopwatch.GetTimestamp();
-                destination.Add(new LoadedPdf(descriptor.IdAllegato, content,
-                    descriptor.FileName, descriptor.ContentType, skipReason));
-                queueWaitTicks += Stopwatch.GetTimestamp() - queueWaitStart;
-                documents++;
+                    destination.Add(missing.IdAllegato, null, missing.FileName, missing.ContentType, missing.ActiveFileCount);
             }
         }
 

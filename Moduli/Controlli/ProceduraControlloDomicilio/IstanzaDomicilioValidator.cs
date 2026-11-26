@@ -413,13 +413,16 @@ namespace ProcedureNet7
                 var full = op.Operazione == 1 || p.TipoContrattoTitoloOneroso.HasValue;
                 if (full) AddContractDocuments(op, cf, d, c, true, p.AddSubentro);
                 else if (p.AddSubentro) AddDocument(op, "SUBENTRO", op.IdAllegatoSubentro,
-                    new(DomicilioPdfDocumentType.Subentro, cf, c.NumeroSerieSubentro, null, c.DataInizioSubentro, null, c.NumeroSerie), null);
+                    new(DomicilioPdfDocumentType.Subentro, cf, c.NumeroSerieSubentro, null, c.DataInizioSubentro, null, c.NumeroSerie,
+                        ComuneDomicilio: d.Comune, CodComuneDomicilio: d.CodComune), null);
             }
             else if (target is ProrogaControlRecord e)
             {
-                var c2 = domicili.SelectMany(x => x.Contratti).First(x => x.Proroghe.Contains(e));
+                var (domicilio, contratto) = domicili.SelectMany(d => d.Contratti, (d, c) => (d, c))
+                    .First(pair => pair.c.Proroghe.Contains(e));
                 AddDocument(op, "PROROGA", op.IdAllegatoProroga,
-                    new(DomicilioPdfDocumentType.Proroga, cf, e.NumeroSerie, null, e.DataDecorrenza, e.DataScadenza, c2.NumeroSerie),
+                    new(DomicilioPdfDocumentType.Proroga, cf, e.NumeroSerie, null, e.DataDecorrenza, e.DataScadenza, contratto.NumeroSerie,
+                        ComuneDomicilio: domicilio.Comune, CodComuneDomicilio: domicilio.CodComune),
                     op.Operazione == 2 ? e.Allegati : null);
             }
             else if (target is DomicilioControlRecord d && op.Operazione == 2)
@@ -433,7 +436,7 @@ namespace ProcedureNet7
                     if (contractPayload?.TipoContrattoTitoloOneroso.HasValue == true) continue;
                     if (contractPayload?.AddSubentro == true)
                         AddDocument(op, "CONTRATTO", null,
-                            c2.IsLocazione ? new(DomicilioPdfDocumentType.Contratto, cf, c2.NumeroSerie, c2.DataRegistrazione, c2.DataInizio, c2.DataFine, null, false, d.Comune)
+                            c2.IsLocazione ? new(DomicilioPdfDocumentType.Contratto, cf, c2.NumeroSerie, c2.DataRegistrazione, c2.DataInizio, c2.DataFine, null, false, d.Comune, CodComuneDomicilio: d.CodComune)
                                 : new(DomicilioPdfDocumentType.ContrattoEnte, cf, null, null, c2.DataInizio, c2.DataFine, null,
                                     ComuneDomicilio: d.Comune, TipoEnte: c2.TipoEnte, DenominazioneEnte: c2.DenominazioneEnte,
                                     ImportoMensileRata: decimal.TryParse(c2.ImportoRata, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var oldAmount) ? oldAmount : null),
@@ -447,14 +450,15 @@ namespace ProcedureNet7
             ContrattoControlRecord c, bool proposed, bool newSubentry)
         {
             AddDocument(op, "CONTRATTO", proposed ? op.IdAllegatoContratto : null,
-                c.IsLocazione ? new(DomicilioPdfDocumentType.Contratto, cf, c.NumeroSerie, c.DataRegistrazione, c.DataInizio, c.DataFine, null, !c.HasSubentro, d.Comune)
+                c.IsLocazione ? new(DomicilioPdfDocumentType.Contratto, cf, c.NumeroSerie, c.DataRegistrazione, c.DataInizio, c.DataFine, null, !c.HasSubentro, d.Comune, CodComuneDomicilio: d.CodComune)
                     : new(DomicilioPdfDocumentType.ContrattoEnte, cf, null, null, c.DataInizio, c.DataFine, null,
                         ComuneDomicilio: d.Comune, TipoEnte: c.TipoEnte, DenominazioneEnte: c.DenominazioneEnte,
                         ImportoMensileRata: decimal.TryParse(c.ImportoRata, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount) ? amount : null),
                 !proposed || op.Operazione == 2 ? c.AllegatiContratto : null);
             if (c.HasSubentro)
                 AddDocument(op, "SUBENTRO", proposed ? op.IdAllegatoSubentro : null,
-                    new(DomicilioPdfDocumentType.Subentro, cf, c.NumeroSerieSubentro, null, c.DataInizioSubentro, null, c.NumeroSerie),
+                    new(DomicilioPdfDocumentType.Subentro, cf, c.NumeroSerieSubentro, null, c.DataInizioSubentro, null, c.NumeroSerie,
+                        ComuneDomicilio: d.Comune, CodComuneDomicilio: d.CodComune),
                     newSubentry ? null : c.AllegatiSubentro);
             if (c.TipoContratto == 1 && c.TipoEnte == "SE")
                 AddDocument(op, "LEARNING_AGREEMENT", proposed ? op.IdAllegatoLearningAgreement : null,

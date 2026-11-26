@@ -46,7 +46,7 @@ namespace ProcedureNet7
             MarkDuplicates(items);
 
             var result = new DataTable();
-            foreach (string name in new[] { "ID_TICKET", "AZIONE_PROPOSTA", "REGOLA", "MOTIVO", "EVIDENZE",
+            foreach (string name in new[] { "ID_TICKET", TicketViolenceCheck.ColumnName, "AZIONE_PROPOSTA", "REGOLA", "MOTIVO", "EVIDENZE",
                 "TICKET_PRINCIPALE", "ANNO_ACCADEMICO_RICHIESTA", "NUM_DOMANDA", "CODFISC", "CATEGORIA",
                 "SOTTOCATEGORIA", "OGGETTO", "PRIMO_MSG_STUDENTE" })
                 result.Columns.Add(name, typeof(string));
@@ -64,6 +64,8 @@ namespace ProcedureNet7
                 DataRow row = result.NewRow();
                 foreach (string name in new[] { "ID_TICKET", "CODFISC", "CATEGORIA", "SOTTOCATEGORIA", "OGGETTO", "PRIMO_MSG_STUDENTE" })
                     row[name] = Read(item.Source, name);
+                row[TicketViolenceCheck.ColumnName] = TicketViolenceCheck.Evaluate(
+                    Read(item.Source, "PRIMO_MSG_STUDENTE"), Read(item.Source, "OGGETTO"));
                 row["AZIONE_PROPOSTA"] = item.CanClose ? "CHIUDERE" : "VERIFICARE";
                 row["REGOLA"] = item.DuplicateOf.Length > 0 ? "DUPLICATO" : string.Join(" | ", item.Checks.Select(c => c.Code).Distinct());
                 row["MOTIVO"] = item.DuplicateOf.Length > 0

@@ -23,10 +23,22 @@ namespace ProcedureNet7
             _masterForm.inProcedure = true;
             AssignArgumentValues(args);
         }
-        private void FinalizeProcedure()
+        private void FinalizeProcedure(bool completata, bool pagamentoNonConfermato)
         {
-            _masterForm.inProcedure = false;
-            Logger.LogInfo(100, "Procedura Completa.");
+            if (_masterForm != null)
+                _masterForm.inProcedure = false;
+
+            if (completata)
+                Logger.LogInfo(100, "Procedura Completa.");
+            else
+            {
+                Logger.LogWarning(100, "Procedura interrotta.");
+                if (pagamentoNonConfermato && !IsSimulazione && _flussoWrittenCF.Count > 0)
+                    Logger.LogWarning(null,
+                        $"Pagamento {codTipoPagamento}/{categoriaPagam} non confermato. " +
+                        "I flussi già generati per questo pagamento non devono essere utilizzati: " +
+                        "le registrazioni contabili non sono state confermate.");
+            }
         }
         private void AssignArgumentValues(ArgsPagamenti args)
         {
@@ -209,7 +221,7 @@ namespace ProcedureNet7
             {
                 Logger.LogInfo(null, "Verifica o creazione della tabella del database completata");
                 exitProcedureEarly = true;
-                sqlTransaction?.Commit();
+                CompleteTransaction();
                 return;
             }
 
@@ -489,49 +501,6 @@ namespace ProcedureNet7
                 };
                 _ = deleteGeneraliCmd.ExecuteNonQuery();
 
-                Logger.LogInfo(10, "Starting index optimization");
-
-                // Step to reorganize/rebuild indexes
-                string rebuildIndexesSQL = @"
-                    DECLARE @TableName NVARCHAR(255);
-                    DECLARE IndexCursor CURSOR FOR
-                    SELECT DISTINCT t.name 
-                    FROM sys.indexes i 
-                    INNER JOIN sys.tables t ON i.object_id = t.object_id 
-                    WHERE t.name IN ('MOVIMENTI_CONTABILI_ELEMENTARI', 'MOVIMENTI_CONTABILI_GENERALI', 'STATI_DEL_MOVIMENTO_CONTABILE');
-
-                    OPEN IndexCursor;
-                    FETCH NEXT FROM IndexCursor INTO @TableName;
-
-                    WHILE @@FETCH_STATUS = 0
-                    BEGIN
-                        EXEC ('ALTER INDEX ALL ON ' + @TableName + ' REORGANIZE;');
-                        FETCH NEXT FROM IndexCursor INTO @TableName;
-                    END;
-
-                    CLOSE IndexCursor;
-                    DEALLOCATE IndexCursor;
-                ";
-                SqlCommand rebuildIndexesCmd = new(rebuildIndexesSQL, CONNECTION, sqlTransaction)
-                {
-                    CommandTimeout = 9000000
-                };
-                _ = rebuildIndexesCmd.ExecuteNonQuery();
-
-                // Step to update statistics
-                Logger.LogInfo(10, "Updating statistics");
-                string updateStatisticsSQL = @"
-                    UPDATE STATISTICS [MOVIMENTI_CONTABILI_ELEMENTARI];
-                    UPDATE STATISTICS [MOVIMENTI_CONTABILI_GENERALI];
-                    UPDATE STATISTICS [STATI_DEL_MOVIMENTO_CONTABILE];
-                 ";
-                SqlCommand updateStatisticsCmd = new(updateStatisticsSQL, CONNECTION, sqlTransaction)
-                {
-                    CommandTimeout = 9000000
-                };
-                _ = updateStatisticsCmd.ExecuteNonQuery();
-
-                Logger.LogInfo(10, "Index and statistics optimization complete.");
             }
             catch
             {

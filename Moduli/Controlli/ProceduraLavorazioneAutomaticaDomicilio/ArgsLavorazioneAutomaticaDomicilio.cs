@@ -9,5 +9,7 @@ namespace ProcedureNet7
         [Required]
         public string CartellaCsv = string.Empty;
         public bool Simulazione = true;
+        public bool UsaOcr = true;
+        public string? UnlimitedOcrUrl;
     }
 }

@@ -76,6 +76,8 @@ namespace ProcedureNet7
                 Add(finding.Severity, finding.Code, finding.Description, finding.OfficeAction);
         }
 
+        public void ResolveMissingMunicipality() => _findings.RemoveAll(f => f.Code == "PDF_024");
+
         public DomicilioControlState Copy()
         {
             var copy = new DomicilioControlState();
@@ -213,9 +215,11 @@ namespace ProcedureNet7
         string? ContractReference,
         bool RequireFiscalCode = true, string ComuneDomicilio = "",
         string TipoEnte = "", string DenominazioneEnte = "", decimal? ImportoMensileRata = null,
-        bool ReadAllPages = false);
+        bool ReadAllPages = false, string CodComuneDomicilio = "");
 
     internal sealed record DomicilioPdfFieldEvidence(string Field, string Value, int Page, string Label);
+
+    internal sealed record DomicilioReceiptProperty(string ContractKey, string ContractIdentifier, bool? Matches, int Page);
 
     internal sealed class DomicilioPdfAnalysis
     {
@@ -227,6 +231,10 @@ namespace ProcedureNet7
         public bool? DataCoherent { get; set; }
         public int PageCount { get; set; }
         public int PagesRead { get; set; }
+        public bool UsedCachedTranscription { get; set; }
+        public List<int> OcrPages { get; } = new();
+        public List<int> HybridOcrPages { get; } = new();
+        public List<string> OcrWarnings { get; } = new();
         public string ExtractedReference { get; set; } = string.Empty;
         public DateTime? ExtractedRegistrationDate { get; set; }
         public DateTime? ExtractedStartDate { get; set; }
@@ -236,6 +244,8 @@ namespace ProcedureNet7
         public string ExtractedEnteName { get; set; } = string.Empty;
         public decimal? ExtractedMonthlyAmount { get; set; }
         public string ExtractedMunicipality { get; set; } = string.Empty;
+        public DomicilioReceiptProperty? ReceiptProperty { get; set; }
+        public bool MunicipalityAbsent { get; set; }
         public List<DomicilioPdfFieldEvidence> DocumentedCorrections { get; } = new();
         public bool CanProposeCorrections { get; set; }
         public DomicilioControlState State { get; } = new();
@@ -250,7 +260,9 @@ namespace ProcedureNet7
             string.IsNullOrWhiteSpace(ExtractedEnteType) ? null : $"Tipo ente={ExtractedEnteType}",
             string.IsNullOrWhiteSpace(ExtractedEnteName) ? null : $"Denominazione ente={ExtractedEnteName}",
             ExtractedMonthlyAmount.HasValue ? $"Rata mensile={ExtractedMonthlyAmount.Value.ToString("0.00", CultureInfo.InvariantCulture)}" : null,
-            string.IsNullOrWhiteSpace(ExtractedMunicipality) ? null : $"Comune immobile={ExtractedMunicipality}"
+            string.IsNullOrWhiteSpace(ExtractedMunicipality) ? null : $"Comune immobile={ExtractedMunicipality}",
+            OcrPages.Count == 0 ? null : $"OCR pagine={string.Join(", ", OcrPages)}",
+            HybridOcrPages.Count == 0 ? null : $"iText+OCR pagine={string.Join(", ", HybridOcrPages)}"
         }.Where(x => !string.IsNullOrWhiteSpace(x)));
     }
 

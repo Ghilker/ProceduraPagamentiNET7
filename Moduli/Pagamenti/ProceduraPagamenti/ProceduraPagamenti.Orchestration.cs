@@ -21,6 +21,7 @@ namespace ProcedureNet7
         public override void RunProcedure(ArgsPagamenti args)
         {
             Logger.LogDebug(null, "Inizio dell'esecuzione di RunProcedure");
+            bool proceduraCompletata = false;
             try
             {
                 if (CONNECTION == null)
@@ -76,7 +77,6 @@ namespace ProcedureNet7
                         {
                             Logger.LogDebug(null, "Connessione o transazione null in ciclo automatico");
                             _masterForm.inProcedure = false;
-                            sqlTransaction?.Rollback();
                             return;
                         }
 
@@ -133,7 +133,7 @@ namespace ProcedureNet7
                             if (exitProcedureEarly)
                             {
                                 Logger.LogDebug(null, "Uscita anticipata dopo CheckAndCreateDatabaseTable (auto)");
-                                sqlTransaction.Rollback();
+                                proceduraCompletata = selectedTipoProcedura == TipologiaProcedura.SoloCreazioneTabella.ToCode();
                                 break;
                             }
 
@@ -141,7 +141,6 @@ namespace ProcedureNet7
                             if (exitProcedureEarly)
                             {
                                 Logger.LogDebug(null, "Uscita anticipata dopo HandleFiltroManuale (auto)");
-                                sqlTransaction.Rollback();
                                 break;
                             }
 
@@ -149,7 +148,6 @@ namespace ProcedureNet7
                             if (exitProcedureEarly)
                             {
                                 Logger.LogDebug(null, "Uscita anticipata dopo ClearMovimentiIfNeeded (auto)");
-                                sqlTransaction.Rollback();
                                 break;
                             }
 
@@ -170,12 +168,13 @@ namespace ProcedureNet7
                         {
                             Logger.LogError(null,
                                 $"Errore nel ciclo automatico per {cfg.CodTipoPagam}/{cfg.CategoriaPagam}: {ex.Message}");
-                            sqlTransaction?.Rollback();
                             throw;
                         }
                     }
 
-                    // riepilogo finale solo informativo (i commit sono già stati fatti per ogni ciclo)
+                    if (exitProcedureEarly)
+                        return;
+
                     // riepilogo finale solo informativo (i commit sono già stati fatti per ogni ciclo)
                     _masterForm.Invoke((MethodInvoker)delegate
                     {
@@ -228,8 +227,7 @@ namespace ProcedureNet7
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
                     });
-
-
+                    proceduraCompletata = true;
                     return;
                 }
 
@@ -240,7 +238,6 @@ namespace ProcedureNet7
                     {
                         Logger.LogDebug(null, "Uscita anticipata da RunProcedure: connessione o transazione null");
                         _masterForm.inProcedure = false;
-                        sqlTransaction?.Rollback();
                         return;
                     }
                     // INTERATTIVO: un tipo di pagamento alla volta
@@ -249,7 +246,6 @@ namespace ProcedureNet7
                     {
                         Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandleTipoPagamentoDialog");
                         _masterForm.inProcedure = false;
-                        sqlTransaction?.Rollback();
                         return;
                     }
 
@@ -258,7 +254,6 @@ namespace ProcedureNet7
                     {
                         Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandlePagamentoSettingsDialog");
                         _masterForm.inProcedure = false;
-                        sqlTransaction?.Rollback();
                         return;
                     }
 
@@ -267,7 +262,6 @@ namespace ProcedureNet7
                     {
                         Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandleTableNameSelectionDialog");
                         _masterForm.inProcedure = false;
-                        sqlTransaction?.Rollback();
                         return;
                     }
 
@@ -276,7 +270,6 @@ namespace ProcedureNet7
                     {
                         Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandleRiepilogoPagamentiDialog");
                         _masterForm.inProcedure = false;
-                        sqlTransaction?.Rollback();
                         return;
                     }
 
@@ -285,7 +278,7 @@ namespace ProcedureNet7
                     {
                         Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo CheckAndCreateDatabaseTable");
                         _masterForm.inProcedure = false;
-                        sqlTransaction?.Rollback();
+                        proceduraCompletata = selectedTipoProcedura == TipologiaProcedura.SoloCreazioneTabella.ToCode();
                         return;
                     }
 
@@ -294,7 +287,6 @@ namespace ProcedureNet7
                     {
                         Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo HandleFiltroManuale");
                         _masterForm.inProcedure = false;
-                        sqlTransaction?.Rollback();
                         return;
                     }
 
@@ -303,7 +295,6 @@ namespace ProcedureNet7
                     {
                         Logger.LogDebug(null, "Uscita anticipata da RunProcedure dopo ClearMovimentiIfNeeded");
                         _masterForm.inProcedure = false;
-                        sqlTransaction?.Rollback();
                         return;
                     }
 
@@ -397,11 +388,11 @@ namespace ProcedureNet7
                         WriteFinalCountsLog(isAutomatic: false);
 
                         CompleteTransaction();
+                        proceduraCompletata = true;
                     }
                     else
                     {
                         Logger.LogInfo(null, "Procedura chiusa dall'utente");
-                        sqlTransaction?.Rollback();
                     }
                 });
 
@@ -409,18 +400,14 @@ namespace ProcedureNet7
             catch (Exception ex)
             {
                 Logger.LogError(null, $"Errore: {ex.Message}");
-                sqlTransaction?.Rollback();
                 throw;
             }
             finally
             {
-                if (IsSimulazione)
-                {
-                    sqlTransaction?.Dispose();
-                    sqlTransaction = null;
-                }
+                bool pagamentoNonConfermato = sqlTransaction != null;
+                RollbackTransaction();
                 Logger.LogDebug(100, "Fine dell'esecuzione di RunProcedure");
-                FinalizeProcedure();
+                FinalizeProcedure(proceduraCompletata, pagamentoNonConfermato);
             }
         }
         private void CompleteTransaction()
@@ -433,12 +420,36 @@ namespace ProcedureNet7
             sqlTransaction = null;
         }
 
+        private void RollbackTransaction()
+        {
+            var transaction = sqlTransaction;
+            sqlTransaction = null;
+            if (transaction == null)
+                return;
+
+            try
+            {
+                using (transaction)
+                {
+                    // SQL Server may already have rolled back a deadlock victim.
+                    if (transaction.Connection != null)
+                        transaction.Rollback();
+                }
+            }
+            catch (Exception ex) when (ex is SqlException || ex is InvalidOperationException)
+            {
+                Logger.LogWarning(null, $"Errore durante la chiusura della transazione: {ex.Message}");
+            }
+        }
+
         private void ResetStatoPerCiclo()
         {
             // Collezioni per-studente
             studentiDaPagare.Clear();
             studentiConErroriPA.Clear();
             impegniList.Clear();
+            _flussoWrittenCF.Clear();
+            _flussoFilesByCF.Clear();
 
             // Filtri e where dinamico
             dictQueryWhere.Clear();

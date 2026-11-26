@@ -369,3 +369,8 @@ work/DomicilioAutomationPublish/
 work/DomicilioAutomationBackendHarnessBuild/
 work/DomicilioAutomationBackend/
 work/domicilio-*.log
+
+# Local large binaries and model files
+/work/DomicilioOcrSingleFile/DomicilioPdfOcr.exe
+/work/domicilio-cf-comuni-replay/host-baseline/runtimes/win-x64/native/OpenCvSharpExtern.dll
+/work/domicilio-estrazione-migliorata/DrosoAssets/brain/visual-graph.pt

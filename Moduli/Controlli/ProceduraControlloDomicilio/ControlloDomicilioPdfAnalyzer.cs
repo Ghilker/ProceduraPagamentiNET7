@@ -1,9 +1,13 @@
 using System.Globalization;
+using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
+using iText.Kernel.Pdf.Canvas.Parser.Data;
 using iText.Kernel.Pdf.Canvas.Parser.Listener;
+using Matrix = iText.Kernel.Geom.Matrix;
+using PdfRectangle = iText.Kernel.Geom.Rectangle;
 
 namespace ProcedureNet7
 {
@@ -19,7 +23,8 @@ namespace ProcedureNet7
             Regex.CacheSize = Math.Max(Regex.CacheSize, 128);
         }
 
-        public static DomicilioPdfAnalysis Analyze(byte[]? file, DomicilioPdfExpectation expectation)
+        public static DomicilioPdfAnalysis Analyze(byte[]? file, DomicilioPdfExpectation expectation, bool useOcr = true,
+            string? unlimitedOcrUrl = null, HttpClient? unlimitedOcrClient = null)
         {
             var analysis = new DomicilioPdfAnalysis
             {
@@ -59,10 +64,14 @@ namespace ProcedureNet7
             PdfExtractedData extracted;
             try
             {
-                extracted = ReadPdf(file, expectation);
+                extracted = ReadPdf(file, expectation, useOcr, unlimitedOcrUrl, unlimitedOcrClient);
                 analysis.PdfValid = true;
                 analysis.PageCount = extracted.PageCount;
                 analysis.PagesRead = extracted.PagesRead;
+                analysis.UsedCachedTranscription = extracted.UsedCachedTranscription;
+                analysis.OcrPages.AddRange(extracted.OcrPages);
+                analysis.HybridOcrPages.AddRange(extracted.HybridOcrPages);
+                analysis.OcrWarnings.AddRange(extracted.OcrWarnings);
             }
             catch (Exception ex)
             {
@@ -74,12 +83,18 @@ namespace ProcedureNet7
                 return analysis;
             }
 
+            if (extracted.OcrWarnings.Count > 0)
+                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_OCR_REVIEW",
+                    string.Join(" ", extracted.OcrWarnings),
+                    "Verificare le pagine indicate sul documento originale; l'esito OCR non consente la lavorazione automatica.");
+
             if (extracted.FailedPages.Count > 0)
             {
                 analysis.State.Add(
                     DomicilioControlSeverity.VerificaManuale,
                     "PDF_019",
-                    $"iText non ha potuto estrarre il testo dalle pagine {string.Join(", ", extracted.FailedPages)}.",
+                    $"Non è stato possibile estrarre il testo dalle pagine {string.Join(", ", extracted.FailedPages)}" +
+                    (useOcr ? ", neppure tramite OCR." : ". OCR disattivato."),
                     "Aprire e verificare manualmente le pagine indicate; le altre pagine sono state comunque analizzate.");
             }
 
@@ -88,30 +103,40 @@ namespace ProcedureNet7
                 analysis.State.Add(
                     DomicilioControlSeverity.VerificaManuale,
                     "PDF_006",
-                    "Il PDF non contiene testo estraibile; potrebbe essere una scansione.",
+                    useOcr ? "Non è stato possibile ottenere testo dal PDF con estrazione diretta o OCR."
+                        : "Il PDF non contiene testo estraibile direttamente. OCR disattivato.",
                     "Aprire il PDF e confrontarlo manualmente con i dati dichiarati.");
                 return analysis;
             }
 
             analysis.Readable = true;
-            if (extracted.TextlessPages.Count > 0 && (expectation.ReadAllPages ||
-                expectation.Type is DomicilioPdfDocumentType.ContrattoEnte or DomicilioPdfDocumentType.LearningAgreement))
+            var incompleteText = extracted.TextlessPages.Count > 0 && (expectation.ReadAllPages ||
+                expectation.Type is DomicilioPdfDocumentType.Contratto or DomicilioPdfDocumentType.ContrattoEnte or DomicilioPdfDocumentType.LearningAgreement);
+            if (incompleteText)
                 analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_TEXT_INCOMPLETE",
-                    $"Le pagine {string.Join(", ", extracted.TextlessPages)} non contengono testo estraibile: il documento non può essere verificato integralmente senza lettura manuale.",
-                    "Verificare le pagine senza testo; non viene eseguito OCR.");
+                    $"Le pagine {string.Join(", ", extracted.TextlessPages)} restano senza testo leggibile " +
+                    (useOcr ? "dopo l'estrazione diretta e il tentativo OCR" : "dopo l'estrazione diretta con OCR disattivato") +
+                    ": il documento non è verificabile integralmente.",
+                    "Verificare manualmente le pagine indicate.");
+            var canCompareFields = extracted.OcrWarnings.Count == 0 &&
+                (useOcr || (!incompleteText && extracted.FailedPages.Count == 0));
             if (expectation.Type is DomicilioPdfDocumentType.ContrattoEnte or DomicilioPdfDocumentType.LearningAgreement)
-                return AnalyzeSpecialDocument(analysis, extracted, expectation);
-            analysis.TypeRecognized = LooksLikeDocument(extracted.Text, expectation.Type);
+                return AnalyzeSpecialDocument(analysis, extracted, expectation, canCompareFields);
+            var hasApplication = extracted.PageTexts.Any(IsRegistrationApplication);
+            analysis.TypeRecognized = (!hasApplication || SelectReceiptPages(extracted, expectation)) &&
+                LooksLikeDocument(extracted.Text, extracted.PageTexts, expectation.Type);
             if (!analysis.TypeRecognized)
             {
                 analysis.State.Add(
                     DomicilioControlSeverity.VerificaManuale,
                     "PDF_007",
-                    $"Il documento non è stato riconosciuto con certezza come {DocumentLabel(expectation.Type)} dell'Agenzia delle Entrate.",
+                    expectation.Type == DomicilioPdfDocumentType.Contratto
+                        ? "Il PDF non prova l'avvenuta registrazione del contratto di locazione. Verificare la ricevuta dell'Agenzia delle Entrate."
+                        : $"Il documento non è stato riconosciuto con certezza come {DocumentLabel(expectation.Type)} dell'Agenzia delle Entrate.",
                     "Verificare manualmente che la tipologia del documento sia corretta.");
             }
 
-            ExtractFields(extracted, expectation.Type);
+            ExtractFields(extracted, expectation);
             ReadOfficialReceiptEvidence(extracted, expectation, analysis);
             analysis.ExtractedReference = BestReference(extracted, expectation.Type);
             analysis.ExtractedRegistrationDate = ParseDate(extracted.RegistrationDate);
@@ -120,8 +145,17 @@ namespace ProcedureNet7
                 : extracted.StartDate);
             analysis.ExtractedEndDate = ParseDate(extracted.EndDate);
             analysis.ExtractedFiscalCodes = FormatFiscalCodes(extracted);
+            if (!analysis.TypeRecognized && (hasApplication || expectation.Type == DomicilioPdfDocumentType.Contratto))
+            {
+                if (expectation.RequireFiscalCode)
+                    analysis.FiscalCodePresent = extracted.FiscalCodes.Contains(expectation.CodFiscale.Trim(), StringComparer.OrdinalIgnoreCase);
+                return analysis;
+            }
+            // Incomplete or uncertain text is useful for review, but cannot prove a mismatch.
+            if (!canCompareFields) return analysis;
             if (expectation.ReadAllPages) ValidateAllPageFields(analysis, extracted, expectation);
 
+            ReadReceiptProperty(analysis, extracted, expectation);
             ValidateMunicipality(analysis, extracted, expectation);
             ValidateFiscalCode(analysis, extracted, expectation);
             ValidateReference(analysis, extracted, expectation.Reference, expectation.Type, allowTextMatch: !expectation.ReadAllPages);
@@ -163,9 +197,9 @@ namespace ProcedureNet7
         }
 
         private static DomicilioPdfAnalysis AnalyzeSpecialDocument(DomicilioPdfAnalysis analysis,
-            PdfExtractedData extracted, DomicilioPdfExpectation expectation)
+            PdfExtractedData extracted, DomicilioPdfExpectation expectation, bool canCompareFields)
         {
-            ExtractFields(extracted, expectation.Type);
+            ExtractFields(extracted, expectation);
             analysis.ExtractedFiscalCodes = FormatFiscalCodes(extracted);
             analysis.TypeRecognized = expectation.Type == DomicilioPdfDocumentType.LearningAgreement
                 ? Regex.IsMatch(extracted.Text, @"\blearning\s+agreement\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
@@ -190,10 +224,6 @@ namespace ProcedureNet7
                 return analysis;
             }
 
-            // Free-form prose is deliberately not interpreted as a declared field.
-            // Every required value must have an explicit label and a single value
-            // over the complete document, with no conflicting later pages.
-            var cf = DeclaredValues(extracted.RawText, @"(?:Codice\s*fiscale\s*(?:dello\s*)?studente|Studente\s*[-:]?\s*(?:CF|Codice\s*fiscale))");
             var starts = DeclaredValues(extracted.RawText, @"(?:Data\s*(?:di\s*)?(?:inizio|decorrenza)(?:\s*(?:del\s*)?(?:contratto|rapporto|alloggio))?|Decorrenza|Start\s*date)");
             var ends = DeclaredValues(extracted.RawText, @"(?:Data\s*(?:di\s*)?(?:fine|scadenza)(?:\s*(?:del\s*)?(?:contratto|rapporto|alloggio))?|Scadenza|End\s*date)");
             foreach (Match period in Regex.Matches(extracted.RawText,
@@ -220,8 +250,16 @@ namespace ProcedureNet7
             analysis.ExtractedMonthlyAmount = decimal.TryParse(SingleDeclaredValue(amountKeys), NumberStyles.AllowDecimalPoint,
                 CultureInfo.InvariantCulture, out var amount) ? amount : null;
 
-            analysis.FiscalCodePresent = ValidateDeclaredValue(analysis, "CF", "codice fiscale dello studente",
-                NormalizeSpecialValue(expectation.CodFiscale), cf.Select(NormalizeSpecialValue));
+            if (!canCompareFields) return analysis;
+            ValidateFiscalCode(analysis, extracted, expectation);
+            const string studentLabel = @"(?:Codice\s*fiscale\s*(?:dello\s*)?studente|Studente\s*[-:]?\s*(?:CF|Codice\s*fiscale))";
+            var declaredCodes = extracted.PageTexts.SelectMany(page => Regex.Matches(page.Text,
+                    @"^[ \t]*" + studentLabel + @"[ \t]*[:=]\s*(?<cf>[A-Z0-9](?:\s*[A-Z0-9]){15})\b",
+                    ReceiptOptions | RegexOptions.Multiline))
+                .Select(match => Regex.Replace(match.Groups["cf"].Value, @"\s", ""))
+                .Where(value => Regex.IsMatch(value, "^" + FiscalCodePattern + "$", ReceiptOptions)).ToList();
+            if (declaredCodes.Count > 0)
+                ValidateDeclaredValue(analysis, "CF", "codice fiscale dello studente", expectation.CodFiscale.Trim(), declaredCodes);
             ValidateDeclaredValue(analysis, "INIZIO", "data di decorrenza", IsoDate(expectation.StartDate), startKeys);
             ValidateDeclaredValue(analysis, "FINE", "data di scadenza", IsoDate(expectation.EndDate), endKeys);
             ValidateDeclaredValue(analysis, "COMUNE", "comune dell'immobile", NormalizeSpecialValue(expectation.ComuneDomicilio), municipality.Select(NormalizeSpecialValue));
@@ -307,34 +345,35 @@ namespace ProcedureNet7
                     "Verificare tutte le pagine e individuare il documento riferito all'operazione.");
             }
 
-            Check("codice identificativo del contratto", Values(@"Codice\s+Identificativo\s+del\s+contratto\s*[:\-]?\s*([A-Z0-9]{10,60})").Select(NormalizeReference));
-            Check("periodo del contratto", Regex.Matches(document.Text,
-                    @"(?:Durata|Periodo)\s*[:\-]?\s*dal\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})\s*al\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})",
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Cast<Match>()
-                .Select(match => DateKey(match.Groups[1].Value) + "|" + DateKey(match.Groups[2].Value)));
-            Check("numero e serie di registrazione", Regex.Matches(document.Text,
-                    @"(?:al\s+)?n\.?\s*([0-9]+)\s*[-–—\/]?\s*serie\s*([A-Z0-9]+)",
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Cast<Match>()
-                .Select(match => NormalizeRegistrationNumber(match.Groups[1].Value) + "|" + NormalizeSeries(match.Groups[2].Value)));
-            Check("contratto richiamato", Regex.Matches(document.Text,
-                    @"\banno\s*(\d{4})\s*[,;/\-]?\s*serie\s*([A-Z0-9]+)\s*[,;/\-]?\s*n(?:umero)?\.?\s*0*([0-9]+)",
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant).Cast<Match>()
+            Check("codice identificativo del contratto", document.PageTexts.SelectMany(ContractIdentifiers).Select(id => id.Value));
+            var periods = ReceiptMatches(document.Text, ReceiptPeriodPattern);
+            Check("numero e serie di registrazione", ReceiptMatches(document.Text, ReceiptNumberSeriesPattern)
+                .Select(match => NormalizeRegistrationNumber(match.Groups["number"].Value) + "|" + NormalizeSeries(match.Groups["series"].Value)));
+            Check("contratto richiamato", ReceiptMatches(document.Text, ReceiptLinkPattern)
                 .Select(match => match.Groups[1].Value + "|" + NormalizeSeries(match.Groups[2].Value) + "|" + NormalizeRegistrationNumber(match.Groups[3].Value)));
 
             if (expectation.Type == DomicilioPdfDocumentType.Contratto)
             {
                 Check("data di registrazione", Values(@"registrat[oa]\s+il\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})\s+al\s+n\.?")
-                    .Concat(Values(@"(?:data\s+di\s+registrazione|registrazione\s+in\s+data)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})")).Select(DateKey));
-                var cities = DeclaredValues(document.RawText, @"(?:Comune\s*(?:(?:dell['’]?|di)\s*)?immobile|Dati\s+(?:degli\s+immobili|dell['’]immobile)\s*:?\s*Comune)");
-                cities.AddRange(Regex.Matches(document.RawText,
-                        @"^[ \t]*immobile\s+(?:sito|situato|ubicato)\s+(?:nel\s+comune\s+di|in|a)\s+(?<city>[^\r\n]{1,100})\r?$",
-                        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline)
-                    .Cast<Match>().Select(match => match.Groups["city"].Value));
-                Check("comune dell'immobile", cities.Select(NormalizeSpecialValue));
+                    .Concat(Values(ReceiptRegistrationLabelPattern)).Concat(Values(ReceiptRegistrationOfficePattern)).Select(DateKey));
+                Check("data di decorrenza", periods.Select(match => match.Groups[1].Value)
+                    .Concat(Values(ReceiptLeaseStartLabelPattern)).Select(DateKey));
+                Check("data di scadenza", periods.Select(match => match.Groups[2].Value)
+                    .Concat(Values(ReceiptLeaseEndLabelPattern)).Select(DateKey));
             }
             else
             {
-                Check("protocollo dell'adempimento", Values(@"(?:protocollo(?:\s+di\s+ricezione)?\s*[:\-]?|acquisito\s+con\s+protocollo)\s*([0-9]{10,25}(?:\s*[-/]\s*[0-9]{4,8})?)").Select(NormalizeReference));
+                Check("periodo del contratto", periods.Select(match => DateKey(match.Groups[1].Value) + "|" + DateKey(match.Groups[2].Value)));
+                var protocols = Values(EventProtocolPattern).Select(NormalizeReference).ToHashSet(StringComparer.Ordinal);
+                // Il frontespizio riporta le 17 cifre della trasmissione. La ricevuta del singolo
+                // adempimento ripete la trasmissione con il progressivo di 6 cifre.
+                if (document.OfficialEvidence?.Primary is { Ambiguous: false, Protocols.Count: 1 } receipt)
+                {
+                    var fullProtocol = NormalizeReference(receipt.Protocols[0]);
+                    if (fullProtocol.Length == 23 && protocols.Contains(fullProtocol))
+                        protocols.Remove(fullProtocol[..17]);
+                }
+                Check("protocollo dell'adempimento", protocols);
                 if (string.IsNullOrWhiteSpace(document.EventProtocol))
                     analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_EVENT_REFERENCE",
                         "La lettura integrale non individua un protocollo esplicitamente riferito all'adempimento: la sola presenza degli estremi nel testo non è sufficiente.",
@@ -342,44 +381,99 @@ namespace ProcedureNet7
                 if (expectation.Type == DomicilioPdfDocumentType.Proroga)
                 {
                     Check("decorrenza della proroga", Values(@"(?:decorrenza|inizio)\s+(?:della\s+)?proroga\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})").Select(DateKey));
-                    Check("scadenza della proroga", Values(@"(?:scadenza|fine)\s+(?:della\s+)?proroga\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})").Select(DateKey));
+                    Check("scadenza della proroga", Values(ReceiptExtensionEndLabelPattern)
+                        .Concat(Values(ReceiptExtensionEndPattern)).Select(DateKey));
                 }
                 else
                     Check("data del subentro", Values(@"(?:cessione|subentro)[\s\S]{0,140}?(?:dalla\s+data|con\s+decorrenza(?:\s+dal)?|dal)\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})")
                         .Concat(Values(@"(?:data|decorrenza|inizio)\s+(?:del\s+|di\s+)?(?:subentro|cessione)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})")).Select(DateKey));
             }
-            var expectedFiscalCode = NormalizeAlphaNumeric(expectation.CodFiscale);
-            Check("ruolo dello studente", document.FiscalCodeRoles
-                .Where(role => NormalizeAlphaNumeric(role.FiscalCode) == expectedFiscalCode).Select(role => role.Role));
         }
 
-        private static PdfExtractedData ReadPdf(byte[] file, DomicilioPdfExpectation expectation)
+        private static PdfExtractedData ReadPdf(byte[] file, DomicilioPdfExpectation expectation, bool useOcr,
+            string? unlimitedOcrUrl, HttpClient? unlimitedOcrClient)
         {
             using var memory = new MemoryStream(file, writable: false);
             using var reader = new PdfReader(memory);
             using var pdf = new PdfDocument(reader);
-
             var extracted = new PdfExtractedData { PageCount = pdf.GetNumberOfPages() };
             if (extracted.PageCount <= 0)
                 throw new InvalidDataException("nessuna pagina presente");
 
             var pages = extracted.PageCount;
+            using var ocr = useOcr ? new DomicilioPdfOcr(file, pages, unlimitedOcrUrl, unlimitedOcrClient) : null;
             var text = new StringBuilder();
+            var canStopEarly = !expectation.ReadAllPages &&
+                expectation.Type is DomicilioPdfDocumentType.Proroga or DomicilioPdfDocumentType.Subentro;
             for (var page = 1; page <= pages; page++)
             {
                 extracted.PagesRead = page;
                 try
                 {
-                    var pdfPage = pdf.GetPage(page);
-                    if (pdfPage == null)
+                    string pageText;
+                    List<FiscalCodeRole>? tableRoles = null;
+                    var extractionFailed = false;
+                    PdfPage? pdfPage = null;
+                    try
                     {
-                        extracted.FailedPages.Add(page);
-                        continue;
+                        pdfPage = pdf.GetPage(page) ?? throw new InvalidDataException("pagina PDF assente");
+                        pageText = PdfTextExtractor.GetTextFromPage(pdfPage, new SimpleTextExtractionStrategy()) ?? string.Empty;
+                        var rliTaxpayerStatement = IsRliTaxpayerStatement(pageText);
+                        if (rliTaxpayerStatement || HasNumberedRoleHeadings(pageText))
+                        {
+                            try
+                            {
+                                tableRoles = rliTaxpayerStatement
+                                    ? ReadRliTaxpayerRole(pdfPage, pages, expectation.Type)
+                                    : ReadPositionedRoles(pdfPage);
+                            }
+                            catch (Exception) { tableRoles = new List<FiscalCodeRole>(); }
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        extractionFailed = true;
+                        pageText = string.Empty;
                     }
 
-                    var strategy = new SimpleTextExtractionStrategy();
-                    var pageText = PdfTextExtractor.GetTextFromPage(pdfPage, strategy) ?? string.Empty;
-                    extracted.PageTexts.Add(new PdfPageText(page, pageText));
+                    if (ocr != null && string.IsNullOrWhiteSpace(pageText))
+                    {
+                        var result = ocr.ReadPage(page);
+                        pageText = result.Text;
+                        if (!string.IsNullOrWhiteSpace(pageText)) extracted.OcrPages.Add(page);
+                        if (result.Warning != null) extracted.OcrWarnings.Add($"Pagina {page}: {result.Warning}");
+                    }
+                    else if (pdfPage != null && pageText.Length is > 0 and <= 200 && !string.IsNullOrWhiteSpace(pageText))
+                    {
+                        bool hasScannedBody = false;
+                        try
+                        {
+                            var layout = new HybridPageLayout(pdfPage.GetCropBox());
+                            new PdfCanvasProcessor(layout).ProcessPageContent(pdfPage);
+                            hasScannedBody = layout.HasScannedBody && !layout.HasBodyText;
+                        }
+                        catch (Exception)
+                        {
+                            extracted.OcrWarnings.Add($"Pagina {page}: impossibile verificare se il testo nativo copre il corpo della pagina.");
+                        }
+                        if (hasScannedBody)
+                        {
+                            var (ocrText, warning) = ocr?.ReadPage(page) ?? (string.Empty, "OCR disattivato.");
+                            if (!string.IsNullOrWhiteSpace(ocrText))
+                            {
+                                extracted.HybridOcrPages.Add(page);
+                                warning ??= CheckHybridText(pageText, ocrText);
+                                tableRoles = (tableRoles ?? ExtractFiscalCodeRoles(pageText))
+                                    .Union(ExtractFiscalCodeRoles(ocrText)).ToList();
+                                pageText += "\n\n" + ocrText;
+                            }
+                            if (warning != null || string.IsNullOrWhiteSpace(ocrText))
+                                extracted.OcrWarnings.Add($"Pagina {page}: corpo scansionato con testo nativo marginale da verificare. {warning}");
+                        }
+                    }
+                    if (extractionFailed && string.IsNullOrWhiteSpace(pageText)) extracted.FailedPages.Add(page);
+                    extracted.PageTexts.Add(new PdfPageText(page, pageText, tableRoles ?? ExtractFiscalCodeRoles(pageText),
+                        extracted.OcrPages.Contains(page)));
                     if (string.IsNullOrWhiteSpace(pageText)) extracted.TextlessPages.Add(page);
                     text.AppendLine(pageText);
 
@@ -387,14 +481,16 @@ namespace ProcedureNet7
                     // prime due pagine. Le pagine successive vengono saltate soltanto
                     // quando tipologia, soggetto, estremi, date e contratto richiamato
                     // e comune dell'immobile risultano già tutti presenti e coerenti con i dati attesi.
-                    if (page >= 2 && page < pages &&
-                        CanStopAfterCurrentPage(text.ToString(), expectation, out var completedExtraction))
+                    if (canStopEarly && page >= 2 && page < pages &&
+                        CanStopAfterCurrentPage(text.ToString(), extracted.PageTexts, expectation, out var completedExtraction))
                     {
                         completedExtraction.PageCount = extracted.PageCount;
                         completedExtraction.PagesRead = extracted.PagesRead;
                         completedExtraction.FailedPages.AddRange(extracted.FailedPages);
-                        completedExtraction.PageTexts.AddRange(extracted.PageTexts);
                         completedExtraction.TextlessPages.AddRange(extracted.TextlessPages);
+                        completedExtraction.OcrPages.AddRange(extracted.OcrPages);
+                        completedExtraction.HybridOcrPages.AddRange(extracted.HybridOcrPages);
+                        completedExtraction.OcrWarnings.AddRange(extracted.OcrWarnings);
                         extracted = completedExtraction;
                         break;
                     }
@@ -410,49 +506,82 @@ namespace ProcedureNet7
 
             extracted.RawText = text.ToString();
             extracted.Text = NormalizeSpaces(extracted.RawText);
+            extracted.UsedCachedTranscription = ocr?.UsedCachedTranscription == true;
             return extracted;
+        }
+
+        private sealed class HybridPageLayout : IEventListener
+        {
+            private readonly PdfRectangle _crop;
+            public bool HasScannedBody { get; private set; }
+            public bool HasBodyText { get; private set; }
+
+            public HybridPageLayout(PdfRectangle crop) => _crop = crop;
+
+            public ICollection<EventType> GetSupportedEvents() => new[] { EventType.RENDER_IMAGE, EventType.RENDER_TEXT };
+
+            public void EventOccurred(IEventData data, EventType type)
+            {
+                if (HasBodyText) return;
+                if (data is TextRenderInfo text && !string.IsNullOrWhiteSpace(text.GetText()))
+                {
+                    var line = text.GetBaseline().GetBoundingRectangle();
+                    var marginX = _crop.GetWidth() * 0.1f;
+                    var marginY = _crop.GetHeight() * 0.1f;
+                    HasBodyText = line.GetRight() > _crop.GetLeft() + marginX && line.GetLeft() < _crop.GetRight() - marginX &&
+                        line.GetTop() > _crop.GetBottom() + marginY && line.GetBottom() < _crop.GetTop() - marginY;
+                }
+                if (data is not ImageRenderInfo image || HasScannedBody) return;
+                var raster = image.GetImage();
+                if (raster.GetWidth() < 200 || raster.GetHeight() < 200) return;
+                var matrix = image.GetImageCtm();
+                var x1 = matrix.Get(Matrix.I11);
+                var y1 = matrix.Get(Matrix.I12);
+                var x2 = matrix.Get(Matrix.I21);
+                var y2 = matrix.Get(Matrix.I22);
+                var bounds = new PdfRectangle(matrix.Get(Matrix.I31) + Math.Min(0, x1) + Math.Min(0, x2),
+                    matrix.Get(Matrix.I32) + Math.Min(0, y1) + Math.Min(0, y2),
+                    Math.Abs(x1) + Math.Abs(x2), Math.Abs(y1) + Math.Abs(y2));
+                var visible = bounds.GetIntersection(_crop);
+                var halfPage = _crop.GetWidth() * _crop.GetHeight() / 2;
+                HasScannedBody = visible != null && visible.GetWidth() * visible.GetHeight() >= halfPage &&
+                    Math.Abs(matrix.GetDeterminant()) >= halfPage;
+            }
+        }
+
+        private static string? CheckHybridText(string nativeText, string ocrText)
+        {
+            static bool IsPageNumber(string line) => Regex.IsMatch(line.Trim(),
+                @"^(?:(?:pag(?:ina)?\.?|p\.)\s*)?\d{1,4}(?:\s*(?:/|di)\s*\d{1,4})?$", ReceiptOptions);
+            // Whole tokens keep ROMA distinct from ROMAGNANO and numeric prefixes from complete values.
+            static string Words(string value) => " " + Regex.Replace(value.ToUpperInvariant(), @"[^\p{L}\p{Nd}]+", " ").Trim() + " ";
+            var nativeKey = Words(nativeText);
+            var ocrKey = Words(ocrText);
+            var ocrLines = ocrText.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (!ocrLines.Any(line => line.Any(char.IsLetterOrDigit) && !IsPageNumber(line) && !nativeKey.Contains(Words(line), StringComparison.Ordinal)))
+                return "L'OCR ha restituito solo il testo marginale.";
+            var nativeLines = nativeText.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (nativeLines.Any(line => line.Any(char.IsLetterOrDigit) && !IsPageNumber(line) && !ocrKey.Contains(Words(line), StringComparison.Ordinal)))
+                return "La lettura OCR non conferma il testo nativo della pagina.";
+            return null;
         }
 
         private static bool CanStopAfterCurrentPage(
             string text,
+            List<PdfPageText> pages,
             DomicilioPdfExpectation expectation,
             out PdfExtractedData snapshot)
         {
             var normalizedText = NormalizeSpaces(text);
             snapshot = new PdfExtractedData { Text = normalizedText };
-            // Special contracts need every labelled value, including any conflicting
-            // values in later pages. They never use the RLI early-stop shortcut.
-            if (expectation.ReadAllPages || expectation.Type is DomicilioPdfDocumentType.ContrattoEnte or DomicilioPdfDocumentType.LearningAgreement)
-                return false;
-            if (!LooksLikeDocument(normalizedText, expectation.Type))
+            if (pages.Any(IsRegistrationApplication) || !LooksLikeDocument(normalizedText, pages, expectation.Type))
                 return false;
 
-            ExtractFields(snapshot, expectation.Type);
+            snapshot.PageTexts.AddRange(pages);
+            ExtractFields(snapshot, expectation);
 
-            if (expectation.Type == DomicilioPdfDocumentType.Contratto &&
-                !HasExpectedMunicipality(normalizedText, expectation.ComuneDomicilio))
+            if (expectation.RequireFiscalCode && !snapshot.FiscalCodes.Contains(expectation.CodFiscale.Trim(), StringComparer.OrdinalIgnoreCase))
                 return false;
-
-            var expectedCf = NormalizeAlphaNumeric(expectation.CodFiscale);
-            if (expectation.RequireFiscalCode)
-            {
-                if (string.IsNullOrWhiteSpace(expectedCf))
-                    return false;
-
-                if (expectation.Type == DomicilioPdfDocumentType.Subentro)
-                {
-                    var role = snapshot.FiscalCodeRoles.FirstOrDefault(x =>
-                        string.Equals(NormalizeAlphaNumeric(x.FiscalCode), expectedCf, StringComparison.OrdinalIgnoreCase));
-                    if (role == null || !string.Equals(role.Role, "D", StringComparison.OrdinalIgnoreCase))
-                        return false;
-                }
-                else if (!snapshot.FiscalCodes.Any(x =>
-                             string.Equals(NormalizeAlphaNumeric(x), expectedCf, StringComparison.OrdinalIgnoreCase)) &&
-                         !NormalizeAlphaNumeric(normalizedText).Contains(expectedCf, StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-            }
 
             var extractedReference = BestReference(snapshot, expectation.Type);
             if (string.IsNullOrWhiteSpace(expectation.Reference))
@@ -460,20 +589,12 @@ namespace ProcedureNet7
                 if (string.IsNullOrWhiteSpace(extractedReference))
                     return false;
             }
-            else if (!ContainsNormalized(normalizedText, expectation.Reference) &&
-                     !AreEqualOrContained(expectation.Reference, extractedReference))
+            else if (DocumentReferenceMatches(snapshot, expectation.Reference, expectation.Type, allowTextMatch: true) != true)
             {
                 return false;
             }
 
-            if (expectation.Type == DomicilioPdfDocumentType.Contratto)
-            {
-                if (!DateMatches(expectation.RegistrationDate, snapshot.RegistrationDate) ||
-                    !DateMatches(expectation.StartDate, snapshot.StartDate) ||
-                    !DateMatches(expectation.EndDate, snapshot.EndDate))
-                    return false;
-            }
-            else if (expectation.Type == DomicilioPdfDocumentType.Subentro)
+            if (expectation.Type == DomicilioPdfDocumentType.Subentro)
             {
                 if (!DateMatches(expectation.StartDate, snapshot.EventDate) ||
                     !ContractReferenceMatches(snapshot, expectation.ContractReference, out _))
@@ -496,10 +617,16 @@ namespace ProcedureNet7
         {
             // Il requisito riguarda il documento del contratto: le ricevute degli
             // adempimenti successivi possono identificare soltanto il contratto.
-            if (expectation.Type != DomicilioPdfDocumentType.Contratto ||
-                HasExpectedMunicipality(document.Text, expectation.ComuneDomicilio))
+            if (expectation.Type != DomicilioPdfDocumentType.Contratto)
                 return;
 
+            var property = MatchPropertyMunicipality(document.PageTexts, expectation);
+            if (property.Matches == true)
+            {
+                analysis.ExtractedMunicipality = expectation.ComuneDomicilio;
+                return;
+            }
+            analysis.MunicipalityAbsent = !property.Matches.HasValue;
             var incomplete = document.FailedPages.Count > 0;
             analysis.State.Add(
                 incomplete || string.IsNullOrWhiteSpace(expectation.ComuneDomicilio)
@@ -508,28 +635,12 @@ namespace ProcedureNet7
                 "PDF_024",
                 incomplete
                     ? "Il comune dell'immobile non è stato verificato perché la lettura del PDF è incompleta."
-                    : "Nel PDF non è stato riscontrato il comune del domicilio associato all'immobile.",
+                    : property.Matches == false
+                        ? "Il campo del comune dell'immobile è illeggibile o discordante dal domicilio dichiarato."
+                        : "Nel PDF non è stato riscontrato il comune del domicilio associato all'immobile.",
                 "Verificare il comune dell'immobile e acquisire un documento che lo riporti; il comune dell'ufficio di registrazione non è sufficiente.");
         }
 
-        private static bool HasExpectedMunicipality(string text, string municipality)
-        {
-            if (string.IsNullOrWhiteSpace(municipality))
-                return false;
-
-            // Non basta trovare il nome della città: deve essere associato
-            // esplicitamente all'immobile, non all'ufficio o ai soggetti.
-            var name = Regex.Escape(NormalizeSpaces(municipality.Trim()));
-            var propertyLabel =
-                @"(?:comune\s+(?:(?:dell['’]?|di)\s*)?immobile\s*[:\-]?\s*" +
-                @"|immobile\s+(?:sito|situato|ubicato)\s+(?:nel\s+comune\s+di|in|a)\s+" +
-                @"|dati\s+(?:degli\s+immobili|dell['’]immobile)\s*[:\-]?\s*comune\s*[:\-]?\s*" +
-                @"|dati\s+(?:degli\s+immobili|dell['’]immobile)\b" +
-                @"(?:(?!\bufficio\b|\bsoggetti\b|\bdati\s+del\s+contratto\b)[\s\S]){0,600}?" +
-                @"\bubicato\s+nel\s+comune\s+di\s+)";
-            return Regex.IsMatch(text, propertyLabel + name + @"(?![\p{L}\p{N}'’\-])",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        }
         private static bool DateMatches(DateTime? expected, string? extracted)
             => !expected.HasValue || ParseDate(extracted)?.Date == expected.Value.Date;
 
@@ -546,9 +657,8 @@ namespace ProcedureNet7
                 return;
             }
 
-            var expectedFiscalCode = expectation.CodFiscale;
-            var expected = NormalizeAlphaNumeric(expectedFiscalCode);
-            if (string.IsNullOrWhiteSpace(expected))
+            var expectedFiscalCode = expectation.CodFiscale.Trim();
+            if (expectedFiscalCode.Length == 0)
             {
                 analysis.FiscalCodePresent = null;
                 analysis.State.Add(
@@ -559,22 +669,7 @@ namespace ProcedureNet7
                 return;
             }
 
-            if (expectation.Type == DomicilioPdfDocumentType.Subentro)
-            {
-                ValidateSubentryFiscalCode(analysis, extracted, expectedFiscalCode, expected);
-                return;
-            }
-            if (expectation.ReadAllPages && expectation.Type is DomicilioPdfDocumentType.Contratto or DomicilioPdfDocumentType.Proroga)
-            {
-                ValidateTenantFiscalCode(analysis, extracted, expectation.Type, expectedFiscalCode, expected);
-                return;
-            }
-
-            var found = extracted.FiscalCodes.Any(x =>
-                string.Equals(NormalizeAlphaNumeric(x), expected, StringComparison.OrdinalIgnoreCase));
-            if (!found)
-                found = NormalizeAlphaNumeric(extracted.Text).Contains(expected, StringComparison.OrdinalIgnoreCase);
-
+            var found = extracted.FiscalCodes.Contains(expectedFiscalCode, StringComparer.OrdinalIgnoreCase);
             analysis.FiscalCodePresent = found;
             if (!found)
             {
@@ -583,99 +678,10 @@ namespace ProcedureNet7
                     : string.Join(", ", extracted.FiscalCodes);
                 analysis.State.Add(
                     DomicilioControlSeverity.NonConforme,
-                    "PDF_009",
-                    $"Il codice fiscale {expectedFiscalCode.Trim()} non è presente nel PDF ({detected}).",
+                    expectation.Type == DomicilioPdfDocumentType.Subentro ? "PDF_022" : "PDF_009",
+                    $"Il codice fiscale {expectedFiscalCode} non è presente nel PDF ({detected}).",
                     "Verificare l'intestatario e richiedere il documento corretto se necessario.");
             }
-        }
-
-        private static void ValidateTenantFiscalCode(DomicilioPdfAnalysis analysis, PdfExtractedData extracted,
-            DomicilioPdfDocumentType type, string expectedFiscalCode, string expected)
-        {
-            var roles = extracted.FiscalCodeRoles
-                .Where(role => NormalizeAlphaNumeric(role.FiscalCode) == expected)
-                .Select(role => role.Role).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            var label = type == DomicilioPdfDocumentType.Proroga ? "proroga" : "contratto";
-            if (roles.Count == 1 && string.Equals(roles[0], "B", StringComparison.OrdinalIgnoreCase))
-            {
-                analysis.FiscalCodePresent = true;
-                return;
-            }
-
-            analysis.FiscalCodePresent = null;
-            if (roles.Count == 0)
-            {
-                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_TENANT_ROLE_MISSING",
-                    $"Nel documento di {label} il codice fiscale {expectedFiscalCode.Trim()} non è associato esplicitamente al ruolo di conduttore (B). La sola presenza del codice fiscale non permette l'accoglimento automatico.",
-                    "Verificare il ruolo dello studente nella tabella dei soggetti del documento.");
-                return;
-            }
-            if (roles.Count > 1)
-            {
-                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_TENANT_ROLE_AMBIGUOUS",
-                    $"Nel documento di {label} il codice fiscale dello studente compare con ruoli distinti ({string.Join(", ", roles)}).",
-                    "Verificare tutte le pagine e individuare il ruolo pertinente alla richiesta.");
-                return;
-            }
-            if (type == DomicilioPdfDocumentType.Proroga && string.Equals(roles[0], "D", StringComparison.OrdinalIgnoreCase))
-            {
-                analysis.State.Add(DomicilioControlSeverity.VerificaManuale, "PDF_TENANT_ROLE_UNSUPPORTED",
-                    "Nella proroga lo studente risulta conduttore cessionario (D); questa indicazione richiede una verifica manuale del collegamento con il subentro e non viene equiparata automaticamente al ruolo ordinario B.",
-                    "Verificare lo studente come conduttore corrente del contratto prorogato.");
-                return;
-            }
-
-            analysis.FiscalCodePresent = false;
-            analysis.State.Add(DomicilioControlSeverity.NonConforme, "PDF_TENANT_ROLE_INCOMPATIBLE",
-                $"Nel documento di {label} il codice fiscale {expectedFiscalCode.Trim()} ha il ruolo {RoleDescription(roles[0])}, non quello di conduttore (B).",
-                "Verificare i soggetti del documento e acquisire un documento coerente con il ruolo dello studente.");
-        }
-
-        private static void ValidateSubentryFiscalCode(
-            DomicilioPdfAnalysis analysis,
-            PdfExtractedData extracted,
-            string expectedFiscalCode,
-            string expected)
-        {
-            var role = extracted.FiscalCodeRoles
-                .FirstOrDefault(x => string.Equals(NormalizeAlphaNumeric(x.FiscalCode), expected, StringComparison.OrdinalIgnoreCase));
-
-            if (role != null && string.Equals(role.Role, "D", StringComparison.OrdinalIgnoreCase))
-            {
-                analysis.FiscalCodePresent = true;
-                return;
-            }
-
-            if (role != null)
-            {
-                analysis.FiscalCodePresent = false;
-                analysis.State.Add(
-                    DomicilioControlSeverity.NonConforme,
-                    "PDF_020",
-                    $"Nel subentro il codice fiscale {expectedFiscalCode.Trim()} ha il ruolo {RoleDescription(role.Role)}, non quello di conduttore cessionario (D).",
-                    "Verificare i soggetti del subentro e richiedere il documento corretto se necessario.");
-                return;
-            }
-
-            var presentWithoutRole = extracted.FiscalCodes.Any(x =>
-                string.Equals(NormalizeAlphaNumeric(x), expected, StringComparison.OrdinalIgnoreCase));
-            if (presentWithoutRole || NormalizeAlphaNumeric(extracted.Text).Contains(expected, StringComparison.OrdinalIgnoreCase))
-            {
-                analysis.FiscalCodePresent = null;
-                analysis.State.Add(
-                    DomicilioControlSeverity.VerificaManuale,
-                    "PDF_021",
-                    $"Il codice fiscale {expectedFiscalCode.Trim()} è presente nel subentro, ma iText non ne ha riconosciuto con certezza il ruolo di conduttore cessionario (D).",
-                    "Verificare manualmente il ruolo dello studente nella tabella dei soggetti coinvolti.");
-                return;
-            }
-
-            analysis.FiscalCodePresent = false;
-            analysis.State.Add(
-                DomicilioControlSeverity.NonConforme,
-                "PDF_022",
-                $"Il codice fiscale {expectedFiscalCode.Trim()} non è presente tra i soggetti del subentro.",
-                "Richiedere il documento di subentro riferito allo studente.");
         }
 
         private static void ValidateReference(
@@ -686,23 +692,16 @@ namespace ProcedureNet7
             if (string.IsNullOrWhiteSpace(expectedReference))
                 return;
 
-            if (OfficialReferenceMatches(extracted.OfficialEvidence?.Primary, expectedReference))
+            var matches = DocumentReferenceMatches(extracted, expectedReference, type, allowTextMatch);
+            if (matches == true)
                 return;
 
-            if (allowTextMatch && (ContainsNormalized(extracted.Text, expectedReference) ||
-                                  AreEqualOrContained(expectedReference, analysis.ExtractedReference)))
-                return;
-            if (!allowTextMatch && (StrictReferenceMatches(expectedReference, analysis.ExtractedReference) ||
-                type == DomicilioPdfDocumentType.Contratto && StrictReferenceMatches(expectedReference,
-                    string.Join(" ", extracted.Series, extracted.Number, extracted.RegistrationYear))))
-                return;
-
-            if (string.IsNullOrWhiteSpace(analysis.ExtractedReference))
+            if (!matches.HasValue)
             {
                 analysis.State.Add(
                     DomicilioControlSeverity.VerificaManuale,
                     "PDF_016",
-                    $"Gli estremi '{expectedReference}' non sono stati estratti automaticamente dal PDF.",
+                    $"Non è stato possibile confrontare gli estremi '{expectedReference}' con un riferimento completo nel PDF.",
                     "Confrontare manualmente gli estremi del documento con quelli registrati.");
                 return;
             }
@@ -712,6 +711,40 @@ namespace ProcedureNet7
                 "PDF_017",
                 $"Gli estremi registrati '{expectedReference}' sono diversi da quelli letti nel PDF '{analysis.ExtractedReference}'.",
                 "Correggere gli estremi o richiedere il documento riferito al contratto corretto.");
+        }
+
+        private static bool IsYearOnlyReference(string reference) =>
+            Regex.IsMatch(reference.Trim(), @"^(?:anno\s*)?(?:19|20)\d{2}$", ReceiptOptions);
+
+        private static bool MatchesExplicitYearShapedNumber(PdfExtractedData document, string reference) =>
+            document.OfficialEvidence is { Unambiguous: true, Primary: { } receipt } && receipt.Number == reference.Trim();
+
+        private static bool? DocumentReferenceMatches(PdfExtractedData document, string expected,
+            DomicilioPdfDocumentType type, bool allowTextMatch)
+        {
+            if (IsYearOnlyReference(expected))
+                return type == DomicilioPdfDocumentType.Contratto && MatchesExplicitYearShapedNumber(document, expected) ? true : null;
+            if (OfficialReferenceMatches(document.OfficialEvidence?.Primary, expected)) return true;
+            var actual = BestReference(document, type);
+            if (type == DomicilioPdfDocumentType.Contratto)
+            {
+                if (Regex.IsMatch(expected.Trim(), @"^\d+$"))
+                    return document.Number.Length == 0 ? null : NormalizeRegistrationNumber(expected) == NormalizeRegistrationNumber(document.Number);
+                if (IsContractIdentifier(expected))
+                    return document.ContractIdentifier.Length == 0 ? null : NormalizeAlphaNumeric(expected) == NormalizeAlphaNumeric(document.ContractIdentifier);
+                var parts = ParseReferenceComponents(expected);
+                if (parts.HasComparableNumber && parts.Series.Length > 0)
+                {
+                    if (document.Number.Length == 0 || document.Series.Length == 0 || parts.Year.Length > 0 && document.RegistrationYear.Length == 0)
+                        return null;
+                    return parts.Number == NormalizeRegistrationNumber(document.Number) && parts.Series == NormalizeSeries(document.Series) &&
+                           (parts.Year.Length == 0 || parts.Year == document.RegistrationYear);
+                }
+            }
+            if (actual.Length == 0) return null;
+            return allowTextMatch
+                ? ContainsNormalized(document.Text, expected) || AreEqualOrContained(expected, actual)
+                : StrictReferenceMatches(expected, actual);
         }
 
         private static void ValidateDate(
@@ -783,6 +816,11 @@ namespace ProcedureNet7
                 return true;
             }
 
+            if (IsYearOnlyReference(contractReference))
+            {
+                comparable = MatchesExplicitYearShapedNumber(extracted, contractReference);
+                return comparable;
+            }
             if (allowTextMatch && ContainsNormalized(extracted.Text, contractReference))
             {
                 comparable = true;
@@ -848,19 +886,18 @@ namespace ProcedureNet7
                    (string.IsNullOrWhiteSpace(first.Year) || first.Year == second.Year);
         }
 
-        private static void ExtractFields(PdfExtractedData document, DomicilioPdfDocumentType type)
+        private static void ExtractFields(PdfExtractedData document, DomicilioPdfExpectation expectation)
         {
             if (document.FieldsExtracted)
                 return;
 
+            var type = expectation.Type;
             var text = document.Text;
             document.EventProtocol = ExtractEventProtocol(text);
-            document.ContractIdentifier = MatchValue(text,
-                @"Codice\s+Identificativo\s+del\s+contratto\s*[:\-]?\s*([A-Z0-9]{10,60})");
+            document.ContractIdentifier = document.PageTexts.SelectMany(ContractIdentifiers).Select(id => id.Value)
+                .FirstOrDefault() ?? MatchValue(text, ReceiptIdentifierPattern);
 
-            var referencedContract = Regex.Match(text,
-                @"\banno\s*(\d{4})\s*[,;/\-]?\s*serie\s*([A-Z0-9]+)\s*[,;/\-]?\s*n(?:umero)?\.?\s*0*([0-9]+)",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var referencedContract = Regex.Match(text, ReceiptLinkPattern, ReceiptOptions);
             if (referencedContract.Success)
             {
                 document.ReferencedContractYear = referencedContract.Groups[1].Value.Trim();
@@ -868,18 +905,7 @@ namespace ProcedureNet7
                 document.ReferencedContractNumber = referencedContract.Groups[3].Value.Trim();
             }
 
-            var officeSeries = Regex.Match(text,
-                @"ufficio\s+([A-Z0-9]+)\s*,?\s*serie\s*([A-Z0-9]+)\s*,?\s*numero\s*([0-9]+)",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            if (officeSeries.Success)
-            {
-                document.Series = officeSeries.Groups[2].Value.Trim();
-                document.Number = officeSeries.Groups[3].Value.Trim();
-            }
-
-            var registration = Regex.Match(text,
-                @"registrat[oa]\s+il\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})\s+al\s+n\.?\s*([0-9]+)\s*[-–—\/]?\s*serie\s*([A-Z0-9]+)",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var registration = Regex.Match(text, ReceiptRegistrationPattern, ReceiptOptions);
             if (registration.Success)
             {
                 document.RegistrationDate = registration.Groups[1].Value.Trim();
@@ -890,40 +916,48 @@ namespace ProcedureNet7
 
             if (string.IsNullOrWhiteSpace(document.RegistrationDate))
             {
-                document.RegistrationDate = MatchValue(text,
-                    @"(?:data\s+di\s+registrazione|registrazione\s+in\s+data|in\s+data)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})");
+                document.RegistrationDate = FirstNotEmpty(MatchValue(text, ReceiptRegistrationLabelPattern),
+                    MatchValue(text, ReceiptRegistrationOfficePattern));
+                if (string.IsNullOrWhiteSpace(document.RegistrationDate))
+                {
+                    var presentationDates = ReceiptMatches(text, ReceiptPresentationDatePattern)
+                        .Select(match => match.Groups[1].Index).ToHashSet();
+                    document.RegistrationDate = ReceiptMatches(text, @"\bin\s+data\s*[:\-]?\s*(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4})\b")
+                        .FirstOrDefault(match => !presentationDates.Contains(match.Groups[1].Index))?.Groups[1].Value ?? string.Empty;
+                }
                 document.RegistrationYear = ExtractYear(document.RegistrationDate);
             }
 
             if (string.IsNullOrWhiteSpace(document.Series) || string.IsNullOrWhiteSpace(document.Number))
             {
-                var numberSeries = Regex.Match(text,
-                    @"(?:al\s+)?n\.?\s*([0-9]+)\s*[-–—\/]?\s*serie\s*([A-Z0-9]+)",
-                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                var numberSeries = Regex.Match(text, ReceiptNumberSeriesPattern, ReceiptOptions);
                 if (numberSeries.Success)
                 {
-                    document.Number = numberSeries.Groups[1].Value.Trim();
-                    document.Series = numberSeries.Groups[2].Value.Trim();
+                    document.Number = numberSeries.Groups["number"].Value;
+                    document.Series = numberSeries.Groups["series"].Value;
                 }
             }
 
-            var duration = Regex.Match(text,
-                @"(?:Durata|Periodo)\s*[:\-]?\s*dal\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})\s*al\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var duration = Regex.Match(text, ReceiptPeriodPattern, ReceiptOptions);
             if (duration.Success)
             {
                 document.StartDate = duration.Groups[1].Value.Trim();
                 document.EndDate = duration.Groups[2].Value.Trim();
             }
 
-            if (type == DomicilioPdfDocumentType.Proroga)
+            if (type == DomicilioPdfDocumentType.Contratto)
+            {
+                document.StartDate = FirstNotEmpty(document.StartDate, MatchValue(text, ReceiptLeaseStartLabelPattern));
+                document.EndDate = FirstNotEmpty(document.EndDate, MatchValue(text, ReceiptLeaseEndLabelPattern));
+            }
+            else if (type == DomicilioPdfDocumentType.Proroga)
             {
                 document.StartDate = FirstNotEmpty(
                     MatchValue(text, @"(?:decorrenza|inizio)\s+(?:della\s+)?proroga\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})"),
                     document.StartDate);
                 document.EndDate = FirstNotEmpty(
-                    MatchValue(text, @"(?:scadenza|fine)\s+(?:della\s+)?proroga\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})"),
-                    document.EndDate);
+                    MatchValue(text, ReceiptExtensionEndLabelPattern),
+                    FirstNotEmpty(MatchValue(text, ReceiptExtensionEndPattern), document.EndDate));
             }
             else if (type == DomicilioPdfDocumentType.Subentro)
             {
@@ -944,25 +978,57 @@ namespace ProcedureNet7
                 document.ReferencedContractYear = document.RegistrationYear;
             }
 
-            document.FiscalCodes = Regex.Matches(text.ToUpperInvariant(), @"\b[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]\b")
-                .Cast<Match>()
-                .Select(x => x.Value)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            document.FiscalCodes = document.PageTexts
+                .SelectMany(page => Regex.Matches(page.Text, @"\b" + FiscalCodePattern + @"\b", ReceiptOptions)
+                    .Select(match => match.Value.ToUpperInvariant()))
+                .Distinct(StringComparer.Ordinal).ToList();
+            var studentCode = expectation.CodFiscale.Trim().ToUpperInvariant();
+            if (!document.FiscalCodes.Contains(studentCode) && document.PageTexts.Any(page => ContainsFiscalCode(page, studentCode)))
+                document.FiscalCodes.Add(studentCode);
 
-            document.FiscalCodeRoles = Regex.Matches(
-                    text.ToUpperInvariant(),
-                    @"\b\d{3}\s+([A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z])\s+([ABCD])\b",
-                    RegexOptions.CultureInvariant)
-                .Cast<Match>()
-                .Select(x => new FiscalCodeRole(x.Groups[1].Value, x.Groups[2].Value))
-                .GroupBy(x => $"{x.FiscalCode}|{x.Role}", StringComparer.OrdinalIgnoreCase)
-                .Select(x => x.First())
-                .ToList();
+            document.FiscalCodeRoles = document.PageTexts.SelectMany(page => page.Roles)
+                .Where(role => document.FiscalCodes.Contains(role.FiscalCode, StringComparer.OrdinalIgnoreCase)).Distinct().ToList();
             document.FieldsExtracted = true;
         }
 
-        private static bool LooksLikeDocument(string text, DomicilioPdfDocumentType type)
+        private static bool ContainsFiscalCode(PdfPageText page, string expected)
+        {
+            var code = expected.Trim().ToUpperInvariant();
+            if (code.Length != 16 || !Regex.IsMatch(code, "^" + FiscalCodePattern + "$", RegexOptions.CultureInvariant)) return false;
+            // A PDF can insert spaces or line breaks between glyphs. Both ends must still be word boundaries on this page.
+            return Regex.IsMatch(page.Text, @"\b" + string.Join(@"\s*", code.ToCharArray()) + @"\b", ReceiptOptions);
+        }
+
+        private static List<FiscalCodeRole> ExtractFiscalCodeRoles(string text)
+        {
+            var roles = new List<FiscalCodeRole>();
+            if (IsRliTaxpayerStatement(text)) return roles;
+            const string codedRow = @"\d{3}[ \t]+(" + FiscalCodePattern + @"|\d{11})[ \t]+([ABCD])";
+            const string ocrRow = @"\d{3}[ \t]+(?:[A-Z0-9]{15,16}|\d{11})[ \t]+[ABCD]";
+            var inDoubleTable = false;
+            foreach (var line in text.ToUpperInvariant().Split('\n'))
+            {
+                var value = line.Trim();
+                if (Regex.IsMatch(value, @"^N[.°º]?[ \t]+CODICE[ \t]+FISCALE[ \t]+RUOLO[ \t]+N[.°º]?[ \t]+CODICE[ \t]+FISCALE[ \t]+RUOLO$"))
+                {
+                    inDoubleTable = true;
+                    continue;
+                }
+                // With both complete triplets in their expected positions, an OCR error in
+                // the neighbouring identifier does not invalidate the student's own triplet.
+                inDoubleTable = inDoubleTable && Regex.IsMatch(value, "^" + ocrRow + "[ \\t]+" + ocrRow + "$");
+                if (inDoubleTable || Regex.IsMatch(value, "^" + codedRow + "(?:[ \\t]+" + codedRow + ")*$"))
+                    roles.AddRange(Regex.Matches(value, codedRow).Cast<Match>()
+                        .Where(m => m.Groups[1].Value.Length == 16)
+                        .Select(m => new FiscalCodeRole(m.Groups[1].Value, m.Groups[2].Value)));
+                var named = Regex.Match(value, @"^(LOCATORE|CONDUTTORE)[ \t]*:[ \t]*(" + FiscalCodePattern + ")$");
+                if (named.Success)
+                    roles.Add(new FiscalCodeRole(named.Groups[2].Value, named.Groups[1].Value == "LOCATORE" ? "A" : "B"));
+            }
+            return roles.Distinct().ToList();
+        }
+
+        private static bool LooksLikeDocument(string text, List<PdfPageText> pages, DomicilioPdfDocumentType type)
         {
             if (type == DomicilioPdfDocumentType.Proroga)
             {
@@ -976,18 +1042,8 @@ namespace ProcedureNet7
                        Regex.IsMatch(text, @"Agenzia\s+delle\s+Entrate|\bRLI\b|adempiment[io]\s+successiv[io]", RegexOptions.IgnoreCase);
             }
 
-            var score = 0;
-            if (Regex.IsMatch(text, @"Registrazione\s+(?:dei\s+)?contratt[oi]\s+di\s+locazione", RegexOptions.IgnoreCase)) score++;
-            if (Regex.IsMatch(text, @"Ricevuta\s+di\s+avvenuta\s+registrazione", RegexOptions.IgnoreCase)) score++;
-            if (Regex.IsMatch(text, @"mod\.?\s*RLI\s*12|RLI12", RegexOptions.IgnoreCase)) score++;
-            if (Regex.IsMatch(text, @"Dati\s+(?:generali\s+)?del\s+contratto", RegexOptions.IgnoreCase)) score++;
-            if (Regex.IsMatch(text, @"Codice\s+Identificativo\s+del\s+contratto", RegexOptions.IgnoreCase)) score++;
-            if (Regex.IsMatch(text, @"Locatori|Conduttori|locatore\s*/\s*\(B\)\s*conduttore", RegexOptions.IgnoreCase)) score++;
-            // La dicitura RLI e il riepilogo "Registrazione dei contratti"
-            // compaiono anche nelle ricevute di cessione: da soli non bastano.
-            return score >= 2 && Regex.IsMatch(text,
-                @"Ricevuta\s+di\s+avvenuta\s+registrazione|registrat[oa]\s+il\s*\d|Dati\s+(?:generali\s+)?del\s+contratto",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var registrations = OfficialReceipts(pages).Where(r => r.Kind == DomicilioPdfDocumentType.Contratto).ToList();
+            return registrations.Count > 0 && registrations.All(r => !r.RegistrationDenied);
         }
 
         private static bool HasPdfSignature(byte[] file)
@@ -1010,6 +1066,8 @@ namespace ProcedureNet7
                 return document.EventProtocol.Trim();
             if (!string.IsNullOrWhiteSpace(document.ContractIdentifier))
                 return document.ContractIdentifier.Trim();
+            if (string.IsNullOrWhiteSpace(document.Number))
+                return string.Empty;
             return string.Join(" ", new[] { document.Series, document.Number, document.RegistrationYear }
                 .Where(x => !string.IsNullOrWhiteSpace(x)));
         }
@@ -1028,6 +1086,9 @@ namespace ProcedureNet7
 
         private static ContractReferenceComponents ParseReferenceComponents(string value)
         {
+            var compact = Regex.Match(value.Trim(), CompactRegistrationPattern, ReceiptOptions);
+            if (compact.Success)
+                return new ContractReferenceComponents("3T", NormalizeRegistrationNumber(compact.Groups["number"].Value), string.Empty);
             var labeled = Regex.Match(
                 value,
                 @"(?:anno\s*)?(?<year>\d{4})?\s*[,;/\-]?\s*serie\s*(?<series>[A-Z0-9]+)\s*[,;/\-]?\s*n(?:umero)?\.?\s*0*(?<number>\d+)",
@@ -1086,11 +1147,13 @@ namespace ProcedureNet7
                 NormalizeYear(year));
         }
 
+        private const string EventProtocolPattern = @"(?:protocollo(?:\s+di\s+ricezione)?\s*[:\-]?|acquisito\s+con\s+protocollo)\s*([0-9]{10,25}(?:\s*[-/]\s*[0-9]{4,8})?)";
+
         private static string ExtractEventProtocol(string text)
         {
             var matches = Regex.Matches(
                     text,
-                    @"(?:protocollo(?:\s+di\s+ricezione)?\s*[:\-]?|acquisito\s+con\s+protocollo)\s*([0-9]{10,25}(?:\s*[-/]\s*[0-9]{4,8})?)",
+                    EventProtocolPattern,
                     RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
                 .Cast<Match>()
                 .Select(x => Regex.Replace(x.Groups[1].Value, @"\s+", " ").Trim())
@@ -1230,9 +1293,13 @@ namespace ProcedureNet7
             public OfficialReceiptEvidence? OfficialEvidence { get; set; }
             public int PageCount { get; set; }
             public int PagesRead { get; set; }
+            public bool UsedCachedTranscription { get; set; }
             public bool FieldsExtracted { get; set; }
             public List<int> FailedPages { get; } = new();
             public List<int> TextlessPages { get; } = new();
+            public List<int> OcrPages { get; } = new();
+            public List<int> HybridOcrPages { get; } = new();
+            public List<string> OcrWarnings { get; } = new();
             public string Text { get; set; } = string.Empty;
             public string RawText { get; set; } = string.Empty;
             public string ContractIdentifier { get; set; } = string.Empty;

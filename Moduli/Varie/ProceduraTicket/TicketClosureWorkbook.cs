@@ -57,6 +57,7 @@ namespace ProcedureNet7
                 sheet.Rows(2, data.Rows.Count + 1).Height = 64;
                 sheet.Rows(2, data.Rows.Count + 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
             }
+            TicketViolenceWorkbook.Highlight(sheet, data);
         }
     }
 }

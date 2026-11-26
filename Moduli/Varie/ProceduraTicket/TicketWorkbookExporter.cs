@@ -13,6 +13,7 @@ namespace ProcedureNet7
         private static readonly string[] MailAttachmentColumns =
         {
             "ID_TICKET",
+            TicketViolenceCheck.ColumnName,
             "CODSTUD",
             "COGNOME",
             "NOME",
@@ -249,9 +250,17 @@ namespace ProcedureNet7
 
             foreach (DataRow sourceRow in summary.Rows)
             {
+                // Anche l'export mail applica l'esclusione, indipendentemente dal chiamante.
+                if (TicketViolenceCheck.IsFlagged(sourceRow)) continue;
                 DataRow targetRow = result.NewRow();
                 foreach (string columnName in MailAttachmentColumns)
                 {
+                    if (columnName == TicketViolenceCheck.ColumnName)
+                    {
+                        targetRow[columnName] = TicketViolenceCheck.Evaluate(
+                            ReadString(sourceRow, "PRIMO_MSG_STUDENTE"), ReadString(sourceRow, "OGGETTO"));
+                        continue;
+                    }
                     targetRow[columnName] = summary.Columns.Contains(columnName)
                         ? sourceRow[columnName]
                         : string.Empty;
@@ -598,6 +607,7 @@ namespace ProcedureNet7
 
             ApplyDateFormat(worksheet, data, lastRow, "DATA_CREAZIONE");
             ApplyDateFormat(worksheet, data, lastRow, "DATA_ULTIMO_MESSAGGIO");
+            TicketViolenceWorkbook.Highlight(worksheet, data);
         }
 
         private static void ConfigureOperationalQueue(IXLWorksheet worksheet, DataTable data)

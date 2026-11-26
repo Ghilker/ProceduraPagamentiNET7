@@ -15,8 +15,8 @@ namespace ProcedureNet7
             var requests = analyzer.Analyze(new ArgsControlloDomicilio
             {
                 _selectedAA = args.AnnoAccademico, _folderPath = args.CartellaCsv
-            }, forAutomation: true);
-            Logger.LogInfo(80, args.Simulazione ? "Simulazione: nessuna istanza verrà modificata." : "Avvio accoglimento delle sole istanze idonee.");
+            }, forAutomation: true, useOcr: args.UsaOcr, unlimitedOcrUrl: args.UnlimitedOcrUrl);
+            Logger.LogInfo(90, args.Simulazione ? "Simulazione: nessuna istanza verrà modificata." : "Avvio accoglimento delle sole istanze idonee.");
             var results = DomicilioAutomaticEngine.Run(requests, args.Simulazione,
                 args.Simulazione ? null : new DomicilioAutomaticProcessExecutor(CONNECTION!,
                     ReferenceEquals(_masterForm?.MainConnection, CONNECTION)

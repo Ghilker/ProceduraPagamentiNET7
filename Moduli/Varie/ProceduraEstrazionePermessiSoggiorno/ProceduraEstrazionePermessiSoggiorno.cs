@@ -87,7 +87,7 @@ WITH base AS (
        AND d.Anno_accademico IN (20262027)
        AND d.Tipo_bando like 'l%'
 	   inner join vStatus_compilazione vsc on d.Anno_accademico = vsc.anno_accademico and d.Num_domanda = vsc.num_domanda and vsc.status_compilazione >= 90
-       inner join vesiti_concorsiPA vpa on d.anno_accademico = vpa.anno_accademico and d.num_domanda = vpa.num_domanda and vpa.cod_tipo_esito = 2
+       inner join vesiti_concorsiBS vpa on d.anno_accademico = vpa.anno_accademico and d.num_domanda = vpa.num_domanda and vpa.cod_tipo_esito <> 0
     INNER JOIN Studente AS s
         ON d.Cod_fiscale = s.Cod_fiscale
     --WHERE vs.Motivazione_permesso = '05'

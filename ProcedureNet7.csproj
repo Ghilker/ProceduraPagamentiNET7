@@ -57,6 +57,27 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="DomicilioOcr\tessdata\ita.traineddata">
+      <Link>tessdata\ita.traineddata</Link>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="DomicilioOcr\LICENSE">
+      <Link>tessdata\LICENSE</Link>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="DomicilioOcr\Setup-UnlimitedOcr.ps1;DomicilioOcr\setup-unlimited-ocr.sh">
+      <Link>DomicilioOcr\%(Filename)%(Extension)</Link>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <COMReference Include="Microsoft.Office.Interop.Excel">
       <WrapperTool>tlbimp</WrapperTool>
       <VersionMinor>9</VersionMinor>
